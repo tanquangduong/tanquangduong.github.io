@@ -11,19 +11,134 @@ colab: <a href="https://colab.research.google.com/drive/1_JS7JKJAQozD48-LhYdegcu
 
 ::: {.column-margin}
 Getting started GenAI & LLM with my Udemy course, [**Hands-on Generative AI Engineering with Large Language Model**](https://www.udemy.com/course/hands-on-generative-ai-engineering-with-large-language-model/?referralCode=0775DF5DDD432646AD97&couponCode=OF83024E) 👇
-<a href="https://www.udemy.com/course/hands-on-generative-ai-engineering-with-large-language-model/?referralCode=0775DF5DDD432646AD97&couponCode=OF83024E"><img src="/images/genai_course/GenAI-Course-Thumbnail-1.png" id="llm-course"></a>
+<a href="https://www.udemy.com/course/hands-on-generative-ai-engineering-with-large-language-model/?referralCode=0775DF5DDD432646AD97&couponCode=OF83024E"><img src="/images/genai_course/GenAI-Course-Thumbnail.png" id="llm-course"></a>
 :::
 
-## 🤝 What is 
+Creating an instruction dataset tailored for fine-tuning a language model is a critical step in enhancing the model's capabilities for specialized tasks. Fine-tuning refers to training a pre-trained model further on a custom dataset to improve its performance on specific tasks. This guide walks through an example of creating an instruction dataset.
 
-*Example of configuration:*
+Before creating your dataset, it’s essential to define the intended purpose. Are you building a chatbot, a story generator, or a question-answering system? Understanding the desired behavior of the model will guide the type and structure of data you include.
 
-```yaml
+In our use-case, we would like to fine-tuning a foundation model on an instruction dataset to obtain a story generator dedicated for the 5-year-olds.
 
-```
+Our starting point is:
+* Foundation model: Qwen2.5-3B
+* Raw dataset: [TinyStory](https://huggingface.co/datasets/roneneldan/TinyStories), associated with the paper [TinyStories: How Small Can Language Models Be and Still Speak Coherent English?](https://arxiv.org/abs/2305.07759) proposed by Romen Eldan and Yuanzhi Li. This dataset has 2 splits: train(2.12M rows) and validation(22K rows). In our use-case, I just use `train` split with 10K rows. Each row contains a story. 
+
+Our objective is:
+* 
+
+
 
 
 ```python
+import concurrent.futures
+import json
+import re
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Tuple
+from datasets import Dataset, load_dataset, concatenate_datasets
+from openai import OpenAI
+from tqdm.auto import tqdm
+from google.colab import userdata
+```
+```python
+def extract_substory(dataset):
+	return [example['text'] for example in dataset]
+```
+```python
+class InstructionAnswerSet:
+	def __init__(self, pairs: List[Tuple[str, str]]):
+		self.pairs = pairs
 
+	@classmethod
+	def from_json(cls, json_str: str, story: str) -> 'InstructionAnswerSet':
+		data = json.loads(json_str)
+		pairs = [(data['instruction_answer'], story)]
+		return cls(pairs)
+
+	def __iter__(self):
+		return iter(self.pairs)
+```
+```python
+def generate_instruction_answer_pairs(story: str, client: OpenAI) -> List[Tuple[str, str]]:
+	prompt = f"""Based on the following story, generate an one-sentence instruction. Instruction \
+		must ask to write about a content the story.
+		Only use content from the story to generate the instruction. \
+		Instruction must never explicitly mention a story. \
+		Instruction must be self-contained and general. \
+
+		Example story: Once upon a time, there was a little girl named Lily. \
+		Lily liked to pretend she was a popular princess. She lived in a big castle \
+		with her best friends, a cat and a dog. One day, while playing in the castle, \
+		Lily found a big cobweb. The cobweb was in the way of her fun game. \
+		She wanted to get rid of it, but she was scared of the spider that lived there. \
+		Lily asked her friends, the cat and the dog, to help her. They all worked together to clean the cobweb. \
+		The spider was sad, but it found a new home outside. Lily, the cat, and \
+		the dog were happy they could play without the cobweb in the way. \
+		And they all lived happily ever after.
+		
+		Example instruction: Write a story about a little girl named Lily who, \
+		with the help of her cat and dog friends, overcomes her fear of a spider to \
+		clean a cobweb in their castle, allowing everyone to play happily ever after. \
+
+		Provide your response in JSON format with the following structure:
+		{{"instruction_answer": "..."}}
+		Story:
+		{story}
+		"""
+	completion = client.chat.completions.create(model="gpt-4o-mini",
+                                                messages=[
+													{"role": "system",
+                                                    "content": "You are a helpful assistant who \
+                                                    generates instruction based on the given story. \
+                                                    Provide your response in JSON format.",},
+													{"role": "user", "content": prompt},
+                                                    ],
+                                                response_format={"type": "json_object"},
+                                                max_tokens=1200,
+                                                temperature=0.7,)
+	result = InstructionAnswerSet.from_json(completion.choices[0].message.content, story)
+	# Convert to list of tuples
+	return result.pairs
+```
+```python
+def create_instruction_dataset(dataset: Dataset, client: OpenAI, num_workers: int = 4) -> Dataset:
+	stories = extract_substory(dataset)
+	instruction_answer_pairs = []
+
+	with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+		futures = [executor.submit(generate_instruction_answer_pairs, story, client) for story in stories]
+
+		for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)):
+			instruction_answer_pairs.extend(future.result())
+
+	instructions, answers = zip(*instruction_answer_pairs)
+	return Dataset.from_dict({"instruction": list(instructions), "output": list(answers)})
+```
+```python
+def main() -> Dataset:
+	client = OpenAI(api_key=userdata.get('OPENAI_API_KEY'))
+
+	# 1. Load the raw data
+	raw_dataset = load_dataset("roneneldan/TinyStories", split="train[:10000]")
+	print("Raw dataset:")
+	print(raw_dataset.to_pandas())
+
+	# 2. Create instructiondataset
+	instruction_dataset = create_instruction_dataset(raw_dataset, client)
+	print("Instruction dataset:")
+	print(instruction_dataset.to_pandas())
+
+	# 3. Train/test split and export
+	filtered_dataset = instruction_dataset.train_test_split(test_size=0.1)
+	filtered_dataset.push_to_hub("tanquangduong/TinyStories_Instruction")
+```
+```python
+from huggingface_hub import login
+# Log in to the Hugging Face Hub
+login(token=userdata.get('HF_TOKEN'))
+
+# Launch the pipeline to create instruction dataset
+main()
 ```
 
