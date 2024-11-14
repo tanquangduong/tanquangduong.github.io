@@ -3,7 +3,7 @@
 render:
 	quarto render
 
-publish: render
-	git add
+publish: 
+	git add .
 	git commit -m "Publish site to docs/"
 	git push
