@@ -1,10 +1,70 @@
 [
   {
-    "objectID": "posts/unsloth-qwen-sft-lora.html#what-is",
-    "href": "posts/unsloth-qwen-sft-lora.html#what-is",
+    "objectID": "posts/unsloth-qwen-sft-lora.html#introduction",
+    "href": "posts/unsloth-qwen-sft-lora.html#introduction",
     "title": "Finetuning Qwen2.5-3B with Unscloth",
-    "section": "🤝 What is",
-    "text": "🤝 What is\n\nQwen2.5-3B as a pretraine language model to be finetuned. The model has 3.09B parameters that are not too big to fine-tune with Colab. This fine-tuning part will be presented in another post.",
+    "section": "Introduction",
+    "text": "Introduction\nQwen2.5-3B is a pretrained language model containing 3.09 billion parameters, making it powerful yet suitable for fine-tuning even on resource-constrained platforms like Google Colab. The goal of this guide is to explore the fine-tuning process for Qwen2.5-3B using LoRA (Low-Rank Adaptation), specifically targeting the incorporation of the Unscloth framework. While the actual fine-tuning steps will be covered in another post, here we introduce the key concepts and detailed implementations necessary to achieve this.",
+    "crumbs": [
+      "🚀 AI Station",
+      "⚡ **Supervised Fine Tuning**",
+      "1. Fine tuning Qwen2.5-3B with LORA & Unscloth"
+    ]
+  },
+  {
+    "objectID": "posts/unsloth-qwen-sft-lora.html#supervised-fine-tuning-with-lora",
+    "href": "posts/unsloth-qwen-sft-lora.html#supervised-fine-tuning-with-lora",
+    "title": "Finetuning Qwen2.5-3B with Unscloth",
+    "section": "Supervised Fine Tuning with Lora",
+    "text": "Supervised Fine Tuning with Lora\nSupervised fine-tuning using Low-Rank Adaptation (LoRA) is a cost-effective and efficient method for adapting pretrained language models to specific tasks by freezing most of the model’s parameters and updating only a small number of task-specific weights. This approach leverages adapters to reduce the training overhead, making it an attractive solution for limited compute scenarios.",
+    "crumbs": [
+      "🚀 AI Station",
+      "⚡ **Supervised Fine Tuning**",
+      "1. Fine tuning Qwen2.5-3B with LORA & Unscloth"
+    ]
+  },
+  {
+    "objectID": "posts/unsloth-qwen-sft-lora.html#use-case",
+    "href": "posts/unsloth-qwen-sft-lora.html#use-case",
+    "title": "Finetuning Qwen2.5-3B with Unscloth",
+    "section": "Use-case",
+    "text": "Use-case\nIn this article, we illustrate a specific use-case: fine-tuning the Qwen2.5-3B model to create and generate Tiny Stories for children. By utilizing a dataset with instructional input-output pairs, we aim to produce engaging and coherent stories that align with the input prompt while maintaining grammatical correctness, a consistent narrative structure, and appropriate tone for the target audience.",
+    "crumbs": [
+      "🚀 AI Station",
+      "⚡ **Supervised Fine Tuning**",
+      "1. Fine tuning Qwen2.5-3B with LORA & Unscloth"
+    ]
+  },
+  {
+    "objectID": "posts/unsloth-qwen-sft-lora.html#implementation",
+    "href": "posts/unsloth-qwen-sft-lora.html#implementation",
+    "title": "Finetuning Qwen2.5-3B with Unscloth",
+    "section": "Implementation",
+    "text": "Implementation\nTo achieve the fine-tuning, we will utilize the following libraries and methods:\nStep 1: Import Necessary Libraries\nimport os\nimport comet_ml\nimport torch\nfrom trl import SFTTrainer\nfrom datasets import load_dataset, concatenate_datasets\nfrom transformers import TrainingArguments, TextStreamer\nfrom unsloth import FastLanguageModel, is_bfloat16_supported\nfrom google.colab import userdata\nStep 2: Comet ML Login\ncomet_ml.login(project_name=\"sft-lora-unsloth\")\nStep 3: Load Pretrained Model and Tokenizer\nmax_seq_length = 2048\nmodel, tokenizer = FastLanguageModel.from_pretrained(\n    model_name=\"Qwen/Qwen2.5-0.5B\",\n    max_seq_length=max_seq_length,\n    load_in_4bit=False,\n    )\nStep 4: Apply LoRA Adaptation\nmodel = FastLanguageModel.get_peft_model(\n    model,\n    r=32,\n    lora_alpha=32,\n    lora_dropout=0,\n    target_modules=[\"q_proj\", \"k_proj\", \"v_proj\", \"up_proj\", \"down_proj\", \"o_proj\", \"gate_proj\"],\n    )\nStep 5: Formatting Dataset\nPrepare the dataset using a specific text template and map it accordingly.\nalpaca_template = \"\"\"Below is an instruction that describes a task.\nWrite a response that appropriately completes the request.\n### Instruction:\n{}\n### Response:\n{}\"\"\"\n\nEOS_TOKEN = tokenizer.eos_token\ndef format_samples(examples):\n    text = []\n    for instruction, output in zip(examples[\"instruction\"], examples[\"output\"], strict=False):\n        message = alpaca_template.format(instruction, output) + EOS_TOKEN\n        text.append(message)\n\n    return {\"text\": text}\n\ndataset = dataset.map(format_samples, batched=True, remove_columns=dataset.column_names)\nStep 6: Setting Up the Trainer\nUtilize the SFTTrainer for supervised fine-tuning.\ntrainer = SFTTrainer(\n    model=model,\n    tokenizer=tokenizer,\n    train_dataset=dataset[\"train\"],\n    eval_dataset=dataset[\"test\"],\n    dataset_text_field=\"text\",\n    max_seq_length=max_seq_length,\n    dataset_num_proc=2,\n    packing=True,\n    args=TrainingArguments(\n        learning_rate=1e-5,\n        lr_scheduler_type=\"linear\",\n        per_device_train_batch_size=2,\n        gradient_accumulation_steps=8,\n        num_train_epochs=3,\n        fp16=not is_bfloat16_supported(),\n        bf16=is_bfloat16_supported(),\n        logging_steps=1,\n        optim=\"adamw_8bit\",\n        weight_decay=0.01,\n        warmup_steps=10,\n        output_dir=\"output\",\n        report_to=\"comet_ml\",\n        seed=0,\n        ),\n    )\ntrainer.train()\nStep 7: Model Inference\nGenerate a response using the fine-tuned model.\nFastLanguageModel.for_inference(model)\nmessage = alpaca_template.format(\"Write a story about a humble little bunny \\\nnamed Ben who follows a mysterious trail in the woods, \\\ndiscovering beautiful flowers, new friends, and a lovely pond along the way.\", \"\")\ninputs = tokenizer([message], return_tensors=\"pt\").to(\"cuda\")\ntext_streamer = TextStreamer(tokenizer)\n_ = model.generate(**inputs, streamer=text_streamer, max_new_tokens=256, use_cache=True)\nStep 8: Save and Push to Hugging Face Hub\nfrom huggingface_hub import login\n# Log in to the Hugging Face Hub\nlogin(token=userdata.get('HF_TOKEN'))\n\nmodel.save_pretrained_merged(\"model\", tokenizer, save_method=\"merged_16bit\")\nmodel.push_to_hub_merged(\"tanquangduong/Qwen2.5-0.5B-Instruct-TinyStories\", tokenizer, save_method=\"merged_16bit\")",
+    "crumbs": [
+      "🚀 AI Station",
+      "⚡ **Supervised Fine Tuning**",
+      "1. Fine tuning Qwen2.5-3B with LORA & Unscloth"
+    ]
+  },
+  {
+    "objectID": "posts/unsloth-qwen-sft-lora.html#inference",
+    "href": "posts/unsloth-qwen-sft-lora.html#inference",
+    "title": "Finetuning Qwen2.5-3B with Unscloth",
+    "section": "Inference",
+    "text": "Inference\nUsing the fine-tuned model for inference:\nfrom transformers import AutoTokenizer, AutoModelForCausalLM\n\ntokenizer = AutoTokenizer.from_pretrained(\"tanquangduong/Qwen2.5-3B-Instruct-TinyStories\")\nmodel = AutoModelForCausalLM.from_pretrained(\"tanquangduong/Qwen2.5-3B-Instruct-TinyStories\")\nmodel = model.to(\"cuda\")\nalpaca_template = \"\"\"Below is an instruction that describes a task.\nWrite a response that appropriately completes the request.\n### Instruction:\n{}\n### Response:\n{}\"\"\"\n\n\nFastLanguageModel.for_inference(model)\n\nmessage = alpaca_template.format(\"Write a story about a humble little bunny named Ben who follows a mysterious trail in the woods, discovering beautiful flowers, new friends, and a lovely pond along the way.\", \"\")\ninputs = tokenizer([message], return_tensors=\"pt\").to(\"cuda\")\n\ntext_streamer = TextStreamer(tokenizer)\n_ = model.generate(**inputs, streamer=text_streamer, max_new_tokens=2048, use_cache=True)",
+    "crumbs": [
+      "🚀 AI Station",
+      "⚡ **Supervised Fine Tuning**",
+      "1. Fine tuning Qwen2.5-3B with LORA & Unscloth"
+    ]
+  },
+  {
+    "objectID": "posts/unsloth-qwen-sft-lora.html#conclusion",
+    "href": "posts/unsloth-qwen-sft-lora.html#conclusion",
+    "title": "Finetuning Qwen2.5-3B with Unscloth",
+    "section": "Conclusion",
+    "text": "Conclusion\nThis guide walked through the supervised fine-tuning process of Qwen2.5-3B using the Unscloth framework and LoRA adapters. Fine-tuning such models with cost-effective methods like LoRA makes it feasible for smaller setups, such as those utilizing Colab. The end result is a model that can generate customized responses tailored to specific use cases, such as creating Tiny Stories. This approach emphasizes the flexibility and power of modern transformer-based architectures in domain-specific tasks.",
     "crumbs": [
       "🚀 AI Station",
       "⚡ **Supervised Fine Tuning**",
@@ -52,7 +112,7 @@
     "href": "posts/preference-dataset-dpo.html#implementation",
     "title": "Preference Dataset Creation for DPO Fine-Tuning",
     "section": "Implementation",
-    "text": "Implementation\nThis implementation involves a series of steps: extracting data, generating AI responses, and creating preference triplets.\nimport concurrent.futures\nimport json\nfrom concurrent.futures import ThreadPoolExecutor\nfrom typing import List, Tuple\nfrom datasets import Dataset, load_dataset, concatenate_datasets\nfrom openai import OpenAI\nfrom tqdm.auto import tqdm\nfrom google.colab import userdata\n1. Data Extraction Function\nThe extract_ground_instruction_story function extracts pairs of instructions and desired outputs from a given dataset.\ndef extract_ground_instruction_story(dataset):\n    return [(example['instruction'], example['output']) for example in dataset]\n2. Creating a PreferenceSet Class\nThe PreferenceSet class manages and stores the triples of (instruction, generated story, desired story).\nclass PreferenceSet:\n    def __init__(self, triples: List[Tuple[str, str, str]]):\n        self.triples = triples\n\n    @classmethod\n    def from_json(cls, json_str: str, instruction, desired_story) -&gt; 'PreferenceSet':\n        data = json.loads(json_str)\n        triples = [(instruction, data['generated_story'], desired_story)]\n        return cls(triples)\n\n    def __iter__(self):\n        return iter(self.triples)\n3. Generating Preference-Response Triplets\nThis function generates a story using OpenAI’s API and returns a preference triple in the format (instruction, generated response, desired response).\ndef generate_preference_answer_triples(instruction: str, desired_story: str, client: OpenAI) -&gt; List[Tuple[str, str, str]]:\n    prompt = f\"\"\"Based on the following instruction, generate a story. \\\n        Story should be no longer than 50 words. Story uses several complex words or structures \\\n        that are not suitable for 5-year-olds.\n\n        Provide your response in JSON format with the following structure:\n        {{\"generated_story\": \"...\"}}\n\n        Instruction:\n        {instruction}\n        \"\"\"\n    completion = client.chat.completions.create(model=\"gpt-4o-mini\",\n                                                    messages=[\n                                                        {\"role\": \"system\",\n                                                        \"content\": \"You are a helpful assistant who \\\n                                                        generates story based on the given instruction. \\\n                                                        Provide your response in JSON format.\",},\n                                                        {\"role\": \"user\", \"content\": prompt},\n                                                        ],\n                                                    response_format={\"type\": \"json_object\"},\n                                                    max_tokens=512,\n                                                    temperature=0.2,)\n    result = PreferenceSet.from_json(completion.choices[0].message.content, instruction, desired_story)\n\n    # Convert to list of tuples\n    return result.triples\n4. Creating the Preference Dataset\nThis function creates a dataset using the extracted stories and generated responses.\ndef create_preference_dataset(dataset: Dataset, client: OpenAI, num_workers: int = 4) -&gt; Dataset:\n    stories = extract_ground_instruction_story(dataset)\n    instruction_answer_triples = []\n\n    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:\n        futures = [executor.submit(generate_instruction_answer_triples, instruction, desired_story, client) for instruction, desired_story in stories]\n\n        for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)):\n        instruction_answer_triples.extend(future.result())\n\n    instructions, rejected_story, chosen_story = zip(*instruction_answer_triples)\n    return Dataset.from_dict({\n        \"prompt\": list(instructions),\n        \"rejected\": list(rejected_story),\n        \"chosen\": list(chosen_story)\n        })\n5. The Main Function\nThis function initializes the OpenAI client, loads the dataset, creates a preference dataset, and uploads it to the Hugging Face Hub.\ndef main() -&gt; Dataset:\n    client = OpenAI(api_key=userdata.get('OPENAI_API_KEY'))\n\n    # 1. Load the raw data\n    # Load the train and test splits\n    train_dataset = load_dataset(\"tanquangduong/TinyStories_Instruction\", split=\"train\")\n    test_dataset = load_dataset(\"tanquangduong/TinyStories_Instruction\", split=\"test\")\n\n    # Combine the datasets\n    raw_dataset = concatenate_datasets([train_dataset, test_dataset])\n\n    print(\"Raw dataset:\")\n    print(raw_dataset.to_pandas())\n\n    # 2. Create preference dataset\n    preference_dataset = create_preference_dataset(raw_dataset, client)\n    print(\"Preference dataset:\")\n    print(preference_dataset.to_pandas())\n\n    # 3. Train/test split and export\n    filtered_dataset = preference_dataset.train_test_split(test_size=0.1)\n    filtered_dataset.push_to_hub(\"tanquangduong/TinyStories_Preference\")\n6. Hugging Face Hub Login\nTo authenticate with Hugging Face and run the pipeline:\nfrom huggingface_hub import login\n# Log in to the Hugging Face Hub\nlogin(token=userdata.get('HF_TOKEN'))\n\n# Launch the pipeline to create instruction dataset\nmain()",
+    "text": "Implementation\nThis implementation involves a series of steps: extracting data, generating AI responses, and creating preference triplets.\nimport concurrent.futures\nimport json\nfrom concurrent.futures import ThreadPoolExecutor\nfrom typing import List, Tuple\nfrom datasets import Dataset, load_dataset, concatenate_datasets\nfrom openai import OpenAI\nfrom tqdm.auto import tqdm\nfrom google.colab import userdata\n1. Data Extraction Function\nThe extract_ground_instruction_story function extracts pairs of instructions and desired outputs from a given dataset.\ndef extract_ground_instruction_story(dataset):\n    return [(example['instruction'], example['output']) for example in dataset]\n2. Creating a PreferenceSet Class\nThe PreferenceSet class manages and stores the triples of (instruction, generated story, desired story).\nclass PreferenceSet:\n    def __init__(self, triples: List[Tuple[str, str, str]]):\n        self.triples = triples\n\n    @classmethod\n    def from_json(cls, json_str: str, instruction, desired_story) -&gt; 'PreferenceSet':\n        data = json.loads(json_str)\n        triples = [(instruction, data['generated_story'], desired_story)]\n        return cls(triples)\n\n    def __iter__(self):\n        return iter(self.triples)\n3. Generating Preference-Response Triplets\nThis function generates a story using OpenAI’s API and returns a preference triple in the format (instruction, generated response, desired response).\ndef generate_preference_answer_triples(instruction: str, desired_story: str, client: OpenAI) -&gt; List[Tuple[str, str, str]]:\n    prompt = f\"\"\"Based on the following instruction, generate a story. \\\n        Story should be no longer than 50 words. Story uses several complex words or structures \\\n        that are not suitable for 5-year-olds.\n\n        Provide your response in JSON format with the following structure:\n        {{\"generated_story\": \"...\"}}\n\n        Instruction:\n        {instruction}\n        \"\"\"\n    completion = client.chat.completions.create(model=\"gpt-4o-mini\",\n                                                    messages=[\n                                                        {\"role\": \"system\",\n                                                        \"content\": \"You are a helpful assistant who \\\n                                                        generates story based on the given instruction. \\\n                                                        Provide your response in JSON format.\",},\n                                                        {\"role\": \"user\", \"content\": prompt},\n                                                        ],\n                                                    response_format={\"type\": \"json_object\"},\n                                                    max_tokens=512,\n                                                    temperature=0.2,)\n    result = PreferenceSet.from_json(completion.choices[0].message.content, instruction, desired_story)\n\n    # Convert to list of tuples\n    return result.triples\n4. Creating the Preference Dataset\nThis function creates a dataset using the extracted stories and generated responses.\ndef create_preference_dataset(dataset: Dataset, client: OpenAI, num_workers: int = 4) -&gt; Dataset:\n    stories = extract_ground_instruction_story(dataset)\n    instruction_answer_triples = []\n\n    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:\n        futures = [executor.submit(generate_instruction_answer_triples, instruction, desired_story, client) for instruction, desired_story in stories]\n\n        for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)):\n        instruction_answer_triples.extend(future.result())\n\n    instructions, rejected_story, chosen_story = zip(*instruction_answer_triples)\n    return Dataset.from_dict({\n        \"prompt\": list(instructions),\n        \"rejected\": list(rejected_story),\n        \"chosen\": list(chosen_story)\n        })\n5. The main function\nThis function initializes the OpenAI client, loads the dataset, creates a preference dataset, and uploads it to the Hugging Face Hub.\ndef main() -&gt; Dataset:\n    client = OpenAI(api_key=userdata.get('OPENAI_API_KEY'))\n\n    # 1. Load the raw data\n    # Load the train and test splits\n    train_dataset = load_dataset(\"tanquangduong/TinyStories_Instruction\", split=\"train\")\n    test_dataset = load_dataset(\"tanquangduong/TinyStories_Instruction\", split=\"test\")\n\n    # Combine the datasets\n    raw_dataset = concatenate_datasets([train_dataset, test_dataset])\n\n    print(\"Raw dataset:\")\n    print(raw_dataset.to_pandas())\n\n    # 2. Create preference dataset\n    preference_dataset = create_preference_dataset(raw_dataset, client)\n    print(\"Preference dataset:\")\n    print(preference_dataset.to_pandas())\n\n    # 3. Train/test split and export\n    filtered_dataset = preference_dataset.train_test_split(test_size=0.1)\n    filtered_dataset.push_to_hub(\"tanquangduong/TinyStories_Preference\")\n6. Hugging Face Hub Login\nTo authenticate with Hugging Face and run the pipeline:\nfrom huggingface_hub import login\n# Log in to the Hugging Face Hub\nlogin(token=userdata.get('HF_TOKEN'))\n\n# Launch the pipeline to create instruction dataset\nmain()",
     "crumbs": [
       "🚀 AI Station",
       "🧪 **Data Processing**",
@@ -76,7 +136,7 @@
     "href": "index.html",
     "title": "✨ AI/ML, MLOps, LLMOps",
     "section": "",
-    "text": "Instruction Dataset Creation for Supervised Fine-Tuning\n\n\nLeveraging LLMs for creating instruction dataset for Supervised Fine-Tuning\n\n\n\ninstruction-dataset\n\n\n\n\n\n\nAug 27, 2024\n\n\n7 min\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nPreference Dataset Creation for DPO Fine-Tuning\n\n\nLeveraging LLMs for creating preference dataset for DPO Fine-Tuning\n\n\n\npreference-dataset\n\n\n\n\n\n\nAug 27, 2024\n\n\n4 min\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nFinetuning Qwen2.5-3B using DPO with Unsloth\n\n\nFinetuning Qwen2.5-3B with DPO using Unsloth on TinyStories prefrence dataset\n\n\n\nFinetuning\n\n\nDPO\n\n\nUnsloth\n\n\nQwen\n\n\n\n\n\n\nAug 24, 2024\n\n\n1 min\n\n\n\n\n\n\n\n\n\n\n\n\nFinetuning Qwen2.5-3B with Unscloth\n\n\nFinetuning Qwen2.5-3B with SFT-Lora using Unsloth on TinyStories instruction dataset\n\n\n\nFinetuning\n\n\nLORA\n\n\nUnsloth\n\n\n\n\n\n\nAug 24, 2024\n\n\n1 min\n\n\n\n\n\n\nNo matching items"
+    "text": "Instruction Dataset Creation for Supervised Fine-Tuning\n\n\nLeveraging LLMs for creating instruction dataset for Supervised Fine-Tuning\n\n\n\ninstruction-dataset\n\n\n\n\n\n\nAug 27, 2024\n\n\n7 min\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nPreference Dataset Creation for DPO Fine-Tuning\n\n\nLeveraging LLMs for creating preference dataset for DPO Fine-Tuning\n\n\n\npreference-dataset\n\n\n\n\n\n\nAug 27, 2024\n\n\n4 min\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nFinetuning Qwen2.5-3B using DPO with Unsloth\n\n\nFinetuning Qwen2.5-3B with DPO using Unsloth on TinyStories prefrence dataset\n\n\n\nFinetuning\n\n\nDPO\n\n\nUnsloth\n\n\nQwen\n\n\n\n\n\n\nAug 24, 2024\n\n\n4 min\n\n\n\n\n\n\n\n\n\n\n\n\nFinetuning Qwen2.5-3B with Unscloth\n\n\nFinetuning Qwen2.5-3B with SFT-Lora using Unsloth on TinyStories instruction dataset\n\n\n\nFinetuning\n\n\nLORA\n\n\nUnsloth\n\n\n\n\n\n\nAug 24, 2024\n\n\n4 min\n\n\n\n\n\n\nNo matching items"
   },
   {
     "objectID": "about.html",
@@ -146,11 +206,71 @@
     ]
   },
   {
-    "objectID": "posts/unsloth-qwen-dpo.html#what-is",
-    "href": "posts/unsloth-qwen-dpo.html#what-is",
+    "objectID": "posts/unsloth-qwen-dpo.html",
+    "href": "posts/unsloth-qwen-dpo.html",
     "title": "Finetuning Qwen2.5-3B using DPO with Unsloth",
-    "section": "🤝 What is",
-    "text": "🤝 What is\nExample of configuration:",
+    "section": "",
+    "text": "title: “Finetuning Qwen2.5-3B using DPO with Unsloth” ## Introduction\nQwen2.5-3B is a large-scale, pretrained language model comprising 3.09 billion parameters. This model provides a balance between expressiveness and computational feasibility, making it well-suited for finetuning using more specialized optimization strategies. In this guide, we will explore using Direct Preference Optimization (DPO) within the Unsloth framework to fine-tune Qwen2.5-3B. This approach focuses on aligning model responses to specific preferences and behaviors, yielding fine-tuned models that can respond to tasks more accurately.",
+    "crumbs": [
+      "🚀 AI Station",
+      "⚡ **Supervised Fine Tuning**",
+      "2. Fine tuning Qwen2.5-3B with DPO & Unsloth"
+    ]
+  },
+  {
+    "objectID": "posts/unsloth-qwen-dpo.html#fine-tuning-with-dpo",
+    "href": "posts/unsloth-qwen-dpo.html#fine-tuning-with-dpo",
+    "title": "Finetuning Qwen2.5-3B using DPO with Unsloth",
+    "section": "Fine Tuning with DPO",
+    "text": "Fine Tuning with DPO\nDirect Preference Optimization (DPO) is a technique used for fine-tuning language models in scenarios where it is critical to optimize for specific outputs based on preferences, such as ranking user responses. By using DPO with the LoRA (Low-Rank Adaptation) technique, we can leverage efficient finetuning by only modifying a small subset of the model’s parameters. This keeps training costs low while maintaining flexibility in the model’s outputs.",
+    "crumbs": [
+      "🚀 AI Station",
+      "⚡ **Supervised Fine Tuning**",
+      "2. Fine tuning Qwen2.5-3B with DPO & Unsloth"
+    ]
+  },
+  {
+    "objectID": "posts/unsloth-qwen-dpo.html#use-case",
+    "href": "posts/unsloth-qwen-dpo.html#use-case",
+    "title": "Finetuning Qwen2.5-3B using DPO with Unsloth",
+    "section": "Use Case",
+    "text": "Use Case\nFor this example, our use-case involves using DPO to fine-tune Qwen2.5-3B to generate engaging Tiny Stories tailored for children. By providing prompts and desired responses (and contrasting rejected responses), we can better shape the model to deliver coherent, engaging, and task-appropriate stories for various instructions.",
+    "crumbs": [
+      "🚀 AI Station",
+      "⚡ **Supervised Fine Tuning**",
+      "2. Fine tuning Qwen2.5-3B with DPO & Unsloth"
+    ]
+  },
+  {
+    "objectID": "posts/unsloth-qwen-dpo.html#implementation",
+    "href": "posts/unsloth-qwen-dpo.html#implementation",
+    "title": "Finetuning Qwen2.5-3B using DPO with Unsloth",
+    "section": "Implementation",
+    "text": "Implementation\nStep 1: Import Necessary Libraries\nfrom unsloth import PatchDPOTrainer\nPatchDPOTrainer()\n\nimport os\nimport torch\nfrom datasets import load_dataset\nfrom transformers import TrainingArguments, TextStreamer\nfrom unsloth import FastLanguageModel, is_bfloat16_supported\nfrom trl import DPOConfig, DPOTrainer\nfrom google.colab import userdata\nStep 2: Initialize Comet ML for Experiment Tracking\nimport comet_ml\ncomet_ml.login(project_name=\"dpo-lora-unsloth\")\nStep 3: Load Pretrained Model and Tokenizer\nmax_seq_length = 2048\nmodel, tokenizer = FastLanguageModel.from_pretrained(\n    model_name=\"Qwen/Qwen2.5-3B\",\n    max_seq_length=max_seq_length,\n    load_in_4bit=False,\n    )\nStep 4: Apply LoRA Adaptation\nmodel = FastLanguageModel.get_peft_model(\n    model,\n    r=32,\n    lora_alpha=32,\n    lora_dropout=0,\n    target_modules=[\"q_proj\", \"k_proj\", \"v_proj\", \"up_proj\", \"down_proj\", \"o_proj\", \"gate_proj\"],\n    )\nStep 5: Dataset Preparation\nFormat the dataset using a specific template and split it for training and testing.\nalpaca_template = \"\"\"Below is an instruction that describes a task.\nWrite a response that appropriately completes the request.\n### Instruction:\n{}\n### Response:\n\"\"\"\n\nEOS_TOKEN = tokenizer.eos_token\ndef format_samples(example):\n    example[\"prompt\"] = alpaca_template.format(example[\"prompt\"])\n    example[\"chosen\"] = example['chosen'] + EOS_TOKEN\n    example[\"rejected\"] = example['rejected'] + EOS_TOKEN\n    return {\n        \"prompt\": example[\"prompt\"],\n        \"chosen\": example[\"chosen\"],\n        \"rejected\": example[\"rejected\"]\n    }\ndataset = dataset.map(format_samples)\ndataset = dataset.train_test_split(test_size=0.05)\nStep 6: Training Using DPOTrainer\nConfigure and train the model using the DPOTrainer class.\ntrainer = DPOTrainer(\n    model=model,\n    ref_model=None,\n    tokenizer=tokenizer,\n    beta=0.5,\n    train_dataset=dataset[\"train\"],\n    eval_dataset=dataset[\"test\"],\n    max_length=max_seq_length//2,\n    max_prompt_length=max_seq_length//2,\n    args=DPOConfig(\n        learning_rate=2e-6,\n        lr_scheduler_type=\"linear\",\n        per_device_train_batch_size=2,\n        per_device_eval_batch_size=2,\n        gradient_accumulation_steps=8,\n        num_train_epochs=1,\n        fp16=not is_bfloat16_supported(),\n        bf16=is_bfloat16_supported(),\n        optim=\"adamw_8bit\",\n        weight_decay=0.01,\n        warmup_steps=10,\n        output_dir=\"output\",\n        eval_strategy=\"steps\",\n        eval_steps=0.2,\n        logging_steps=1,\n        report_to=\"comet_ml\",\n        seed=0,\n        ),\n)\n\n\ntrainer.train()\nStep 7: Model Inference\nGenerate a response using the fine-tuned model.\nFastLanguageModel.for_inference(model)\nmessage = alpaca_template.format(\"Write a story about a humble little bunny \\\nnamed Ben who follows a mysterious trail in the woods, \\\ndiscovering beautiful flowers, new friends, and a lovely pond along the way.\", \"\")\ninputs = tokenizer([message], return_tensors=\"pt\").to(\"cuda\")\ntext_streamer = TextStreamer(tokenizer)\n_ = model.generate(**inputs, streamer=text_streamer, max_new_tokens=2048, use_cache=True)\nStep 8: Save and Push to Hugging Face Hub\nfrom huggingface_hub import login\n# Log in to the Hugging Face Hub\nlogin(token=userdata.get('HF_TOKEN'))\n\nmodel.save_pretrained_merged(\"model\", tokenizer, save_method=\"merged_16bit\")\nmodel.push_to_hub_merged(\"tanquangduong/Qwen2.5-3B-DPO-TinyStories\", tokenizer, save_method=\"merged_16bit\")",
+    "crumbs": [
+      "🚀 AI Station",
+      "⚡ **Supervised Fine Tuning**",
+      "2. Fine tuning Qwen2.5-3B with DPO & Unsloth"
+    ]
+  },
+  {
+    "objectID": "posts/unsloth-qwen-dpo.html#inference",
+    "href": "posts/unsloth-qwen-dpo.html#inference",
+    "title": "Finetuning Qwen2.5-3B using DPO with Unsloth",
+    "section": "Inference",
+    "text": "Inference\nUsing the fine-tuned model for generating outputs:\nfrom transformers import AutoTokenizer, AutoModelForCausalLM\n\ntokenizer = AutoTokenizer.from_pretrained(\"tanquangduong/Qwen2.5-3B-DPO-TinyStories\")\nmodel = AutoModelForCausalLM.from_pretrained(\"tanquangduong/Qwen2.5-3B-DPO-TinyStories\")\nalpaca_template = \"\"\"Below is an instruction that describes a task.\nWrite a response that appropriately completes the request.\n### Instruction:\n{}\n### Response:\n{}\"\"\"\n\nmodel = model.to(\"cuda\")\nFastLanguageModel.for_inference(model)\nmessage = alpaca_template.format(\"Write a story about a humble little bunny \\\nnamed Ben who follows a mysterious trail in the woods, \\\ndiscovering beautiful flowers, new friends, and a lovely pond along the way.\", \"\")\ninputs = tokenizer([message], return_tensors=\"pt\").to(\"cuda\")\ntext_streamer = TextStreamer(tokenizer)\n_ = model.generate(**inputs, streamer=text_streamer, max_new_tokens=2048, use_cache=True)",
+    "crumbs": [
+      "🚀 AI Station",
+      "⚡ **Supervised Fine Tuning**",
+      "2. Fine tuning Qwen2.5-3B with DPO & Unsloth"
+    ]
+  },
+  {
+    "objectID": "posts/unsloth-qwen-dpo.html#conclusion",
+    "href": "posts/unsloth-qwen-dpo.html#conclusion",
+    "title": "Finetuning Qwen2.5-3B using DPO with Unsloth",
+    "section": "Conclusion",
+    "text": "Conclusion\nIn this guide, we demonstrated how to fine-tune Qwen2.5-3B using Direct Preference Optimization (DPO) within the Unsloth framework. By leveraging LoRA for parameter-efficient adaptation, we tailored the model’s output behavior to better suit our target use case of generating child-friendly Tiny Stories. This methodology highlights the effectiveness of combining DPO and LoRA to achieve powerful, specialized fine-tuned models.",
     "crumbs": [
       "🚀 AI Station",
       "⚡ **Supervised Fine Tuning**",
