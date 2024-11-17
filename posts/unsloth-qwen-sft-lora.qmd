@@ -14,15 +14,164 @@ Getting started GenAI & LLM with my Udemy course, [**Hands-on Generative AI Engi
 <a href="https://www.udemy.com/course/hands-on-generative-ai-engineering-with-large-language-model/?referralCode=0775DF5DDD432646AD97&couponCode=OF83024E"><img src="/images/genai_course/GenAI-Course-Thumbnail.png" id="llm-course"></a>
 :::
 
-## 🤝 What is 
+## Introduction
 
-* [Qwen2.5-3B](https://huggingface.co/Qwen/Qwen2.5-3B) as a pretraine language model to be finetuned. The model has 3.09B parameters that are not too big to fine-tune with Colab. This fine-tuning part will be presented in another post.
+[Qwen2.5-3B](https://huggingface.co/Qwen/Qwen2.5-3B) is a pretrained language model containing 3.09 billion parameters, making it powerful yet suitable for fine-tuning even on resource-constrained platforms like Google Colab. The goal of this guide is to explore the fine-tuning process for Qwen2.5-3B using LoRA (Low-Rank Adaptation), specifically targeting the incorporation of the Unscloth framework. While the actual fine-tuning steps will be covered in another post, here we introduce the key concepts and detailed implementations necessary to achieve this.
 
-```yaml
+## Supervised Fine Tuning with Lora
 
+Supervised fine-tuning using Low-Rank Adaptation (LoRA) is a cost-effective and efficient method for adapting pretrained language models to specific tasks by freezing most of the model's parameters and updating only a small number of task-specific weights. This approach leverages adapters to reduce the training overhead, making it an attractive solution for limited compute scenarios.
+
+## Use-case
+In this article, we illustrate a specific use-case: fine-tuning the Qwen2.5-3B model to create and generate Tiny Stories for children. By utilizing a dataset with instructional input-output pairs, we aim to produce engaging and coherent stories that align with the input prompt while maintaining grammatical correctness, a consistent narrative structure, and appropriate tone for the target audience.
+
+## Implementation
+To achieve the fine-tuning, we will utilize the following libraries and methods:
+
+**Step 1: Import Necessary Libraries**
+```python
+import os
+import comet_ml
+import torch
+from trl import SFTTrainer
+from datasets import load_dataset, concatenate_datasets
+from transformers import TrainingArguments, TextStreamer
+from unsloth import FastLanguageModel, is_bfloat16_supported
+from google.colab import userdata
 ```
 
+**Step 2: Comet ML Login**
 
 ```python
-
+comet_ml.login(project_name="sft-lora-unsloth")
 ```
+
+**Step 3: Load Pretrained Model and Tokenizer**
+```python
+max_seq_length = 2048
+model, tokenizer = FastLanguageModel.from_pretrained(
+    model_name="Qwen/Qwen2.5-0.5B",
+    max_seq_length=max_seq_length,
+    load_in_4bit=False,
+    )
+```
+
+**Step 4: Apply LoRA Adaptation**
+```python
+model = FastLanguageModel.get_peft_model(
+    model,
+    r=32,
+    lora_alpha=32,
+    lora_dropout=0,
+    target_modules=["q_proj", "k_proj", "v_proj", "up_proj", "down_proj", "o_proj", "gate_proj"],
+    )
+```
+
+**Step 5: Formatting Dataset**
+
+Prepare the dataset using a specific text template and map it accordingly.
+```python
+alpaca_template = """Below is an instruction that describes a task.
+Write a response that appropriately completes the request.
+### Instruction:
+{}
+### Response:
+{}"""
+
+EOS_TOKEN = tokenizer.eos_token
+def format_samples(examples):
+    text = []
+    for instruction, output in zip(examples["instruction"], examples["output"], strict=False):
+        message = alpaca_template.format(instruction, output) + EOS_TOKEN
+        text.append(message)
+
+    return {"text": text}
+
+dataset = dataset.map(format_samples, batched=True, remove_columns=dataset.column_names)
+```
+
+**Step 6: Setting Up the Trainer**
+
+Utilize the `SFTTrainer` for supervised fine-tuning.
+
+```python
+trainer = SFTTrainer(
+	model=model,
+	tokenizer=tokenizer,
+	train_dataset=dataset["train"],
+	eval_dataset=dataset["test"],
+	dataset_text_field="text",
+	max_seq_length=max_seq_length,
+	dataset_num_proc=2,
+	packing=True,
+	args=TrainingArguments(
+		learning_rate=1e-5,
+		lr_scheduler_type="linear",
+		per_device_train_batch_size=2,
+		gradient_accumulation_steps=8,
+		num_train_epochs=3,
+		fp16=not is_bfloat16_supported(),
+		bf16=is_bfloat16_supported(),
+		logging_steps=1,
+		optim="adamw_8bit",
+		weight_decay=0.01,
+		warmup_steps=10,
+		output_dir="output",
+		report_to="comet_ml",
+		seed=0,
+		),
+	)
+trainer.train()
+```
+**Step 7: Model Inference**
+
+Generate a response using the fine-tuned model.
+
+```python
+FastLanguageModel.for_inference(model)
+message = alpaca_template.format("Write a story about a humble little bunny \
+named Ben who follows a mysterious trail in the woods, \
+discovering beautiful flowers, new friends, and a lovely pond along the way.", "")
+inputs = tokenizer([message], return_tensors="pt").to("cuda")
+text_streamer = TextStreamer(tokenizer)
+_ = model.generate(**inputs, streamer=text_streamer, max_new_tokens=256, use_cache=True)
+```
+
+**Step 8: Save and Push to Hugging Face Hub**
+
+```python
+from huggingface_hub import login
+# Log in to the Hugging Face Hub
+login(token=userdata.get('HF_TOKEN'))
+
+model.save_pretrained_merged("model", tokenizer, save_method="merged_16bit")
+model.push_to_hub_merged("tanquangduong/Qwen2.5-0.5B-Instruct-TinyStories", tokenizer, save_method="merged_16bit")
+```
+
+## Inference
+Using the fine-tuned model for inference:
+
+```python
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+tokenizer = AutoTokenizer.from_pretrained("tanquangduong/Qwen2.5-3B-Instruct-TinyStories")
+model = AutoModelForCausalLM.from_pretrained("tanquangduong/Qwen2.5-3B-Instruct-TinyStories")
+model = model.to("cuda")
+alpaca_template = """Below is an instruction that describes a task.
+Write a response that appropriately completes the request.
+### Instruction:
+{}
+### Response:
+{}"""
+
+
+FastLanguageModel.for_inference(model)
+
+message = alpaca_template.format("Write a story about a humble little bunny named Ben who follows a mysterious trail in the woods, discovering beautiful flowers, new friends, and a lovely pond along the way.", "")
+inputs = tokenizer([message], return_tensors="pt").to("cuda")
+
+text_streamer = TextStreamer(tokenizer)
+_ = model.generate(**inputs, streamer=text_streamer, max_new_tokens=2048, use_cache=True)
+```
+## Conclusion
+This guide walked through the supervised fine-tuning process of Qwen2.5-3B using the Unscloth framework and LoRA adapters. Fine-tuning such models with cost-effective methods like LoRA makes it feasible for smaller setups, such as those utilizing Colab. The end result is a model that can generate customized responses tailored to specific use cases, such as creating Tiny Stories. This approach emphasizes the flexibility and power of modern transformer-based architectures in domain-specific tasks.
