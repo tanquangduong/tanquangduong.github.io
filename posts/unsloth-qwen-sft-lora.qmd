@@ -14,16 +14,39 @@ Getting started GenAI & LLM with my Udemy course, [**Hands-on Generative AI Engi
 <a href="https://www.udemy.com/course/hands-on-generative-ai-engineering-with-large-language-model/?referralCode=0775DF5DDD432646AD97&couponCode=OF83024E"><img src="/images/genai-course/GenAI-Course-Thumbnail.png" id="llm-course"></a>
 :::
 
-## Introduction
+Pretrained language models possess broad knowledge acquired from vast amounts of unlabeled data. It is trained to predict the next token. This makes it unadaptable for QA tasks. In addition, the pretrained general knowledge may not be sufficient for specific tasks or domains where the knowleadge is closed to the public. Those senario are where Supervised Fine-Tuning (SFT) comes into play. SFT allows us to extend the model's capabilities to perform targeted tasks more accurately. It allows the model to learn task-specific patterns and nuances not present in general pretraining data.
 
-[Qwen2.5-3B](https://huggingface.co/Qwen/Qwen2.5-3B) is a pretrained language model containing 3.09 billion parameters, making it powerful yet suitable for fine-tuning even on resource-constrained platforms like Google Colab. The goal of this guide is to explore the fine-tuning process for Qwen2.5-3B using LoRA (Low-Rank Adaptation), specifically targeting the incorporation of the Unscloth framework. While the actual fine-tuning steps will be covered in another post, here we introduce the key concepts and detailed implementations necessary to achieve this.
+There are three main types of Supervised Fine-Tuning (SFT) for large language models:
 
-## Supervised Fine Tuning with Lora
+1. **Full Model Fine-Tuning**. This approach involves updating all parameters of the pre-trained model. It offers maximum flexibility in adapting the model to specialized tasks. Often yields significant performance improvements but requires substantial computational resources.
 
-Supervised fine-tuning using Low-Rank Adaptation (LoRA) is a cost-effective and efficient method for adapting pretrained language models to specific tasks by freezing most of the model's parameters and updating only a small number of task-specific weights. This approach leverages adapters to reduce the training overhead, making it an attractive solution for limited compute scenarios.
+2. **Feature-Based Fine-Tuning**. This method focuses on extracting features from the pre-trained model and used as input for another model or classifier. The main pre-trained model remains unchanged. It's less resource-intensive and provides faster results, making it suitable when computational power is limited.
+
+3. **Parameter-Efficient Fine-Tuning (PEFT)**. PEFT techniques aim to fine-tune models more efficiently. Only a portion of the model's weights are modified, leaving the fundamental language understanding intact. It adds task-specific layers or adapters to the pre-trained model. Significantly reduces computational costs compared to full fine-tuning while still achieving competitive performance.
+
+The choice between these approaches is based on the specific requirements of the task, available computational resources, and desired model performance.
+
+In this article, we will discuss the two most popular and effective PEFT techniques: LoRA and QLoRA. 
+
+## Supervised Fine Tuning with LoRA and QLoRA
+LoRA (Low-Rank Adaptation) is introduced in 2021 in the paper ["**LoRA: Low-Rank Adaptation of Large Language Models**"](https://arxiv.org/abs/2106.09685) by Adward et al.. It then has gained widespread adoption. It is a cost-effective and efficient method for adapting pretrained language models to specific tasks by freezing most of the model's parameters and updating only a small number of task-specific weights. This approach leverages adapters to reduce the training overhead, making it an attractive solution for limited compute scenarios.
+
+QLoRA (Quantized Low-Rank Adaptation) is an extension of the LoRA technique. It is proposed in the paper ["**QLoRA: Efficient Finetuning of Quantized LLMs**"](https://arxiv.org/abs/2305.14314) by Tim et al. in 2023. It quantizes the weight of each pretrained parameter to 4 bits (from the typical 32 bits). This results in significant memory savings and enables running large language models on a single GPU
+
+## How to choose between LoRA and QLoRA
+
+LoRA generally requires more GPU memory than QLoRA but is more efficient than full fine-tuning, making it suitable for systems with moderate to high GPU memory capacity. QLoRA, on the other hand, significantly lowers memory demands, making it more suitable for devices with limited memory resources. While LoRA is often faster, QLoRA incurs slight speed trade-offs due to quantization steps but offers superior memory efficiency, enabling fine-tuning of larger models on constrained hardware.
+
+Accuracy and computational efficiency also differ between the two methods. LoRA typically yields stable and precise results, whereas QLoRA's use of quantization may lead to minor accuracy losses, though it can sometimes reduce overfitting. When it comes to specific needs, LoRA is ideal if preserving full model precision is vital, whereas QLoRA shines for extremely large models or environments with tight memory constraints. QLoRA also supports varying levels of quantization (e.g., 8-bit, 4-bit, or even 2-bit), adding flexibility but at the cost of increased implementation complexity. 
+
+When deciding between LoRA  and QLoRA  for fine-tuning large language models, key considerations revolve around hardware, model size, speed, and accuracy needs. 
 
 ## Use-case
-In this article, we illustrate a specific use-case: fine-tuning the Qwen2.5-3B model to create and generate Tiny Stories for children. By utilizing a dataset with instructional input-output pairs, we aim to produce engaging and coherent stories that align with the input prompt while maintaining grammatical correctness, a consistent narrative structure, and appropriate tone for the target audience.
+In this article, we illustrate a specific use-case: Supervised fine-tuning Qwen2.5-3B model using LoRA and QLoRA, to create and generate a story generator for children. 
+
+For the `supervised` aspect, we use an instruction dataset [TinyStories_Instruction](https://huggingface.co/datasets/tanquangduong/TinyStories_Instruction) which contains instruction-story pairs. I have prepared this dataset in the [previsous post](https://tanquangduong.github.io/posts/instruction-dataset-sft.html), if you have not read it yet, I recommend you to check it out. The stories in this dataset are short and synthetically generated stories created by GPT-3.5 and GPT-4 with a limited vocabulary, making it highly suitable for our intended 5-year-old readers. While, the instruction is also created synthetically using GPT-4o-mini.
+
+[Qwen2.5-3B](https://huggingface.co/Qwen/Qwen2.5-3B) is a pretrained language model containing 3.09 billion parameters, making it powerful yet suitable for fine-tuning even on resource-constrained platforms like Google Colab. The goal of this guide is to explore the fine-tuning process for Qwen2.5-3B using LoRA (Low-Rank Adaptation), specifically targeting the incorporation of the Unscloth framework. While the actual fine-tuning steps will be covered in another post, here we introduce the key concepts and detailed implementations necessary to achieve this.
 
 ## Implementation
 To achieve the fine-tuning, we will utilize the following libraries and methods:
