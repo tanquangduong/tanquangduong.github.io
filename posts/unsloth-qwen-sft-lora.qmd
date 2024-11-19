@@ -14,55 +14,45 @@ Getting started GenAI & LLM with my Udemy course, [**Hands-on Generative AI Engi
 <a href="https://www.udemy.com/course/hands-on-generative-ai-engineering-with-large-language-model/?referralCode=0775DF5DDD432646AD97&couponCode=OF83024E"><img src="/images/genai-course/GenAI-Course-Thumbnail.png" id="llm-course"></a>
 :::
 
-Large language models (LLMs) are initially trained on vast amounts of unlabeled data to acquire broad general knowledge. However, this pretraining approach has limitations for specialized tasks like question answering:
-(1) The next-token prediction objective used in pretraining is not directly aligned with targeted tasks like QA. (2) General knowledge may be insufficient for domain-specific applications requiring specialized expertise. (3) Publicly available pretraining data may lack up-to-date or proprietary information needed for certain use cases.
+Large language models (LLMs) are initially trained on vast amounts of unlabeled data to acquire broad general knowledge. However, this pretraining approach has limitations for specialized tasks like Question Answering (QA) due to the facts like (1) The next-token prediction objective used in pretraining is not directly aligned with targeted tasks like QA. (2) General knowledge may be insufficient for domain-specific applications requiring specialized expertise. (3) Publicly available pretraining data may lack up-to-date or proprietary information needed for certain use cases.
 
 Those senarios are where Supervised Fine-Tuning (SFT) comes into play. It addresses these limitations by adapting pretrained LLMs for specific downstream tasks, by (1) enabling models to learn task-specific patterns and nuances, (2) incorporating domain knowledge not present in general pretraining data, (3) improving performance on targeted applications like QA
 
 ## SFT Pipeline Components
-The SFT pipeline consists of several key stages, illustrated in the follwing flowchart:
+The SFT pipeline consists of several key stages and components, illustrated in the follwing flowchart:
 ![SFT pipeline](/images/unsloth-qwen-sft-lora/sft-pipeline-flowchart.png)
 
-1. **Inputs**:
-* Raw dataset containing task-specific examples
-* Pretrained base language model
+1. **Inputs**: Including a raw dataset comprising task-specific examples, along with a pretrained base language model.
 
-2. **Instruction-Dataset Preparation**:
-* Data cleaning and filtering
-* Generating instruction-answer pairs
+2. **Instruction-Dataset Preparation**: In this phase, the raw data undergoes a process of refinement and structuring. This stage involves data cleaning and filtering, which ensures the removal of irrelevant, inconsistent, or low-quality examples. Following this, the generation of instruction-answer pairs takes place, transforming the dataset into a form conducive to instructional tasks and allowing the model to learn through guided examples that are relevant to its intended applications.
 
-3. **Dataset Formatting**:
-* Converting data to standardized JSON formats (e.g. Alpaca, ShareGPT, OpenAI)
-* Structuring examples using chat templates (e.g. Alpaca, ChatML, Llama 3)
+3. **Dataset Formatting**: During this phase, the prepared data is converted into standardized formats to maintain consistency across diverse implementations. These formats include widely-used structures such as JSON configurations modeled on popular frameworks like Alpaca, ShareGPT, and OpenAI formats. Additionally, examples are organized with the aid of structured chat templates, such as those derived from Alpaca, ChatML, and Llama 3, further enhancing the model's ability to engage in coherent, context-aware dialogues.
 
-4. **Core SFT Process**:
-* Fine-tuning the base model on the formatted instruction dataset
-* Applying SFT techniques like full fine-tuning or LoRA or QLoRA
+4. **Core SFT Process**:  This stage builds on the well-structured data to fine-tune the base model. During this stage, the model is trained on the formatted instruction dataset using advanced SFT methodologies. Techniques like full fine-tuning, LoRA (Low-Rank Adaptation), or QLoRA (Quantized LoRA) are employed to optimize the model's performance while preserving efficiency and adaptability.
 
-5. **Output**:
-* Task-specific fine-tuned model
+5. **Output**: At the final stage, we will obtain task-specific fine-tuned model.
 
-This pipeline allows for systematic adaptation of LLMs to targeted applications while leveraging their pretrained knowledge. The formatted instruction datasets and chat templates provide a unified way to present diverse training examples to the model.
+This pipeline allows for systematic adaptation of LLMs to targeted applications while leveraging their pretrained knowledge. 
 
-Note that if we fine-tune the pretrained base model, we can choose any data formats and chat templates. However, if we fine-tune an instruct model, we need to use the sample template.
+Note that the formatted instruction datasets and chat templates provide a unified way to present diverse training examples to the model. If we fine-tune the pretrained base model, we can choose any chat templates. However, if we fine-tune an instruct model, we need to use the sample template.
 
 ## SFT techniques
 There are three main types of Supervised Fine-Tuning (SFT) for large language models:
 
-1. **Full Model Fine-Tuning**. This approach involves updating all parameters of the pre-trained model. It offers maximum flexibility in adapting the model to specialized tasks. Often yields significant performance improvements but requires substantial computational resources.
+1. **Full Model Fine-Tuning**. This approach involves updating all parameters of the pre-trained model. It offers maximum flexibility in adapting the model to specialized tasks. It often yields significant performance improvements but requires substantial computational resources.
 
 2. **Feature-Based Fine-Tuning**. This method focuses on extracting features from the pre-trained model and used as input for another model or classifier. The main pre-trained model remains unchanged. It's less resource-intensive and provides faster results, making it suitable when computational power is limited.
 
 3. **Parameter-Efficient Fine-Tuning (PEFT)**. PEFT techniques aim to fine-tune models more efficiently. Only a portion of the model's weights are modified, leaving the fundamental language understanding intact. It adds task-specific layers or adapters to the pre-trained model. Significantly reduces computational costs compared to full fine-tuning while still achieving competitive performance.
 
-The choice between these approaches is based on the specific requirements of the task, available computational resources, and desired model performance.
+The choice between these approaches is often based on the specific requirements of the task, available computational resources, and desired model performance.
 
-In this article, we will discuss the two most popular and effective PEFT techniques: LoRA and QLoRA. 
+In this article, we will discuss more about the two most popular and effective PEFT techniques: LoRA and QLoRA. 
 
 ## PEFT with LoRA and QLoRA
-LoRA (Low-Rank Adaptation) is introduced in 2021 in the paper ["**LoRA: Low-Rank Adaptation of Large Language Models**"](https://arxiv.org/abs/2106.09685) by Adward et al.. It then has gained widespread adoption. It is a cost-effective and efficient method for adapting pretrained language models to specific tasks by freezing most of the model's parameters and updating only a small number of task-specific weights. This approach leverages adapters to reduce the training overhead, making it an attractive solution for limited compute scenarios.
+LoRA (Low-Rank Adaptation) is introduced in 2021 in the paper ["*LoRA: Low-Rank Adaptation of Large Language Models*"](https://arxiv.org/abs/2106.09685) by Adward et al.. It then has gained widespread adoption. It is a cost-effective and efficient method for adapting pretrained language models to specific tasks by freezing most of the model's parameters and updating only a small number of task-specific weights. This approach leverages adapters to reduce the training overhead, making it an attractive solution for limited compute scenarios.
 
-QLoRA (Quantized Low-Rank Adaptation) is an extension of the LoRA technique. It is proposed in the paper ["**QLoRA: Efficient Finetuning of Quantized LLMs**"](https://arxiv.org/abs/2305.14314) by Tim et al. in 2023. It quantizes the weight of each pretrained parameter to 4 bits (from the typical 32 bits). This results in significant memory savings and enables running large language models on a single GPU
+QLoRA (Quantized Low-Rank Adaptation) is an extension of the LoRA technique. It is proposed in the paper ["*QLoRA: Efficient Finetuning of Quantized LLMs*"](https://arxiv.org/abs/2305.14314) by Tim et al. in 2023. It quantizes the weight of each pretrained parameter to 4 bits (from the typical 32 bits). This results in significant memory savings and enables running large language models on a single GPU
 
 When deciding between LoRA  and QLoRA  for fine-tuning large language models, key considerations revolve around hardware, model size, speed, and accuracy needs. 
 
@@ -70,30 +60,30 @@ LoRA generally requires more GPU memory than QLoRA but is more efficient than fu
 
 Accuracy and computational efficiency also differ between the two methods. LoRA typically yields stable and precise results, whereas QLoRA's use of quantization may lead to minor accuracy losses, though it can sometimes reduce overfitting. When it comes to specific needs, LoRA is ideal if preserving full model precision is vital, whereas QLoRA shines for extremely large models or environments with tight memory constraints. QLoRA also supports varying levels of quantization (e.g., 8-bit, 4-bit, or even 2-bit), adding flexibility but at the cost of increased implementation complexity. 
 
-To implement LoRA and QLoRA in practice, we use the Unscloth framework. This is an innovative open-source framework designed to revolutionize the fine-tuning and training of large language models. It's worth to discuss more about Unsloth in the next section. 
+To implement LoRA and QLoRA in practice, among other frameworks like PEFT/Bitsandbytes (Hugging Face), TorchTune, Axolotl, ...,  we use the Unscloth framework in this article. This is an innovative open-source framework designed to revolutionize the fine-tuning and training of large language models. So it is worth to discuss more about Unsloth in the next section. 
 
-## Unsloth
-Unsloth is developed by Daniel Han and Michael Han at Unsloth AI. This framework addresses some of the most significant challenges in LLM training, particularly speed and resource efficiency. Let's check out some of its remarkable features and benefits:
+## Why Unsloth?
+[Unsloth](https://unsloth.ai/#unsloth%20PC%20logo) is developed by Daniel Han and Michael Han at Unsloth AI. This framework addresses some of the most significant challenges in LLM training, particularly speed and resource efficiency. Let's check out some of its remarkable features and benefits:
 
 * **Speed Improvements**. It makes an impressive acceleration in training speed, up to 30 times faster performance compared to other advanced methods like Flash Attention 2 (FA2), completing tasks like the Alpaca benchmark in just 3 hours instead of the usual 85. This dramatic reduction in training time allows us to iterate more quickly. 
 
 * **Memory Efficiency**. It achieves up to 90% reduction in memory usage compared to FA2.
 
-* **Accuracy Preservation and Enhancement**. Despite its focus on speed and efficiency, Unsloth maintains model accuracy, or up to 20% increase in accuracy using their MAX offering
+* **Accuracy Preservation and Enhancement**. Despite its focus on speed and efficiency, Unsloth maintains model accuracy with 0% performance loss, or up to 20% increase in accuracy using their MAX offering.
 
 * **Hardware Flexibility**. It is designed to be hardware-agnostic, supporting a wide range of GPUs including those from NVIDIA, AMD, and Intel. This compatibility ensures that users can leverage Unsloth's benefits regardless of their existing hardware setup.
 
 
 ## Use-case
-In this article, we illustrate a specific use-case: Supervised fine-tuning Qwen2.5-3B model using LoRA and QLoRA, to create and generate a story generator for children. 
+In this article, we illustrate a specific use-case: Supervised fine-tuning Qwen2.5-3B model using LoRA and QLoRA, to create a story generator for children. 
 
-For the `supervised` aspect, we use an instruction dataset [TinyStories_Instruction](https://huggingface.co/datasets/tanquangduong/TinyStories_Instruction) which contains instruction-story pairs. I have prepared this dataset in the [previsous post](https://tanquangduong.github.io/posts/instruction-dataset-sft.html), if you have not read it yet, I recommend you to check it out. The stories in this dataset are short and synthetically generated stories created by GPT-3.5 and GPT-4 with a limited vocabulary, making it highly suitable for our intended 5-year-old readers. While, the instruction is also created synthetically using GPT-4o-mini based on the stories.
+For the instruction dataset preparation stage, we use an instruction dataset [TinyStories_Instruction](https://huggingface.co/datasets/tanquangduong/TinyStories_Instruction) which contains instruction-story pairs. I have prepared this dataset in [my previsous post](https://tanquangduong.github.io/posts/instruction-dataset-sft.html), if you have not read it yet, I recommend you to check it out. The stories in this dataset are short and synthetically generated by GPT-3.5 and GPT-4 with a limited vocabulary, making it highly suitable for our intended 5-year-old readers. While, the instruction corresponding to each story is also created synthetically using GPT-4o-mini.
 
-For the pretrained language model, we use [Qwen2.5-3B](https://huggingface.co/Qwen/Qwen2.5-3B), a pretrained language model containing 3.09 billion parameters. I choose this for our use-case as its reasonable size, making it powerful yet suitable for fine-tuning even on resource-constrained platforms like Google Colab. 
+For the pretrained language model, we use [Qwen2.5-3B](https://huggingface.co/Qwen/Qwen2.5-3B), a pretrained language model containing 3.09 billion parameters. We choose this for our use-case as its reasonable size, making it powerful yet suitable for fine-tuning even on resource-constrained platforms like Google Colab. 
 
-For the implementation part, we leverage Unsloth for speed and memory efficiency. 
+For the implementation part, we leverage Unsloth for speed and memory efficiency reasons. 
 
-## Implementation
+## Fine-Tuning Implementation
 To achieve the fine-tuning, we will utilize the following libraries and methods:
 
 **Step 1: Import Necessary Libraries**
@@ -110,11 +100,16 @@ from google.colab import userdata
 
 **Step 2: Comet ML Login**
 
+We leverage Comet ML for real-time monitoring and tracking our fine-tuning experiments. Comet ML allows you to automatically track a wide range of metrics, parameters, and artifacts during the model training process. This includes training loss, gradient norms, hyperparameters, code versions, and more.
+
+In addition, Comet ML makes it easy to compare different experiments, helping you understand how changes in code, hyperparameters, or data affect model performance. The platform provides workspaces and sharing capabilities, enabling teams to collaborate more effectively on ML projects. To dicover more about its features and benefits, please check out [Comet ML's website](https://www.comet.com/site/).
+
 ```python
 comet_ml.login(project_name="sft-lora-unsloth")
 ```
 
 **Step 3: Load Pretrained Model and Tokenizer**
+Next, we use `FastLanguageModel` class from `Unsloth` with the `.from_pretrained()` method to load `Qwen2.5-3B` model and its corresponding tokenizer. We specify the max sequence length as 2048 in this use-case. Then, the `load_in_4bit` argument indicates if we want to use QLoRA (assign `True`), else LoRA.
 ```python
 max_seq_length = 2048
 model, tokenizer = FastLanguageModel.from_pretrained(
@@ -125,6 +120,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 ```
 
 **Step 4: Apply LoRA Adaptation**
+Then, we set up LoRA configurations for our loaded model, including the rank `r` as 32, `alpha` as 32, no dropout and target modules as linear layers. This is where leveraging experiment tracking and comparison, we can apply hyperparameter tuning to find out the best set of parameters. 
 ```python
 model = FastLanguageModel.get_peft_model(
     model,
@@ -136,8 +132,8 @@ model = FastLanguageModel.get_peft_model(
 ```
 
 **Step 5: Formatting Dataset**
+Next, we need to format and map the instruction dataset into a specific text template, using Alpaca template in this example.
 
-Prepare the dataset using a specific text template and map it accordingly.
 ```python
 alpaca_template = """Below is an instruction that describes a task.
 Write a response that appropriately completes the request.
@@ -159,8 +155,7 @@ dataset = dataset.map(format_samples, batched=True, remove_columns=dataset.colum
 ```
 
 **Step 6: Setting Up the Trainer**
-
-Utilize the `SFTTrainer` for supervised fine-tuning.
+When the instruction dataset is formatted and prepared, and the model is loaded with adapted parameters and architectures (e.g., LoRA or QLoRA), we utilize the `SFTTrainer` class from the TRL library for supervised fine-tuning.
 
 ```python
 trainer = SFTTrainer(
@@ -193,20 +188,33 @@ trainer.train()
 ```
 **Step 7: Model Inference**
 
-Generate a response using the fine-tuned model.
+When the fine-tuning is finished, we can do a quick test on  the fine-tuned model.
 
 ```python
+# Switch model to inference mode (disables training-specific components)
 FastLanguageModel.for_inference(model)
+
+# Format the story prompt using Alpaca template
 message = alpaca_template.format("Write a story about a humble little bunny \
 named Ben who follows a mysterious trail in the woods, \
 discovering beautiful flowers, new friends, and a lovely pond along the way.", "")
+
+# Convert text to tokens, create PyTorch tensors, and move to GPU
 inputs = tokenizer([message], return_tensors="pt").to("cuda")
+
+# Initialize streamer for real-time token-by-token text output
 text_streamer = TextStreamer(tokenizer)
+
+# Generate text from the model:
+# - streamer: Enables streaming output
+# - max_new_tokens: Limits response length
+# - use_cache: Enables KV-cache for faster generation
+# Result assigned to _ since we only care about streamed output
 _ = model.generate(**inputs, streamer=text_streamer, max_new_tokens=256, use_cache=True)
 ```
 
 **Step 8: Save and Push to Hugging Face Hub**
-
+Now if we are sastisfy with the fine-tuned model's performance, it's time to login and push it into Hugging Face Hub for later use.
 ```python
 from huggingface_hub import login
 # Log in to the Hugging Face Hub
@@ -217,14 +225,26 @@ model.push_to_hub_merged("tanquangduong/Qwen2.5-0.5B-Instruct-TinyStories", toke
 ```
 
 ## Inference
-Using the fine-tuned model for inference:
+After fine-tuning and uploading the fine-tuned model to HF Hub, for future usage we use the following code-snippet to perform the inference.
 
 ```python
-from transformers import AutoTokenizer, AutoModelForCausalLM
+# Import required packages
+from unsloth import FastLanguageModel
+from transformers import TextStreamer
 
-tokenizer = AutoTokenizer.from_pretrained("tanquangduong/Qwen2.5-3B-Instruct-TinyStories")
-model = AutoModelForCausalLM.from_pretrained("tanquangduong/Qwen2.5-3B-Instruct-TinyStories")
+# Load the pre-trained tokenizer and model from Hugging Face hub
+max_seq_length = 2048
+model, tokenizer = FastLanguageModel.from_pretrained(
+    model_name="tanquangduong/Qwen2.5-3B-Instruct-TinyStories",
+    max_seq_length=max_seq_length,
+    load_in_4bit=False,
+    )
+
+# Move model to GPU for faster inference and Switch model to inference mode
 model = model.to("cuda")
+FastLanguageModel.for_inference(model)
+
+# Define Alpaca prompt template with placeholders for instruction and response
 alpaca_template = """Below is an instruction that describes a task.
 Write a response that appropriately completes the request.
 ### Instruction:
@@ -232,14 +252,25 @@ Write a response that appropriately completes the request.
 ### Response:
 {}"""
 
-
-FastLanguageModel.for_inference(model)
-
+# Format the story prompt with the template
+# Second parameter is empty string as we don't have a response yet
 message = alpaca_template.format("Write a story about a humble little bunny named Ben who follows a mysterious trail in the woods, discovering beautiful flowers, new friends, and a lovely pond along the way.", "")
+
+# Tokenize the prompt and prepare it for the model
+# Convert to PyTorch tensors and move to GPU
 inputs = tokenizer([message], return_tensors="pt").to("cuda")
 
+# Initialize text streamer for real-time output
 text_streamer = TextStreamer(tokenizer)
+
+# Generate text from the model:
+# - max_new_tokens: Allow longer story generation (2048 tokens)
+# - use_cache: Enable KV-cache for faster generation
+# - streamer: Enable real-time token output
+# Result assigned to _ since we only care about streamed output
 _ = model.generate(**inputs, streamer=text_streamer, max_new_tokens=2048, use_cache=True)
 ```
 ## Conclusion
-This guide walked through the supervised fine-tuning process of Qwen2.5-3B using the Unscloth framework and LoRA adapters. Fine-tuning such models with cost-effective methods like LoRA makes it feasible for smaller setups, such as those utilizing Colab. The end result is a model that can generate customized responses tailored to specific use cases, such as creating Tiny Stories. This approach emphasizes the flexibility and power of modern transformer-based architectures in domain-specific tasks.
+In this article, we discuss fine-tuning LLMs for specialized tasks, such as Question Answering for a story generator, which general pretraining often falls short of due to limited instructive data and objectives. Supervised Fine-Tuning addresses this by refining LLMs using instruction datasets, structured formats, and techniques like LoRA and QLoRA to optimize performance and resource efficiency. LoRA focuses on selective parameter tuning, while QLoRA adds memory-efficient quantization, making it suitable for constrained hardware. In addition, we leverage the Unsloth framework for efficient and fast fine-tuning
+
+We demonstrated through an example of adapting a custom instruction dataset to fine-tune the Qwen2.5-3B model to obtain a story generator that can generate children's story based on a simple instruction prompt. 
