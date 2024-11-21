@@ -14,19 +14,25 @@ Getting started GenAI & LLM with my Udemy course, [**Hands-on Generative AI Engi
 <a href="https://www.udemy.com/course/hands-on-generative-ai-engineering-with-large-language-model/?referralCode=0775DF5DDD432646AD97&couponCode=OF83024E"><img src="/images/genai-course/GenAI-Course-Thumbnail.png" id="llm-course"></a>
 ::: -->
 
-## Introduction
-Direct Preference Optimization (DPO) is a technique used to align AI-generated outputs with human preferences by optimizing language models. To achieve this, a preference dataset is required, containing data that enables models to understand which responses are preferred by humans and which are not. In this article, we'll walk through a code implementation to create such a dataset using Python, OpenAI's API, and Hugging Face's Datasets library.
+In the realm of Supervised Fine-Tuning (SFT) for custom LLM, Direct Preference Optimization (DPO) is a technique used to align AI-generated outputs with human preferences by optimizing language models. 
+
+To achieve this, a preference dataset is required, containing data that enables models to understand which responses are preferred by humans and which are not. 
+
+In this article, we'll walk through an example to create such a dataset using Python, OpenAI's API, and Hugging Face's Datasets library.
+
+Let's dive in.
 
 ## Components of a Preference Dataset for DPO
 A preference dataset typically includes:
 
-Prompts: Inputs or questions given to the AI model.
-Chosen Responses: AI-generated responses preferred by human evaluators.
-Rejected Responses: Less preferred responses or responses not selected by human evaluators.
+* Prompts: Inputs or questions given to the AI model.
+* Chosen Responses: Responses preferred by human evaluators.
+* Rejected Responses: Less preferred responses or responses not selected by human evaluators.
+
 By providing this structure, the dataset allows a model to learn which responses are preferable, making it better aligned with human preferences.
 
 ## Our use-case
-In [our previous post](https://tanquangduong.github.io/posts/instruction-dataset-sft.html), we created an instruction dataset, [TinyStories_Instruction](https://huggingface.co/datasets/tanquangduong/TinyStories_Instruction), from the raw [TinyStories](https://huggingface.co/datasets/roneneldan/TinyStories) dataset. This dataset was specifically designed for fine-tuning a pretrained Large/Small Language Model using LORA/QLORA to develop a story generator tailored to 5-year-olds.
+In [our previous post](https://tanquangduong.github.io/posts/instruction-dataset-sft.html), we created an instruction dataset, [TinyStories_Instruction](https://huggingface.co/datasets/tanquangduong/TinyStories_Instruction), from the raw [TinyStories](https://huggingface.co/datasets/roneneldan/TinyStories) dataset. This dataset was specifically designed for fine-tuning a pretrained Large/Small Language Model to develop a story generator tailored to 5-year-olds.
 
 In this guide, we take the next step by creating a preference dataset from the previously generated instruction dataset. This dataset is used for fine-tuning a pretrained Large/Small Language Model through Direct Preference Optimization (DPO), enhancing our story generator to align even better with human preferences and produce engaging, age-appropriate content for young children.
 
@@ -35,7 +41,10 @@ The process for creating a preference dataset is illustrated below:
 ![](../images/preference-dataset-dpo/preference_dataset_illus.png)
 
 ## Implementation
-This implementation involves a series of steps: extracting data, generating AI responses, and creating preference triplets.
+
+The implementation involves a series of steps: extracting data, generating AI responses, and creating preference triplets.
+
+We will first import the required packages.
 
 ```python
 import concurrent.futures
@@ -50,6 +59,7 @@ from google.colab import userdata
 **1. Data Extraction Function**
 
 The `extract_ground_instruction_story` function extracts pairs of instructions and desired outputs from a given dataset.
+
 ```python
 def extract_ground_instruction_story(dataset):
 	return [(example['instruction'], example['output']) for example in dataset]
@@ -74,7 +84,7 @@ class PreferenceSet:
 ```
 **3. Generating Preference-Response Triplets**
 
-This function generates a story using OpenAI's API and returns a preference triple in the format (instruction, generated response, desired response).
+The function `generate_preference_answer_triples` generates a story using OpenAI's API and returns a preference triple in the format (instruction, generated response, desired response).
 
 ```python
 def generate_preference_answer_triples(instruction: str, desired_story: str, client: OpenAI) -> List[Tuple[str, str, str]]:
@@ -106,7 +116,7 @@ def generate_preference_answer_triples(instruction: str, desired_story: str, cli
 ```
 **4. Creating the Preference Dataset**
 
-This function creates a dataset using the extracted stories and generated responses.
+The function `create_preference_dataset` creates a dataset using the extracted stories and generated responses.
 
 ```python
 def create_preference_dataset(dataset: Dataset, client: OpenAI, num_workers: int = 4) -> Dataset:
@@ -126,9 +136,10 @@ def create_preference_dataset(dataset: Dataset, client: OpenAI, num_workers: int
 		"chosen": list(chosen_story)
 		})
 ```
+
 **5. The `main` function**
 
-This function initializes the OpenAI client, loads the dataset, creates a preference dataset, and uploads it to the Hugging Face Hub.
+The `main` function initializes the OpenAI client, loads the dataset, creates a preference dataset, and uploads it to the Hugging Face Hub.
 
 ```python
 def main() -> Dataset:
@@ -154,9 +165,9 @@ def main() -> Dataset:
 	filtered_dataset = preference_dataset.train_test_split(test_size=0.1)
 	filtered_dataset.push_to_hub("tanquangduong/TinyStories_Preference")
 ```
-**6. Hugging Face Hub Login**
+**6. Running the pipeline**
 
-To authenticate with Hugging Face and run the pipeline:
+Finally, we authenticate with Hugging Face for later dataset uploading and start running the pipeline.
 
 ```python
 from huggingface_hub import login
@@ -166,5 +177,15 @@ login(token=userdata.get('HF_TOKEN'))
 # Launch the pipeline to create instruction dataset
 main()
 ```
+## Resulting Preference Dataset
+After running the above pipeline, the resulting preference dataset will look like this:
+![](/images/preference-dataset-dpo/snapshot-TinyStories-Preference-hf.PNG)
+
 ## Conclusion
-The article outlines the process of creating a Preference Dataset for Direct Preference Optimization (DPO) to align AI-generated outputs with human preferences. It focuses on enhancing a story-generation model for 5-year-olds by building on a previously created instruction dataset. The dataset consists of prompts, human-preferred responses, and rejected responses, allowing the model to learn desired behavior. Key steps include extracting instruction-output pairs, generating AI responses using OpenAI's API, and organizing the data into preference triplets. The final dataset, prepared for fine-tuning, is uploaded to the Hugging Face Hub, improving the AI's ability to produce engaging, age-appropriate content.
+The article outlines the process of creating a Preference Dataset for fine tuning with DPO to align AI-generated outputs with human preferences. 
+
+The dataset consists of prompts, human-preferred responses, and rejected responses, allowing the model to learn desired behavior. Key steps include extracting instruction-output pairs, generating AI responses using OpenAI's API, and organizing the data into preference triplets. 
+
+The final dataset is then uploaded to the Hugging Face Hub for later use.
+
+We will use this preference dataset for fine-tuning with DPO in our upcoming post.   
