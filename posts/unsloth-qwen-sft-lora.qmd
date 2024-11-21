@@ -139,6 +139,7 @@ model = FastLanguageModel.get_peft_model(
 Next, we need to format and map the instruction dataset into a specific text template, using Alpaca template in this example.
 
 ```python
+# Template for formatting instruction-output pairs following Alpaca dataset format
 alpaca_template = """Below is an instruction that describes a task.
 Write a response that appropriately completes the request.
 ### Instruction:
@@ -146,15 +147,29 @@ Write a response that appropriately completes the request.
 ### Response:
 {}"""
 
+# Get the end of sequence token from the tokenizer
 EOS_TOKEN = tokenizer.eos_token
+
 def format_samples(examples):
+    """
+    Format instruction-output pairs into training samples.
+    Args:
+        examples: Dictionary containing 'instruction' and 'output' lists
+    Returns:
+        Dictionary with formatted 'text' list
+    """
     text = []
+    # Zip instruction-output pairs together and format each pair
     for instruction, output in zip(examples["instruction"], examples["output"], strict=False):
+        # Insert instruction & output into template and append EOS token
         message = alpaca_template.format(instruction, output) + EOS_TOKEN
         text.append(message)
 
     return {"text": text}
 
+# Apply formatting to entire dataset:
+# - Process in batches for efficiency
+# - Remove original columns since they're now formatted into 'text'
 dataset = dataset.map(format_samples, batched=True, remove_columns=dataset.column_names)
 ```
 
@@ -196,7 +211,7 @@ trainer.train()
 
 During training, we can track the training loss or other metrics using the Comet ML platform. The plots should look like the following:
 
-![ML Experiment Tracking](/images/unsloth-qwen-sft-lora/metric_tracking_comet_ml.png)
+![ML Experiment Tracking using Comet ML](/images/unsloth-qwen-sft-lora/metric_tracking_comet_ml.png)
 
 **Step 8: Model Inference**
 
