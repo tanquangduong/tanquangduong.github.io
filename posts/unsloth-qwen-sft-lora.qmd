@@ -19,7 +19,7 @@ Large language models (LLMs) are initially trained on vast amounts of unlabeled 
 Those senarios are where Supervised Fine-Tuning (SFT) comes into play. It addresses these limitations by adapting pretrained LLMs for specific downstream tasks, by (1) enabling models to learn task-specific patterns and nuances, (2) incorporating domain knowledge not present in general pretraining data, (3) improving performance on targeted applications like QA
 
 ## SFT Pipeline Components
-The SFT pipeline consists of several key stages and components, illustrated in the follwing flowchart:
+The SFT pipeline consists of several key stages and components, illustrated in the following flowchart:
 ![SFT pipeline](/images/unsloth-qwen-sft-lora/sft-pipeline-flowchart.png)
 
 1. **Inputs**: Including a raw dataset comprising task-specific examples, along with a pretrained base language model.
@@ -60,7 +60,7 @@ LoRA generally requires more GPU memory than QLoRA but is more efficient than fu
 
 Accuracy and computational efficiency also differ between the two methods. LoRA typically yields stable and precise results, whereas QLoRA's use of quantization may lead to minor accuracy losses, though it can sometimes reduce overfitting. When it comes to specific needs, LoRA is ideal if preserving full model precision is vital, whereas QLoRA shines for extremely large models or environments with tight memory constraints. QLoRA also supports varying levels of quantization (e.g., 8-bit, 4-bit, or even 2-bit), adding flexibility but at the cost of increased implementation complexity. 
 
-To implement LoRA and QLoRA in practice, among other frameworks like PEFT/Bitsandbytes (Hugging Face), TorchTune, Axolotl, ...,  we use the Unscloth framework in this article. This is an innovative open-source framework designed to revolutionize the fine-tuning and training of large language models. So it is worth to discuss more about Unsloth in the next section. 
+To implement LoRA and QLoRA in practice, among other frameworks like PEFT/Bitsandbytes (Hugging Face), TorchTune, Axolotl, ...,  we use the Unsloth framework in this article. This is an innovative open-source framework designed to revolutionize the fine-tuning and training of large language models. So it is worth to discuss more about Unsloth in the next section. 
 
 ## Why Unsloth?
 [Unsloth](https://unsloth.ai/#unsloth%20PC%20logo) is developed by Daniel Han and Michael Han at Unsloth AI. This framework addresses some of the most significant challenges in LLM training, particularly speed and resource efficiency. Let's check out some of its remarkable features and benefits:
@@ -86,7 +86,7 @@ For the implementation part, we leverage Unsloth for speed and memory efficiency
 ## Fine-Tuning Implementation
 To achieve the fine-tuning, we will utilize the following libraries and methods:
 
-**Step 1: Import Necessary Libraries**
+**1. Import Necessary Libraries**
 
 ```python
 import os
@@ -99,7 +99,7 @@ from unsloth import FastLanguageModel, is_bfloat16_supported
 from google.colab import userdata
 ```
 
-**Step 2: Comet ML Login**
+**2. Comet ML Login**
 
 We leverage Comet ML for real-time monitoring and tracking our fine-tuning experiments. Comet ML allows you to automatically track a wide range of metrics, parameters, and artifacts during the model training process. This includes training loss, gradient norms, hyperparameters, code versions, and more.
 
@@ -109,19 +109,19 @@ In addition, Comet ML makes it easy to compare different experiments, helping yo
 comet_ml.login(project_name="sft-lora-unsloth")
 ```
 
-**Step 3: Load Pretrained Model and Tokenizer**
+**3. Load Pretrained Model and Tokenizer**
 
 Next, we use `FastLanguageModel` class from `Unsloth` with the `.from_pretrained()` method to load `Qwen2.5-3B` model and its corresponding tokenizer. We specify the max sequence length as 2048 in this use-case. Then, the `load_in_4bit` argument indicates if we want to use QLoRA (assign `True`), else LoRA.
 ```python
 max_seq_length = 2048
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name="Qwen/Qwen2.5-0.5B",
+    model_name="Qwen/Qwen2.5-3B",
     max_seq_length=max_seq_length,
     load_in_4bit=False,
     )
 ```
 
-**Step 4: Apply LoRA Adaptation**
+**4. Apply LoRA Adaptation**
 
 Then, we set up LoRA configurations for our loaded model, including the rank `r` as 32, `alpha` as 32, no dropout and target modules as linear layers. This is where leveraging experiment tracking and comparison, we can apply hyperparameter tuning to find out the best set of parameters. 
 ```python
@@ -134,7 +134,7 @@ model = FastLanguageModel.get_peft_model(
     )
 ```
 
-**Step 5: Formatting Dataset**
+**5. Formatting Dataset**
 
 Next, we need to format and map the instruction dataset into a specific text template, using Alpaca template in this example.
 
@@ -173,7 +173,7 @@ def format_samples(examples):
 dataset = dataset.map(format_samples, batched=True, remove_columns=dataset.column_names)
 ```
 
-**Step 6: Setting Up the Trainer and Lauching the Training**
+**6. Setting Up the Trainer and Lauching the Training**
 
 When the instruction dataset is formatted and prepared, and the model is loaded with adapted parameters and architectures (e.g., LoRA or QLoRA), we utilize the `SFTTrainer` class from the TRL library for supervised fine-tuning.
 
@@ -207,13 +207,13 @@ trainer = SFTTrainer(
 	)
 trainer.train()
 ```
-**Step 7: Experiment tracking**
+**7. Experiment tracking**
 
 During training, we can track the training loss or other metrics using the Comet ML platform. The plots should look like the following:
 
 ![ML Experiment Tracking using Comet ML](/images/unsloth-qwen-sft-lora/metric_tracking_comet_ml.png)
 
-**Step 8: Model Inference**
+**8. Model Inference**
 
 When the fine-tuning is finished, we can perform a quick test on the fine-tuned model.
 
@@ -243,7 +243,7 @@ Example of inference output looks like this:
 
 ![Inference Output Example](/images/unsloth-qwen-sft-lora/inference_output_example.png)
 
-**Step 9: Save and Push to Hugging Face Hub**
+**9. Save and Push to Hugging Face Hub**
 
 Now, if we are satisfied with the fine-tuned model's performance, it's time to log in and push it to the Hugging Face Hub for later use.
 ```python
@@ -252,9 +252,10 @@ from huggingface_hub import login
 login(token=userdata.get('HF_TOKEN'))
 
 model.save_pretrained_merged("model", tokenizer, save_method="merged_16bit")
-model.push_to_hub_merged("tanquangduong/Qwen2.5-0.5B-Instruct-TinyStories", tokenizer, save_method="merged_16bit")
+model.push_to_hub_merged("tanquangduong/Qwen2.5-3B-Instruct-TinyStories", tokenizer, save_method="merged_16bit")
 ```
 ## Conclusion
+
 In this article, we discuss fine-tuning LLMs for specialized tasks, such as Question Answering for a story generator, which general pretraining often falls short of due to limited instructive data and objectives. Supervised Fine-Tuning addresses this by refining LLMs using instruction datasets, structured formats, and techniques like LoRA and QLoRA to optimize performance and resource efficiency. LoRA focuses on selective parameter tuning, while QLoRA adds memory-efficient quantization, making it suitable for constrained hardware. 
 
 Additionally, we utilize the Unsloth framework for efficient and fast fine-tuning, Hugging Face's TRL for setting up the training process, Comet ML for real-time tracking of fine-tuning experiments, and Hugging Face Hub for dataset and model storage and access.
