@@ -17,12 +17,10 @@ Creating a tailored instruction dataset for fine-tuning a language model is a cr
 
 Before starting, it is essential to define the dataset's intended purpose. Are you developing a chatbot, a story generator, or a question-answering system? Clearly understanding the desired model behavior will guide the type and structure of the data you prepare.
 
-In this example, our goal is to:
-
-*Create an instruction dataset suitable for fine-tuning a pretrained Large/Small Language Model using LORA/QLORA to produce a story generator designed for 5-year-olds.*
+In this guide, our goal is to create an instruction dataset suitable for fine-tuning a pretrained Large/Small Language Model to produce a story generator dedicated for 5-year-olds.
 
 ## Use Case
-For demonstration purposes, we use:
+Let's examine our use-case for this guide.
 
 The raw dataset [TinyStories](https://huggingface.co/datasets/roneneldan/TinyStories), introduced in the paper [TinyStories: How Small Can Language Models Be and Still Speak Coherent English?](https://arxiv.org/abs/2305.07759) by Ronen Eldan and Yuanzhi Li. This dataset consists of short, synthetically generated stories created by GPT-3.5 and GPT-4 with a limited vocabulary, making it highly suitable for our intended 5-year-old readers. The dataset is divided into two splits: train (2.12M rows) and validation (22K rows). For this use case, we will use the train split with 10K rows.
 
@@ -35,8 +33,8 @@ To create the instruction dataset, we will generate synthetic instruction senten
 
 
 ## Implementation
-### Step 1: Load Required Packages
-Begin by loading the necessary packages:
+### 1. Load Required Packages
+Let's begin by loading the necessary packages.
 
 ```python
 import concurrent.futures
@@ -49,7 +47,7 @@ from openai import OpenAI
 from tqdm.auto import tqdm
 from google.colab import userdata
 ```
-### Step 2: Define Modular Functions
+### 2. Define Modular Functions
 Next, we define key functions to structure our pipeline.
 
 **Extracting Stories**
@@ -139,9 +137,9 @@ def create_instruction_dataset(dataset: Dataset, client: OpenAI, num_workers: in
 	instructions, answers = zip(*instruction_answer_pairs)
 	return Dataset.from_dict({"instruction": list(instructions), "output": list(answers)})
 ```
-### Step 3: Orchestrating the Pipeline
+### 3. Orchestrating the Pipeline
 
-The `main` function orchestrates the entire pipeline:
+Nest, the `main` function orchestrates the entire pipeline, which includes:
 
 	+ Initialize the OpenAI client
 	+ Load the raw TinyStories dataset
@@ -166,9 +164,9 @@ def main() -> Dataset:
 	# Push the processed dataset to Hugging Face Hub
 	filtered_dataset.push_to_hub("tanquangduong/TinyStories_Instruction")
 ```
-### Step 4: Authenticating and Running the Pipeline
+### 4. Authenticating and Running the Pipeline
 
-Authenticate with the Hugging Face Hub and execute the pipeline:
+Then, we authenticate with the Hugging Face Hub for later dataset uploading and execute the pipeline.
 
 ```python
 from huggingface_hub import login
@@ -178,8 +176,9 @@ login(token=userdata.get('HF_TOKEN'))
 # Launch the pipeline to create instruction dataset
 main()
 ```
-## Result
-The resulting instruction dataset will look like this:
+## Resulting Instruction Dataset
+
+After running the above pipeline, the resulting instruction dataset will look like this:
 ![A snapshot of TinyStories-Instruction dataset on Hugging Face Dataset Hub](../images/instruction-dataset-sft/snapshot-TinyStories-Instruction-hf.PNG)
 
 ## Conclusion
