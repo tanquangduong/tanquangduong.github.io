@@ -1,6 +1,6 @@
 ---
-title: "Finetuning Qwen2.5-3B using DPO with Unsloth"
-subtitle: "Finetuning Qwen2.5-3B with DPO using Unsloth on TinyStories prefrence dataset"
+title: "Fine-Tune Qwen2.5-3B with DPO"
+subtitle: "Fine-Tuning Qwen2.5-3B with DPO using Unsloth on Preference TinyStories Dataset"
 author: "Quang T. Duong"
 date: "2024-08-24"
 categories: [Finetuning, DPO, Unsloth, Qwen]
@@ -9,26 +9,39 @@ image: "/images/unsloth-qwen-dpo/thumbnail.jpg"
 
 <center><img src="/images/unsloth-qwen-dpo/thumbnail.jpg"></center>
 
-::: {.column-margin}
-Getting started GenAI & LLM with my Udemy course, [**Hands-on Generative AI Engineering with Large Language Model**](https://www.udemy.com/course/hands-on-generative-ai-engineering-with-large-language-model/?referralCode=0775DF5DDD432646AD97&couponCode=OF83024E) 👇
-<a href="https://www.udemy.com/course/hands-on-generative-ai-engineering-with-large-language-model/?referralCode=0775DF5DDD432646AD97&couponCode=OF83024E"><img src="/images/genai-course/GenAI-Course-Thumbnail.png" id="llm-course"></a>
-:::
+Supervised fine-tuning for large language models (LLMs) enables precise adaptation of a model to specific tasks or domains, significantly improving its performance by providing labeled data tailored to desired outputs. This technique is particularly beneficial in scenarios where off-the-shelf LLMs fail to meet domain-specific or task-specific requirements, such as legal document summarization or medical diagnostics, where accuracy and relevance are critical. 
 
+However, supervised fine-tuning alone may not address alignment with human preferences, especially in open-ended or subjective tasks. This is where Reinforcement Learning from Human Feedback (RLHF) techniques come into handy. As they align the model's outputs with user preferences by incorporating feedback on what users value most, ensuring that the LLM generates responses that are not only accurate but also contextually aligned with human expectations and ethical considerations. These fine-tuning techniques are often named as fine-tuning with preference aligmnent.
 
-## Fine-Tuning with Preference Alignment
+This post focuses on Direct Preference Optimization (DPO), a fine-tuning technique that aligns large language models (LLMs) with human preferences by directly optimizing the model's outputs based on human feedback. 
 
+##  Preference Aligmnent with DPO
 
-##  Fine Tuning with DPO
-Direct Preference Optimization (DPO) is a technique used for fine-tuning language models in scenarios where it is critical to optimize for specific outputs based on preferences, such as ranking user responses. By using DPO with the LoRA (Low-Rank Adaptation) technique, we can leverage efficient finetuning by only modifying a small subset of the model's parameters. This keeps training costs low while maintaining flexibility in the model's outputs.
+DPO is introduced in the paper [Direct Preference Optimization: Your Language Model is Secretly a Reward Model] (https://arxiv.org/abs/2305.18290) by R. Rafailov et al in 2023.
 
-##  Use Case
-For this example, our use-case involves using DPO to fine-tune Qwen2.5-3B to generate engaging Tiny Stories tailored for children. By providing prompts and desired responses (and contrasting rejected responses), we can better shape the model to deliver coherent, engaging, and task-appropriate stories for various instructions.
+Unlike Proximal Policy Optimization (PPO), a reinforcement learning algorithm that requires training a separate reward model and iterative sampling, DPO simplifies the process by using a supervised learning framework to adjust the model's behavior according to ranked human preferences. 
 
-[Qwen2.5-3B](https://huggingface.co/Qwen/Qwen2.5-3B) is a large-scale, pretrained language model comprising 3.09 billion parameters. This model provides a balance between expressiveness and computational feasibility, making it well-suited for finetuning using more specialized optimization strategies. In this guide, we will explore using Direct Preference Optimization (DPO) within the Unsloth framework to fine-tune Qwen2.5-3B. This approach focuses on aligning model responses to specific preferences and behaviors, yielding fine-tuned models that can respond to tasks more accurately.
+The principle of DPO involves collecting human preferences on model outputs and using a binary cross-entropy objective to steer the model towards producing desired responses.
 
+This method offers several benefits: it simplifies the training process, reduces computational requirements, and potentially leads to faster and more effective alignment with human values. Additionally, it can be more efficient in mitigating the risk of inheriting biases from training data. 
+
+In the next session, we will work on an use-case where we implement DPO to fine-tune a base LLM for a specific question-answering task that align with human preference.
+
+## Use-case
+
+In the previous post, [Fine-tune Qwen2.5-3B using Lora with Unsloth](https://tanquangduong.github.io/posts/unsloth-qwen-sft-lora.html), we have fine-tuned the base model [Qwen2.5-3B](https://huggingface.co/Qwen/Qwen2.5-3B) on the instruction dataset [TinyStories_Instruction](https://huggingface.co/datasets/tanquangduong/TinyStories_Instruction) using Parameter-Efficient Fine-Tuning (PEFT) technique like LoRA to obtain a story generator for childrens given an story instruction request.
+
+Continue this use-case, in this post we will also fine-tune the base model Qwen2.5-3B, but using DPO. For this end, we need to use a preference dataset [TinyStories_Preference](https://huggingface.co/datasets/tanquangduong/TinyStories_Preference). Please refer this post [Create Preference Dataset for DPO Fine-Tuning](https://tanquangduong.github.io/posts/preference-dataset-dpo.html) for more detail about this dataset.
+
+At the end we will compare the stories generated by the two methods.
 
 ##  Implementation
-**Step 1: Import Necessary Libraries**
+### Install and import required packages
+```python
+!pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
+!pip install --no-deps xformers trl peft accelerate bitsandbytes
+!pip install -q comet_ml
+```
 
 ```python
 from unsloth import PatchDPOTrainer
@@ -41,15 +54,15 @@ from transformers import TrainingArguments, TextStreamer
 from unsloth import FastLanguageModel, is_bfloat16_supported
 from trl import DPOConfig, DPOTrainer
 from google.colab import userdata
+import comet_ml
 ```
 
-**Step 2: Initialize Comet ML for Experiment Tracking**
+### Initialize Comet ML for Experiment Tracking
 ```python
-import comet_ml
 comet_ml.login(project_name="dpo-lora-unsloth")
 ```
 
-**Step 3: Load Pretrained Model and Tokenizer**
+### Load Pretrained Model and Tokenizer
 ```python
 max_seq_length = 2048
 model, tokenizer = FastLanguageModel.from_pretrained(
@@ -58,7 +71,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     load_in_4bit=False,
     )
 ```
-**Step 4: Apply LoRA Adaptation**
+### Apply LoRA Adaptation
 ```python
 model = FastLanguageModel.get_peft_model(
     model,
@@ -68,9 +81,10 @@ model = FastLanguageModel.get_peft_model(
     target_modules=["q_proj", "k_proj", "v_proj", "up_proj", "down_proj", "o_proj", "gate_proj"],
     )
 ```
-**Step 5: Dataset Preparation**
+### Dataset Preparation
 
 Format the dataset using a specific template and split it for training and testing.
+
 ```python
 alpaca_template = """Below is an instruction that describes a task.
 Write a response that appropriately completes the request.
@@ -92,9 +106,10 @@ def format_samples(example):
 dataset = dataset.map(format_samples)
 dataset = dataset.train_test_split(test_size=0.05)
 ```
-**Step 6: Training Using DPOTrainer**
+### Training Using DPOTrainer
 
 Configure and train the model using the DPOTrainer class.
+
 ```python
 trainer = DPOTrainer(
     model=model,
@@ -129,7 +144,7 @@ trainer = DPOTrainer(
 
 trainer.train()
 ```
-**Step 7: Model Inference**
+### Model Inference
 
 Generate a response using the fine-tuned model.
 ```python
@@ -141,7 +156,7 @@ inputs = tokenizer([message], return_tensors="pt").to("cuda")
 text_streamer = TextStreamer(tokenizer)
 _ = model.generate(**inputs, streamer=text_streamer, max_new_tokens=2048, use_cache=True)
 ```
-**Step 8: Save and Push to Hugging Face Hub**
+### Save and Push to Hugging Face Hub
 
 ```python
 from huggingface_hub import login
@@ -152,32 +167,8 @@ model.save_pretrained_merged("model", tokenizer, save_method="merged_16bit")
 model.push_to_hub_merged("tanquangduong/Qwen2.5-3B-DPO-TinyStories", tokenizer, save_method="merged_16bit")
 ```
 
-
-##  Inference
-Using the fine-tuned model for generating outputs:
-
-```python
-from transformers import AutoTokenizer, AutoModelForCausalLM
-
-tokenizer = AutoTokenizer.from_pretrained("tanquangduong/Qwen2.5-3B-DPO-TinyStories")
-model = AutoModelForCausalLM.from_pretrained("tanquangduong/Qwen2.5-3B-DPO-TinyStories")
-alpaca_template = """Below is an instruction that describes a task.
-Write a response that appropriately completes the request.
-### Instruction:
-{}
-### Response:
-{}"""
-
-model = model.to("cuda")
-FastLanguageModel.for_inference(model)
-message = alpaca_template.format("Write a story about a humble little bunny \
-named Ben who follows a mysterious trail in the woods, \
-discovering beautiful flowers, new friends, and a lovely pond along the way.", "")
-inputs = tokenizer([message], return_tensors="pt").to("cuda")
-text_streamer = TextStreamer(tokenizer)
-_ = model.generate(**inputs, streamer=text_streamer, max_new_tokens=2048, use_cache=True)
-```
 ## Conclusion
+
 In this guide, we demonstrated how to fine-tune Qwen2.5-3B using Direct Preference Optimization (DPO) within the Unsloth framework. By leveraging LoRA for parameter-efficient adaptation, we tailored the model's output behavior to better suit our target use case of generating child-friendly Tiny Stories. This methodology highlights the effectiveness of combining DPO and LoRA to achieve powerful, specialized fine-tuned models.
 
 
