@@ -2,97 +2,97 @@
   {
     "objectID": "posts/unsloth-qwen-sft-lora.html",
     "href": "posts/unsloth-qwen-sft-lora.html",
-    "title": "Fine-tune Qwen2.5-3B with Unscloth",
+    "title": "Supervised Fine-Tune Qwen2.5-3B with LoRA & Unsloth",
     "section": "",
     "text": "Large language models (LLMs) are initially trained on vast amounts of unlabeled data to acquire broad general knowledge. However, this pretraining approach has limitations for specialized tasks like Question Answering (QA) due to the facts like (1) The next-token prediction objective used in pretraining is not directly aligned with targeted tasks like QA. (2) General knowledge may be insufficient for domain-specific applications requiring specialized expertise. (3) Publicly available pretraining data may lack up-to-date or proprietary information needed for certain use cases.\nThose senarios are where Supervised Fine-Tuning (SFT) comes into play. It addresses these limitations by adapting pretrained LLMs for specific downstream tasks, by (1) enabling models to learn task-specific patterns and nuances, (2) incorporating domain knowledge not present in general pretraining data, (3) improving performance on targeted applications like QA",
     "crumbs": [
       "📝Posts",
       "⚡ **Fine-Tuning**",
-      "1. Supervised Fine-Tune Qwen2.5-3B vs LoRA"
+      "1. Supervised Fine-Tune with LoRA"
     ]
   },
   {
     "objectID": "posts/unsloth-qwen-sft-lora.html#sft-pipeline-components",
     "href": "posts/unsloth-qwen-sft-lora.html#sft-pipeline-components",
-    "title": "Fine-tune Qwen2.5-3B with Unscloth",
+    "title": "Supervised Fine-Tune Qwen2.5-3B with LoRA & Unsloth",
     "section": "SFT Pipeline Components",
     "text": "SFT Pipeline Components\nThe SFT pipeline consists of several key stages and components, illustrated in the following flowchart: \n\nInputs: Including a raw dataset comprising task-specific examples, along with a pretrained base language model.\nInstruction-Dataset Preparation: In this phase, the raw data undergoes a process of refinement and structuring. This stage involves data cleaning and filtering, which ensures the removal of irrelevant, inconsistent, or low-quality examples. Following this, the generation of instruction-answer pairs takes place, transforming the dataset into a form conducive to instructional tasks and allowing the model to learn through guided examples that are relevant to its intended applications.\nDataset Formatting: During this phase, the prepared data is converted into standardized formats to maintain consistency across diverse implementations. These formats include widely-used structures such as JSON configurations modeled on popular frameworks like Alpaca, ShareGPT, and OpenAI formats. Additionally, examples are organized with the aid of structured chat templates, such as those derived from Alpaca, ChatML, and Llama 3, further enhancing the model’s ability to engage in coherent, context-aware dialogues.\nCore SFT Process: This stage builds on the well-structured data to fine-tune the base model. During this stage, the model is trained on the formatted instruction dataset using advanced SFT methodologies. Techniques like full fine-tuning, LoRA (Low-Rank Adaptation), or QLoRA (Quantized LoRA) are employed to optimize the model’s performance while preserving efficiency and adaptability.\nOutput: At the final stage, we will obtain task-specific fine-tuned model.\n\nThis pipeline allows for systematic adaptation of LLMs to targeted applications while leveraging their pretrained knowledge.\nNote that the formatted instruction datasets and chat templates provide a unified way to present diverse training examples to the model. If we fine-tune the pretrained base model, we can choose any chat templates. However, if we fine-tune an instruct model, we need to use the sample template.",
     "crumbs": [
       "📝Posts",
       "⚡ **Fine-Tuning**",
-      "1. Supervised Fine-Tune Qwen2.5-3B vs LoRA"
+      "1. Supervised Fine-Tune with LoRA"
     ]
   },
   {
     "objectID": "posts/unsloth-qwen-sft-lora.html#sft-techniques",
     "href": "posts/unsloth-qwen-sft-lora.html#sft-techniques",
-    "title": "Fine-tune Qwen2.5-3B with Unscloth",
+    "title": "Supervised Fine-Tune Qwen2.5-3B with LoRA & Unsloth",
     "section": "SFT techniques",
     "text": "SFT techniques\nThere are three main types of Supervised Fine-Tuning (SFT) for large language models:\n\nFull Model Fine-Tuning. This approach involves updating all parameters of the pre-trained model. It offers maximum flexibility in adapting the model to specialized tasks. It often yields significant performance improvements but requires substantial computational resources.\nFeature-Based Fine-Tuning. This method focuses on extracting features from the pre-trained model and used as input for another model or classifier. The main pre-trained model remains unchanged. It’s less resource-intensive and provides faster results, making it suitable when computational power is limited.\nParameter-Efficient Fine-Tuning (PEFT). PEFT techniques aim to fine-tune models more efficiently. Only a portion of the model’s weights are modified, leaving the fundamental language understanding intact. It adds task-specific layers or adapters to the pre-trained model. Significantly reduces computational costs compared to full fine-tuning while still achieving competitive performance.\n\nThe choice between these approaches is often based on the specific requirements of the task, available computational resources, and desired model performance.\nIn this article, we will discuss more about the two most popular and effective PEFT techniques: LoRA and QLoRA.",
     "crumbs": [
       "📝Posts",
       "⚡ **Fine-Tuning**",
-      "1. Supervised Fine-Tune Qwen2.5-3B vs LoRA"
+      "1. Supervised Fine-Tune with LoRA"
     ]
   },
   {
     "objectID": "posts/unsloth-qwen-sft-lora.html#peft-with-lora-and-qlora",
     "href": "posts/unsloth-qwen-sft-lora.html#peft-with-lora-and-qlora",
-    "title": "Fine-tune Qwen2.5-3B with Unscloth",
+    "title": "Supervised Fine-Tune Qwen2.5-3B with LoRA & Unsloth",
     "section": "PEFT with LoRA and QLoRA",
     "text": "PEFT with LoRA and QLoRA\nLoRA (Low-Rank Adaptation) is introduced in 2021 in the paper “LoRA: Low-Rank Adaptation of Large Language Models” by Adward et al.. It then has gained widespread adoption. It is a cost-effective and efficient method for adapting pretrained language models to specific tasks by freezing most of the model’s parameters and updating only a small number of task-specific weights. This approach leverages adapters to reduce the training overhead, making it an attractive solution for limited compute scenarios.\nQLoRA (Quantized Low-Rank Adaptation) is an extension of the LoRA technique. It is proposed in the paper “QLoRA: Efficient Finetuning of Quantized LLMs” by Tim et al. in 2023. It quantizes the weight of each pretrained parameter to 4 bits (from the typical 32 bits). This results in significant memory savings and enables running large language models on a single GPU\nWhen deciding between LoRA and QLoRA for fine-tuning large language models, key considerations revolve around hardware, model size, speed, and accuracy needs.\nLoRA generally requires more GPU memory than QLoRA but is more efficient than full fine-tuning, making it suitable for systems with moderate to high GPU memory capacity. QLoRA, on the other hand, significantly lowers memory demands, making it more suitable for devices with limited memory resources. While LoRA is often faster, QLoRA incurs slight speed trade-offs due to quantization steps but offers superior memory efficiency, enabling fine-tuning of larger models on constrained hardware.\nAccuracy and computational efficiency also differ between the two methods. LoRA typically yields stable and precise results, whereas QLoRA’s use of quantization may lead to minor accuracy losses, though it can sometimes reduce overfitting. When it comes to specific needs, LoRA is ideal if preserving full model precision is vital, whereas QLoRA shines for extremely large models or environments with tight memory constraints. QLoRA also supports varying levels of quantization (e.g., 8-bit, 4-bit, or even 2-bit), adding flexibility but at the cost of increased implementation complexity.\nTo implement LoRA and QLoRA in practice, among other frameworks like PEFT/Bitsandbytes (Hugging Face), TorchTune, Axolotl, …, we use the Unsloth framework in this article. This is an innovative open-source framework designed to revolutionize the fine-tuning and training of large language models. So it is worth to discuss more about Unsloth in the next section.",
     "crumbs": [
       "📝Posts",
       "⚡ **Fine-Tuning**",
-      "1. Supervised Fine-Tune Qwen2.5-3B vs LoRA"
+      "1. Supervised Fine-Tune with LoRA"
     ]
   },
   {
     "objectID": "posts/unsloth-qwen-sft-lora.html#why-unsloth",
     "href": "posts/unsloth-qwen-sft-lora.html#why-unsloth",
-    "title": "Fine-tune Qwen2.5-3B with Unscloth",
+    "title": "Supervised Fine-Tune Qwen2.5-3B with LoRA & Unsloth",
     "section": "Why Unsloth?",
     "text": "Why Unsloth?\nUnsloth is developed by Daniel Han and Michael Han at Unsloth AI. This framework addresses some of the most significant challenges in LLM training, particularly speed and resource efficiency. Let’s check out some of its remarkable features and benefits:\n\nSpeed Improvements. It makes an impressive acceleration in training speed, up to 30 times faster performance compared to other advanced methods like Flash Attention 2 (FA2), completing tasks like the Alpaca benchmark in just 3 hours instead of the usual 85. This dramatic reduction in training time allows us to iterate more quickly.\nMemory Efficiency. It achieves up to 90% reduction in memory usage compared to FA2.\nAccuracy Preservation and Enhancement. Despite its focus on speed and efficiency, Unsloth maintains model accuracy with 0% performance loss, or up to 20% increase in accuracy using their MAX offering.\nHardware Flexibility. It is designed to be hardware-agnostic, supporting a wide range of GPUs including those from NVIDIA, AMD, and Intel. This compatibility ensures that users can leverage Unsloth’s benefits regardless of their existing hardware setup.",
     "crumbs": [
       "📝Posts",
       "⚡ **Fine-Tuning**",
-      "1. Supervised Fine-Tune Qwen2.5-3B vs LoRA"
+      "1. Supervised Fine-Tune with LoRA"
     ]
   },
   {
     "objectID": "posts/unsloth-qwen-sft-lora.html#use-case",
     "href": "posts/unsloth-qwen-sft-lora.html#use-case",
-    "title": "Fine-tune Qwen2.5-3B with Unscloth",
+    "title": "Supervised Fine-Tune Qwen2.5-3B with LoRA & Unsloth",
     "section": "Use-case",
     "text": "Use-case\nIn this article, we illustrate a specific use-case: Supervised fine-tuning Qwen2.5-3B model using LoRA and QLoRA, to create a story generator for children.\nFor the instruction dataset preparation stage, we use an instruction dataset TinyStories_Instruction which contains instruction-story pairs. I have prepared this dataset in my previsous post, if you have not read it yet, I recommend you to check it out. The stories in this dataset are short and synthetically generated by GPT-3.5 and GPT-4 with a limited vocabulary, making it highly suitable for our intended 5-year-old readers. While, the instruction corresponding to each story is also created synthetically using GPT-4o-mini.\nFor the pretrained language model, we use Qwen2.5-3B, a pretrained language model containing 3.09 billion parameters. We choose this for our use-case as its reasonable size, making it powerful yet suitable for fine-tuning even on resource-constrained platforms like Google Colab.\nFor the implementation part, we leverage Unsloth for speed and memory efficiency reasons.",
     "crumbs": [
       "📝Posts",
       "⚡ **Fine-Tuning**",
-      "1. Supervised Fine-Tune Qwen2.5-3B vs LoRA"
+      "1. Supervised Fine-Tune with LoRA"
     ]
   },
   {
     "objectID": "posts/unsloth-qwen-sft-lora.html#fine-tuning-implementation",
     "href": "posts/unsloth-qwen-sft-lora.html#fine-tuning-implementation",
-    "title": "Fine-tune Qwen2.5-3B with Unscloth",
+    "title": "Supervised Fine-Tune Qwen2.5-3B with LoRA & Unsloth",
     "section": "Fine-Tuning Implementation",
     "text": "Fine-Tuning Implementation\nTo achieve the fine-tuning, we will utilize the following libraries and methods:\n1. Import Necessary Libraries\nimport os\nimport comet_ml\nimport torch\nfrom trl import SFTTrainer\nfrom datasets import load_dataset, concatenate_datasets\nfrom transformers import TrainingArguments, TextStreamer\nfrom unsloth import FastLanguageModel, is_bfloat16_supported\nfrom google.colab import userdata\n2. Comet ML Login\nWe leverage Comet ML for real-time monitoring and tracking our fine-tuning experiments. Comet ML allows you to automatically track a wide range of metrics, parameters, and artifacts during the model training process. This includes training loss, gradient norms, hyperparameters, code versions, and more.\nIn addition, Comet ML makes it easy to compare different experiments, helping you understand how changes in code, hyperparameters, or data affect model performance. The platform provides workspaces and sharing capabilities, enabling teams to collaborate more effectively on ML projects. To dicover more about its features and benefits, please check out Comet ML’s website.\ncomet_ml.login(project_name=\"sft-lora-unsloth\")\n3. Load Pretrained Model and Tokenizer\nNext, we use FastLanguageModel class from Unsloth with the .from_pretrained() method to load Qwen2.5-3B model and its corresponding tokenizer. We specify the max sequence length as 2048 in this use-case. Then, the load_in_4bit argument indicates if we want to use QLoRA (assign True), else LoRA.\nmax_seq_length = 2048\nmodel, tokenizer = FastLanguageModel.from_pretrained(\n    model_name=\"Qwen/Qwen2.5-3B\",\n    max_seq_length=max_seq_length,\n    load_in_4bit=False,\n    )\n4. Apply LoRA Adaptation\nThen, we set up LoRA configurations for our loaded model, including the rank r as 32, alpha as 32, no dropout and target modules as linear layers. This is where leveraging experiment tracking and comparison, we can apply hyperparameter tuning to find out the best set of parameters.\nmodel = FastLanguageModel.get_peft_model(\n    model,\n    r=32,\n    lora_alpha=32,\n    lora_dropout=0,\n    target_modules=[\"q_proj\", \"k_proj\", \"v_proj\", \"up_proj\", \"down_proj\", \"o_proj\", \"gate_proj\"],\n    )\n5. Formatting Dataset\nNext, we need to load, format and map the instruction dataset into a specific text template, using Alpaca template in this example.\n# Get Instruction Dataset\ndataset = load_dataset(\"tanquangduong/TinyStories_Instruction\", split=\"train\")\n\n# Template for formatting instruction-output pairs following Alpaca dataset format\nalpaca_template = \"\"\"Below is an instruction that describes a task.\nWrite a response that appropriately completes the request.\n### Instruction:\n{}\n### Response:\n{}\"\"\"\n\n# Get the end of sequence token from the tokenizer\nEOS_TOKEN = tokenizer.eos_token\n\ndef format_samples(examples):\n    \"\"\"\n    Format instruction-output pairs into training samples.\n    Args:\n        examples: Dictionary containing 'instruction' and 'output' lists\n    Returns:\n        Dictionary with formatted 'text' list\n    \"\"\"\n    text = []\n    # Zip instruction-output pairs together and format each pair\n    for instruction, output in zip(examples[\"instruction\"], examples[\"output\"], strict=False):\n        # Insert instruction & output into template and append EOS token\n        message = alpaca_template.format(instruction, output) + EOS_TOKEN\n        text.append(message)\n\n    return {\"text\": text}\n\n# Apply formatting to entire dataset:\n# - Process in batches for efficiency\n# - Remove original columns since they're now formatted into 'text'\ndataset = dataset.map(format_samples, batched=True, remove_columns=dataset.column_names)\n6. Setting Up the Trainer and Lauching the Training\nWhen the instruction dataset is formatted and prepared, and the model is loaded with adapted parameters and architectures (e.g., LoRA or QLoRA), we utilize the SFTTrainer class from the TRL library for supervised fine-tuning.\ntrainer = SFTTrainer(\n    model=model,\n    tokenizer=tokenizer,\n    train_dataset=dataset[\"train\"],\n    eval_dataset=dataset[\"test\"],\n    dataset_text_field=\"text\",\n    max_seq_length=max_seq_length,\n    dataset_num_proc=2,\n    packing=True,\n    args=TrainingArguments(\n        learning_rate=1e-5,\n        lr_scheduler_type=\"linear\",\n        per_device_train_batch_size=2,\n        per_device_eval_batch_size=2,\n        gradient_accumulation_steps=8,\n        num_train_epochs=3,\n        fp16=not is_bfloat16_supported(),\n        bf16=is_bfloat16_supported(),\n        logging_steps=1,\n        optim=\"adamw_8bit\",\n        weight_decay=0.01,\n        warmup_steps=10,\n        output_dir=\"output\",\n        report_to=\"comet_ml\",\n        seed=0,\n        ),\n    )\ntrainer.train()\n7. Experiment tracking\nDuring training, we can track the training loss or other metrics using the Comet ML platform. The plots should look like the following:\n\n\n\nML Experiment Tracking using Comet ML\n\n\n8. Model Inference\nWhen the fine-tuning is finished, we can perform a quick test on the fine-tuned model.\n# Switch model to inference mode (disables training-specific components)\nFastLanguageModel.for_inference(model)\n\n# Format the story prompt using Alpaca template\nmessage = alpaca_template.format(\"Write a story about a humble little bunny \\\nnamed Ben who follows a mysterious trail in the woods, \\\ndiscovering beautiful flowers, new friends, and a lovely pond along the way.\", \"\")\n\n# Convert text to tokens, create PyTorch tensors, and move to GPU\ninputs = tokenizer([message], return_tensors=\"pt\").to(\"cuda\")\n\n# Initialize streamer for real-time token-by-token text output\ntext_streamer = TextStreamer(tokenizer)\n\n# Generate text from the model:\n# - streamer: Enables streaming output\n# - max_new_tokens: Limits response length\n# - use_cache: Enables KV-cache for faster generation\n# Result assigned to _ since we only care about streamed output\n_ = model.generate(**inputs, streamer=text_streamer, max_new_tokens=256, use_cache=True)\nExample of inference output looks like this:\n\n\n\nInference Output Example\n\n\n9. Save and Push to Hugging Face Hub\nNow, if we are satisfied with the fine-tuned model’s performance, it’s time to log in and push it to the Hugging Face Hub for later use.\nfrom huggingface_hub import login\n# Log in to the Hugging Face Hub\nlogin(token=userdata.get('HF_TOKEN'))\n\nmodel.save_pretrained_merged(\"model\", tokenizer, save_method=\"merged_16bit\")\nmodel.push_to_hub_merged(\"tanquangduong/Qwen2.5-3B-Instruct-TinyStories\", tokenizer, save_method=\"merged_16bit\")",
     "crumbs": [
       "📝Posts",
       "⚡ **Fine-Tuning**",
-      "1. Supervised Fine-Tune Qwen2.5-3B vs LoRA"
+      "1. Supervised Fine-Tune with LoRA"
     ]
   },
   {
     "objectID": "posts/unsloth-qwen-sft-lora.html#conclusion",
     "href": "posts/unsloth-qwen-sft-lora.html#conclusion",
-    "title": "Fine-tune Qwen2.5-3B with Unscloth",
+    "title": "Supervised Fine-Tune Qwen2.5-3B with LoRA & Unsloth",
     "section": "Conclusion",
     "text": "Conclusion\nIn this article, we discuss fine-tuning LLMs for specialized tasks, such as Question Answering for a story generator, which general pretraining often falls short of due to limited instructive data and objectives. Supervised Fine-Tuning addresses this by refining LLMs using instruction datasets, structured formats, and techniques like LoRA and QLoRA to optimize performance and resource efficiency. LoRA focuses on selective parameter tuning, while QLoRA adds memory-efficient quantization, making it suitable for constrained hardware.\nAdditionally, we utilize the Unsloth framework for efficient and fast fine-tuning, Hugging Face’s TRL for setting up the training process, Comet ML for real-time tracking of fine-tuning experiments, and Hugging Face Hub for dataset and model storage and access.\nWe demonstrated through an example of adapting a custom instruction dataset to fine-tune the Qwen2.5-3B model, resulting in a fine-tuned model that functions as a story generator capable of creating children’s stories based on a simple instruction prompt.",
     "crumbs": [
       "📝Posts",
       "⚡ **Fine-Tuning**",
-      "1. Supervised Fine-Tune Qwen2.5-3B vs LoRA"
+      "1. Supervised Fine-Tune with LoRA"
     ]
   },
   {
@@ -268,7 +268,7 @@
     "href": "index.html",
     "title": "✨ AI/ML, MLOps, LLMOps",
     "section": "",
-    "text": "Implement Guardrails for Domain-specific Chatbots\n\n\nInput & Output Guardrails for Food and Dish Recommendation Chatbot | Asynchronous Programming | SOLID Principles\n\n\n\nChatbot Guardrail\n\n\nAsynchronous Programming\n\n\nSOLID Principles\n\n\n\n\n\n\nDec 1, 2024\n\n\n16 min\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nBuild Conversational Agentic Chatbot\n\n\nBuilding conversational chatbot using agent (tool/function calling) to interact with database\n\n\n\nAgentic Chatbot\n\n\nConversational Chatbot\n\n\nFunction Calling\n\n\n\n\n\n\nNov 23, 2024\n\n\n14 min\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nFine-Tune Qwen2.5-3B with DPO\n\n\nFine-Tuning Qwen2.5-3B with DPO using Unsloth on Preference TinyStories Dataset\n\n\n\nFinetuning\n\n\nDPO\n\n\nUnsloth\n\n\nQwen\n\n\n\n\n\n\nAug 26, 2024\n\n\n8 min\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nFine-tune Qwen2.5-3B with Unscloth\n\n\nFinetuning Qwen2.5-3B with SFT-Lora using Unsloth on TinyStories instruction dataset\n\n\n\nFinetuning\n\n\nLORA\n\n\nUnsloth\n\n\n\n\n\n\nAug 25, 2024\n\n\n12 min\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nCreate Preference Dataset for DPO Fine-Tuning\n\n\nLeveraging LLMs for creating preference dataset for DPO Fine-Tuning\n\n\n\npreference-dataset\n\n\n\n\n\n\nAug 18, 2024\n\n\n4 min\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nCreate Instruction Dataset for Supervised Fine-Tuning\n\n\nLeveraging LLMs for creating instruction dataset for Supervised Fine-Tuning\n\n\n\ninstruction-dataset\n\n\n\n\n\n\nAug 11, 2024\n\n\n7 min\n\n\n\n\n\n\n\n\n\nNo matching items"
+    "text": "Implement Guardrails for Domain-specific Chatbots\n\n\nInput & Output Guardrails for Food and Dish Recommendation Chatbot | Asynchronous Programming | SOLID Principles\n\n\n\nChatbot Guardrail\n\n\nAsynchronous Programming\n\n\nSOLID Principles\n\n\n\n\n\n\nDec 1, 2024\n\n\n16 min\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nBuild Conversational Agentic Chatbot\n\n\nBuilding conversational chatbot using agent (tool/function calling) to interact with database\n\n\n\nAgentic Chatbot\n\n\nConversational Chatbot\n\n\nFunction Calling\n\n\n\n\n\n\nNov 23, 2024\n\n\n14 min\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nFine-Tune Qwen2.5-3B with DPO & Unsloth\n\n\nFine-Tuning Qwen2.5-3B with DPO using Unsloth on Preference TinyStories Dataset\n\n\n\nFinetuning\n\n\nDPO\n\n\nUnsloth\n\n\nQwen\n\n\n\n\n\n\nAug 26, 2024\n\n\n8 min\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nSupervised Fine-Tune Qwen2.5-3B with LoRA & Unsloth\n\n\nFinetuning Qwen2.5-3B with SFT-Lora using Unsloth on TinyStories instruction dataset\n\n\n\nFinetuning\n\n\nLORA\n\n\nUnsloth\n\n\n\n\n\n\nAug 25, 2024\n\n\n12 min\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nCreate Preference Dataset for DPO Fine-Tuning\n\n\nLeveraging LLMs for creating preference dataset for DPO Fine-Tuning\n\n\n\npreference-dataset\n\n\n\n\n\n\nAug 18, 2024\n\n\n4 min\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nCreate Instruction Dataset for Supervised Fine-Tuning\n\n\nLeveraging LLMs for creating instruction dataset for Supervised Fine-Tuning\n\n\n\ninstruction-dataset\n\n\n\n\n\n\nAug 11, 2024\n\n\n7 min\n\n\n\n\n\n\n\n\n\nNo matching items"
   },
   {
     "objectID": "draft/course.html",
@@ -438,61 +438,61 @@
   {
     "objectID": "posts/unsloth-qwen-dpo.html",
     "href": "posts/unsloth-qwen-dpo.html",
-    "title": "Fine-Tune Qwen2.5-3B with DPO",
+    "title": "Fine-Tune Qwen2.5-3B with DPO & Unsloth",
     "section": "",
     "text": "Supervised fine-tuning for large language models (LLMs) enables precise adaptation of a model to specific tasks or domains, significantly improving its performance by providing labeled data tailored to desired outputs. This technique is particularly beneficial in scenarios where off-the-shelf LLMs fail to meet domain-specific or task-specific requirements, such as legal document summarization or medical diagnostics, where accuracy and relevance are critical.\nHowever, supervised fine-tuning alone may not address alignment with human preferences, especially in open-ended or subjective tasks. This is where Reinforcement Learning from Human Feedback (RLHF) techniques come in handy. As they align the model’s outputs with user preferences by incorporating feedback on what users value most, ensuring that the LLM generates responses that are not only accurate but also contextually aligned with human expectations and ethical considerations. These fine-tuning techniques are often named as fine-tuning with preference alignmnent.\nThis post focuses on Direct Preference Optimization (DPO), a fine-tuning technique that aligns LLMs with human preferences by directly optimizing the model’s outputs based on human feedback.",
     "crumbs": [
       "📝Posts",
       "⚡ **Fine-Tuning**",
-      "2. Fine-Tune Qwen2.5-3B vs DPO"
+      "2. Preference Alignment Fine-Tune with DPO"
     ]
   },
   {
     "objectID": "posts/unsloth-qwen-dpo.html#preference-alignmnent-with-dpo",
     "href": "posts/unsloth-qwen-dpo.html#preference-alignmnent-with-dpo",
-    "title": "Fine-Tune Qwen2.5-3B with DPO",
+    "title": "Fine-Tune Qwen2.5-3B with DPO & Unsloth",
     "section": "Preference Alignmnent with DPO",
     "text": "Preference Alignmnent with DPO\nDPO is introduced in the paper Direct Preference Optimization: Your Language Model is Secretly a Reward Model by R. Rafailov et al in 2023.\nUnlike Proximal Policy Optimization (PPO), a reinforcement learning algorithm that requires training a separate reward model and iterative sampling, DPO simplifies the process by using a supervised learning framework to adjust the model’s behavior according to ranked human preferences.\nThe principle of DPO involves collecting human preferences on model outputs and using a binary cross-entropy objective to steer the model towards producing desired responses.\nThis method offers several benefits: it simplifies the training process, reduces computational requirements, and potentially leads to faster and more effective alignment with human values. Additionally, it can be more efficient in mitigating the risk of inheriting biases from training data.\nIn the next session, we will work on a use-case where we implement DPO to fine-tune a base LLM for a specific question-answering task that aligns with human preference.",
     "crumbs": [
       "📝Posts",
       "⚡ **Fine-Tuning**",
-      "2. Fine-Tune Qwen2.5-3B vs DPO"
+      "2. Preference Alignment Fine-Tune with DPO"
     ]
   },
   {
     "objectID": "posts/unsloth-qwen-dpo.html#use-case",
     "href": "posts/unsloth-qwen-dpo.html#use-case",
-    "title": "Fine-Tune Qwen2.5-3B with DPO",
+    "title": "Fine-Tune Qwen2.5-3B with DPO & Unsloth",
     "section": "Use-case",
     "text": "Use-case\nIn the previous post, Fine-tune Qwen2.5-3B using Lora with Unsloth, we have fine-tuned the base model Qwen2.5-3B on the instruction dataset TinyStories_Instruction using Parameter-Efficient Fine-Tuning (PEFT) technique like LoRA to obtain a story generator for children given a story instruction request.\nContinue this use-case, in this post we will also fine-tune the base model Qwen2.5-3B, but using DPO. For this end, we need to use a preference dataset TinyStories_Preference, that we have created and discussed in the previous post Create Preference Dataset for DPO Fine-Tuning.\nEventually we will compare stories generated by the two above methods to evaluate their performance.\nLet’s jump into the implementation part.",
     "crumbs": [
       "📝Posts",
       "⚡ **Fine-Tuning**",
-      "2. Fine-Tune Qwen2.5-3B vs DPO"
+      "2. Preference Alignment Fine-Tune with DPO"
     ]
   },
   {
     "objectID": "posts/unsloth-qwen-dpo.html#implementation",
     "href": "posts/unsloth-qwen-dpo.html#implementation",
-    "title": "Fine-Tune Qwen2.5-3B with DPO",
+    "title": "Fine-Tune Qwen2.5-3B with DPO & Unsloth",
     "section": "Implementation",
     "text": "Implementation\n\nInstall and import required packages\n!pip install \"unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git\"\n!pip install --no-deps xformers trl peft accelerate bitsandbytes\n!pip install -q comet_ml\nfrom unsloth import PatchDPOTrainer\nPatchDPOTrainer()\n\nimport os\nimport torch\nfrom datasets import load_dataset\nfrom transformers import TrainingArguments, TextStreamer\nfrom unsloth import FastLanguageModel, is_bfloat16_supported\nfrom trl import DPOConfig, DPOTrainer\nfrom google.colab import userdata\nimport comet_ml\n\n\nInitialize Comet ML for Experiment Tracking\nSet up Comet ML to log experiments, track training metrics, and monitor performance:\ncomet_ml.login(project_name=\"dpo-lora-unsloth\")\n\n\nLoad Pretrained Model and Tokenizer\nLoad the pretrained Qwen model and tokenizer from Hugging Face. Specify the maximum sequence length and determine whether to load the model in 4-bit precision for efficiency: True means using QLoRA, False means using LoRA.\nmax_seq_length = 2048\nmodel, tokenizer = FastLanguageModel.from_pretrained(\n    model_name=\"Qwen/Qwen2.5-3B\",\n    max_seq_length=max_seq_length,\n    load_in_4bit=False,\n    )\n\n\nApply LoRA Adaptation\nLoRA efficiently fine-tunes specific layers, i.e. “q_proj”, “k_proj”, “v_proj”, etc, by introducing additional trainable parameters, significantly reducing memory and computation requirements:\nmodel = FastLanguageModel.get_peft_model(\n    model,\n    r=32,\n    lora_alpha=32,\n    lora_dropout=0,\n    target_modules=[\"q_proj\", \"k_proj\", \"v_proj\", \"up_proj\", \"down_proj\", \"o_proj\", \"gate_proj\"],\n    )\n\n\nDataset Preparation\nFormat the dataset with a specific Alpaca-like template and append the EOS token to chosen and rejected samples. Then split the dataset into training and testing sets:\nalpaca_template = \"\"\"Below is an instruction that describes a task.\nWrite a response that appropriately completes the request.\n### Instruction:\n{}\n### Response:\n\"\"\"\n\nEOS_TOKEN = tokenizer.eos_token\ndef format_samples(example):\n    example[\"prompt\"] = alpaca_template.format(example[\"prompt\"])\n    example[\"chosen\"] = example['chosen'] + EOS_TOKEN\n    example[\"rejected\"] = example['rejected'] + EOS_TOKEN\n    return {\n        \"prompt\": example[\"prompt\"],\n        \"chosen\": example[\"chosen\"],\n        \"rejected\": example[\"rejected\"]\n    }\ndataset = dataset.map(format_samples)\ndataset = dataset.train_test_split(test_size=0.05)\n\n\nTraining Using DPOTrainer\nConfigure the training process with the DPOTrainer class. Define hyperparameters such as learning rate, batch size, gradient accumulation steps, and number of epochs. Enable Comet ML for logging:\ntrainer = DPOTrainer(\n    model=model,\n    ref_model=None,\n    tokenizer=tokenizer,\n    beta=0.5,\n    train_dataset=dataset[\"train\"],\n    eval_dataset=dataset[\"test\"],\n    max_length=max_seq_length//2,\n    max_prompt_length=max_seq_length//2,\n    args=DPOConfig(\n        learning_rate=2e-6,\n        lr_scheduler_type=\"linear\",\n        per_device_train_batch_size=2,\n        per_device_eval_batch_size=2,\n        gradient_accumulation_steps=8,\n        num_train_epochs=1,\n        fp16=not is_bfloat16_supported(),\n        bf16=is_bfloat16_supported(),\n        optim=\"adamw_8bit\",\n        weight_decay=0.01,\n        warmup_steps=10,\n        output_dir=\"output\",\n        eval_strategy=\"steps\",\n        eval_steps=0.2,\n        logging_steps=1,\n        report_to=\"comet_ml\",\n        seed=0,\n        ),\n)\n\n\ntrainer.train()\n\n\nModel Inference\nWhen the training has finished, let’s test our fine-tuned model. The inference includes formatting the input prompt and using a text streamer for real-time text generation:\nFastLanguageModel.for_inference(model)\nmessage = alpaca_template.format(\"Write a story about a humble little bunny \\\nnamed Ben who follows a mysterious trail in the woods, \\\ndiscovering beautiful flowers, new friends, and a lovely pond along the way.\", \"\")\ninputs = tokenizer([message], return_tensors=\"pt\").to(\"cuda\")\ntext_streamer = TextStreamer(tokenizer)\n_ = model.generate(**inputs, streamer=text_streamer, max_new_tokens=2048, use_cache=True)\nThe generated output is as below:\nOnce upon a time, there was a little bunny named Ben. Ben lived in a cozy little house in the woods, surrounded by tall trees and a beautiful meadow. He loved to play and explore, but he always felt a little bit lost and alone.\n\nOne day, Ben decided to take a walk in the woods. He was feeling a little adventurous and wanted to see what he could find. As he walked, he noticed a trail that led deeper into the woods. He followed the trail, and soon he found himself in a beautiful meadow filled with colorful flowers.\n\nAs Ben walked through the meadow, he met a little bird named Lily. Lily was a cheerful bird who loved to sing and dance. She told Ben about all the different flowers she had seen in the meadow, and they spent the rest of the day playing and having fun together.\n\nAfter a while, Ben and Lily decided to take a break and rest in a cozy little clearing. As they sat there, they heard a gentle sound coming from the pond. They followed the sound and found a lovely pond with clear, blue water. They sat by the pond and watched the fish swim around, and they even saw a little frog hop by.\n\nAs the sun began to set, Ben and Lily decided to head back home. They said goodbye to each other and promised to meet again soon. Ben felt a little bit sad, but he knew that he had made some new friends and had discovered some beautiful things in the woods.\n\nFrom that day on, Ben made a habit of exploring the woods every day. He would follow the mysterious trail and discover new things, new friends, and new adventures. And he knew that no matter where he went, he would always have a little bit of magic in his heart.\nLet’s compare it with the story generated by the instructed model:\nOnce upon a time, there was a humble little bunny named Ben. Ben loved to hop around in the meadow, eating carrots and playing with his friends. One day, Ben saw a mysterious trail in the woods. He was curious and wanted to follow it.\n\nBen hopped along the trail, hopping faster and faster. He saw beautiful flowers and new friends along the way. Suddenly, he came to a big pond. He hopped into the water and splashed around. It was so much fun!\n\nBen continued to follow the mysterious trail, hopping and splashing until he couldn't see the end. He was happy to have had such a wonderful adventure. From that day on, Ben knew that he could always follow a mysterious trail and have fun.\n\nIt can be seen that the story generated by preference alignment using DPO is more attractive and having more interesting content than the one generated by supervised fine-tune with LoRA on instruction dataset.\n\n\nSave and Push to Hugging Face Hub\nWhen we are satisfied with our training process, let’s save the fine-tuned model in 16-bit merged format and push it to the Hugging Face Hub for easy sharing and deployment:\nfrom huggingface_hub import login\n# Log in to the Hugging Face Hub\nlogin(token=userdata.get('HF_TOKEN'))\n\nmodel.save_pretrained_merged(\"model\", tokenizer, save_method=\"merged_16bit\")\nmodel.push_to_hub_merged(\"tanquangduong/Qwen2.5-3B-DPO-TinyStories\", tokenizer, save_method=\"merged_16bit\")",
     "crumbs": [
       "📝Posts",
       "⚡ **Fine-Tuning**",
-      "2. Fine-Tune Qwen2.5-3B vs DPO"
+      "2. Preference Alignment Fine-Tune with DPO"
     ]
   },
   {
     "objectID": "posts/unsloth-qwen-dpo.html#conclusion",
     "href": "posts/unsloth-qwen-dpo.html#conclusion",
-    "title": "Fine-Tune Qwen2.5-3B with DPO",
+    "title": "Fine-Tune Qwen2.5-3B with DPO & Unsloth",
     "section": "Conclusion",
-    "text": "Conclusion\nIn this article, we have discussed the need for preference alignment in fine-tuning LLMs. While traditional fine-tuning enhances model accuracy for structured tasks, while preference alignment techniques like Direct Preference Optimization (DPO) extend the capabilities of LLMs to align with human values and preferences.\nThe implementation provided in this post demonstrates how to apply DPO for fine-tuning the Qwen2.5-3B model using a preference dataset. This workflow enables the model to generate outputs that are not only accurate but also contextually relevant and ethically aligned with user expectations.",
+    "text": "Conclusion\nIn this article, we have discussed the need for preference alignment in fine-tuning LLMs. While traditional fine-tuning enhances model accuracy for structured tasks, preference alignment techniques like DPO extend the capabilities of LLMs to align with human values and preferences.\nThe implementation provided in this post demonstrates how to apply DPO for fine-tuning the Qwen2.5-3B model using a preference dataset. This workflow enables the model to generate outputs that are not only accurate but also contextually relevant and ethically aligned with user expectations.",
     "crumbs": [
       "📝Posts",
       "⚡ **Fine-Tuning**",
-      "2. Fine-Tune Qwen2.5-3B vs DPO"
+      "2. Preference Alignment Fine-Tune with DPO"
     ]
   }
 ]
