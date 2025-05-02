@@ -1,0 +1,439 @@
+---
+title: "Build Conversational Agentic Chatbot"
+subtitle: "Building conversational chatbot using agent (tool/function calling) to interact with database"
+author: "Quang T. Duong"
+colab: <a href="https://colab.research.google.com/drive/10bQcHTZ47B4iteiJYoXpVvMhd1vRzx-C?usp=sharing"><img src="images/colab.png" alt="Open In Colab"></a>
+date: "2025-03-23"
+# categories: [Agentic Chatbot, Conversational Chatbot, Function Calling]
+image: "/images/conversational-agent-chatbot/thumbnail_conversational_agent_chatbot.png" 
+---
+
+<center><img src="/images/conversational-agent-chatbot/thumbnail_conversational_agent_chatbot.png"></center>
+
+Conversational Agentic Chatbots leveraging Large Language Models (LLMs) represent a significant leap in AI-powered communication. These advanced chatbots go beyond simple query responses, actively engaging in complex tasks and decision-making processes. 
+
+They can interact with databases to answer user questions, schedule appointments, or compose and send emails, to name but a few. Unlike traditional chatbots, these AI agents understand context, adapt to user needs in real time, and can perform actions autonomously. 
+
+The increasing importance of agentic chatbots in the AI world stems from their ability to provide more personalized, efficient, and human-like interactions. 
+
+Some benefits include reduced workload for human teams, and the capacity to handle complex inquiries with greater accuracy and contextual awareness. 
+
+As businesses seek to enhance customer engagement and streamline operations, agentic chatbots powered by LLMs are becoming indispensable tools for delivering superior user experiences and driving operational efficiency
+
+## Conversational Agentic Chatbot
+
+In this guide, we'll explore the development of a conversational agentic chatbot through a real-world use case. 
+
+*Our objective is to create an LLM-powered chatbot capable of interacting with an unstructured database of food images and generating detailed descriptions of dishes presented in these images.* 
+
+For instance:
+```
+Human: Can you describe images presented famous dishes?
+AI: Please provide the name or details of the image you would like me to describe.
+Human: I think it is Figure 1
+AI: This image showcases a traditional Vietnamese Bánh Mì, a popular street food sandwich ...
+Human: Now describe Figure 2
+AI: This dish is a classic Italian spaghetti with tomato sauce, ...
+```
+Our technology stack for this project includes:
+
+- LLM model: OpenAI's GPT-4 or GPT-4-mini
+- Orchestration framework: LangGraph & LangChain for creating and orchestrating the conversational agent-based chatbot
+- Unstructured database: MongoDB for efficient storage and retrieval of image data
+- LLM & prompt monitoring: Opik by Comet ML for performance tracking and artifact management
+
+Now, let's dive into the exciting implementation phase of our project!
+
+##  Implementation with LangGraph, OpenAI, MongoDB, Opik (Comet ML)
+
+### Importing packages & Loading environment variables 
+First, we import necessary packages.
+```python
+# Import required packages
+import os
+import json
+import requests
+import opik
+from opik import track
+from langchain_core.messages import HumanMessage
+from langchain_openai import ChatOpenAI
+from langchain_core.tools import tool
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.prebuilt import create_react_agent
+from pymongo import MongoClient
+from IPython.display import Image, display
+from dotenv import load_dotenv
+```
+Next, we need to load environment variables, such as API keys, to enable the use of various services. For example: `OPENAI_API_KEY` for accessing OpenAI GPT models, `COMET_API_KEY` for utilizing Comet ML's Opik monitoring service, and `CONNECTION_STRING` for connecting to MongoDB.
+
+![Example of .env file](/images/conversational-agent-chatbot/example_env_file.PNG)
+
+We use the `load_dotenv` function from the `dotenv` package to securely load our confidential API keys.
+```python
+load_dotenv()
+```
+
+### Connect, Add and Query MongoDB
+
+Let's first connect with your MongoDB cluster. 
+```python
+# Get MongoDB Connection String, database name and collection name
+MONGO_CONNECTION_STRING = os.getenv('CONNECTION_STRING')
+FOOD_DATABASE_NAME = os.getenv('FOOD_DATABASE_NAME')
+FOOD_COLLECTION_NAME = os.getenv('FOOD_COLLECTION_NAME')
+
+# Connect to Mongo
+client = MongoClient(MONGO_CONNECTION_STRING)
+food_db = client[FOOD_DATABASE_NAME]
+food_collection = food_db[FOOD_COLLECTION_NAME]
+```
+Imagine you have raw data in JSON format containing image names and their corresponding URLs. We load this data into a dictionary.
+
+#### Get the raw data
+```python
+data_path = './data/food_db.json'
+with open(data_path, 'r') as file:
+    food_dict = json.load(file)
+print(food_dict)
+```
+The raw data is structured as follows:
+```yml
+{'Figure 1': 'https://drive.usercontent.google.com/download?id=1ODozOIYAjChN_oZoSFxUqGaAlNMeKYya&export=view&authuser=0',
+ 'Figure 2': 'https://drive.usercontent.google.com/download?id=1bxNoQ0ORvvA1Ywnijq3mCmlH4kp5Az96&export=view&authuser=0'}
+```
+
+#### Add item to Mongo DB
+Next, we insert each item from the above data dictionary into our `food_photos` data collection.
+```python
+# Iterate and upload to MongoDB
+for image_name, image_uri in food_dict.items():
+    food_collection.insert_one({'image_name': image_name, 'image_uri': image_uri})
+```
+![Food Photo DB on MongoDB](/images/conversational-agent-chatbot/mongo_food_photo_db.png)
+
+#### Query an item from Mongo DB
+The following example demonstrates how to retrieve an image URI from our MongoDB collection using an image name, and then display the image.
+```python
+import requests
+from IPython.display import Image, display
+
+# Querying image_uri by image_name
+image_name = "Figure 1"
+item = food_collection.find_one({'image_name': image_name})
+image_url = item['image_uri']
+
+# Plot image
+response = requests.get(image_url)
+image_data = response.content
+display(Image(data=image_data))
+```
+![Example of querying image_uri](/images/conversational-agent-chatbot/vietnamese_sandwich.webp)
+
+### Create OpenAI LLM and Opik clients 
+In the next step, we initialize the OpenAI LLM model and the Opik client, which serve as the core AI model and the AI monitoring service, respectively.  
+```python
+# Initial OpenAI model, i.e. gpt-4o or gpt-4o-mini
+llm = ChatOpenAI(model="gpt-4o")
+
+# Initiate Opik client for LLM and prompt monitoring and management
+opik_client = opik.Opik()
+```
+### Promp tracking and management with Opik (Comet ML)
+Prompt engineering significantly impacts LLM performance. Therefore, a dedicated tool for prompt monitoring, versioning, and management is crucial. This practice is a cornerstone of LLMOps best practices. A centralized platform is essential for streamlining prompt monitoring and management while enabling seamless team collaboration.
+
+For this vital task, we utilize Comet ML's Opik to ensure easy-to-use and effectiveness.
+
+Let’s create our prompt for the agent task on the Opik platform. Alternatively, you can also create it programmatically. See [this tutorial from Opik](https://www.comet.com/docs/opik/library/prompt_management) for more information.
+![Example of creating prompt on Opik (Comet ML)](/images/conversational-agent-chatbot/create_prompt_on_opik.png)
+
+The prompt for our agent is as bellow.
+```
+You are a renowned master chef with expertise in analyzing dishes and crafting exquisite recipes. 
+
+Upon receiving a photo of a food item, you will provide a detailed description of the dish, including its key characteristics, ingredients, and cultural context if applicable. 
+
+Then, you will create a high-quality, easy-to-follow recipe to prepare this dish, ensuring both flavor and presentation are exceptional.
+```
+
+When you create different prompts for various purposes, the Opik's Prompt Library page should look like this:
+![Prompt library on Opik (Comet ML)](/images/conversational-agent-chatbot/prompt_library_opik.png)
+
+### Prepare prompt for AI Tool
+
+After creating the agent prompt on the Opik platform, we use the Opik Python SDK to retrieve this prompt directly in our source code. We then integrate it into a `HumanMessage` template from LangChain, enabling its use in the main function of our agentic tool. 
+
+The prompt and human message preparation are achieved using the following `get_prompt` function.
+
+We use a decorator for this function:
+
+- @track: for Opik to track the function's inputs and outputs.
+
+```python
+@track
+def get_prompt(prompt_name, image_url):
+    # Get prompt that is created on Opik platform
+    prompt_template = opik_client.get_prompt(name=prompt_name)
+    formatted_prompt_template = prompt_template.format()
+
+    # Create Human message
+    human_message = HumanMessage(
+        content=[
+            {"type": "text", "text": formatted_prompt_template},
+            {"type": "image_url", "image_url": {"url": image_url}},
+        ],
+    )
+    return human_message
+```
+Next, we create the main function, `generate_ip_image_description`, for our agentic tool. Following the LangGraph agent convention, we include a docstring that describes the task the agent should perform. This function performs several steps:
+
+1. Specify the name of the prompt we want to use.
+2. Query the image_url from the MongoDB collection using the image_name.
+3. Create a human message using the `get_prompt` function with two input arguments: `prompt_name` and `image_url`.
+4. Invoke the LLM model with the message to generate the response as the image description.
+
+We apply two decorators to this function:
+
+- @tool from LangChain_Core to define this function as an agentic tool.
+- @track for Opik to enable tracking of inputs and outputs.
+
+### Create main function for agentic tool
+```python
+@tool
+@track
+def generate_ip_image_description(image_name):
+    """Generate description for an image about food. 
+    Call this whenever you need to provide an image description, 
+    for example when a customer asks 'Can you describe the Figure 1?'"""
+    
+    # prompt_name in created Opik prompt library
+    prompt_name = "food_image_description"
+
+    # get image_url from mongodb based on image_name
+    item = food_collection.find_one({'image_name': image_name})
+    image_url = item['image_uri']
+
+    # Get human message
+    message = get_prompt(prompt_name, image_url)
+
+    # Get image description from llm
+    response = llm.invoke([message])
+    return response.content
+```
+
+### Agent {Tools + Prompt + LLM + Memory}
+Once the tools, LLM, and prompt are ready, we combine these agent components using the `create_react_agent` function from LangGraph to build our LLM agent. Importantly, to enable our agent chatbot to handle conversations effectively, we integrate memory by using `MemorySaver` from LangGraph.
+```python
+# Use`generate_ip_image_description` as tools for function calling
+tools = [generate_ip_image_description]
+
+# Global prompt for agent
+prompt = (
+    "You are a helpful assistant. "
+    "You may not need to use tools for every query - the user may just want to chat!"
+)
+
+# Agent memory
+memory = MemorySaver()
+
+# Create Agent
+agent = create_react_agent(llm, tools, state_modifier=prompt, checkpointer=memory)
+```
+## Agent Inference 
+Now, let’s move on to the final and exciting step: testing our conversational agentic chatbot.
+
+Before testing, we need to create the `agent_inference` function, which performs two key tasks:
+
+1. Invoke the agent's invoke method using the user's query.
+2. Retrieve the desired answer, handling two possible scenarios:
+	- If no ToolMessage is returned, retrieve the AIMessage content to guide the user in providing more information.
+	- If a ToolMessage is returned, extract and return its content.
+
+```python
+def agent_inference(query):
+    # Response 
+    response = agent.invoke(
+        {"messages": [HumanMessage(query)]},
+        config={"configurable": {"thread_id": "1"}},
+    )
+    
+    # Get ToolMessage if exists, else get AIMessage
+    if response['messages'][-2].__class__.__name__ != 'ToolMessage':
+        return response['messages'][-1].content # AIMessage content
+    else:
+        return response['messages'][-2].content # ToolMessage content
+```
+Now, let’s test our conversational agentic chatbot with three scenarios:
+
+1. QA #1: The user asks a general question about describing an image. The chatbot responds by requesting more specific information.
+2. QA #2: The user specifies the image name (e.g., "Figure 1"), and the chatbot generates a description for this image.
+3. QA #3: The user asks about a new image (e.g., "Figure 2"), and the chatbot processes the request and generates a description for the new image.
+
+### QA #1
+```python
+# Question-Response 1
+query = "Can you describe for me an image?"
+response = agent_inference(query)
+print(response)
+```
+*Of course! Please provide me with the image name or more details, so I can generate a description for you.*
+
+### QA #2
+```python
+# Question-Response 2
+query = "I think it is Figure 1"
+response = agent_inference(query)
+print(response)
+```
+![Figure 1: Vietnamese Sandwich](/images/conversational-agent-chatbot/vietnamese_sandwich.webp)
+```
+This image showcases a Bánh Mì, a popular Vietnamese sandwich known for its delightful combination of flavors and textures. The Bánh Mì is a fusion of French and Vietnamese culinary traditions, originating from the period of French colonial rule in Vietnam. It typically features a crusty baguette filled with a variety of ingredients that create a harmonious balance of savory, spicy, sweet, and tangy flavors.
+
+### Key Characteristics:
+- **Bread:** A light, crispy baguette with a soft interior.
+- **Protein:** Often includes grilled or roasted meats such as pork or chicken.
+- **Vegetables:** Fresh cucumber slices, pickled carrots, and daikon radish.
+- **Herbs:** Fresh cilantro adds a fragrant note.
+- **Condiments:** Mayonnaise, pâté, and a hint of spicy chili.
+
+### Recipe for a Classic Bánh Mì
+
+#### Ingredients:
+- **Baguette:**
+	- 1 fresh baguette
+
+- **Protein:**
+	- 200g pork tenderloin or chicken breast
+	- 2 tablespoons soy sauce
+	- 1 tablespoon fish sauce
+	- 1 tablespoon sugar
+	- 1 garlic clove, minced
+	- 1 tablespoon vegetable oil
+
+- **Pickled Vegetables:**
+	- 1 carrot, julienned
+	- 1 daikon radish, julienned
+	- 1/4 cup white vinegar
+	- 1/4 cup sugar
+	- 1/2 cup water
+	- Pinch of salt
+
+- **Additional Toppings:**
+	- 1 cucumber, thinly sliced
+	- Fresh cilantro leaves
+	- 2 tablespoons mayonnaise
+	- Fresh chili slices (optional)
+
+#### Instructions:
+
+1. **Marinate the Protein:**
+	- In a bowl, combine soy sauce, fish sauce, sugar, garlic, and oil. Add the pork or chicken, ensuring it's well-coated. Marinate for at least 30 minutes.
+
+2. **Prepare Pickled Vegetables:**
+	- In a small saucepan, combine vinegar, sugar, water, and salt. Heat until sugar dissolves, then let cool.
+	- Place carrot and daikon in a jar, pour the pickling liquid over, and let sit for at least 30 minutes.
+
+3. **Cook the Protein:**
+	- Heat a grill pan or skillet over medium-high heat. Cook the marinated meat until it's cooked through and slightly caramelized. Let rest, then slice thinly.
+
+4. **Assemble the Bánh Mì:**
+	- Slice the baguette lengthwise, spread mayonnaise on both sides.
+	- Layer the cooked protein, pickled vegetables, cucumber slices, cilantro, and chili (if using) inside the baguette.
+
+5. **Serve:**
+	- Press the sandwich slightly to hold it together, and serve immediately to enjoy the contrasting textures and flavors.
+
+This Bánh Mì recipe offers a delightful balance of flavors and can be customized with your preferred proteins and additional toppings. Enjoy this Vietnamese classic as a flavorful and satisfying meal.
+```
+
+### QA #3
+```python
+# Question-Response 3
+query = "Now describe Figure 2"
+response = agent_inference(query)
+print(response)
+```
+![Figure 2: Italian Spaghetti](/images/conversational-agent-chatbot/italian_spaghetti.webp)
+```
+This dish is a classic Italian Spaghetti al Pomodoro. It features a beautifully arranged mound of spaghetti topped with a rich tomato sauce, adorned with fresh basil leaves and a sprinkle of grated Parmesan cheese. The vibrant red of the sauce contrasts with the golden pasta, and the garnishing adds a touch of green, making it visually appealing.
+
+### Key Characteristics and Cultural Context:
+- **Main Ingredients**: Spaghetti, tomatoes, basil, Parmesan cheese.
+- **Cultural Context**: Spaghetti al Pomodoro is a staple in Italian cuisine, celebrated for its simplicity and fresh ingredients. It embodies the Italian philosophy of letting high-quality ingredients shine without overwhelming them.
+
+### Recipe for Spaghetti al Pomodoro
+
+#### Ingredients:
+- 400g spaghetti
+- 800g ripe tomatoes (or canned whole tomatoes)
+- 3 tablespoons olive oil
+- 3 cloves garlic, minced
+- Salt and freshly ground black pepper to taste
+- A pinch of red pepper flakes (optional)
+- Fresh basil leaves
+- 100g Parmesan cheese, grated
+
+#### Instructions:
+
+1. **Prepare the Tomatoes:**
+	- If using fresh tomatoes, blanch them in boiling water for 30 seconds, then transfer to ice water. Peel and chop them.
+
+2. **Cook the Pasta:**
+	- Bring a large pot of salted water to a boil. Add the spaghetti and cook according to package instructions until al dente. Reserve 1 cup of pasta water, then drain the pasta.
+
+3. **Make the Sauce:**
+	- In a large skillet, heat the olive oil over medium heat. Add the minced garlic and sauté until fragrant, about 1 minute.
+	- Add the tomatoes (fresh or canned) and crush them with a spoon. Season with salt, black pepper, and red pepper flakes if using.
+	- Simmer the sauce for about 15 minutes, stirring occasionally. Adjust the seasoning as needed.
+
+4. **Combine Pasta and Sauce:**
+	- Add the cooked spaghetti to the sauce. Toss to coat the pasta, adding reserved pasta water if the sauce is too thick.
+
+5. **Serve:**
+	- Divide the pasta among serving plates. Top with grated Parmesan cheese and fresh basil leaves.
+	- Drizzle a little olive oil over the top for extra flavor.
+
+### Presentation Tips:
+- Use a fork to twist the pasta into nests on each plate.
+- Place basil leaves strategically for a pop of color.
+- Serve with extra Parmesan cheese on the side.
+
+Enjoy your homemade Spaghetti al Pomodoro with a glass of red wine for an authentic Italian dining experience!
+```
+
+Great! Amazing! Our conversational agentic chatbot has successfully provided descriptions for each photo we requested!
+
+## Monitoring QA, Prompt, Execution Time
+As discussed earlier, monitoring prompts and the LLM's inputs and outputs is crucial for enhancing traceability, which helps us analyze the performance of the LLM agent effectively.
+
+Opik platform ensures tracking for each query, including:
+
+- The prompt used.
+- Inputs and outputs for each function, sub-function, and agent tool.
+- Execution time for each step and function.
+
+### Monitoring QA #1
+![QA tracking #1 on Opik platform](/images/conversational-agent-chatbot/tracking_qa1_opik.png)
+
+### Monitoring QA #2
+![QA tracking #2 on Opik platform](/images/conversational-agent-chatbot/tracking_qa2_opik.png)
+
+### Monitoring QA #3
+![QA tracking #3 on Opik platform](/images/conversational-agent-chatbot/tracking_qa3_opik.png)
+
+When numerous experiments are conducted, analyzing these tracked data points can help us optimize the system effectively.
+
+## Conclusion
+
+In summary, Conversational Agentic Chatbots leveraging Large Language Models (LLMs) are innovating AI-driven interactions by combining contextual understanding, adaptability, and autonomous decision-making. 
+
+As demonstrated in the development of a food image description chatbot, these systems can seamlessly integrate with unstructured databases like MongoDB, advanced LLM like OpenAI GPT-4o, advanced orchestration frameworks like LangGraph, and monitoring tools like Comet ML's Opik to deliver highly personalized and context-aware user experiences. 
+
+By enabling enhanced customer engagement, streamlined operations, and creative problem-solving, agentic chatbots are transforming industries and setting new standards for intelligent communication tools. As businesses increasingly adopt this cutting-edge technology, the potential for innovation and efficiency in human-AI collaboration continues to grow.
+
+## Reference
+
+[1] https://cookbook.openai.com/examples/how_to_use_guardrails
+
+[2] https://medium.com/velotio-perspectives/an-introduction-to-asynchronous-programming-in-python-af0189a88bbb
+
+[3] https://realpython.com/solid-principles-python/

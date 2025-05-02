@@ -1,0 +1,187 @@
+---
+title: "Create Instruction Dataset for Supervised Fine-Tuning"
+subtitle: "Leveraging LLMs for creating instruction dataset for Supervised Fine-Tuning"
+author: "Quang Duong"
+colab: <a href="https://colab.research.google.com/drive/1n7wKnyWQ1Q3Z45T0R8PvTQeLWdLVdzXg?usp=sharing"><img src="images/colab.png" alt="Open In Colab"></a>
+date: "2025-03-16"
+# categories: [instruction-dataset]
+image: "/images/instruction-dataset-sft/thumbnail.jpg"
+---
+<center><img src="/images/instruction-dataset-sft/thumbnail.jpg"></center>
+
+<!-- ::: {.column-margin}
+Getting started GenAI & LLM with my Udemy course, [**Hands-on Generative AI Engineering with Large Language Model**](https://www.udemy.com/course/hands-on-generative-ai-engineering-with-large-language-model/?referralCode=0775DF5DDD432646AD97&couponCode=OF83024E) 👇
+<a href="https://www.udemy.com/course/hands-on-generative-ai-engineering-with-large-language-model/?referralCode=0775DF5DDD432646AD97&couponCode=OF83024E"><img src="/images/genai-course/GenAI-Course-Thumbnail.png" id="llm-course"></a>
+::: -->
+
+Creating a tailored instruction dataset for fine-tuning a language model is a critical step in enhancing the model's capabilities for specialized tasks. This guide provides a step-by-step example of how to create an instruction dataset.
+
+Before starting, it is essential to define the dataset's intended purpose. Are you developing a chatbot, a story generator, or a question-answering system? Clearly understanding the desired model behavior will guide the type and structure of the data you prepare.
+
+In this guide, our goal is to create an instruction dataset suitable for fine-tuning a pretrained Large/Small Language Model to produce a story generator dedicated for 5-year-olds.
+
+## Use Case
+Let's examine our use-case for this guide.
+
+The raw dataset [TinyStories](https://huggingface.co/datasets/roneneldan/TinyStories), introduced in the paper [TinyStories: How Small Can Language Models Be and Still Speak Coherent English?](https://arxiv.org/abs/2305.07759) by Ronen Eldan and Yuanzhi Li. This dataset consists of short, synthetically generated stories created by GPT-3.5 and GPT-4 with a limited vocabulary, making it highly suitable for our intended 5-year-old readers. The dataset is divided into two splits: train (2.12M rows) and validation (22K rows). For this use case, we will use the train split with 10K rows.
+
+Below is a sample view of the TinyStories dataset on the Hugging Face Dataset Hub:
+![A snapshot of TinyStories dataset on Hugging Face Dataset Hub](../images/instruction-dataset-sft/snapshot-TinyStories-hf.PNG)
+
+To create the instruction dataset, we will generate synthetic instruction sentences that correspond to each story in the TinyStories dataset.
+
+![](../images/instruction-dataset-sft/instruction_dataset_illus.png)
+
+
+## Implementation
+### 1. Load Required Packages
+Let's begin by loading the necessary packages.
+
+```python
+import concurrent.futures
+import json
+import re
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Tuple
+from datasets import Dataset, load_dataset, concatenate_datasets
+from openai import OpenAI
+from tqdm.auto import tqdm
+from google.colab import userdata
+```
+### 2. Define Modular Functions
+Next, we define key functions to structure our pipeline.
+
+**Extracting Stories**
+The `get_story_list` function creates a list of stories from the raw dataset:
+```python
+def get_story_list(dataset):
+	return [example['text'] for example in dataset]
+```
+**Managing Instruction-Answer Pairs**
+
+The `InstructionAnswerSet` class defines a structure to store and manage instruction-answer pairs, with methods to create instances from JSON and iterate over pairs:
+
+```python
+class InstructionAnswerSet:
+	def __init__(self, pairs: List[Tuple[str, str]]):
+		self.pairs = pairs
+
+	@classmethod
+	def from_json(cls, json_str: str, story: str) -> 'InstructionAnswerSet':
+		data = json.loads(json_str)
+		pairs = [(data['instruction_answer'], story)]
+		return cls(pairs)
+
+	def __iter__(self):
+		return iter(self.pairs)
+```
+**Generating Instruction-Answer Pairs**
+
+The `generate_instruction_answer_pairs` function takes a story and an OpenAI client as inputs to generate instruction-answer pairs using GPT-4. The function crafts a prompt to create relevant instructions while adhering to specific formatting requirements:
+```python
+def generate_instruction_answer_pairs(story: str, client: OpenAI) -> List[Tuple[str, str]]:
+	prompt = f"""Based on the following story, generate an one-sentence instruction. Instruction \
+		must ask to write about a content the story.
+		Only use content from the story to generate the instruction. \
+		Instruction must never explicitly mention a story. \
+		Instruction must be self-contained and general. \
+
+		Example story: Once upon a time, there was a little girl named Lily. \
+		Lily liked to pretend she was a popular princess. She lived in a big castle \
+		with her best friends, a cat and a dog. One day, while playing in the castle, \
+		Lily found a big cobweb. The cobweb was in the way of her fun game. \
+		She wanted to get rid of it, but she was scared of the spider that lived there. \
+		Lily asked her friends, the cat and the dog, to help her. They all worked together to clean the cobweb. \
+		The spider was sad, but it found a new home outside. Lily, the cat, and \
+		the dog were happy they could play without the cobweb in the way. \
+		And they all lived happily ever after.
+		
+		Example instruction: Write a story about a little girl named Lily who, \
+		with the help of her cat and dog friends, overcomes her fear of a spider to \
+		clean a cobweb in their castle, allowing everyone to play happily ever after. \
+
+		Provide your response in JSON format with the following structure:
+		{{"instruction_answer": "..."}}
+		Story:
+		{story}
+		"""
+	completion = client.chat.completions.create(model="gpt-4o-mini",
+                                                messages=[
+													{"role": "system",
+                                                    "content": "You are a helpful assistant who \
+                                                    generates instruction based on the given story. \
+                                                    Provide your response in JSON format.",},
+													{"role": "user", "content": prompt},
+                                                    ],
+                                                response_format={"type": "json_object"},
+                                                max_tokens=1200,
+                                                temperature=0.7,)
+	result = InstructionAnswerSet.from_json(completion.choices[0].message.content, story)
+	# Convert to list of tuples
+	return result.pairs
+```
+
+**Creating the Instruction Dataset**
+
+We now wrap the previous functions into a final function `create_instruction_dataset`:
+```python
+def create_instruction_dataset(dataset: Dataset, client: OpenAI, num_workers: int = 4) -> Dataset:
+	stories = extract_substory(dataset)
+	instruction_answer_pairs = []
+
+	with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+		futures = [executor.submit(generate_instruction_answer_pairs, story, client) for story in stories]
+
+		for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)):
+			instruction_answer_pairs.extend(future.result())
+
+	instructions, answers = zip(*instruction_answer_pairs)
+	return Dataset.from_dict({"instruction": list(instructions), "output": list(answers)})
+```
+### 3. Orchestrating the Pipeline
+
+Nest, the `main` function orchestrates the entire pipeline, which includes:
+
+	+ Initialize the OpenAI client
+	+ Load the raw TinyStories dataset
+	+ Create instruction dataset
+	+ Perform train/test split
+	+ Push the processed dataset to Hugging Face Hub
+
+```python
+def main() -> Dataset:
+	# Initializes the OpenAI client
+	client = OpenAI(api_key=userdata.get('OPENAI_API_KEY'))
+
+	# Load the raw data
+	raw_dataset = load_dataset("roneneldan/TinyStories", split="train[:10000]")
+
+	# Create instructiondataset
+	instruction_dataset = create_instruction_dataset(raw_dataset, client)
+
+	# Train/test split and export
+	filtered_dataset = instruction_dataset.train_test_split(test_size=0.1)
+
+	# Push the processed dataset to Hugging Face Hub
+	filtered_dataset.push_to_hub("tanquangduong/TinyStories_Instruction")
+```
+### 4. Authenticating and Running the Pipeline
+
+Then, we authenticate with the Hugging Face Hub for later dataset uploading and execute the pipeline.
+
+```python
+from huggingface_hub import login
+# Log in to the Hugging Face Hub
+login(token=userdata.get('HF_TOKEN'))
+
+# Launch the pipeline to create instruction dataset
+main()
+```
+## Resulting Instruction Dataset 
+
+After running the above pipeline, the resulting instruction dataset will look like this:
+![A snapshot of TinyStories-Instruction dataset on Hugging Face Dataset Hub](../images/instruction-dataset-sft/snapshot-TinyStories-Instruction-hf.PNG)
+
+## Conclusion
+
+In summary, this guide demonstrated the creation of an instruction dataset tailored for fine-tuning. We first defined the purpose of fine-tuning and structured the dataset accordingly. By leveraging GPT-4, we generated instructions for each story using best practices in prompt engineering, including precise instructions, a one-shot example, and a specified output format. Finally, the processed dataset was uploaded to the Hugging Face Hub for future use.
