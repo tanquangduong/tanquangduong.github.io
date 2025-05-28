@@ -1,0 +1,334 @@
+---
+title: "Implement Guardrails for Domain-specific Chatbots"
+subtitle: "Input & Output Guardrails for Food and Dish Recommendation Chatbot | Asynchronous Programming | SOLID Principles"
+author: "Quang T. Duong"
+colab: <a href="https://colab.research.google.com/drive/1yBUvpRn1GbXRZ3bO6hxugWyGmQvURwsK?usp=sharing"><img src="images/colab.png" alt="Open In Colab"></a>
+date: "2025-03-22"
+# categories: [Chatbot Guardrail, Asynchronous Programming, SOLID Principles]
+image: "/images/domain-specific-chatbot-guardrails/thumbnail.webp" 
+---
+
+<center><img src="/images/domain-specific-chatbot-guardrails/thumbnail.webp"></center>
+
+Chatbots are now a key part of how we interact with daily tasks, either answering questions or giving recommendations. But as they become more advanced and widely used, it’s important to make sure their responses are accurate, appropriate, and relevant to their intended purpose. This is where guardrails come in handy. As they act as safety measures to ensure the chatbot handles both user input and its own responses correctly.
+
+In this article, we explore the motivation behind implementing guardrails in a domain-specific chatbot, such as one for food and dish recommendation, the types of guardrails available, trade-offs involved, asynchronous programming for reducing latency, and the importance of adhering to the SOLID principles in code design. Finally, we’ll demonstrate these concepts using sample code snippets.
+
+## Guardrails in Domain-Specific Chatbots
+
+In domain-specific chatbots, without strong safeguards (called guardrails), the chatbot might give irrelevant, incorrect, or insensitive responses, which could frustrate users and harm its credibility. For instance, a chatbot that fails to recognize domain boundaries may provide information outside its scope or respond insensitively to user input, leading to dissatisfaction or reputational harm.
+
+In our use-case, for a chatbot focused on food and dish recommendations, the guardrails address issues like out-of-scope topics, culturally insensitive suggestions or ignoring dietary restrictions. Here's how these safeguards work:
+
+- Relevance: The chatbot sticks to food and dish recommendations, avoiding topics outside its expertise to ensure helpful and accurate responses.
+- Appropriateness: Responses are respectful of cultural norms and dietary preferences. For example:
+	- Medical Restrictions: For a diabetic diet, it avoids recommending foods high in sugar or carbs.
+	- Vegetarian Choices: No meat suggestions, but includes options with dairy or eggs, if acceptable.
+	- Cultural Sensitivity: For traditional Asian diets, it prioritizes rice-based dishes with vegetables, fish, and soy, while limiting dairy.
+
+These guardrails ensure the chatbot provides a positive user experience and is seen as a reliable and trustworthy helper in its specific area.
+
+## Types of Guardrails
+Guardrails can be categorized into input guardrails and output guardrails, each serving a unique role in ensuring the chatbot's effectiveness.
+
+1. **Input Guardrails** focus on validating and managing the user’s input before processing it:
+
+- Topical Filtering: Ensures the user’s query aligns with the chatbot’s purpose. For instance, a food-focused chatbot would reject questions about cars or unrelated topics.
+- Jailbreaking Prevention: Protects against attempts to bypass the chatbot’s intended behavior, such as override its prompting to generate inappropriate content.
+- Prompt Injection Defense: Safeguards against maliciously crafted inputs designed to manipulate the chatbot into behaving unexpectedly in any downstream functions.
+
+2. **Output Guardrails** ensure the chatbot’s responses are accurate, relevant, and appropriate:
+
+- Hallucination/Fact-Checking: Using ground truth information or ML-based classifier to identify and minimize instances where the chatbot generates incorrect or made-up information.
+- Moderation: Screens responses to ensure they are free from offensive, sensitive, or irrelevant content. For example, building food-specific scoring that can evaluate responses based on criteria such as cultural sensitivity or dietary appropriateness.
+- Syntax Checks: Checking errors and inconsistencies in output's format to make sure that the outputs are suitable for downstream tasks like easy-to-read for answering question or corrected schema format for 'arguments' in function calling task.
+
+These guardrails work together to create a robust system, improving user trust and the overall experience with the chatbot.
+
+## Trade-Offs Between Accuracy and Latency
+Implementing guardrails introduces a trade-off between accuracy and latency.
+
+While guardrails improve the chatbot’s ability to provide relevant and high-quality responses, this increased accuracy often comes at a cost. That is higher latency. The added computational steps (e.g., moderation checks, scoring) can slow down the response time.
+
+Striking a balance between these factors is the key. Using asynchronous programming in Python, as demonstrated in the implementation section, can help mitigate latency issues by parallelizing guardrail checks.
+
+## Using Asynchronous Programming for Reducing Latency
+Asynchronous programming shines in scenarios requiring concurrency, where multiple tasks can be executed independently and simultaneously. This is particularly beneficial for systems that deal with I/O-bound operations, such as network requests or database queries, as it prevents blocking the main execution thread while waiting for responses. 
+
+In the context of a food and dish recommendation chatbot, asynchronous programming allows input guardrails and output generation task to run in parallel, significantly reducing overall latency. For example, while the chatbot processes a user query for moderation, input validation tasks can execute simultaneously, ensuring both operations are completed efficiently without delay. 
+
+In general, this concurrency is critical in delivering fast, real-time responses to users, enhancing the chatbot’s usability and user experience. Moreover, it scales well, allowing multiple requests to be handled concurrently in multi-user environments without overwhelming system resources.
+
+## Understanding Our Use-case
+In the context of our use-case with food and dish recommendation chatbot, for the demonstration purpose, we will just implement one input guardrail and one output guardrail for our chatbot system. 
+
+The input guardrail is designed to ensure that user queries align with the chatbot's intended domain and purpose. For example, it filters out irrelevant topics (like questions about cars or unrelated areas). 
+
+On the other hand, the output guardrail focuses on ensuring the chatbot's responses are accurate, appropriate, and aligned with user expectations. This includes screening for culturally sensitive content, adhering to dietary restrictions.
+
+## Implementation
+
+Before jumping to coding step, we think about scalability, maintainability, and extensibility of our implementation.
+
+As the chatbot evolves new requirements, such as adding more guardrails or integrating alternative APIs, may emerge. Without a structured approach, changes to the codebase could lead to unnecessary complexity, higher maintenance costs, and bugs. 
+
+This is where SOLID principles come in handy. The principles ensure that our codebase is modular, easy to understand, and adaptable to future changes without requiring extensive rewrites.
+
+### Adhering to SOLID Principles for Scalability and Maintainability
+To implement input and output guardrails effectively, we break the chatbot system into distinct classes: `OpenAIClient`, `Guardrail`, and `ChatbotHandler`, each adhering to SOLID principles and designed to work seamlessly with asynchronous programming.
+
+::: {.callout-tip}
+## Playground in Colab
+The full Colab notebook can be found [here](https://colab.research.google.com/drive/1yBUvpRn1GbXRZ3bO6hxugWyGmQvURwsK?usp=sharing).
+:::
+
+Before we jump into the function/class implementation, let's installing and importing necessary packages:
+
+```python
+# !pip install openai==1.55.0 python-dotenv==1.0.1
+import asyncio
+import openai
+from dotenv import load_dotenv
+load_dotenv()
+```
+
+1. **`OpenAIClient` class**
+
+This class acts as the interface to interact with the OpenAI API, handling message formatting and API calls.
+
+It uses asynchronous programming to make non-blocking requests to the API, ensuring the chatbot can handle multiple user queries efficiently. This follows the Single Responsibility Principle (SRP) as it focuses solely on managing API interactions.
+
+By following the Liskov Substitution Principle (LSP), this class can be replaced with another implementation (e.g., another LLM client) without affecting the rest of the system.
+
+```python
+class OpenAIClient:
+    def __init__(self, model: str):
+        self.model = model
+
+    async def get_response(self, messages, temperature=0.5):
+        try:
+            response = openai.chat.completions.create(
+                model=self.model, messages=messages, temperature=temperature
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"Error getting response: {e}")
+            return None
+```
+
+2. **`Guardrail` class**
+
+This class encapsulates the logic for input and output guardrails. It ensures user input aligns with the chatbot’s purpose and validates the chatbot’s responses for appropriateness and relevance.
+
+It uses asynchronous tasks to execute topical filtering, moderation, and scoring concurrently, improving performance and responsiveness.
+
+By adhering to the Open-Closed Principle (OCP), the guardrail system can be extended with additional checks (e.g., language-specific filters) without modifying existing code.
+
+Following the Dependency Inversion Principle (DIP), Guardrail interacts with an abstract `OpenAIClient`, ensuring that it does not rely on a specific implementation.
+```python
+class Guardrail:
+    def __init__(self, client: OpenAIClient):
+        self.client = client
+
+    async def check_topical(self, user_request):
+        print("Checking topical guardrail")
+        messages = [
+            {
+                "role": "system",
+                "content": "Your role is to assess whether the user question is allowed or not. The allowed topics are food and dish recommendations. If the topic is allowed, say 'allowed' otherwise say 'not_allowed'.",
+            },
+            {"role": "user", "content": user_request},
+        ]
+        print("Got topical guardrail response")
+        return await self.client.get_response(messages, temperature=0)
+
+    async def check_moderation(self, domain, criteria, steps, content):
+        print("Checking moderation guardrail")
+        moderation_system_prompt = f"""
+        You are a moderation assistant. Your role is to detect content about {domain} in the text provided and mark the severity of that content.
+
+        ## Domain: {domain}
+
+        ### Criteria: {criteria}
+
+        ### Instructions: {steps}
+
+        ### Content: {content}
+
+        ### Evaluation (score only!)
+        """
+        messages = [{"role": "user", "content": moderation_system_prompt}]
+
+        print("Got moderation response")
+        return await self.client.get_response(messages, temperature=0)
+```
+
+3. **`ChatbotHandler` class**
+
+This is the high-level controller that coordinates input validation, response generation, and output moderation.
+
+It orchestrates multiple asynchronous tasks, such as executing guardrails and fetching chatbot responses, to ensure smooth operation without delays. 
+
+The Interface Segregation Principle (ISP) is respected, as the class uses only the necessary methods from `OpenAIClient` and `Guardrail` without relying on unused functionality.
+```python
+class ChatbotHandler:
+    def __init__(self, client: OpenAIClient, guardrail: Guardrail, fallback_responses: dict):
+        self.client = client
+        self.guardrail = guardrail
+        self.system_prompt = "You are a helpful assistant for food and dish recommendations."
+        self.domain = "dish recommendation"
+        self.dish_advice_criteria = """
+        Assess the presence of explicit recommendation of unhealthy or culturally insensitive dishes in the content.
+        The content should only contain general advice and appropriate suggestions for dishes.
+        """
+        self.dish_advice_steps = """
+        1. Read the content and the criteria carefully.
+        2. Assess how much inappropriate or culturally insensitive dish recommendation is contained in the content.
+        3. Assign a dish advice score from 1 to 5, with 1 being no inappropriate content, and 5 being multiple instances of such content.
+        """
+        self.fallback_responses = fallback_responses
+
+    async def get_chat_response(self, user_request):
+        print("Getting LLM response")
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": user_request},
+        ]
+        response = await self.client.get_response(messages)
+
+        if response:
+            print("Got LLM response")
+            return response 
+        else:
+            self.fallback_responses["api_error"]
+
+    async def execute_all_guardrails(self, user_request):
+        topical_guardrail_task = asyncio.create_task(self.guardrail.check_topical(user_request))
+        chat_task = asyncio.create_task(self.get_chat_response(user_request))
+
+        while True:
+            done, _ = await asyncio.wait(
+                [topical_guardrail_task, chat_task], return_when=asyncio.FIRST_COMPLETED
+            )
+            if topical_guardrail_task in done:
+                guardrail_response = topical_guardrail_task.result()
+                if guardrail_response == "not_allowed":
+                    chat_task.cancel()
+                    print("Topical guardrail triggered")
+                    return self.fallback_responses["content_policy"]
+                elif chat_task in done:
+                    print('Passed topical guardrail')
+                    chat_response = chat_task.result()
+                    moderation_response = await self.guardrail.check_moderation(
+                        self.domain, self.dish_advice_criteria, self.dish_advice_steps, chat_response
+                    )
+                    if int(moderation_response) >= 3:
+                        print(f"Moderation guardrail flagged with a score of {int(moderation_response)}")
+                        return self.fallback_responses["content_policy"]
+                    else:
+                        print('Passed moderation')
+                        return chat_response
+            else:
+                await asyncio.sleep(0.1)
+````
+
+4. **Our `main` function**
+
+Finally, the main function serves as the entry point for testing the chatbot’s functionality, orchestrating the interactions between the key components (OpenAIClient, Guardrail, and ChatbotHandler).
+
+- First, it sets up the necessary components of the chatbot, such as the client for interacting with the language model, guardrails for input/output validation, and fallback responses for handling errors.
+- Then, the function tests the chatbot with a variety of user queries to simulate real-world interactions, covering both valid and invalid scenarios.
+
+```python
+async def main():
+	# Set up LLM model name and input queries
+	GPT_MODEL = 'gpt-4o-mini'
+    bad_request = "Tell me about cars"
+    good_request = "What are some good vegetarian dishes to try?"
+    great_request = "Can you suggest some easy Italian recipes for a beginner?"        
+    tests = [good_request, bad_request, great_request]
+
+	# Initializing chatbot components
+    client = OpenAIClient(GPT_MODEL)
+    guardrail = Guardrail(client)
+    fallback_responses = {
+        "unclear_input": "I'm sorry, I didn't understand that. Could you please rephrase?",
+        "api_error": "I'm having trouble processing your request. Please try again later.",
+        "content_policy": "I'm not able to respond to that type of request.",
+    }
+    handler = ChatbotHandler(client, guardrail, fallback_responses)
+
+	# Testing
+    for test in tests:
+        response = await handler.execute_all_guardrails(test)
+        print("*" * 10)
+        print(response)
+        print("*" * 50)
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
+The output looks like this:
+```
+Checking topical guardrail
+Got topical guardrail response
+Getting LLM response
+Got LLM response
+Passed topical guardrail
+Checking moderation guardrail
+Got moderation response
+Passed moderation
+**********
+There are many delicious vegetarian dishes from various cuisines around the world. Here are some popular options to consider:
+
+1. **Chana Masala** - A flavorful Indian dish made with chickpeas cooked in a spicy tomato-based sauce, often served with rice or naan.
+
+2. **Vegetable Stir-Fry** - A quick and healthy dish made with a mix of colorful vegetables, tofu, and a savory sauce, served over rice or noodles.
+...
+
+These dishes are not only vegetarian but also packed with flavor and nutrients. Enjoy exploring these culinary delights!
+**************************************************
+
+
+Checking topical guardrail
+Got topical guardrail response
+Getting LLM response
+Got LLM response
+Topical guardrail triggered
+**********
+I'm not able to respond to that type of request.
+
+
+**************************************************
+Checking topical guardrail
+Got topical guardrail response
+Getting LLM response
+Got LLM response
+Passed topical guardrail
+Checking moderation guardrail
+Got moderation response
+Passed moderation
+**********
+Absolutely! Here are three easy Italian recipes that are perfect for beginners:
+
+### 1. **Spaghetti Aglio e Olio**
+
+**Ingredients:**
+- 400g spaghetti
+- 4 cloves garlic, thinly sliced
+- 1/2 cup extra virgin olive oil
+...
+
+These recipes are simple and delicious, making them perfect for beginners. Enjoy your cooking!    
+**************************************************
+```
+
+
+## Conclusion
+To wrap up, guardrails are essential in creating robust, user-centric chatbots that align with their intended purpose. 
+
+They ensure relevance, appropriateness, and accuracy while protecting against user dissatisfaction or ethical missteps. 
+
+While the trade-off between accuracy and latency is unavoidable, leveraging asynchronous programming can optimize performance. Adhering to the SOLID principles ensures that the chatbot's architecture remains scalable and maintainable as requirements evolve.
+
+By integrating input and output guardrails thoughtfully, as demonstrated in the code snippets, we can build reliable and user-friendly chatbots that excel in delivering high-quality interactions.
