@@ -10,7 +10,7 @@ date: "2025-05-31"
 **Institutions:** ABB Ability Innovation Center, Bangalore, India • ABB Ability Innovation Center, Hyderabad, India • Indian Institute of Technology, Kharagpur, India<br>
 **Keywords:** LLM, Ontology Learning, Retrieval-Augmented Generation, Knowledge Graph, GraphRAG, Leiden algorithm, Semantic Web, Question Answering, PDF Parsing, Information Extraction<br>
 
-<img src="https://picsum.photos/id/714/300/200" 
+<img src="https://picsum.photos/id/71/300/200" 
 alt="Random Unsplash-style image" 
 style="display: block; margin-left: auto; margin-right: auto; border-radius:8px; margin-bottom:1em; box-shadow: 0 4px 16px rgba(0,0,0,0.15);">
 
