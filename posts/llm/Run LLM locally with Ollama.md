@@ -1,12 +1,13 @@
 ---
 title: "Run LLM Locally with Ollama"
 subtitle: "From setup to deployment: run and serve local LLMs easily with Ollama"
-image: /images/llm/ollama-1.png
+image: /images/llm/ollama-300px.png
 date: "2025-05-25"
 ---
 
 **Keywords:** Ollama, Local LLM, AI deployment, llama3, mistral, phi, generative AI, on-prem AI, LLM inference
 
+![](/images/llm/ollama-300px.png){fig-align="center" width=300}
 
 ## Introduction
 Running Large Language Models (LLMs) locally is becoming a key trend for developers and companies who want **privacy, low latency, and cost control**. 

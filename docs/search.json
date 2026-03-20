@@ -39,6 +39,98 @@
     "text": "Authors:  A. Glentis et al. Published on Arxiv:  2025-05-28 Link:  http://arxiv.org/abs/2505.22922v1 Institutions: University of Minnesota • Peking University • University of Sydney Keywords: large language models, parameter-efficient pre-training, memory-efficient optimization, low-rank factorization, weight refactorization, momentum reset, GaLore, Fira, SLTrain, LLaMA, LoRA, C4 dataset, scaling laws, AdamW, model compression, benchmarking\n\n\n\nThe exponential growth in the scale of large language models (LLMs), now reaching trillions of parameters, is driving significant challenges for both computation and memory, especially during pre-training and fine-tuning phases. Techniques for parameter-efficient fine-tuning like LoRA have succeeded in downstream tasks, but applying such efficiency methods directly to LLM pre-training remains difficult due to scale and data requirements.\n\nTo address these issues, the authors conducted an in-depth examination of current strategies and proposed new practical improvements:\n\nComprehensive review of state-of-the-art parameter- and memory-efficient pre-training methods, focusing on those evaluated for LLM pre-training.\nBenchmarking leading memory-efficient pre-training approaches, including memory-efficient optimizers (GaLore, Fira) and weight factorization (Low-rank, LoRA, SLTrain) across various LLaMA model sizes (60M to 1B parameters) using the C4 dataset.\nRigorous optimization technique comparison using hyperparameter sweeps, and best practices like momentum reset and adaptive gradient clipping to ensure fair baselines.\nIntroduction of two practical innovations: weight refactorization (periodic SVD updates of factorized weights), and momentum reset (periodically zeroing optimizer momentum in AdamW), to boost the efficiency and performance of low-rank/SLTrain methods.\n\n\nBuilding on these approaches, their benchmarking uncovered several notable findings:\n\nFull-rank models remain highest-performing when optimally trained.\nPlain low-rank factorization yields surprisingly competitive perplexity for small models, with performance degrading for larger models but never entirely failing as previously thought.\nRestoring full-rankness in factorization- or optimizer-based methods (SLTrain, Fira) substantially reduces the performance gap compared to full-rank models.\nThe newly introduced weight refactorization and momentum reset techniques further improved low-rank/SLTrain models, approaching performance of leading memory-efficient optimizers (e.g., for Llama 1B: SLTrain-restarts achieved 14.37 perplexity vs. 13.97 for full-rank, saving ~25% memory).\nScaling law analysis reveals that final perplexity depends primarily on the total computation (FLOPs) rather than on specific model configuration.\n\n\nThese results lead to several important conclusions and directions for future work:\n\nWell-designed and well-tuned efficient pre-training methods can reach performance close to full-model training, though a minor gap persists for the largest models.\nPractical techniques like weight refactorization and momentum reset play a critical role in narrowing this gap.\nFuture research aims to extend benchmarking across more models and datasets, and to develop further efficient pre-training techniques."
   },
   {
+    "objectID": "posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html",
+    "href": "posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html",
+    "title": "Fine-tuning an LLM with Unsloth and Serving with Ollama",
+    "section": "",
+    "text": "Keywords: Unsloth, Ollama, fine-tuning, Hugging Face, Qwen, Alpaca dataset, LoRA, GGUF, local LLM, AI deployment"
+  },
+  {
+    "objectID": "posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html#introduction",
+    "href": "posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html#introduction",
+    "title": "Fine-tuning an LLM with Unsloth and Serving with Ollama",
+    "section": "Introduction",
+    "text": "Introduction\nFine-tuning your own Large Language Model (LLM) is no longer limited to large GPU clusters. With modern tools like Unsloth and Ollama, you can fine-tune a small model on a small dataset and run it locally on your machine.\nThis approach is ideal if you want:\n\nFull control over your model\nPrivacy (no external API calls)\nLow-cost experimentation\nCustom domain adaptation\n\nIn this tutorial, we will walk through a complete pipeline:\n\nLoad a small LLM from Hugging Face\n\nFine-tune it with Unsloth\n\nExport it to GGUF\n\nServe it locally with Ollama"
+  },
+  {
+    "objectID": "posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html#what-is-unsloth",
+    "href": "posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html#what-is-unsloth",
+    "title": "Fine-tuning an LLM with Unsloth and Serving with Ollama",
+    "section": "What is Unsloth?",
+    "text": "What is Unsloth?\nUnsloth is an optimized framework for fine-tuning LLMs efficiently. It enables:\n\nFast training (2x–5x speed improvements)\nReduced VRAM usage (4-bit quantization)\nEasy LoRA fine-tuning\nDirect export to GGUF"
+  },
+  {
+    "objectID": "posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html#what-is-ollama",
+    "href": "posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html#what-is-ollama",
+    "title": "Fine-tuning an LLM with Unsloth and Serving with Ollama",
+    "section": "What is Ollama?",
+    "text": "What is Ollama?\nOllama is a lightweight framework designed to simplify local LLM usage. It enables you to:\n\nRun LLMs locally (CPU or GPU).\nDownload and manage open-source models (including custom configurations and models pulled from Hugging Face).\nServe models via a built-in local HTTP API server.\nCustomize models using simple configuration files.\n\nRead this article for more details:: Run LLM Locally with Ollama"
+  },
+  {
+    "objectID": "posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html#fine-tune-llm-with-unsloth",
+    "href": "posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html#fine-tune-llm-with-unsloth",
+    "title": "Fine-tuning an LLM with Unsloth and Serving with Ollama",
+    "section": "Fine-tune LLM with Unsloth",
+    "text": "Fine-tune LLM with Unsloth\n\nModel & Dataset Selection\nModel\nunsloth/Qwen2.5-0.5B-Instruct\nDataset\nyahma/alpaca-cleaned (subset of 200 samples)\n\n\nEnvironment Setup\n!pip install -q unsloth\n!pip install -q transformers datasets trl accelerate peft bitsandbytes sentencepiece\n\n\nLoad Model\nfrom unsloth import FastLanguageModel\n\nmodel, tokenizer = FastLanguageModel.from_pretrained(\n    model_name=\"unsloth/Qwen2.5-0.5B-Instruct\",\n    max_seq_length=1024,\n    load_in_4bit=True,\n)\n\n\nAdd LoRA Adapters\nmodel = FastLanguageModel.get_peft_model(\n    model,\n    r=16,\n    target_modules=[\n        \"q_proj\",\"k_proj\",\"v_proj\",\"o_proj\",\n        \"gate_proj\",\"up_proj\",\"down_proj\",\n    ],\n    lora_alpha=16,\n    lora_dropout=0,\n    bias=\"none\",\n)\n\n\nLoad Dataset\nfrom datasets import load_dataset\ndataset = load_dataset(\"yahma/alpaca-cleaned\", split=\"train[:200]\")\n\n\nFormat Dataset\ndef format_example(example):\n    user_text = example[\"instruction\"]\n    if example[\"input\"]:\n        user_text += \"\\n\\nInput:\\n\" + example[\"input\"]\n\n    messages = [\n        {\"role\": \"user\", \"content\": user_text},\n        {\"role\": \"assistant\", \"content\": example[\"output\"]},\n    ]\n\n    text = tokenizer.apply_chat_template(\n        messages,\n        tokenize=False,\n    )\n    return {\"text\": text}\n\ndataset = dataset.map(format_example)\n\n\nFine-tuning\nfrom trl import SFTTrainer, SFTConfig\n\ntrainer = SFTTrainer(\n    model=model,\n    tokenizer=tokenizer,\n    train_dataset=dataset,\n    args=SFTConfig(\n        dataset_text_field=\"text\",\n        per_device_train_batch_size=2,\n        max_steps=60,\n        learning_rate=2e-4,\n        output_dir=\"outputs\",\n    ),\n)\n\ntrainer.train()\n\n\nTest Model\nfrom unsloth import FastLanguageModel\nFastLanguageModel.for_inference(model)\n\ninputs = tokenizer(\"Explain fine-tuning simply\", return_tensors=\"pt\").to(model.device)\noutputs = model.generate(**inputs, max_new_tokens=100)\n\nprint(tokenizer.decode(outputs[0]))\n\n\nSave Model\nmodel.save_pretrained(\"lora_model\")\ntokenizer.save_pretrained(\"lora_model\")\n\n\nExport GGUF\nmodel.save_pretrained_gguf(\n    \"gguf_model\",\n    tokenizer,\n    quantization_method=\"q4_k_m\",\n)\n\n\nDownload Model from Colab\n!zip -r model.zip gguf_model"
+  },
+  {
+    "objectID": "posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html#run-your-fine-tuned-model-with-ollama",
+    "href": "posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html#run-your-fine-tuned-model-with-ollama",
+    "title": "Fine-tuning an LLM with Unsloth and Serving with Ollama",
+    "section": "Run your fine-tuned model with Ollama",
+    "text": "Run your fine-tuned model with Ollama\n\nInstall Ollama\nDownload from: https://ollama.com\nOr via terminal:\ncurl -fsSL https://ollama.com/install.sh | sh\n\n\nCreate an Ollama Model\nFolder structure:\nmy-model/\n├── Modelfile\n├── model.gguf\n\n\nCreate Modelfile\nFROM ./model.gguf\n\nSYSTEM You are a helpful AI assistant.\n\nPARAMETER temperature 0.7\nPARAMETER num_ctx 2048\n\n\nRun Model\nollama create my-model -f Modelfile\nollama run my-model\n\n\nAPI Usage\nimport requests\n\nresponse = requests.post(\n    \"http://localhost:11434/api/generate\",\n    json={\n        \"model\": \"my-model\",\n        \"prompt\": \"Explain LoRA\",\n        \"stream\": False\n    }\n)\n\nprint(response.json()[\"response\"])"
+  },
+  {
+    "objectID": "posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html#deployment-tips",
+    "href": "posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html#deployment-tips",
+    "title": "Fine-tuning an LLM with Unsloth and Serving with Ollama",
+    "section": "Deployment Tips",
+    "text": "Deployment Tips\n\nUse quantized models (Q4/Q5) to reduce RAM usage\nPrefer GPU acceleration if available\nKeep dataset clean → quality &gt; quantity\nStart small, then scale"
+  },
+  {
+    "objectID": "posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html#conclusion",
+    "href": "posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html#conclusion",
+    "title": "Fine-tuning an LLM with Unsloth and Serving with Ollama",
+    "section": "Conclusion",
+    "text": "Conclusion\nWith Unsloth + Hugging Face + Ollama, you now have a complete local LLM pipeline:\n\nFine-tune efficiently with minimal hardware\nCustomize models for your use case\nDeploy locally with zero latency\nMaintain full control and privacy\n\nThis workflow is perfect for:\n\nPrototyping AI products\nInternal enterprise tools\nPersonal AI assistants"
+  },
+  {
+    "objectID": "posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html#next-steps",
+    "href": "posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html#next-steps",
+    "title": "Fine-tuning an LLM with Unsloth and Serving with Ollama",
+    "section": "Next Steps",
+    "text": "Next Steps\n\nTrain on your own domain dataset (RAG + fine-tuning)\nAdd tools with LangGraph agents\nDeploy behind an API gateway (FastAPI, Nginx)\nScale with Docker + GPU servers"
+  },
+  {
+    "objectID": "page_rag.html",
+    "href": "page_rag.html",
+    "title": "RAG",
+    "section": "",
+    "text": "No matching items",
+    "crumbs": [
+      "AI & Agents",
+      "RAG"
+    ]
+  },
+  {
+    "objectID": "MD.html",
+    "href": "MD.html",
+    "title": "Quang Duong",
+    "section": "",
+    "text": "Random Unsplash-style image\n\n\n\n\n\nRandom piscum photos"
+  },
+  {
+    "objectID": "page_article_takeaways.html",
+    "href": "page_article_takeaways.html",
+    "title": "Article Takeaways",
+    "section": "",
+    "text": "Scalable, Parameter- and Memory-Efficient Pretraining for Large Language Models\n\n\nRecent Algorithmic Advances and Comprehensive Benchmarking\n\n\n\n\n\nMay 28, 2025\n\n\n\n\n\n\n\n\n\n\n\n\nTowards Fully FP8 GEMM LLM Training at Scale\n\n\nIntroducing FOG Architectures for Efficient and Stable Low-Precision Transformer Training\n\n\n\n\n\nMay 26, 2025\n\n\n\n\n\n\n\n\n\n\n\n\nGUARDIAN: Safeguarding LLM Multi-Agent Collaborations with Temporal Graph Modeling\n\n\nA Model-Agnostic Framework for Detecting Anomalies and Errors in Multi-Agent Language Model Systems\n\n\n\n\n\nMay 25, 2025\n\n\n\n\n\n\n\n\n\n\n\n\nHypercube-RAG: A Hypercube-Based RAG for Efficient and Explainable Scientific QA\n\n\nA novel multidimensional retrieval-augmented framework for domain-specific question answering\n\n\n\n\n\nMay 25, 2025\n\n\n\n\n\nNo matching items",
+    "crumbs": [
+      "AI & Agents",
+      "Article Takeaways"
+    ]
+  },
+  {
     "objectID": "posts/llm/Run LLM locally with Ollama.html",
     "href": "posts/llm/Run LLM locally with Ollama.html",
     "title": "Run LLM Locally with Ollama",
@@ -123,35 +215,6 @@
     "text": "Next Steps\n\nIntegrate with LangChain or LangGraph.\nBuild a local RAG system (FAISS, Chroma) with your private data.\nDeploy behind a secure API gateway."
   },
   {
-    "objectID": "page_article_takeaways.html",
-    "href": "page_article_takeaways.html",
-    "title": "Article Takeaways",
-    "section": "",
-    "text": "Scalable, Parameter- and Memory-Efficient Pretraining for Large Language Models\n\n\nRecent Algorithmic Advances and Comprehensive Benchmarking\n\n\n\n\n\nMay 28, 2025\n\n\n\n\n\n\n\n\n\n\n\n\nTowards Fully FP8 GEMM LLM Training at Scale\n\n\nIntroducing FOG Architectures for Efficient and Stable Low-Precision Transformer Training\n\n\n\n\n\nMay 26, 2025\n\n\n\n\n\n\n\n\n\n\n\n\nGUARDIAN: Safeguarding LLM Multi-Agent Collaborations with Temporal Graph Modeling\n\n\nA Model-Agnostic Framework for Detecting Anomalies and Errors in Multi-Agent Language Model Systems\n\n\n\n\n\nMay 25, 2025\n\n\n\n\n\n\n\n\n\n\n\n\nHypercube-RAG: A Hypercube-Based RAG for Efficient and Explainable Scientific QA\n\n\nA novel multidimensional retrieval-augmented framework for domain-specific question answering\n\n\n\n\n\nMay 25, 2025\n\n\n\n\n\nNo matching items",
-    "crumbs": [
-      "AI & Agents",
-      "Article Takeaways"
-    ]
-  },
-  {
-    "objectID": "MD.html",
-    "href": "MD.html",
-    "title": "Quang Duong",
-    "section": "",
-    "text": "Random Unsplash-style image\n\n\n\n\n\nRandom piscum photos"
-  },
-  {
-    "objectID": "page_rag.html",
-    "href": "page_rag.html",
-    "title": "RAG",
-    "section": "",
-    "text": "No matching items",
-    "crumbs": [
-      "AI & Agents",
-      "RAG"
-    ]
-  },
-  {
     "objectID": "posts/articles_takaways/2025-05-26_FP8-GEMM-LLM-FOG.html",
     "href": "posts/articles_takaways/2025-05-26_FP8-GEMM-LLM-FOG.html",
     "title": "Towards Fully FP8 GEMM LLM Training at Scale",
@@ -188,7 +251,7 @@
     "href": "index.html",
     "title": "LLM",
     "section": "",
-    "text": "Run LLM Locally with Ollama\n\n\nFrom setup to deployment: run and serve local LLMs easily with Ollama\n\n\n\n\n\nMay 25, 2025\n\n\n\n\n\nNo matching items",
+    "text": "Fine-tuning an LLM with Unsloth and Serving with Ollama\n\n\nEnd-to-end guide: fine-tune a small model on Hugging Face with Unsloth and deploy locally with Ollama\n\n\n\n\n\nJun 20, 2025\n\n\n\n\n\n\n\n\n\n\n\n\nRun LLM Locally with Ollama\n\n\nFrom setup to deployment: run and serve local LLMs easily with Ollama\n\n\n\n\n\nMay 25, 2025\n\n\n\n\n\nNo matching items",
     "crumbs": [
       "AI & Agents",
       "LLM"

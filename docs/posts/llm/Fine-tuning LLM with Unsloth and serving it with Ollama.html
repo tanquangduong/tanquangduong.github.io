@@ -6,9 +6,9 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="dcterms.date" content="2025-05-25">
+<meta name="dcterms.date" content="2025-06-20">
 
-<title>Run LLM Locally with Ollama – Quang Duong</title>
+<title>Fine-tuning an LLM with Unsloth and Serving with Ollama – Quang Duong</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -112,16 +112,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 <link rel="stylesheet" href="../../styles.css">
-<meta property="og:title" content="Run LLM Locally with Ollama – Quang Duong">
-<meta property="og:description" content="From setup to deployment: run and serve local LLMs easily with Ollama">
-<meta property="og:image" content="https://tanquangduong.github.io//images/llm/ollama-300px.png">
+<meta property="og:title" content="Fine-tuning an LLM with Unsloth and Serving with Ollama – Quang Duong">
+<meta property="og:description" content="End-to-end guide: fine-tune a small model on Hugging Face with Unsloth and deploy locally with Ollama">
+<meta property="og:image" content="https://tanquangduong.github.io//images/llm/unsloth x ollama-300px.png">
 <meta property="og:site_name" content="Quang Duong">
-<meta property="og:image:height" content="300">
+<meta property="og:image:height" content="200">
 <meta property="og:image:width" content="300">
-<meta name="twitter:title" content="Run LLM Locally with Ollama – Quang Duong">
-<meta name="twitter:description" content="From setup to deployment: run and serve local LLMs easily with Ollama">
-<meta name="twitter:image" content="https://tanquangduong.github.io//images/llm/ollama-300px.png">
-<meta name="twitter:image-height" content="300">
+<meta name="twitter:title" content="Fine-tuning an LLM with Unsloth and Serving with Ollama – Quang Duong">
+<meta name="twitter:description" content="End-to-end guide: fine-tune a small model on Hugging Face with Unsloth and deploy locally with Ollama">
+<meta name="twitter:image" content="https://tanquangduong.github.io//images/llm/unsloth x ollama-300px.png">
+<meta name="twitter:image-height" content="200">
 <meta name="twitter:image-width" content="300">
 <meta name="twitter:card" content="summary_large_image">
 </head>
@@ -218,14 +218,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
    
   <ul class="collapse">
   <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#what-is-unsloth" id="toc-what-is-unsloth" class="nav-link" data-scroll-target="#what-is-unsloth">What is Unsloth?</a></li>
   <li><a href="#what-is-ollama" id="toc-what-is-ollama" class="nav-link" data-scroll-target="#what-is-ollama">What is Ollama?</a></li>
-  <li><a href="#hardware-considerations" id="toc-hardware-considerations" class="nav-link" data-scroll-target="#hardware-considerations">Hardware Considerations</a></li>
-  <li><a href="#installation-verification" id="toc-installation-verification" class="nav-link" data-scroll-target="#installation-verification">Installation &amp; Verification</a></li>
-  <li><a href="#run-your-first-model" id="toc-run-your-first-model" class="nav-link" data-scroll-target="#run-your-first-model">Run Your First Model</a></li>
-  <li><a href="#serve-models-via-api" id="toc-serve-models-via-api" class="nav-link" data-scroll-target="#serve-models-via-api">Serve Models via API</a></li>
-  <li><a href="#using-ollama-in-python" id="toc-using-ollama-in-python" class="nav-link" data-scroll-target="#using-ollama-in-python">Using Ollama in Python</a></li>
-  <li><a href="#custom-models-with-modelfile" id="toc-custom-models-with-modelfile" class="nav-link" data-scroll-target="#custom-models-with-modelfile">Custom Models with Modelfile</a></li>
-  <li><a href="#deployment-options-performance-tips" id="toc-deployment-options-performance-tips" class="nav-link" data-scroll-target="#deployment-options-performance-tips">Deployment Options &amp; Performance Tips</a></li>
+  <li><a href="#fine-tune-llm-with-unsloth" id="toc-fine-tune-llm-with-unsloth" class="nav-link" data-scroll-target="#fine-tune-llm-with-unsloth">Fine-tune LLM with Unsloth</a></li>
+  <li><a href="#run-your-fine-tuned-model-with-ollama" id="toc-run-your-fine-tuned-model-with-ollama" class="nav-link" data-scroll-target="#run-your-fine-tuned-model-with-ollama">Run your fine-tuned model with Ollama</a></li>
+  <li><a href="#deployment-tips" id="toc-deployment-tips" class="nav-link" data-scroll-target="#deployment-tips">Deployment Tips</a></li>
   <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
   <li><a href="#next-steps" id="toc-next-steps" class="nav-link" data-scroll-target="#next-steps">Next Steps</a></li>
   </ul>
@@ -236,8 +233,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Run LLM Locally with Ollama</h1>
-<p class="subtitle lead">From setup to deployment: run and serve local LLMs easily with Ollama</p>
+<h1 class="title">Fine-tuning an LLM with Unsloth and Serving with Ollama</h1>
+<p class="subtitle lead">End-to-end guide: fine-tune a small model on Hugging Face with Unsloth and deploy locally with Ollama</p>
 </div>
 
 
@@ -248,7 +245,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">May 25, 2025</p>
+      <p class="date">June 20, 2025</p>
     </div>
   </div>
   
@@ -260,16 +257,42 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<p><strong>Keywords:</strong> Ollama, Local LLM, AI deployment, llama3, mistral, phi, generative AI, on-prem AI, LLM inference</p>
+<p><strong>Keywords:</strong> Unsloth, Ollama, fine-tuning, Hugging Face, Qwen, Alpaca dataset, LoRA, GGUF, local LLM, AI deployment</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="../../images/llm/ollama-300px.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="300"></p>
+<p><img src="../../images/llm/unsloth x ollama-300px.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="300"></p>
 </figure>
 </div>
 <section id="introduction" class="level2">
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
-<p>Running Large Language Models (LLMs) locally is becoming a key trend for developers and companies who want <strong>privacy, low latency, and cost control</strong>.</p>
-<p>Instead of relying on external APIs and paying for hosted services, tools like <strong>Ollama</strong> allow you to run powerful models directly on your own computer with minimal setup. This free open-source tool ensures complete privacy, security, and zero-latency responses.</p>
+<p>Fine-tuning your own Large Language Model (LLM) is no longer limited to large GPU clusters. With modern tools like <strong>Unsloth</strong> and <strong>Ollama</strong>, you can fine-tune a <strong>small model on a small dataset</strong> and run it locally on your machine.</p>
+<p>This approach is ideal if you want:</p>
+<ul>
+<li><strong>Full control over your model</strong></li>
+<li><strong>Privacy (no external API calls)</strong></li>
+<li><strong>Low-cost experimentation</strong></li>
+<li><strong>Custom domain adaptation</strong></li>
+</ul>
+<p>In this tutorial, we will walk through a <strong>complete pipeline</strong>:</p>
+<ol type="1">
+<li>Load a small LLM from Hugging Face<br>
+</li>
+<li>Fine-tune it with Unsloth<br>
+</li>
+<li>Export it to GGUF<br>
+</li>
+<li>Serve it locally with Ollama</li>
+</ol>
+</section>
+<section id="what-is-unsloth" class="level2">
+<h2 class="anchored" data-anchor-id="what-is-unsloth">What is Unsloth?</h2>
+<p><strong>Unsloth</strong> is an optimized framework for fine-tuning LLMs efficiently. It enables:</p>
+<ul>
+<li>Fast training (2x–5x speed improvements)</li>
+<li>Reduced VRAM usage (4-bit quantization)</li>
+<li>Easy LoRA fine-tuning</li>
+<li>Direct export to GGUF</li>
+</ul>
 </section>
 <section id="what-is-ollama" class="level2">
 <h2 class="anchored" data-anchor-id="what-is-ollama">What is Ollama?</h2>
@@ -280,108 +303,195 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>Serve models via a built-in local HTTP API server.</li>
 <li>Customize models using simple configuration files.</li>
 </ul>
-<p>Supported models include hundreds of options available in the Ollama library, such as <strong>Llama 3.1, Llama 2, Mistral, Phi, and Gemma</strong>, as well as multimodal models that accept photos, video, and voice.</p>
+<p>Read this article for more details:: <a href="https://tanquangduong.github.io/posts/llm/Run%20LLM%20locally%20with%20Ollama.html">Run LLM Locally with Ollama</a></p>
 </section>
-<section id="hardware-considerations" class="level2">
-<h2 class="anchored" data-anchor-id="hardware-considerations">Hardware Considerations</h2>
-<p>Since you are running these models locally, you must download the entire model to your machine. <strong>You need to ensure you have enough disk space and RAM to load and run them</strong>.</p>
-<p>For example, the massive Llama 3.1 405B model requires hundreds of gigabytes of space and RAM, which is difficult for standard machines to handle. For local environments, it is highly recommended to start with lightweight or older models (like Llama 2, Phi, Gemma 2b, or Mistral) that most computers can comfortably run.</p>
+<section id="fine-tune-llm-with-unsloth" class="level2">
+<h2 class="anchored" data-anchor-id="fine-tune-llm-with-unsloth">Fine-tune LLM with Unsloth</h2>
+<section id="model-dataset-selection" class="level3">
+<h3 class="anchored" data-anchor-id="model-dataset-selection">Model &amp; Dataset Selection</h3>
+<p><em>Model</em></p>
+<p><code>unsloth/Qwen2.5-0.5B-Instruct</code></p>
+<p><em>Dataset</em></p>
+<p><code>yahma/alpaca-cleaned</code> (subset of 200 samples)</p>
 </section>
-<section id="installation-verification" class="level2">
-<h2 class="anchored" data-anchor-id="installation-verification">Installation &amp; Verification</h2>
-<p>Installing Ollama is incredibly straightforward:</p>
-<ol type="1">
-<li>Go to the official website at <a href="https://ollama.com">https://ollama.com</a> and click on download.</li>
-<li>Select your operating system (<strong>Windows, macOS, or Linux</strong>) and install the application.</li>
-<li>Run the desktop application; nothing will appear on your screen immediately because this simply starts a backend server running the Ollama service.</li>
-</ol>
-<p><strong>Verify Installation:</strong></p>
-<p>Open your terminal or command prompt and type:</p>
-<p><code>ollama</code></p>
-<p><code>ollama --version</code></p>
-<p>If you receive an output of available commands, you have installed Ollama correctly.</p>
+<section id="environment-setup" class="level3">
+<h3 class="anchored" data-anchor-id="environment-setup">Environment Setup</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>pip install <span class="op">-</span>q unsloth</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="op">!</span>pip install <span class="op">-</span>q transformers datasets trl accelerate peft bitsandbytes sentencepiece</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
-<section id="run-your-first-model" class="level2">
-<h2 class="anchored" data-anchor-id="run-your-first-model">Run Your First Model</h2>
-<p>Ollama automatically downloads models the first time you run them. To start a model, simply type <code>ollama run</code> followed by the model’s identifier.</p>
-<p>For example, to run Mistral or Llama 2:</p>
-<p><code>ollama run llama2</code></p>
-<p><code>ollama run mistral</code></p>
-<p>If the model isn’t on your system, Ollama will pull the manifest and download it. If it is already installed, it will instantly bring up an interactive prompt where you can start chatting with the model.</p>
-<p><strong>Basic Terminal Commands:</strong></p>
+<section id="load-model" class="level3">
+<h3 class="anchored" data-anchor-id="load-model">Load Model</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> unsloth <span class="im">import</span> FastLanguageModel</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>model, tokenizer <span class="op">=</span> FastLanguageModel.from_pretrained(</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    model_name<span class="op">=</span><span class="st">"unsloth/Qwen2.5-0.5B-Instruct"</span>,</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    max_seq_length<span class="op">=</span><span class="dv">1024</span>,</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    load_in_4bit<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="add-lora-adapters" class="level3">
+<h3 class="anchored" data-anchor-id="add-lora-adapters">Add LoRA Adapters</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> FastLanguageModel.get_peft_model(</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    model,</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    r<span class="op">=</span><span class="dv">16</span>,</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    target_modules<span class="op">=</span>[</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>        <span class="st">"q_proj"</span>,<span class="st">"k_proj"</span>,<span class="st">"v_proj"</span>,<span class="st">"o_proj"</span>,</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"gate_proj"</span>,<span class="st">"up_proj"</span>,<span class="st">"down_proj"</span>,</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    ],</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    lora_alpha<span class="op">=</span><span class="dv">16</span>,</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    lora_dropout<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    bias<span class="op">=</span><span class="st">"none"</span>,</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="load-dataset" class="level3">
+<h3 class="anchored" data-anchor-id="load-dataset">Load Dataset</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datasets <span class="im">import</span> load_dataset</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>dataset <span class="op">=</span> load_dataset(<span class="st">"yahma/alpaca-cleaned"</span>, split<span class="op">=</span><span class="st">"train[:200]"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="format-dataset" class="level3">
+<h3 class="anchored" data-anchor-id="format-dataset">Format Dataset</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> format_example(example):</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    user_text <span class="op">=</span> example[<span class="st">"instruction"</span>]</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> example[<span class="st">"input"</span>]:</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>        user_text <span class="op">+=</span> <span class="st">"</span><span class="ch">\n\n</span><span class="st">Input:</span><span class="ch">\n</span><span class="st">"</span> <span class="op">+</span> example[<span class="st">"input"</span>]</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    messages <span class="op">=</span> [</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: user_text},</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"assistant"</span>, <span class="st">"content"</span>: example[<span class="st">"output"</span>]},</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    ]</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    text <span class="op">=</span> tokenizer.apply_chat_template(</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>        messages,</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>        tokenize<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"text"</span>: text}</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>dataset <span class="op">=</span> dataset.<span class="bu">map</span>(format_example)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="fine-tuning" class="level3">
+<h3 class="anchored" data-anchor-id="fine-tuning">Fine-tuning</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> trl <span class="im">import</span> SFTTrainer, SFTConfig</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>trainer <span class="op">=</span> SFTTrainer(</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span>model,</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    tokenizer<span class="op">=</span>tokenizer,</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    train_dataset<span class="op">=</span>dataset,</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    args<span class="op">=</span>SFTConfig(</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>        dataset_text_field<span class="op">=</span><span class="st">"text"</span>,</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>        per_device_train_batch_size<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>        max_steps<span class="op">=</span><span class="dv">60</span>,</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>        learning_rate<span class="op">=</span><span class="fl">2e-4</span>,</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>        output_dir<span class="op">=</span><span class="st">"outputs"</span>,</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>trainer.train()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="test-model" class="level3">
+<h3 class="anchored" data-anchor-id="test-model">Test Model</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> unsloth <span class="im">import</span> FastLanguageModel</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>FastLanguageModel.for_inference(model)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>inputs <span class="op">=</span> tokenizer(<span class="st">"Explain fine-tuning simply"</span>, return_tensors<span class="op">=</span><span class="st">"pt"</span>).to(model.device)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>outputs <span class="op">=</span> model.generate(<span class="op">**</span>inputs, max_new_tokens<span class="op">=</span><span class="dv">100</span>)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(tokenizer.decode(outputs[<span class="dv">0</span>]))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="save-model" class="level3">
+<h3 class="anchored" data-anchor-id="save-model">Save Model</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>model.save_pretrained(<span class="st">"lora_model"</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>tokenizer.save_pretrained(<span class="st">"lora_model"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="export-gguf" class="level3">
+<h3 class="anchored" data-anchor-id="export-gguf">Export GGUF</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>model.save_pretrained_gguf(</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"gguf_model"</span>,</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    tokenizer,</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    quantization_method<span class="op">=</span><span class="st">"q4_k_m"</span>,</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="download-model-from-colab" class="level3">
+<h3 class="anchored" data-anchor-id="download-model-from-colab">Download Model from Colab</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="op">!</span><span class="bu">zip</span> <span class="op">-</span>r model.<span class="bu">zip</span> gguf_model</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="run-your-fine-tuned-model-with-ollama" class="level2">
+<h2 class="anchored" data-anchor-id="run-your-fine-tuned-model-with-ollama">Run your fine-tuned model with Ollama</h2>
+<section id="install-ollama" class="level3">
+<h3 class="anchored" data-anchor-id="install-ollama">Install Ollama</h3>
+<p>Download from: <a href="https://ollama.com">https://ollama.com</a></p>
+<p>Or via terminal:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-fsSL</span> https://ollama.com/install.sh <span class="kw">|</span> <span class="fu">sh</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="create-an-ollama-model" class="level3">
+<h3 class="anchored" data-anchor-id="create-an-ollama-model">Create an Ollama Model</h3>
+<p>Folder structure:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="ex">my-model/</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> Modelfile</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="ex">├──</span> model.gguf</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="create-modelfile" class="level3">
+<h3 class="anchored" data-anchor-id="create-modelfile">Create Modelfile</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode txt code-with-copy"><code class="sourceCode default"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>FROM ./model.gguf</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>SYSTEM You are a helpful AI assistant.</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>PARAMETER temperature 0.7</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>PARAMETER num_ctx 2048</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="run-model" class="level3">
+<h3 class="anchored" data-anchor-id="run-model">Run Model</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="ex">ollama</span> create my-model <span class="at">-f</span> Modelfile</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="ex">ollama</span> run my-model</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="api-usage" class="level3">
+<h3 class="anchored" data-anchor-id="api-usage">API Usage</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> requests</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> requests.post(</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">"http://localhost:11434/api/generate"</span>,</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>    json<span class="op">=</span>{</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"model"</span>: <span class="st">"my-model"</span>,</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"prompt"</span>: <span class="st">"Explain LoRA"</span>,</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>        <span class="st">"stream"</span>: <span class="va">False</span></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(response.json()[<span class="st">"response"</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="deployment-tips" class="level2">
+<h2 class="anchored" data-anchor-id="deployment-tips">Deployment Tips</h2>
 <ul>
-<li><strong>Exit the chat prompt:</strong> Type <code>/bye</code>.</li>
-<li><strong>List installed models:</strong> Type <code>ollama list</code>.</li>
-<li><strong>Remove a model:</strong> Type <code>ollama rm &lt;model_name&gt;</code>.</li>
-</ul>
-</section>
-<section id="serve-models-via-api" class="level2">
-<h2 class="anchored" data-anchor-id="serve-models-via-api">Serve Models via API</h2>
-<p>Ollama automatically exposes a local HTTP API, meaning you can trigger models from curl, Postman, Python code, or custom software applications.</p>
-<ul>
-<li><p>If the Ollama desktop application is running, the API is automatically open in the background on <strong>port 11434</strong>.</p></li>
-<li><p>If you need to manually invoke the server from your terminal, run the command:</p>
-<p><code>ollama serve</code></p></li>
-</ul>
-<p>This will run the HTTP API in your terminal instance, allowing you to view all incoming requests.</p>
-</section>
-<section id="using-ollama-in-python" class="level2">
-<h2 class="anchored" data-anchor-id="using-ollama-in-python">Using Ollama in Python</h2>
-<p>You have complete control over how you interact with Ollama in code.</p>
-<p><strong>Method 1: Using the <code>requests</code> library manually</strong></p>
-<p>You can send POST requests directly to the local server API endpoint (<code>http://localhost:11434/api/chat</code>). You can even enable streaming mode to grab responses in real-time as the model types them out.</p>
-<p><em>Example code</em></p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> requests</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> requests.post(</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">"http://localhost:11434/api/generate"</span>,</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    json<span class="op">=</span>{</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"model"</span>: <span class="st">"phi"</span>,</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"prompt"</span>: <span class="st">"Explain AI in simple terms"</span>,</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>        <span class="st">"stream"</span>: <span class="va">False</span></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(response.json()[<span class="st">"response"</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><strong>Method 2: Using the official <code>ollama</code> package (Recommended)</strong></p>
-<p>For a much simpler integration, use the official Python or JavaScript packages. <code>pip install ollama</code></p>
-<p><em>Example code:</em></p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> ollama</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> ollama.generate(model<span class="op">=</span><span class="st">'mistral'</span>, prompt<span class="op">=</span><span class="st">'Explain Python.'</span>)</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(response[<span class="st">'response'</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="custom-models-with-modelfile" class="level2">
-<h2 class="anchored" data-anchor-id="custom-models-with-modelfile">Custom Models with Modelfile</h2>
-<p>You can easily create your own customized assistants by writing a Modelfile (a simple file with no extension).</p>
-<p>Example: Creating a Pirate Assistant</p>
-<p>Create a file named <code>Modelfile</code> in your directory with the following syntax:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode txt code-with-copy"><code class="sourceCode default"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>FROM llama3.2</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>SYSTEM "You are a pirate. Speak like a pirate and answer all questions in pirate style."</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Open your terminal in that directory and build the model by assigning it a name and pointing to the file (-f):</p>
-<p><code>ollama create pirate-bot -f ./Modelfile</code></p>
-<p>Run your custom model:</p>
-<p><code>ollama run pirate-bot</code></p>
-<p>Now, if you say “hello”, the model will respond like a pirate, for example:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode txt code-with-copy"><code class="sourceCode default"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>"Ahoy matey! What brings ye to these waters?"</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="deployment-options-performance-tips" class="level2">
-<h2 class="anchored" data-anchor-id="deployment-options-performance-tips">Deployment Options &amp; Performance Tips</h2>
-<ul>
-<li>Use GPU (NVIDIA recommended) if available to drastically speed up processing.</li>
-<li>Docker / Kubernetes: You can containerize Ollama and deploy it on GPU-enabled nodes for scalable production.</li>
-<li>Reduce context size or use quantized models (Q4, Q5) if your machine’s RAM is limited.</li>
+<li>Use quantized models (Q4/Q5) to reduce RAM usage</li>
+<li>Prefer GPU acceleration if available</li>
+<li>Keep dataset clean → quality &gt; quantity</li>
+<li>Start small, then scale</li>
 </ul>
 </section>
 <section id="conclusion" class="level2">
 <h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
-<p>Ollama makes running LLMs locally simple, fast, and production-ready. With just a few commands, you can download models, chat with them instantly without latency, customize their behaviors with Modelfiles, and seamlessly integrate them into your code via a local HTTP API. It is a powerful solution for building private, low-cost, and efficient AI systems.</p>
+<p>With Unsloth + Hugging Face + Ollama, you now have a complete local LLM pipeline:</p>
+<ul>
+<li>Fine-tune efficiently with minimal hardware</li>
+<li>Customize models for your use case</li>
+<li>Deploy locally with zero latency</li>
+<li>Maintain full control and privacy</li>
+</ul>
+<p>This workflow is perfect for:</p>
+<ul>
+<li>Prototyping AI products</li>
+<li>Internal enterprise tools</li>
+<li>Personal AI assistants</li>
+</ul>
 </section>
 <section id="next-steps" class="level2">
 <h2 class="anchored" data-anchor-id="next-steps">Next Steps</h2>
 <ul>
-<li>Integrate with LangChain or LangGraph.</li>
-<li>Build a local RAG system (FAISS, Chroma) with your private data.</li>
-<li>Deploy behind a secure API gateway.</li>
+<li>Train on your own domain dataset (RAG + fine-tuning)</li>
+<li>Add tools with LangGraph agents</li>
+<li>Deploy behind an API gateway (FastAPI, Nginx)</li>
+<li>Scale with Docker + GPU servers</li>
 </ul>
 
 

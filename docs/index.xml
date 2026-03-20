@@ -10,7 +10,512 @@
 <atom:link href="https://tanquangduong.github.io/index.xml" rel="self" type="application/rss+xml"/>
 <description>Get Insights with Latest AI Research Papers</description>
 <generator>quarto-1.9.36</generator>
-<lastBuildDate>Sun, 25 May 2025 00:00:00 GMT</lastBuildDate>
+<lastBuildDate>Fri, 20 Jun 2025 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>Fine-tuning an LLM with Unsloth and Serving with Ollama</title>
+  <link>https://tanquangduong.github.io/posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p><strong>Keywords:</strong> Unsloth, Ollama, fine-tuning, Hugging Face, Qwen, Alpaca dataset, LoRA, GGUF, local LLM, AI deployment</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tanquangduong.github.io/images/llm/unsloth x ollama-300px.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="300"></p>
+</figure>
+</div>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>Fine-tuning your own Large Language Model (LLM) is no longer limited to large GPU clusters. With modern tools like <strong>Unsloth</strong> and <strong>Ollama</strong>, you can fine-tune a <strong>small model on a small dataset</strong> and run it locally on your machine.</p>
+<p>This approach is ideal if you want:</p>
+<ul>
+<li><strong>Full control over your model</strong></li>
+<li><strong>Privacy (no external API calls)</strong></li>
+<li><strong>Low-cost experimentation</strong></li>
+<li><strong>Custom domain adaptation</strong></li>
+</ul>
+<p>In this tutorial, we will walk through a <strong>complete pipeline</strong>:</p>
+<ol type="1">
+<li>Load a small LLM from Hugging Face<br>
+</li>
+<li>Fine-tune it with Unsloth<br>
+</li>
+<li>Export it to GGUF<br>
+</li>
+<li>Serve it locally with Ollama</li>
+</ol>
+</section>
+<section id="what-is-unsloth" class="level2">
+<h2 class="anchored" data-anchor-id="what-is-unsloth">What is Unsloth?</h2>
+<p><strong>Unsloth</strong> is an optimized framework for fine-tuning LLMs efficiently. It enables:</p>
+<ul>
+<li>Fast training (2x–5x speed improvements)</li>
+<li>Reduced VRAM usage (4-bit quantization)</li>
+<li>Easy LoRA fine-tuning</li>
+<li>Direct export to GGUF</li>
+</ul>
+</section>
+<section id="what-is-ollama" class="level2">
+<h2 class="anchored" data-anchor-id="what-is-ollama">What is Ollama?</h2>
+<p><strong>Ollama</strong> is a lightweight framework designed to simplify local LLM usage. It enables you to:</p>
+<ul>
+<li>Run LLMs locally (CPU or GPU).</li>
+<li>Download and manage open-source models (including custom configurations and models pulled from Hugging Face).</li>
+<li>Serve models via a built-in local HTTP API server.</li>
+<li>Customize models using simple configuration files.</li>
+</ul>
+<p>Read this article for more details:: <a href="https://tanquangduong.github.io/posts/llm/Run%20LLM%20locally%20with%20Ollama.html">Run LLM Locally with Ollama</a></p>
+</section>
+<section id="fine-tune-llm-with-unsloth" class="level2">
+<h2 class="anchored" data-anchor-id="fine-tune-llm-with-unsloth">Fine-tune LLM with Unsloth</h2>
+<section id="model-dataset-selection" class="level3">
+<h3 class="anchored" data-anchor-id="model-dataset-selection">Model &amp; Dataset Selection</h3>
+<p><em>Model</em></p>
+<p><code>unsloth/Qwen2.5-0.5B-Instruct</code></p>
+<p><em>Dataset</em></p>
+<p><code>yahma/alpaca-cleaned</code> (subset of 200 samples)</p>
+</section>
+<section id="environment-setup" class="level3">
+<h3 class="anchored" data-anchor-id="environment-setup">Environment Setup</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">!</span>pip install <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>q unsloth</span>
+<span id="cb1-2"><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">!</span>pip install <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>q transformers datasets trl accelerate peft bitsandbytes sentencepiece</span></code></pre></div></div>
+</section>
+<section id="load-model" class="level3">
+<h3 class="anchored" data-anchor-id="load-model">Load Model</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> unsloth <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> FastLanguageModel</span>
+<span id="cb2-2"></span>
+<span id="cb2-3">model, tokenizer <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> FastLanguageModel.from_pretrained(</span>
+<span id="cb2-4">    model_name<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"unsloth/Qwen2.5-0.5B-Instruct"</span>,</span>
+<span id="cb2-5">    max_seq_length<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1024</span>,</span>
+<span id="cb2-6">    load_in_4bit<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb2-7">)</span></code></pre></div></div>
+</section>
+<section id="add-lora-adapters" class="level3">
+<h3 class="anchored" data-anchor-id="add-lora-adapters">Add LoRA Adapters</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">model <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> FastLanguageModel.get_peft_model(</span>
+<span id="cb3-2">    model,</span>
+<span id="cb3-3">    r<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">16</span>,</span>
+<span id="cb3-4">    target_modules<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[</span>
+<span id="cb3-5">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"q_proj"</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"k_proj"</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"v_proj"</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"o_proj"</span>,</span>
+<span id="cb3-6">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"gate_proj"</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"up_proj"</span>,<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"down_proj"</span>,</span>
+<span id="cb3-7">    ],</span>
+<span id="cb3-8">    lora_alpha<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">16</span>,</span>
+<span id="cb3-9">    lora_dropout<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,</span>
+<span id="cb3-10">    bias<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"none"</span>,</span>
+<span id="cb3-11">)</span></code></pre></div></div>
+</section>
+<section id="load-dataset" class="level3">
+<h3 class="anchored" data-anchor-id="load-dataset">Load Dataset</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> datasets <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> load_dataset</span>
+<span id="cb4-2">dataset <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> load_dataset(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"yahma/alpaca-cleaned"</span>, split<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"train[:200]"</span>)</span></code></pre></div></div>
+</section>
+<section id="format-dataset" class="level3">
+<h3 class="anchored" data-anchor-id="format-dataset">Format Dataset</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> format_example(example):</span>
+<span id="cb5-2">    user_text <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> example[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"instruction"</span>]</span>
+<span id="cb5-3">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> example[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"input"</span>]:</span>
+<span id="cb5-4">        user_text <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">Input:</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> example[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"input"</span>]</span>
+<span id="cb5-5"></span>
+<span id="cb5-6">    messages <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [</span>
+<span id="cb5-7">        {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"user"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: user_text},</span>
+<span id="cb5-8">        {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"assistant"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: example[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"output"</span>]},</span>
+<span id="cb5-9">    ]</span>
+<span id="cb5-10"></span>
+<span id="cb5-11">    text <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> tokenizer.apply_chat_template(</span>
+<span id="cb5-12">        messages,</span>
+<span id="cb5-13">        tokenize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span>,</span>
+<span id="cb5-14">    )</span>
+<span id="cb5-15">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"text"</span>: text}</span>
+<span id="cb5-16"></span>
+<span id="cb5-17">dataset <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> dataset.<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">map</span>(format_example)</span></code></pre></div></div>
+</section>
+<section id="fine-tuning" class="level3">
+<h3 class="anchored" data-anchor-id="fine-tuning">Fine-tuning</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> trl <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> SFTTrainer, SFTConfig</span>
+<span id="cb6-2"></span>
+<span id="cb6-3">trainer <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> SFTTrainer(</span>
+<span id="cb6-4">    model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>model,</span>
+<span id="cb6-5">    tokenizer<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>tokenizer,</span>
+<span id="cb6-6">    train_dataset<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>dataset,</span>
+<span id="cb6-7">    args<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>SFTConfig(</span>
+<span id="cb6-8">        dataset_text_field<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"text"</span>,</span>
+<span id="cb6-9">        per_device_train_batch_size<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>,</span>
+<span id="cb6-10">        max_steps<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">60</span>,</span>
+<span id="cb6-11">        learning_rate<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2e-4</span>,</span>
+<span id="cb6-12">        output_dir<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"outputs"</span>,</span>
+<span id="cb6-13">    ),</span>
+<span id="cb6-14">)</span>
+<span id="cb6-15"></span>
+<span id="cb6-16">trainer.train()</span></code></pre></div></div>
+</section>
+<section id="test-model" class="level3">
+<h3 class="anchored" data-anchor-id="test-model">Test Model</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> unsloth <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> FastLanguageModel</span>
+<span id="cb7-2">FastLanguageModel.for_inference(model)</span>
+<span id="cb7-3"></span>
+<span id="cb7-4">inputs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> tokenizer(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Explain fine-tuning simply"</span>, return_tensors<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"pt"</span>).to(model.device)</span>
+<span id="cb7-5">outputs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> model.generate(<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span>inputs, max_new_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100</span>)</span>
+<span id="cb7-6"></span>
+<span id="cb7-7"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(tokenizer.decode(outputs[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>]))</span></code></pre></div></div>
+</section>
+<section id="save-model" class="level3">
+<h3 class="anchored" data-anchor-id="save-model">Save Model</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">model.save_pretrained(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"lora_model"</span>)</span>
+<span id="cb8-2">tokenizer.save_pretrained(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"lora_model"</span>)</span></code></pre></div></div>
+</section>
+<section id="export-gguf" class="level3">
+<h3 class="anchored" data-anchor-id="export-gguf">Export GGUF</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">model.save_pretrained_gguf(</span>
+<span id="cb9-2">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"gguf_model"</span>,</span>
+<span id="cb9-3">    tokenizer,</span>
+<span id="cb9-4">    quantization_method<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"q4_k_m"</span>,</span>
+<span id="cb9-5">)</span></code></pre></div></div>
+</section>
+<section id="download-model-from-colab" class="level3">
+<h3 class="anchored" data-anchor-id="download-model-from-colab">Download Model from Colab</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">!</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">zip</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span>r model.<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">zip</span> gguf_model</span></code></pre></div></div>
+</section>
+</section>
+<section id="run-your-fine-tuned-model-with-ollama" class="level2">
+<h2 class="anchored" data-anchor-id="run-your-fine-tuned-model-with-ollama">Run your fine-tuned model with Ollama</h2>
+<section id="install-ollama" class="level3">
+<h3 class="anchored" data-anchor-id="install-ollama">Install Ollama</h3>
+<p>Download from: <a href="https://ollama.com">https://ollama.com</a></p>
+<p>Or via terminal:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">curl</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-fsSL</span> https://ollama.com/install.sh <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">|</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sh</span></span></code></pre></div></div>
+</section>
+<section id="create-an-ollama-model" class="level3">
+<h3 class="anchored" data-anchor-id="create-an-ollama-model">Create an Ollama Model</h3>
+<p>Folder structure:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">my-model/</span></span>
+<span id="cb12-2"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> Modelfile</span>
+<span id="cb12-3"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> model.gguf</span></code></pre></div></div>
+</section>
+<section id="create-modelfile" class="level3">
+<h3 class="anchored" data-anchor-id="create-modelfile">Create Modelfile</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode txt code-with-copy"><code class="sourceCode default"><span id="cb13-1">FROM ./model.gguf</span>
+<span id="cb13-2"></span>
+<span id="cb13-3">SYSTEM You are a helpful AI assistant.</span>
+<span id="cb13-4"></span>
+<span id="cb13-5">PARAMETER temperature 0.7</span>
+<span id="cb13-6">PARAMETER num_ctx 2048</span></code></pre></div></div>
+</section>
+<section id="run-model" class="level3">
+<h3 class="anchored" data-anchor-id="run-model">Run Model</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">ollama</span> create my-model <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-f</span> Modelfile</span>
+<span id="cb14-2"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">ollama</span> run my-model</span></code></pre></div></div>
+</section>
+<section id="api-usage" class="level3">
+<h3 class="anchored" data-anchor-id="api-usage">API Usage</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> requests</span>
+<span id="cb15-2"></span>
+<span id="cb15-3">response <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> requests.post(</span>
+<span id="cb15-4">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"http://localhost:11434/api/generate"</span>,</span>
+<span id="cb15-5">    json<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>{</span>
+<span id="cb15-6">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"model"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"my-model"</span>,</span>
+<span id="cb15-7">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"prompt"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Explain LoRA"</span>,</span>
+<span id="cb15-8">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"stream"</span>: <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span></span>
+<span id="cb15-9">    }</span>
+<span id="cb15-10">)</span>
+<span id="cb15-11"></span>
+<span id="cb15-12"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(response.json()[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"response"</span>])</span></code></pre></div></div>
+</section>
+</section>
+<section id="deployment-tips" class="level2">
+<h2 class="anchored" data-anchor-id="deployment-tips">Deployment Tips</h2>
+<ul>
+<li>Use quantized models (Q4/Q5) to reduce RAM usage</li>
+<li>Prefer GPU acceleration if available</li>
+<li>Keep dataset clean → quality &gt; quantity</li>
+<li>Start small, then scale</li>
+</ul>
+</section>
+<section id="conclusion" class="level2">
+<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
+<p>With Unsloth + Hugging Face + Ollama, you now have a complete local LLM pipeline:</p>
+<ul>
+<li>Fine-tune efficiently with minimal hardware</li>
+<li>Customize models for your use case</li>
+<li>Deploy locally with zero latency</li>
+<li>Maintain full control and privacy</li>
+</ul>
+<p>This workflow is perfect for:</p>
+<ul>
+<li>Prototyping AI products</li>
+<li>Internal enterprise tools</li>
+<li>Personal AI assistants</li>
+</ul>
+</section>
+<section id="next-steps" class="level2">
+<h2 class="anchored" data-anchor-id="next-steps">Next Steps</h2>
+<ul>
+<li>Train on your own domain dataset (RAG + fine-tuning)</li>
+<li>Add tools with LangGraph agents</li>
+<li>Deploy behind an API gateway (FastAPI, Nginx)</li>
+<li>Scale with Docker + GPU servers</li>
+</ul>
+
+
+</section>
+
+ ]]></description>
+  <guid>https://tanquangduong.github.io/posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html</guid>
+  <pubDate>Fri, 20 Jun 2025 00:00:00 GMT</pubDate>
+  <media:content url="https://tanquangduong.github.io/images/llm/unsloth x ollama-300px.png" medium="image" type="image/png" height="96" width="144"/>
+</item>
 <item>
   <title>Run LLM Locally with Ollama</title>
   <link>https://tanquangduong.github.io/posts/llm/Run LLM locally with Ollama.html</link>
@@ -20,6 +525,11 @@
 
 
 <p><strong>Keywords:</strong> Ollama, Local LLM, AI deployment, llama3, mistral, phi, generative AI, on-prem AI, LLM inference</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tanquangduong.github.io/images/llm/ollama-300px.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="300"></p>
+</figure>
+</div>
 <section id="introduction" class="level2">
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
 <p>Running Large Language Models (LLMs) locally is becoming a key trend for developers and companies who want <strong>privacy, low latency, and cost control</strong>.</p>
@@ -184,7 +694,7 @@ font-style: inherit;">'response'</span>])</span></code></pre></div></div>
  ]]></description>
   <guid>https://tanquangduong.github.io/posts/llm/Run LLM locally with Ollama.html</guid>
   <pubDate>Sun, 25 May 2025 00:00:00 GMT</pubDate>
-  <media:content url="https://tanquangduong.github.io/images/llm/ollama-1.png" medium="image" type="image/png" height="144" width="144"/>
+  <media:content url="https://tanquangduong.github.io/images/llm/ollama-300px.png" medium="image" type="image/png" height="144" width="144"/>
 </item>
 </channel>
 </rss>
