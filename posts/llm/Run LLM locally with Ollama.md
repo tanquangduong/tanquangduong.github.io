@@ -15,6 +15,7 @@ Instead of relying on external APIs and paying for hosted services, tools like *
 
 ## What is Ollama?
 **Ollama** is a lightweight framework designed to simplify local LLM usage. It enables you to:
+
 * Run LLMs locally (CPU or GPU).
 * Download and manage open-source models (including custom configurations and models pulled from Hugging Face).
 * Serve models via a built-in local HTTP API server.
@@ -23,10 +24,13 @@ Instead of relying on external APIs and paying for hosted services, tools like *
 Supported models include hundreds of options available in the Ollama library, such as **Llama 3.1, Llama 2, Mistral, Phi, and Gemma**, as well as multimodal models that accept photos, video, and voice.
 
 ## Hardware Considerations
-Since you are running these models locally, you must download the entire model to your machine. **You need to ensure you have enough disk space and RAM to load and run them**. For example, the massive Llama 3.1 405B model requires hundreds of gigabytes of space and RAM, which is difficult for standard machines to handle. For local environments, it is highly recommended to start with lightweight or older models (like Llama 2, Phi, Gemma 2b, or Mistral) that most computers can comfortably run.
+Since you are running these models locally, you must download the entire model to your machine. **You need to ensure you have enough disk space and RAM to load and run them**. 
+
+For example, the massive Llama 3.1 405B model requires hundreds of gigabytes of space and RAM, which is difficult for standard machines to handle. For local environments, it is highly recommended to start with lightweight or older models (like Llama 2, Phi, Gemma 2b, or Mistral) that most computers can comfortably run.
 
 ## Installation & Verification
 Installing Ollama is incredibly straightforward:
+
 1. Go to the official website at https://ollama.com and click on download.
 2. Select your operating system (**Windows, macOS, or Linux**) and install the application.
 3. Run the desktop application; nothing will appear on your screen immediately because this simply starts a backend server running the Ollama service.
@@ -53,12 +57,14 @@ For example, to run Mistral or Llama 2:
 If the model isn't on your system, Ollama will pull the manifest and download it. If it is already installed, it will instantly bring up an interactive prompt where you can start chatting with the model.
 
 **Basic Terminal Commands:**
+
 * **Exit the chat prompt:** Type `/bye`.
 * **List installed models:** Type `ollama list`.
 * **Remove a model:** Type `ollama rm <model_name>`.
 
 ## Serve Models via API
 Ollama automatically exposes a local HTTP API, meaning you can trigger models from curl, Postman, Python code, or custom software applications.
+
 * If the Ollama desktop application is running, the API is automatically open in the background on **port 11434**.
 * If you need to manually invoke the server from your terminal, run the command: 
 
