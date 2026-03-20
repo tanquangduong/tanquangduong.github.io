@@ -31,7 +31,7 @@ For example, the massive Llama 3.1 405B model requires hundreds of gigabytes of 
 ## Installation & Verification
 Installing Ollama is incredibly straightforward:
 
-1. Go to the official website at https://ollama.com and click on download.
+1. Go to the official website at [https://ollama.com](https://ollama.com) and click on download.
 2. Select your operating system (**Windows, macOS, or Linux**) and install the application.
 3. Run the desktop application; nothing will appear on your screen immediately because this simply starts a backend server running the Ollama service.
 
