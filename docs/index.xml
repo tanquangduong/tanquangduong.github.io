@@ -10,7 +10,1056 @@
 <atom:link href="https://tanquangduong.github.io/index.xml" rel="self" type="application/rss+xml"/>
 <description>Get Insights with Latest AI Research Papers</description>
 <generator>quarto-1.9.36</generator>
-<lastBuildDate>Fri, 20 Jun 2025 00:00:00 GMT</lastBuildDate>
+<lastBuildDate>Tue, 15 Jul 2025 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>Deploying and Serving LLM with vLLM</title>
+  <link>https://tanquangduong.github.io/posts/llm/Deploying and Serving LLM with vLLM.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p><strong>Keywords:</strong> vLLM, LLM serving, model deployment, inference optimization, PagedAttention, OpenAI API, batching, GPU inference, production LLM</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tanquangduong.github.io/images/llm/vllm-deploying-serving-300px.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="300"></p>
+</figure>
+</div>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>Serving Large Language Models (LLMs) in production requires more than just loading a model and running inference. You need <strong>high throughput, low latency, and efficient GPU memory usage</strong> to handle real-world traffic.</p>
+<p><strong>vLLM</strong> is an open-source library designed specifically for this purpose. It makes LLM serving:</p>
+<ul>
+<li><strong>Fast</strong> (up to 24x higher throughput than naive serving)</li>
+<li><strong>Memory-efficient</strong> (via PagedAttention)</li>
+<li><strong>Production-ready</strong> (OpenAI-compatible API server)</li>
+<li><strong>Easy to deploy</strong> (Docker, Kubernetes, cloud)</li>
+</ul>
+<p>In this tutorial, we will walk through a <strong>complete pipeline</strong>:</p>
+<ol type="1">
+<li>Install and configure vLLM</li>
+<li>Serve a model with the OpenAI-compatible API</li>
+<li>Query the model from Python</li>
+<li>Optimize for production deployment</li>
+</ol>
+</section>
+<section id="what-is-vllm" class="level2">
+<h2 class="anchored" data-anchor-id="what-is-vllm">What is vLLM?</h2>
+<p><strong>vLLM</strong> is a high-throughput and memory-efficient inference and serving engine for LLMs. Key features include:</p>
+<ul>
+<li><strong>PagedAttention</strong>: Efficient memory management inspired by OS virtual memory, reducing GPU memory waste</li>
+<li><strong>Continuous batching</strong>: Dynamically batches incoming requests for maximum throughput</li>
+<li><strong>OpenAI-compatible API</strong>: Drop-in replacement for OpenAI API endpoints</li>
+<li><strong>Tensor parallelism</strong>: Distribute models across multiple GPUs</li>
+<li><strong>Support for many models</strong>: Llama, Mistral, Qwen, Phi, Gemma, and more</li>
+</ul>
+</section>
+<section id="hardware-requirements" class="level2">
+<h2 class="anchored" data-anchor-id="hardware-requirements">Hardware Requirements</h2>
+<p>vLLM is designed for <strong>GPU inference</strong>. Minimum requirements depend on your model size:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Model Size</th>
+<th>Minimum GPU VRAM</th>
+<th>Recommended GPU</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0.5B–3B</td>
+<td>4 GB</td>
+<td>RTX 3060 / T4</td>
+</tr>
+<tr class="even">
+<td>7B–8B</td>
+<td>16 GB</td>
+<td>RTX 4090 / A10</td>
+</tr>
+<tr class="odd">
+<td>13B</td>
+<td>24 GB</td>
+<td>A10 / A100</td>
+</tr>
+<tr class="even">
+<td>70B</td>
+<td>80 GB+</td>
+<td>A100 / H100 (multi-GPU)</td>
+</tr>
+</tbody>
+</table>
+<p>For CPU-only machines, consider using Ollama or llama.cpp instead.</p>
+</section>
+<section id="installation" class="level2">
+<h2 class="anchored" data-anchor-id="installation">Installation</h2>
+<section id="install-vllm" class="level3">
+<h3 class="anchored" data-anchor-id="install-vllm">Install vLLM</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">pip</span> install vllm</span></code></pre></div></div>
+</section>
+<section id="install-with-cuda-support-recommended" class="level3">
+<h3 class="anchored" data-anchor-id="install-with-cuda-support-recommended">Install with CUDA support (recommended)</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">pip</span> install vllm<span class="pp" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">[</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">cuda</span><span class="pp" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">]</span></span></code></pre></div></div>
+</section>
+<section id="verify-installation" class="level3">
+<h3 class="anchored" data-anchor-id="verify-installation">Verify installation</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> vllm</span>
+<span id="cb3-2"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(vllm.__version__)</span></code></pre></div></div>
+</section>
+</section>
+<section id="offline-inference-batch-processing" class="level2">
+<h2 class="anchored" data-anchor-id="offline-inference-batch-processing">Offline Inference (Batch Processing)</h2>
+<p>Use vLLM for fast batch inference without starting a server.</p>
+<section id="basic-example" class="level3">
+<h3 class="anchored" data-anchor-id="basic-example">Basic Example</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> vllm <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> LLM, SamplingParams</span>
+<span id="cb4-2"></span>
+<span id="cb4-3">llm <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> LLM(model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Qwen/Qwen2.5-0.5B-Instruct"</span>)</span>
+<span id="cb4-4"></span>
+<span id="cb4-5">sampling_params <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> SamplingParams(</span>
+<span id="cb4-6">    temperature<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.7</span>,</span>
+<span id="cb4-7">    max_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">256</span>,</span>
+<span id="cb4-8">)</span>
+<span id="cb4-9"></span>
+<span id="cb4-10">prompts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [</span>
+<span id="cb4-11">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Explain machine learning in simple terms."</span>,</span>
+<span id="cb4-12">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"What is the difference between AI and ML?"</span>,</span>
+<span id="cb4-13">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Write a Python function to reverse a string."</span>,</span>
+<span id="cb4-14">]</span>
+<span id="cb4-15"></span>
+<span id="cb4-16">outputs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> llm.generate(prompts, sampling_params)</span>
+<span id="cb4-17"></span>
+<span id="cb4-18"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> output <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> outputs:</span>
+<span id="cb4-19">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(output.outputs[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>].text)</span>
+<span id="cb4-20">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"---"</span>)</span></code></pre></div></div>
+</section>
+<section id="chat-style-inference" class="level3">
+<h3 class="anchored" data-anchor-id="chat-style-inference">Chat-style Inference</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> vllm <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> LLM, SamplingParams</span>
+<span id="cb5-2"></span>
+<span id="cb5-3">llm <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> LLM(model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Qwen/Qwen2.5-0.5B-Instruct"</span>)</span>
+<span id="cb5-4"></span>
+<span id="cb5-5">messages <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [</span>
+<span id="cb5-6">    {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"system"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"You are a helpful AI assistant."</span>},</span>
+<span id="cb5-7">    {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"user"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Explain vLLM in simple terms."</span>},</span>
+<span id="cb5-8">]</span>
+<span id="cb5-9"></span>
+<span id="cb5-10">sampling_params <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> SamplingParams(</span>
+<span id="cb5-11">    temperature<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.7</span>,</span>
+<span id="cb5-12">    max_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">256</span>,</span>
+<span id="cb5-13">)</span>
+<span id="cb5-14"></span>
+<span id="cb5-15">outputs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> llm.chat(messages<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[messages], sampling_params<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>sampling_params)</span>
+<span id="cb5-16"></span>
+<span id="cb5-17"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(outputs[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>].outputs[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>].text)</span></code></pre></div></div>
+</section>
+</section>
+<section id="serving-with-openai-compatible-api" class="level2">
+<h2 class="anchored" data-anchor-id="serving-with-openai-compatible-api">Serving with OpenAI-Compatible API</h2>
+<p>vLLM provides an API server that is <strong>fully compatible with the OpenAI API format</strong>.</p>
+<section id="start-the-server" class="level3">
+<h3 class="anchored" data-anchor-id="start-the-server">Start the Server</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">vllm</span> serve Qwen/Qwen2.5-0.5B-Instruct <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb6-2">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--host</span> 0.0.0.0 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb6-3">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--port</span> 8000 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb6-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--api-key</span> your-secret-key <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb6-5">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--served-model-name</span> my-model <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb6-6">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--chat-template</span> ./chat_template.jinja <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb6-7">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--gpu-memory-utilization</span> 0.90</span></code></pre></div></div>
+<p>Key options explained:</p>
+<ul>
+<li><code>--served-model-name</code>: Sets the model name exposed in the API (clients use this name in requests instead of the full HuggingFace path)</li>
+<li><code>--chat-template</code>: Path to a Jinja2 chat template file for formatting chat messages (useful for custom or fine-tuned models)</li>
+<li><code>--gpu-memory-utilization</code>: Fraction of GPU memory to use (0.0–1.0, default 0.9). Increase for larger models, decrease to leave room for other processes</li>
+</ul>
+</section>
+<section id="start-with-custom-parameters" class="level3">
+<h3 class="anchored" data-anchor-id="start-with-custom-parameters">Start with Custom Parameters</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">vllm</span> serve Qwen/Qwen2.5-0.5B-Instruct <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb7-2">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--host</span> 0.0.0.0 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb7-3">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--port</span> 8000 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb7-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--api-key</span> your-secret-key <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb7-5">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--served-model-name</span> my-model <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb7-6">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--chat-template</span> ./chat_template.jinja <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb7-7">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--max-model-len</span> 4096 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb7-8">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--gpu-memory-utilization</span> 0.90 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb7-9">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--dtype</span> auto</span></code></pre></div></div>
+</section>
+<section id="verify-the-server" class="level3">
+<h3 class="anchored" data-anchor-id="verify-the-server">Verify the Server</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">curl</span> http://localhost:8000/v1/models</span></code></pre></div></div>
+</section>
+</section>
+<section id="querying-the-api" class="level2">
+<h2 class="anchored" data-anchor-id="querying-the-api">Querying the API</h2>
+<section id="using-curl" class="level3">
+<h3 class="anchored" data-anchor-id="using-curl">Using curl</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">curl</span> http://localhost:8000/v1/chat/completions <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb9-2">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-H</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Content-Type: application/json"</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb9-3">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-H</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Authorization: Bearer your-secret-key"</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb9-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-d</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'{</span></span>
+<span id="cb9-5"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">        "model": "my-model",</span></span>
+<span id="cb9-6"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">        "messages": [</span></span>
+<span id="cb9-7"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">            {"role": "user", "content": "What is vLLM?"}</span></span>
+<span id="cb9-8"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">        ],</span></span>
+<span id="cb9-9"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">        "temperature": 0.7,</span></span>
+<span id="cb9-10"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">        "max_tokens": 256</span></span>
+<span id="cb9-11"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">    }'</span></span></code></pre></div></div>
+</section>
+<section id="using-python-requests" class="level3">
+<h3 class="anchored" data-anchor-id="using-python-requests">Using Python (requests)</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> requests</span>
+<span id="cb10-2"></span>
+<span id="cb10-3">response <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> requests.post(</span>
+<span id="cb10-4">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"http://localhost:8000/v1/chat/completions"</span>,</span>
+<span id="cb10-5">    headers<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>{<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Authorization"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Bearer your-secret-key"</span>},</span>
+<span id="cb10-6">    json<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>{</span>
+<span id="cb10-7">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"model"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"my-model"</span>,</span>
+<span id="cb10-8">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"messages"</span>: [</span>
+<span id="cb10-9">            {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"user"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Explain PagedAttention."</span>}</span>
+<span id="cb10-10">        ],</span>
+<span id="cb10-11">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"temperature"</span>: <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.7</span>,</span>
+<span id="cb10-12">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"max_tokens"</span>: <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">256</span>,</span>
+<span id="cb10-13">    }</span>
+<span id="cb10-14">)</span>
+<span id="cb10-15"></span>
+<span id="cb10-16"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(response.json()[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"choices"</span>][<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>][<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"message"</span>][<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>])</span></code></pre></div></div>
+</section>
+<section id="using-openai-python-client-recommended" class="level3">
+<h3 class="anchored" data-anchor-id="using-openai-python-client-recommended">Using OpenAI Python Client (Recommended)</h3>
+<p>Since vLLM is OpenAI-compatible, you can use the official OpenAI client:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> openai <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> OpenAI</span>
+<span id="cb11-2"></span>
+<span id="cb11-3">client <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> OpenAI(</span>
+<span id="cb11-4">    base_url<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"http://localhost:8000/v1"</span>,</span>
+<span id="cb11-5">    api_key<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"your-secret-key"</span>,</span>
+<span id="cb11-6">)</span>
+<span id="cb11-7"></span>
+<span id="cb11-8">response <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> client.chat.completions.create(</span>
+<span id="cb11-9">    model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"my-model"</span>,</span>
+<span id="cb11-10">    messages<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[</span>
+<span id="cb11-11">        {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"system"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"You are a helpful assistant."</span>},</span>
+<span id="cb11-12">        {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"user"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"What is continuous batching?"</span>},</span>
+<span id="cb11-13">    ],</span>
+<span id="cb11-14">    temperature<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.7</span>,</span>
+<span id="cb11-15">    max_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">256</span>,</span>
+<span id="cb11-16">)</span>
+<span id="cb11-17"></span>
+<span id="cb11-18"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(response.choices[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>].message.content)</span></code></pre></div></div>
+</section>
+</section>
+<section id="serving-custom-fine-tuned-models" class="level2">
+<h2 class="anchored" data-anchor-id="serving-custom-fine-tuned-models">Serving Custom / Fine-tuned Models</h2>
+<p>If you fine-tuned a small LLM with <strong>Unsloth</strong> and exported it to GGUF (e.g., <code>gguf_model_small</code>), here is how to serve it with vLLM.</p>
+<p>vLLM <strong>natively supports GGUF</strong> files — no conversion required. See the <a href="https://docs.vllm.ai/en/stable/features/quantization/gguf/">official vLLM GGUF documentation</a> for full details.</p>
+<blockquote class="blockquote">
+<p><strong>Note:</strong> GGUF support in vLLM is experimental and under-optimized. Currently, only <strong>single-file</strong> GGUF models are supported. If you have a multi-file GGUF model, use <a href="https://github.com/ggerganov/llama.cpp/pull/6135"><code>gguf-split</code></a> to merge them first.</p>
+</blockquote>
+<section id="option-a-serve-a-gguf-file-directly" class="level3">
+<h3 class="anchored" data-anchor-id="option-a-serve-a-gguf-file-directly">Option A: Serve a GGUF file directly</h3>
+<section id="step-1-prepare-your-gguf-model" class="level4">
+<h4 class="anchored" data-anchor-id="step-1-prepare-your-gguf-model">Step 1: Prepare Your GGUF Model</h4>
+<p>After fine-tuning with Unsloth and exporting to GGUF, you should have a file like:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">gguf_model_small/</span></span>
+<span id="cb12-2"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> added_tokens.json</span>
+<span id="cb12-3"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> chat_template.jinja</span>
+<span id="cb12-4"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> config.json</span>
+<span id="cb12-5"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> generation_config.json</span>
+<span id="cb12-6"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> merges.txt</span>
+<span id="cb12-7"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> model.safetensors</span>
+<span id="cb12-8"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> special_tokens_map.json</span>
+<span id="cb12-9"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> tokenizer.json</span>
+<span id="cb12-10"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> tokenizer_config.json</span>
+<span id="cb12-11"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> unsloth.BF16.gguf</span>
+<span id="cb12-12"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">├──</span> unsloth.Q4_K_M.gguf</span>
+<span id="cb12-13"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">└──</span> vocab.json</span></code></pre></div></div>
+</section>
+<section id="step-2-serve-with-vllm" class="level4">
+<h4 class="anchored" data-anchor-id="step-2-serve-with-vllm">Step 2: Serve with vLLM</h4>
+<p>Point vLLM directly at the GGUF file. Use <code>--tokenizer</code> to specify the base model’s tokenizer (recommended over the GGUF-embedded tokenizer for stability):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">vllm</span> serve ./gguf_model_small/unsloth.Q4_K_M.gguf <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-2">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--tokenizer</span> ./gguf_model_small <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-3">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--served-model-name</span> my-finetuned-model <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--chat-template</span> ./chat_template.jinja <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-5">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--host</span> 0.0.0.0 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-6">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--port</span> 8000 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-7">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--api-key</span> your-secret-key <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-8">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--gpu-memory-utilization</span> 0.90 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-9">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--max-model-len</span> 2048</span></code></pre></div></div>
+<p>You can also load GGUF models from HuggingFace using the <code>repo_id:quant_type</code> format:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">vllm</span> serve unsloth/Qwen3-0.6B-GGUF:Q4_K_M <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb14-2">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--tokenizer</span> Qwen/Qwen3-0.6B <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb14-3">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--served-model-name</span> qwen3-gguf <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb14-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--host</span> 0.0.0.0 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb14-5">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--port</span> 8000 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb14-6">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--api-key</span> your-secret-key <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb14-7">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--gpu-memory-utilization</span> 0.90</span></code></pre></div></div>
+<p>Add <code>--tensor-parallel-size 2</code> to distribute across multiple GPUs:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb15-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">vllm</span> serve unsloth/Qwen3-0.6B-GGUF:Q4_K_M <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb15-2">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--tokenizer</span> Qwen/Qwen3-0.6B <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb15-3">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--tensor-parallel-size</span> 2 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb15-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--api-key</span> your-secret-key</span></code></pre></div></div>
+</section>
+<section id="step-3-verify-and-query" class="level4">
+<h4 class="anchored" data-anchor-id="step-3-verify-and-query">Step 3: Verify and Query</h4>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">curl</span> http://localhost:8000/v1/models <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb16-2">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-H</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Authorization: Bearer your-secret-key"</span></span></code></pre></div></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> openai <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> OpenAI</span>
+<span id="cb17-2"></span>
+<span id="cb17-3">client <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> OpenAI(</span>
+<span id="cb17-4">    base_url<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"http://localhost:8000/v1"</span>,</span>
+<span id="cb17-5">    api_key<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"your-secret-key"</span>,</span>
+<span id="cb17-6">)</span>
+<span id="cb17-7"></span>
+<span id="cb17-8">response <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> client.chat.completions.create(</span>
+<span id="cb17-9">    model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"my-finetuned-model"</span>,</span>
+<span id="cb17-10">    messages<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[</span>
+<span id="cb17-11">        {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"system"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"You are a helpful assistant."</span>},</span>
+<span id="cb17-12">        {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"user"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"What is fine-tuning?"</span>},</span>
+<span id="cb17-13">    ],</span>
+<span id="cb17-14">    temperature<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.7</span>,</span>
+<span id="cb17-15">    max_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">256</span>,</span>
+<span id="cb17-16">)</span>
+<span id="cb17-17"></span>
+<span id="cb17-18"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(response.choices[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>].message.content)</span></code></pre></div></div>
+</section>
+</section>
+<section id="option-b-serve-in-hugging-face-format-safetensors" class="level3">
+<h3 class="anchored" data-anchor-id="option-b-serve-in-hugging-face-format-safetensors">Option B: Serve in Hugging Face format (safetensors)</h3>
+<p>If you prefer <strong>maximum compatibility</strong> (e.g., with LoRA adapters or features not yet supported with GGUF), export in HF format instead:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># During fine-tuning with Unsloth, save in HF format</span></span>
+<span id="cb18-2">model.save_pretrained_merged(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"hf_model_small"</span>, tokenizer)</span></code></pre></div></div>
+<p>Then serve:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb19-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">vllm</span> serve ./hf_model_small <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb19-2">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--host</span> 0.0.0.0 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb19-3">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--port</span> 8000 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb19-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--api-key</span> your-secret-key <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb19-5">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--served-model-name</span> my-finetuned-model <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb19-6">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--chat-template</span> ./chat_template.jinja <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb19-7">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--gpu-memory-utilization</span> 0.90 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb19-8">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--dtype</span> auto <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb19-9">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--max-model-len</span> 2048</span></code></pre></div></div>
+</section>
+<section id="serve-a-lora-adapter-without-merging" class="level3">
+<h3 class="anchored" data-anchor-id="serve-a-lora-adapter-without-merging">Serve a LoRA Adapter (Without Merging)</h3>
+<p>If you prefer to keep LoRA weights separate, vLLM supports serving LoRA adapters on top of a base model:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb20-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">vllm</span> serve Qwen/Qwen2.5-0.5B-Instruct <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-2">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--enable-lora</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-3">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--lora-modules</span> my-lora=./lora_model <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--host</span> 0.0.0.0 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-5">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--port</span> 8000 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-6">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--api-key</span> your-secret-key</span></code></pre></div></div>
+<p>Then query with the LoRA model name:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1">response <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> client.chat.completions.create(</span>
+<span id="cb21-2">    model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"my-lora"</span>,</span>
+<span id="cb21-3">    messages<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[{<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"user"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Hello!"</span>}],</span>
+<span id="cb21-4">)</span></code></pre></div></div>
+</section>
+</section>
+<section id="docker-deployment" class="level2">
+<h2 class="anchored" data-anchor-id="docker-deployment">Docker Deployment</h2>
+<p>Deploy vLLM in a container for production environments.</p>
+<section id="dockerfile" class="level3">
+<h3 class="anchored" data-anchor-id="dockerfile">Dockerfile</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode dockerfile code-with-copy"><code class="sourceCode dockerfile"><span id="cb22-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">FROM</span> vllm/vllm-openai:latest</span>
+<span id="cb22-2"></span>
+<span id="cb22-3"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">ENV</span> MODEL_NAME=Qwen/Qwen2.5-0.5B-Instruct</span>
+<span id="cb22-4"></span>
+<span id="cb22-5"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">CMD</span> [<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"--model"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"${MODEL_NAME}"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"--host"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"0.0.0.0"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"--port"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"8000"</span>]</span></code></pre></div></div>
+</section>
+<section id="run-with-docker" class="level3">
+<h3 class="anchored" data-anchor-id="run-with-docker">Run with Docker</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb23-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">docker</span> run <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--gpus</span> all <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb23-2">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-p</span> 8000:8000 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb23-3">    vllm/vllm-openai:latest <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb23-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--model</span> Qwen/Qwen2.5-0.5B-Instruct <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb23-5">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--host</span> 0.0.0.0 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb23-6">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--port</span> 8000</span></code></pre></div></div>
+</section>
+</section>
+<section id="performance-optimization-tips" class="level2">
+<h2 class="anchored" data-anchor-id="performance-optimization-tips">Performance Optimization Tips</h2>
+<ul>
+<li><strong>GPU memory utilization</strong>: Set <code>--gpu-memory-utilization 0.90</code> to maximize GPU usage (range: 0.0–1.0)</li>
+<li><strong>Served model name</strong>: Use <code>--served-model-name</code> for cleaner API model names instead of long HuggingFace paths</li>
+<li><strong>Chat template</strong>: Use <code>--chat-template</code> to apply a custom Jinja2 chat template for fine-tuned models</li>
+<li><strong>Quantization</strong>: Use AWQ or GPTQ quantized models to reduce VRAM</li>
+<li><strong>Tensor parallelism</strong>: Use <code>--tensor-parallel-size N</code> for multi-GPU setups</li>
+<li><strong>Max model length</strong>: Reduce <code>--max-model-len</code> if you don’t need long contexts</li>
+<li><strong>Continuous batching</strong>: Enabled by default, handles concurrent requests efficiently</li>
+<li><strong>Streaming</strong>: Use <code>stream=True</code> for real-time token generation</li>
+</ul>
+</section>
+<section id="vllm-vs-other-serving-solutions" class="level2">
+<h2 class="anchored" data-anchor-id="vllm-vs-other-serving-solutions">vLLM vs Other Serving Solutions</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Feature</th>
+<th>vLLM</th>
+<th>Ollama</th>
+<th>TGI</th>
+<th>llama.cpp</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Throughput</td>
+<td>Very High</td>
+<td>Medium</td>
+<td>High</td>
+<td>Low-Medium</td>
+</tr>
+<tr class="even">
+<td>GPU Required</td>
+<td>Yes</td>
+<td>Optional</td>
+<td>Yes</td>
+<td>Optional</td>
+</tr>
+<tr class="odd">
+<td>OpenAI API</td>
+<td>Yes</td>
+<td>Partial</td>
+<td>Yes</td>
+<td>Partial</td>
+</tr>
+<tr class="even">
+<td>Multi-GPU</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td>Ease of Use</td>
+<td>Medium</td>
+<td>Easy</td>
+<td>Medium</td>
+<td>Medium</td>
+</tr>
+<tr class="even">
+<td>Best For</td>
+<td>Production</td>
+<td>Local Dev</td>
+<td>Production</td>
+<td>Edge/CPU</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="conclusion" class="level2">
+<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
+<p>vLLM is the go-to solution for <strong>high-performance LLM serving in production</strong>:</p>
+<ul>
+<li>Serves models with an OpenAI-compatible API</li>
+<li>Handles high-concurrency with continuous batching</li>
+<li>Optimizes GPU memory with PagedAttention</li>
+<li>Supports custom and fine-tuned models</li>
+<li>Deploys easily with Docker and Kubernetes</li>
+</ul>
+<p>This workflow is perfect for:</p>
+<ul>
+<li>Production AI APIs</li>
+<li>Enterprise LLM platforms</li>
+<li>High-traffic chatbot backends</li>
+<li>Multi-model serving infrastructure</li>
+</ul>
+</section>
+<section id="next-steps" class="level2">
+<h2 class="anchored" data-anchor-id="next-steps">Next Steps</h2>
+<ul>
+<li>Combine with a RAG pipeline (LangChain + vLLM)</li>
+<li>Add load balancing with Nginx or Traefik</li>
+<li>Deploy on Kubernetes with GPU node pools</li>
+<li>Monitor with Prometheus + Grafana</li>
+<li>Serve multiple models with model routing</li>
+</ul>
+
+
+</section>
+
+ ]]></description>
+  <guid>https://tanquangduong.github.io/posts/llm/Deploying and Serving LLM with vLLM.html</guid>
+  <pubDate>Tue, 15 Jul 2025 00:00:00 GMT</pubDate>
+  <media:content url="https://tanquangduong.github.io/images/llm/vllm-deploying-serving-300px.png" medium="image" type="image/png" height="96" width="144"/>
+</item>
 <item>
   <title>Fine-tuning an LLM with Unsloth and Serving with Ollama</title>
   <link>https://tanquangduong.github.io/posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html</link>
@@ -65,7 +1114,7 @@
 <li>Serve models via a built-in local HTTP API server.</li>
 <li>Customize models using simple configuration files.</li>
 </ul>
-<p>Read this article for more details:: <a href="https://tanquangduong.github.io/posts/llm/Run%20LLM%20locally%20with%20Ollama.html">Run LLM Locally with Ollama</a></p>
+<p>Read this article for more details: <a href="https://tanquangduong.github.io/posts/llm/Run%20LLM%20locally%20with%20Ollama.html">Run LLM Locally with Ollama</a></p>
 </section>
 <section id="fine-tune-llm-with-unsloth" class="level2">
 <h2 class="anchored" data-anchor-id="fine-tune-llm-with-unsloth">Fine-tune LLM with Unsloth</h2>
@@ -694,7 +1743,7 @@ font-style: inherit;">'response'</span>])</span></code></pre></div></div>
  ]]></description>
   <guid>https://tanquangduong.github.io/posts/llm/Run LLM locally with Ollama.html</guid>
   <pubDate>Sun, 25 May 2025 00:00:00 GMT</pubDate>
-  <media:content url="https://tanquangduong.github.io/images/llm/ollama-300px.png" medium="image" type="image/png" height="144" width="144"/>
+  <media:content url="https://tanquangduong.github.io/images/llm/ollama-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 </channel>
 </rss>

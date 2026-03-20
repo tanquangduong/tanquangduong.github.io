@@ -44,7 +44,7 @@ In this tutorial, we will walk through a **complete pipeline**:
 * Serve models via a built-in local HTTP API server.
 * Customize models using simple configuration files.
 
-Read this article for more details:: [Run LLM Locally with Ollama](https://tanquangduong.github.io/posts/llm/Run%20LLM%20locally%20with%20Ollama.html) 
+Read this article for more details: [Run LLM Locally with Ollama](https://tanquangduong.github.io/posts/llm/Run%20LLM%20locally%20with%20Ollama.html) 
 
 
 ## Fine-tune LLM with Unsloth
