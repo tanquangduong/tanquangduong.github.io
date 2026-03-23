@@ -29,6 +29,20 @@ In this tutorial, we will walk through a **complete pipeline**:
 5. Query the model from Python
 6. Optimize for production deployment
 
+```{mermaid}
+graph LR
+    A["Install<br/>llama.cpp"] --> B["Obtain GGUF<br/>model"]
+    B --> C["CLI inference<br/>or API server"]
+    C --> D["Query from<br/>Python / curl"]
+    D --> E["Deploy to<br/>production"]
+
+    style A fill:#ffce67,stroke:#333
+    style B fill:#ffce67,stroke:#333
+    style C fill:#6cc3d5,stroke:#333,color:#fff
+    style D fill:#6cc3d5,stroke:#333,color:#fff
+    style E fill:#56cc9d,stroke:#333,color:#fff
+```
+
 
 ## What is llama.cpp?
 **llama.cpp** is a high-performance C/C++ inference engine for LLMs, originally created by Georgi Gerganov. Key features include:
@@ -39,6 +53,22 @@ In this tutorial, we will walk through a **complete pipeline**:
 - **GPU offloading**: Offload layers to NVIDIA (CUDA), AMD (ROCm), Apple Metal, or Vulkan GPUs
 - **Built-in server**: OpenAI-compatible HTTP API with continuous batching
 - **Support for many models**: Llama, Mistral, Qwen, Phi, Gemma, DeepSeek, and more
+
+```{mermaid}
+graph TD
+    A["llama.cpp"] --> B["GGUF Format<br/>Embedded metadata"]
+    A --> C["Quantization<br/>Q2_K to Q8_0"]
+    A --> D["CPU Optimized<br/>AVX / AVX2 / NEON"]
+    A --> E["GPU Offloading<br/>CUDA / Metal / Vulkan"]
+    A --> F["Built-in Server<br/>OpenAI-compatible"]
+
+    style A fill:#56cc9d,stroke:#333,color:#fff
+    style B fill:#6cc3d5,stroke:#333,color:#fff
+    style C fill:#6cc3d5,stroke:#333,color:#fff
+    style D fill:#6cc3d5,stroke:#333,color:#fff
+    style E fill:#6cc3d5,stroke:#333,color:#fff
+    style F fill:#6cc3d5,stroke:#333,color:#fff
+```
 
 
 ## Hardware Requirements
@@ -112,6 +142,22 @@ cmake --build build --config Release
 
 
 ## Obtaining GGUF Models
+
+```{mermaid}
+graph TD
+    A["Need a GGUF model"] --> B{"Source?"}
+    B -->|"Pre-quantized"| C["Download from<br/>HuggingFace"]
+    B -->|"Own model"| D["Convert HF model<br/>to GGUF (F16)"]
+    D --> E["Quantize to<br/>Q4_K_M / Q5_K_M"]
+    C --> F["Ready for<br/>inference"]
+    E --> F
+
+    style A fill:#f8f9fa,stroke:#333
+    style C fill:#56cc9d,stroke:#333,color:#fff
+    style D fill:#ffce67,stroke:#333
+    style E fill:#ffce67,stroke:#333
+    style F fill:#56cc9d,stroke:#333,color:#fff
+```
 
 ### Download Pre-quantized Models from HuggingFace
 
@@ -244,6 +290,27 @@ print(output["choices"][0]["message"]["content"])
 ## Serving with OpenAI-Compatible API
 llama.cpp includes a built-in HTTP server that is **fully compatible with the OpenAI API format**.
 
+```{mermaid}
+graph TD
+    A["llama-server"] --> B["Load GGUF model"]
+    B --> C["OpenAI-compatible<br/>/v1/chat/completions"]
+    C --> D["curl"]
+    C --> E["Python requests"]
+    C --> F["OpenAI Python client"]
+
+    G["Options"] --> H["-ngl: GPU layers"]
+    G --> I["-c: Context length"]
+    G --> J["--slots: Parallelism"]
+
+    style A fill:#56cc9d,stroke:#333,color:#fff
+    style B fill:#6cc3d5,stroke:#333,color:#fff
+    style C fill:#6cc3d5,stroke:#333,color:#fff
+    style D fill:#f8f9fa,stroke:#333
+    style E fill:#f8f9fa,stroke:#333
+    style F fill:#f8f9fa,stroke:#333
+    style G fill:#ffce67,stroke:#333
+```
+
 ### Start the Server (C++ binary)
 
 ```bash
@@ -353,6 +420,25 @@ print(response.choices[0].message.content)
 
 ## Serving Custom / Fine-tuned Models
 If you fine-tuned a small LLM with **Unsloth** and exported it to GGUF (e.g., `gguf_model_small`), here is how to serve it with llama.cpp.
+
+```{mermaid}
+graph TD
+    A["Fine-tuned model"] --> B{"Format?"}
+    B -->|"Already GGUF"| C["Serve directly<br/>with llama-server"]
+    B -->|"HF safetensors"| D["Convert to GGUF<br/>(convert_hf_to_gguf.py)"]
+    B -->|"LoRA adapter"| E["Serve with<br/>--lora flag"]
+    D --> F["Quantize<br/>(llama-quantize)"]
+    F --> C
+    C --> G["OpenAI-compatible API"]
+    E --> G
+
+    style A fill:#f8f9fa,stroke:#333
+    style C fill:#56cc9d,stroke:#333,color:#fff
+    style D fill:#ffce67,stroke:#333
+    style F fill:#ffce67,stroke:#333
+    style E fill:#6cc3d5,stroke:#333,color:#fff
+    style G fill:#56cc9d,stroke:#333,color:#fff
+```
 
 ### Option A: Serve a GGUF File Directly
 
@@ -466,6 +552,21 @@ response = client.chat.completions.create(
 
 ## Docker Deployment
 Deploy llama.cpp in a container for production environments.
+
+```{mermaid}
+graph LR
+    subgraph cpu["CPU Deployment"]
+        A1["llama.cpp:server"] --> B1["Mount models<br/>volume"]
+        B1 --> C1["Expose port 8000"]
+    end
+    subgraph gpu["GPU Deployment"]
+        A2["llama.cpp:server-cuda"] --> B2["--gpus all<br/>+ mount models"]
+        B2 --> C2["Expose port 8000"]
+    end
+
+    style cpu fill:#6cc3d5,stroke:#333,color:#fff
+    style gpu fill:#56cc9d,stroke:#333,color:#fff
+```
 
 ### Run with Docker (CPU)
 

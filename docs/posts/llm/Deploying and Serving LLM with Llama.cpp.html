@@ -109,6 +109,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     "search-label": "Search"
   }
 }</script>
+<script src="../../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
 
 
 <link rel="stylesheet" href="../../styles.css">
@@ -289,6 +292,28 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>Query the model from Python</li>
 <li>Optimize for production deployment</li>
 </ol>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    A["Install&lt;br/&gt;llama.cpp"] --&gt; B["Obtain GGUF&lt;br/&gt;model"]
+    B --&gt; C["CLI inference&lt;br/&gt;or API server"]
+    C --&gt; D["Query from&lt;br/&gt;Python / curl"]
+    D --&gt; E["Deploy to&lt;br/&gt;production"]
+
+    style A fill:#ffce67,stroke:#333
+    style B fill:#ffce67,stroke:#333
+    style C fill:#6cc3d5,stroke:#333,color:#fff
+    style D fill:#6cc3d5,stroke:#333,color:#fff
+    style E fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
 </section>
 <section id="what-is-llama.cpp" class="level2">
 <h2 class="anchored" data-anchor-id="what-is-llama.cpp">What is llama.cpp?</h2>
@@ -301,6 +326,30 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><strong>Built-in server</strong>: OpenAI-compatible HTTP API with continuous batching</li>
 <li><strong>Support for many models</strong>: Llama, Mistral, Qwen, Phi, Gemma, DeepSeek, and more</li>
 </ul>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["llama.cpp"] --&gt; B["GGUF Format&lt;br/&gt;Embedded metadata"]
+    A --&gt; C["Quantization&lt;br/&gt;Q2_K to Q8_0"]
+    A --&gt; D["CPU Optimized&lt;br/&gt;AVX / AVX2 / NEON"]
+    A --&gt; E["GPU Offloading&lt;br/&gt;CUDA / Metal / Vulkan"]
+    A --&gt; F["Built-in Server&lt;br/&gt;OpenAI-compatible"]
+
+    style A fill:#56cc9d,stroke:#333,color:#fff
+    style B fill:#6cc3d5,stroke:#333,color:#fff
+    style C fill:#6cc3d5,stroke:#333,color:#fff
+    style D fill:#6cc3d5,stroke:#333,color:#fff
+    style E fill:#6cc3d5,stroke:#333,color:#fff
+    style F fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
 </section>
 <section id="hardware-requirements" class="level2">
 <h2 class="anchored" data-anchor-id="hardware-requirements">Hardware Requirements</h2>
@@ -381,6 +430,30 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="obtaining-gguf-models" class="level2">
 <h2 class="anchored" data-anchor-id="obtaining-gguf-models">Obtaining GGUF Models</h2>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["Need a GGUF model"] --&gt; B{"Source?"}
+    B --&gt;|"Pre-quantized"| C["Download from&lt;br/&gt;HuggingFace"]
+    B --&gt;|"Own model"| D["Convert HF model&lt;br/&gt;to GGUF (F16)"]
+    D --&gt; E["Quantize to&lt;br/&gt;Q4_K_M / Q5_K_M"]
+    C --&gt; F["Ready for&lt;br/&gt;inference"]
+    E --&gt; F
+
+    style A fill:#f8f9fa,stroke:#333
+    style C fill:#56cc9d,stroke:#333,color:#fff
+    style D fill:#ffce67,stroke:#333
+    style E fill:#ffce67,stroke:#333
+    style F fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
 <section id="download-pre-quantized-models-from-huggingface" class="level3">
 <h3 class="anchored" data-anchor-id="download-pre-quantized-models-from-huggingface">Download Pre-quantized Models from HuggingFace</h3>
 <p>Many models are available pre-quantized in GGUF format:</p>
@@ -540,6 +613,35 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="serving-with-openai-compatible-api" class="level2">
 <h2 class="anchored" data-anchor-id="serving-with-openai-compatible-api">Serving with OpenAI-Compatible API</h2>
 <p>llama.cpp includes a built-in HTTP server that is <strong>fully compatible with the OpenAI API format</strong>.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["llama-server"] --&gt; B["Load GGUF model"]
+    B --&gt; C["OpenAI-compatible&lt;br/&gt;/v1/chat/completions"]
+    C --&gt; D["curl"]
+    C --&gt; E["Python requests"]
+    C --&gt; F["OpenAI Python client"]
+
+    G["Options"] --&gt; H["-ngl: GPU layers"]
+    G --&gt; I["-c: Context length"]
+    G --&gt; J["--slots: Parallelism"]
+
+    style A fill:#56cc9d,stroke:#333,color:#fff
+    style B fill:#6cc3d5,stroke:#333,color:#fff
+    style C fill:#6cc3d5,stroke:#333,color:#fff
+    style D fill:#f8f9fa,stroke:#333
+    style E fill:#f8f9fa,stroke:#333
+    style F fill:#f8f9fa,stroke:#333
+    style G fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
 <section id="start-the-server-c-binary" class="level3">
 <h3 class="anchored" data-anchor-id="start-the-server-c-binary">Start the Server (C++ binary)</h3>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./build/bin/llama-server</span> <span class="dt">\</span></span>
@@ -637,6 +739,33 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="serving-custom-fine-tuned-models" class="level2">
 <h2 class="anchored" data-anchor-id="serving-custom-fine-tuned-models">Serving Custom / Fine-tuned Models</h2>
 <p>If you fine-tuned a small LLM with <strong>Unsloth</strong> and exported it to GGUF (e.g., <code>gguf_model_small</code>), here is how to serve it with llama.cpp.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["Fine-tuned model"] --&gt; B{"Format?"}
+    B --&gt;|"Already GGUF"| C["Serve directly&lt;br/&gt;with llama-server"]
+    B --&gt;|"HF safetensors"| D["Convert to GGUF&lt;br/&gt;(convert_hf_to_gguf.py)"]
+    B --&gt;|"LoRA adapter"| E["Serve with&lt;br/&gt;--lora flag"]
+    D --&gt; F["Quantize&lt;br/&gt;(llama-quantize)"]
+    F --&gt; C
+    C --&gt; G["OpenAI-compatible API"]
+    E --&gt; G
+
+    style A fill:#f8f9fa,stroke:#333
+    style C fill:#56cc9d,stroke:#333,color:#fff
+    style D fill:#ffce67,stroke:#333
+    style F fill:#ffce67,stroke:#333
+    style E fill:#6cc3d5,stroke:#333,color:#fff
+    style G fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
 <section id="option-a-serve-a-gguf-file-directly" class="level3">
 <h3 class="anchored" data-anchor-id="option-a-serve-a-gguf-file-directly">Option A: Serve a GGUF File Directly</h3>
 <section id="step-1-prepare-your-gguf-model" class="level4">
@@ -731,6 +860,29 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="docker-deployment" class="level2">
 <h2 class="anchored" data-anchor-id="docker-deployment">Docker Deployment</h2>
 <p>Deploy llama.cpp in a container for production environments.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph cpu["CPU Deployment"]
+        A1["llama.cpp:server"] --&gt; B1["Mount models&lt;br/&gt;volume"]
+        B1 --&gt; C1["Expose port 8000"]
+    end
+    subgraph gpu["GPU Deployment"]
+        A2["llama.cpp:server-cuda"] --&gt; B2["--gpus all&lt;br/&gt;+ mount models"]
+        B2 --&gt; C2["Expose port 8000"]
+    end
+
+    style cpu fill:#6cc3d5,stroke:#333,color:#fff
+    style gpu fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
 <section id="run-with-docker-cpu" class="level3">
 <h3 class="anchored" data-anchor-id="run-with-docker-cpu">Run with Docker (CPU)</h3>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb29"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> run <span class="at">-p</span> 8000:8000 <span class="dt">\</span></span>

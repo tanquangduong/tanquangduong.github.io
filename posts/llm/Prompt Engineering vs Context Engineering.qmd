@@ -1,0 +1,338 @@
+---
+title: "Prompt Engineering vs Context Engineering"
+subtitle: "From crafting single prompts to designing dynamic systems that give LLMs everything they need to succeed"
+image: /images/llm/prompt-vs-context-engineering-300px.png
+date: "2025-08-10"
+---
+
+**Keywords:** context engineering, prompt engineering, LLM applications, RAG, few-shot examples, tool use, context window, agent design, system prompts, memory management
+
+## Introduction
+For years, **prompt engineering** has been the go-to skill for working with LLMs — crafting the perfect instruction to get the best output. But as LLM applications evolve from simple chatbots to complex agentic systems, a new discipline is emerging: **context engineering**.
+
+The shift is significant. Prompt engineering focuses on *what you say* to the model. Context engineering focuses on *everything the model sees* before it generates a response — and building the systems that assemble that context dynamically.
+
+> "Context engineering is the art of providing all the context for the task to be plausibly solvable by the LLM." — Tobi Lutke (CEO, Shopify)
+
+> "In every industrial-strength LLM app, context engineering is the delicate art and science of filling the context window with just the right information for the next step." — Andrej Karpathy
+
+This article breaks down both disciplines, compares them, and shows how context engineering builds on prompt engineering to create production-grade LLM applications.
+
+```{mermaid}
+graph LR
+    A["Prompt Engineering<br/>(craft the instruction)"] --> B["Context Engineering<br/>(design the full context)"]
+    B --> C["Production-grade<br/>LLM applications"]
+
+    style A fill:#ffce67,stroke:#333
+    style B fill:#6cc3d5,stroke:#333,color:#fff
+    style C fill:#56cc9d,stroke:#333,color:#fff
+```
+
+## What is Prompt Engineering?
+Prompt engineering is the practice of designing and refining the text input (prompt) sent to an LLM to elicit the desired output. It operates primarily at the **instruction level**.
+
+### Core Techniques
+
+| Technique | Description | Example |
+|-----------|-------------|---------|
+| **Zero-shot** | Direct instruction, no examples | "Summarize this article in 3 bullet points." |
+| **Few-shot** | Include examples in the prompt | "Here are 3 examples of good summaries..." |
+| **Chain-of-thought** | Ask the model to reason step by step | "Think step by step before answering." |
+| **Role prompting** | Assign a persona or role | "You are a senior Python developer..." |
+| **Output formatting** | Specify the desired format | "Return your answer as a JSON object with..." |
+
+### Strengths
+
+- Simple and accessible — anyone can iterate on prompts
+- No infrastructure required — works directly in a chat interface
+- Fast iteration cycle — change text, see results immediately
+- Well-documented with established best practices
+
+### Limitations
+
+- **Static**: The prompt is the same regardless of the user or context
+- **Doesn't scale**: As tasks get complex, prompts become unwieldy
+- **Information gap**: The model only knows what's in the prompt — no access to external data, tools, or state
+- **Context window waste**: Manual inclusion of examples and context is inefficient
+
+## What is Context Engineering?
+Context engineering is the discipline of **designing and building dynamic systems** that provide the right information, tools, and state — in the right format, at the right time — to give an LLM everything it needs to accomplish a task.
+
+It's not just about writing a better prompt. It's about building the **entire input pipeline** that feeds the model.
+
+```{mermaid}
+graph TD
+    A["Context Engineering"] --> B["Instructions /<br/>System Prompt"]
+    A --> C["User Prompt"]
+    A --> D["State / History<br/>(Short-term Memory)"]
+    A --> E["Long-term Memory<br/>(Cross-session)"]
+    A --> F["Retrieved Information<br/>(RAG)"]
+    A --> G["Available Tools<br/>(Functions, APIs)"]
+    A --> H["Structured Output<br/>(Format definitions)"]
+
+    style A fill:#56cc9d,stroke:#333,color:#fff
+    style B fill:#6cc3d5,stroke:#333,color:#fff
+    style C fill:#6cc3d5,stroke:#333,color:#fff
+    style D fill:#6cc3d5,stroke:#333,color:#fff
+    style E fill:#6cc3d5,stroke:#333,color:#fff
+    style F fill:#6cc3d5,stroke:#333,color:#fff
+    style G fill:#6cc3d5,stroke:#333,color:#fff
+    style H fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### The Seven Components of Context
+
+1. **Instructions / System Prompt**: Rules, persona, constraints, and few-shot examples that define the model's behavior.
+2. **User Prompt**: The immediate task or question from the user.
+3. **State / History (Short-term Memory)**: The current conversation history — user messages and model responses that led to this point.
+4. **Long-term Memory**: Persistent knowledge across sessions — user preferences, past interactions, learned facts.
+5. **Retrieved Information (RAG)**: External, up-to-date knowledge pulled from documents, databases, or APIs to answer specific questions. See our tutorials on [building RAG systems](/pages/rag.html) for implementation details.
+6. **Available Tools**: Definitions of functions the model can call (e.g., `search_docs`, `send_email`, `run_code`). For tool-using agents, see [our agents section](/pages/agent.html).
+7. **Structured Output**: Format specifications that constrain the model's response (JSON schemas, enums, etc.).
+
+### Key Principles
+
+Context engineering is:
+
+- **A system, not a string**: Context is the output of a dynamic pipeline, not a static template.
+- **Dynamic**: Assembled on the fly based on the current task — calendar data for scheduling, code files for debugging, search results for research.
+- **Selective**: The right information at the right time. Not everything, but exactly what's needed.
+- **Format-aware**: How you present information matters. A concise summary beats a raw data dump.
+
+
+## Prompt Engineering vs Context Engineering
+
+```{mermaid}
+graph LR
+    subgraph pe["Prompt Engineering"]
+        direction TB
+        P1["Static prompt template"]
+        P2["Manual few-shot examples"]
+        P3["Single LLM call"]
+    end
+    subgraph ce["Context Engineering"]
+        direction TB
+        C1["Dynamic context assembly"]
+        C2["RAG + Memory + Tools"]
+        C3["Multi-step agent systems"]
+    end
+
+    pe -->|"evolves into"| ce
+
+    style pe fill:#ffce67,stroke:#333
+    style ce fill:#56cc9d,stroke:#333,color:#fff
+```
+
+| Dimension | Prompt Engineering | Context Engineering |
+|-----------|-------------------|-------------------|
+| **Focus** | Crafting the instruction text | Designing the full input pipeline |
+| **Nature** | Static, template-based | Dynamic, system-based |
+| **Scope** | Single prompt / LLM call | End-to-end context assembly |
+| **Information** | Manually included in prompt | Dynamically retrieved (RAG, APIs, memory) |
+| **Tools** | None — text only | Function calling, MCP, tool schemas |
+| **State** | Stateless or manual history | Managed conversation + long-term memory |
+| **Complexity** | Low — text editing | High — infrastructure + engineering |
+| **Best for** | Simple tasks, prototyping | Production agents, complex applications |
+| **Failure mode** | Bad output from bad instructions | Agent failure from missing context |
+
+
+## Why Context Engineering Matters for Agents
+
+The rise of AI agents — systems that autonomously plan, use tools, and iterate — makes context engineering essential. Agent failures are increasingly **not model failures, but context failures**.
+
+```{mermaid}
+graph TD
+    A["Agent receives task"] --> B["Context Engineering<br/>System assembles context"]
+    B --> C["Fetch relevant docs<br/>(RAG)"]
+    B --> D["Load conversation<br/>history"]
+    B --> E["Inject available<br/>tools"]
+    B --> F["Retrieve user<br/>preferences"]
+    C --> G["LLM generates<br/>response / action"]
+    D --> G
+    E --> G
+    F --> G
+    G --> H["Execute tools /<br/>return response"]
+    H -->|"loop"| B
+
+    style B fill:#6cc3d5,stroke:#333,color:#fff
+    style G fill:#56cc9d,stroke:#333,color:#fff
+    style H fill:#ffce67,stroke:#333
+```
+
+Consider an AI assistant asked to schedule a meeting from an email:
+
+**With prompt engineering only** (poor context):
+
+> "Thank you for your message. Tomorrow works for me. May I ask what time you had in mind?"
+
+**With context engineering** (rich context — calendar, contacts, email history, tools):
+
+> "Hey Jim! Tomorrow's packed on my end, back-to-back all day. Thursday AM free if that works for you? Sent an invite, lmk if it works."
+
+The second response is possible because the system *engineered the context* — it loaded the user's calendar, identified the sender from the contact list, checked the email history for tone, and had access to a `send_invite` tool.
+
+## Practical Context Engineering Techniques
+
+### 1. Retrieval-Augmented Generation (RAG)
+
+Dynamically retrieve relevant documents or data before the LLM call.
+
+```python
+# Pseudocode: RAG-powered context
+query = user_message
+relevant_docs = vector_store.similarity_search(query, k=5)
+context = "\n".join([doc.page_content for doc in relevant_docs])
+
+messages = [
+    {"role": "system", "content": f"Use this context to answer:\n{context}"},
+    {"role": "user", "content": query},
+]
+```
+
+For hands-on RAG tutorials, see our [RAG section](/pages/rag.html).
+
+### 2. Conversation History Management
+
+Maintain short-term memory with intelligent truncation or summarization.
+
+```python
+# Keep recent messages + summarize older ones
+if len(history) > MAX_MESSAGES:
+    summary = llm.summarize(history[:len(history) - KEEP_RECENT])
+    history = [{"role": "system", "content": f"Summary: {summary}"}] + history[-KEEP_RECENT:]
+```
+
+### 3. Tool / Function Definitions
+
+Give the model capabilities, not just knowledge.
+
+```python
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "search_docs",
+            "description": "Search internal documentation",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search query"}
+                },
+                "required": ["query"]
+            }
+        }
+    }
+]
+```
+
+### 4. Dynamic System Prompts
+
+Tailor instructions based on the current task type.
+
+```python
+def build_system_prompt(task_type, user_profile):
+    base = "You are a helpful AI assistant."
+    if task_type == "coding":
+        base += " You are an expert Python developer. Always include type hints."
+    if user_profile.get("prefers_concise"):
+        base += " Keep responses brief and to the point."
+    return base
+```
+
+### 5. Few-shot Example Selection
+
+Instead of static examples, dynamically select the most relevant ones.
+
+```python
+# Select examples similar to the current query
+examples = example_store.similarity_search(user_query, k=3)
+formatted = "\n".join([f"Q: {e.question}\nA: {e.answer}" for e in examples])
+```
+
+
+## Context Engineering in Practice: The Full Picture
+
+A production LLM application combines all these components into a context assembly pipeline:
+
+```{mermaid}
+graph TD
+    A["User Request"] --> B["Context Assembly Pipeline"]
+    B --> C["1. Route / classify<br/>the request"]
+    C --> D["2. Retrieve relevant<br/>documents (RAG)"]
+    D --> E["3. Load conversation<br/>history + memory"]
+    E --> F["4. Select tools<br/>for this task"]
+    F --> G["5. Build system prompt<br/>(dynamic)"]
+    G --> H["6. Select few-shot<br/>examples"]
+    H --> I["7. Assemble final<br/>context"]
+    I --> J["LLM Call"]
+    J --> K["Response / Tool Call"]
+    K -->|"Tool result"| B
+
+    style B fill:#6cc3d5,stroke:#333,color:#fff
+    style I fill:#ffce67,stroke:#333
+    style J fill:#56cc9d,stroke:#333,color:#fff
+```
+
+This pipeline runs **before every LLM call** in a production system. The LLM itself is often the simplest part — the real engineering is in everything that feeds it.
+
+
+## When to Use What
+
+```{mermaid}
+graph TD
+    Start["What are you building?"] --> Simple{"Simple task?<br/>(Q&A, summarization)"}
+    Start --> Complex{"Complex app?<br/>(RAG, multi-step)"}
+    Start --> Agent{"Autonomous agent?<br/>(Planning, tools)"}
+
+    Simple -->|"Yes"| PE["Prompt Engineering<br/>is sufficient"]
+    Complex -->|"Yes"| CE["Context Engineering<br/>required"]
+    Agent -->|"Yes"| CE_ADV["Advanced Context<br/>Engineering essential"]
+
+    style PE fill:#ffce67,stroke:#333
+    style CE fill:#6cc3d5,stroke:#333,color:#fff
+    style CE_ADV fill:#56cc9d,stroke:#333,color:#fff
+```
+
+**Use prompt engineering when:**
+
+- Building a prototype or quick experiment
+- The task is self-contained (summarization, translation, classification)
+- All needed information fits naturally in a single prompt
+- No external data or tool access is required
+
+**Use context engineering when:**
+
+- Building production applications with real users
+- The model needs access to external data (RAG), tools, or user state
+- You're building multi-turn conversational systems
+- You're building agents that plan and act autonomously
+- Context quality directly determines success or failure
+
+
+## Conclusion
+Prompt engineering isn't going away — it's the foundation. But for production LLM applications, **context engineering is the real skill**. The difference between a demo and a production-grade application is rarely the model or the prompt — it's the quality of the context you provide.
+
+The key insight: **most agent failures are context failures, not model failures.** When an LLM gives a bad response, the first question should be: *"Did it have everything it needed?"*
+
+Context engineering is:
+
+- **A system, not a string** — dynamic pipelines that assemble context on the fly
+- **Selective** — the right information at the right time, not everything at once
+- **The bridge** between prompt engineering and production AI
+
+
+## References
+- Lutke, T. (2025). ["Context engineering" over "prompt engineering"](https://x.com/tobi/status/1935533422589399127). X (Twitter).
+- Karpathy, A. (2025). [+1 for "context engineering"](https://x.com/karpathy/status/1937902205765607626). X (Twitter).
+- Willison, S. (2025). [Context engineering](https://simonwillison.net/2025/Jun/27/context-engineering/). Simon Willison's Weblog.
+- Schmid, P. (2025). [The New Skill in AI is Not Prompting, It's Context Engineering](https://www.philschmid.de/context-engineering). philschmid.de.
+- Anthropic (2024). [Building Effective Agents](https://www.anthropic.com/research/building-effective-agents). Anthropic Research.
+- LangChain (2025). [The Rise of Context Engineering](https://blog.langchain.com/the-rise-of-context-engineering/). LangChain Blog.
+
+
+## Next Steps
+- Build a RAG pipeline with dynamic context assembly — see our [RAG tutorials](/pages/rag.html).
+- Explore agent patterns with tool use — see our [Agents section](/pages/agent.html).
+- Deploy your LLM application with [vLLM](/posts/llm/Deploying%20and%20Serving%20LLM%20with%20vLLM.html) or [llama.cpp](/posts/llm/Deploying%20and%20Serving%20LLM%20with%20Llama.cpp.html).
+- Compress models for efficient serving with [quantization techniques](/posts/llm/Quantization%20Methods%20for%20LLMs.html).
+- Run models locally with [Ollama](/posts/llm/Run%20LLM%20locally%20with%20Ollama.html) for private, zero-latency inference.

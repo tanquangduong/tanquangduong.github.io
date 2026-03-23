@@ -109,6 +109,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     "search-label": "Search"
   }
 }</script>
+<script src="../../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
 
 
 <link rel="stylesheet" href="../../styles.css">
@@ -285,6 +288,28 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>Query the model from Python</li>
 <li>Optimize for production deployment</li>
 </ol>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    A["Install vLLM"] --&gt; B["Load / configure&lt;br/&gt;model"]
+    B --&gt; C["Start OpenAI-compatible&lt;br/&gt;API server"]
+    C --&gt; D["Query from&lt;br/&gt;Python / curl"]
+    D --&gt; E["Deploy to&lt;br/&gt;production"]
+
+    style A fill:#ffce67,stroke:#333
+    style B fill:#ffce67,stroke:#333
+    style C fill:#6cc3d5,stroke:#333,color:#fff
+    style D fill:#6cc3d5,stroke:#333,color:#fff
+    style E fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
 </section>
 <section id="what-is-vllm" class="level2">
 <h2 class="anchored" data-anchor-id="what-is-vllm">What is vLLM?</h2>
@@ -296,6 +321,30 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><strong>Tensor parallelism</strong>: Distribute models across multiple GPUs</li>
 <li><strong>Support for many models</strong>: Llama, Mistral, Qwen, Phi, Gemma, and more</li>
 </ul>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["vLLM Engine"] --&gt; B["PagedAttention&lt;br/&gt;Memory efficiency"]
+    A --&gt; C["Continuous Batching&lt;br/&gt;Max throughput"]
+    A --&gt; D["OpenAI-compatible API&lt;br/&gt;Drop-in replacement"]
+    A --&gt; E["Tensor Parallelism&lt;br/&gt;Multi-GPU support"]
+    A --&gt; F["Wide Model Support&lt;br/&gt;Llama, Mistral, Qwen..."]
+
+    style A fill:#56cc9d,stroke:#333,color:#fff
+    style B fill:#6cc3d5,stroke:#333,color:#fff
+    style C fill:#6cc3d5,stroke:#333,color:#fff
+    style D fill:#6cc3d5,stroke:#333,color:#fff
+    style E fill:#6cc3d5,stroke:#333,color:#fff
+    style F fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
 </section>
 <section id="hardware-requirements" class="level2">
 <h2 class="anchored" data-anchor-id="hardware-requirements">Hardware Requirements</h2>
@@ -399,6 +448,30 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="serving-with-openai-compatible-api" class="level2">
 <h2 class="anchored" data-anchor-id="serving-with-openai-compatible-api">Serving with OpenAI-Compatible API</h2>
 <p>vLLM provides an API server that is <strong>fully compatible with the OpenAI API format</strong>.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    A["vLLM Server&lt;br/&gt;(port 8000)"] --&gt; B["OpenAI-compatible&lt;br/&gt;/v1/chat/completions"]
+    B --&gt; C["curl"]
+    B --&gt; D["Python requests"]
+    B --&gt; E["OpenAI Python client"]
+    B --&gt; F["Any OpenAI-compatible&lt;br/&gt;application"]
+
+    style A fill:#56cc9d,stroke:#333,color:#fff
+    style B fill:#6cc3d5,stroke:#333,color:#fff
+    style C fill:#f8f9fa,stroke:#333
+    style D fill:#f8f9fa,stroke:#333
+    style E fill:#f8f9fa,stroke:#333
+    style F fill:#f8f9fa,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
 <section id="start-the-server" class="level3">
 <h3 class="anchored" data-anchor-id="start-the-server">Start the Server</h3>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">vllm</span> serve Qwen/Qwen2.5-0.5B-Instruct <span class="dt">\</span></span>
@@ -497,6 +570,32 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <blockquote class="blockquote">
 <p><strong>Note:</strong> GGUF support in vLLM is experimental and under-optimized. Currently, only <strong>single-file</strong> GGUF models are supported. If you have a multi-file GGUF model, use <a href="https://github.com/ggerganov/llama.cpp/pull/6135"><code>gguf-split</code></a> to merge them first.</p>
 </blockquote>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["Fine-tuned model"] --&gt; B{"Export format?"}
+    B --&gt;|"GGUF"| C["Serve GGUF directly&lt;br/&gt;with vLLM"]
+    B --&gt;|"HF safetensors"| D["Serve HF format&lt;br/&gt;with vLLM"]
+    B --&gt;|"LoRA adapter"| E["Serve with&lt;br/&gt;--enable-lora"]
+
+    C --&gt; F["OpenAI-compatible API"]
+    D --&gt; F
+    E --&gt; F
+
+    style A fill:#f8f9fa,stroke:#333
+    style C fill:#56cc9d,stroke:#333,color:#fff
+    style D fill:#56cc9d,stroke:#333,color:#fff
+    style E fill:#56cc9d,stroke:#333,color:#fff
+    style F fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
 <section id="option-a-serve-a-gguf-file-directly" class="level3">
 <h3 class="anchored" data-anchor-id="option-a-serve-a-gguf-file-directly">Option A: Serve a GGUF file directly</h3>
 <section id="step-1-prepare-your-gguf-model" class="level4">
@@ -601,6 +700,28 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="docker-deployment" class="level2">
 <h2 class="anchored" data-anchor-id="docker-deployment">Docker Deployment</h2>
 <p>Deploy vLLM in a container for production environments.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    A["vLLM Docker Image&lt;br/&gt;(vllm/vllm-openai)"] --&gt; B["GPU Container&lt;br/&gt;(--gpus all)"]
+    B --&gt; C["Model loaded&lt;br/&gt;in container"]
+    C --&gt; D["Expose port 8000"]
+    D --&gt; E["Production traffic"]
+
+    style A fill:#ffce67,stroke:#333
+    style B fill:#6cc3d5,stroke:#333,color:#fff
+    style C fill:#6cc3d5,stroke:#333,color:#fff
+    style D fill:#56cc9d,stroke:#333,color:#fff
+    style E fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
 <section id="dockerfile" class="level3">
 <h3 class="anchored" data-anchor-id="dockerfile">Dockerfile</h3>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb22"><pre class="sourceCode dockerfile code-with-copy"><code class="sourceCode dockerfile"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> vllm/vllm-openai:latest</span>
