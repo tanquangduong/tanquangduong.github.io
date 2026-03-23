@@ -1,0 +1,900 @@
+---
+title: "Training LLMs with Mixture of Experts"
+subtitle: "From dense to sparse: understanding MoE architecture, routing strategies, expert specialization, sparse upcycling, and fine-tuning MoE models with PyTorch and Unsloth"
+image: /images/llm/training-llm-moe-300px.png
+date: "2024-10-20"
+---
+
+**Keywords:** Mixture of Experts, MoE, sparse model, router, expert specialization, Mixtral, DeepSeekMoE, OLMoE, Switch Transformer, top-k routing, load balancing, sparse upcycling, fine-tuning, Unsloth, LoRA, PyTorch
+
+![](/images/llm/training-llm-moe-300px.png){fig-align="center" width=300}
+
+## Introduction
+
+Scaling dense language models has been the dominant recipe for better performance — more parameters and more data. But dense scaling hits practical limits: training costs grow linearly with parameter count, inference latency increases, and memory requirements balloon. **Mixture of Experts (MoE)** offers an elegant alternative: scale model capacity without proportionally scaling computation.
+
+The key idea is **conditional computation** — instead of activating all parameters for every input token, a MoE model selects a small subset of "experts" per token. This means a model with 47B total parameters might only use 13B active parameters per token (as in Mixtral 8x7B), achieving the quality of a much larger dense model at the inference cost of a much smaller one.
+
+This article covers MoE architecture from the ground up: how routing works, how to balance load across experts, the design innovations from Mixtral, DeepSeek, and OLMoE, and how to build and fine-tune your own MoE models. All examples target small, practical MoE configurations.
+
+> For the full pretraining pipeline (data collection, cleaning, tokenization), see [Pre-training LLMs from Scratch](/posts/llm/Pre-training%20LLMs%20from%20Scratch.html). For post-training alignment, see [Post-Training LLMs for Human Alignment](/posts/llm/Post-Training%20LLMs%20for%20Human%20Alignment.html).
+
+## Dense vs Sparse: Why MoE?
+
+```{mermaid}
+graph LR
+    subgraph Dense["Dense Model"]
+        direction TB
+        D1["All parameters<br/>activated for<br/>every token"]
+    end
+
+    subgraph Sparse["Sparse MoE Model"]
+        direction TB
+        S1["Only selected<br/>experts activated<br/>per token"]
+    end
+
+    A["Input<br/>Token"] --> Dense
+    A --> Sparse
+    Dense --> D2["High compute<br/>High quality"]
+    Sparse --> S2["Low compute<br/>Same quality"]
+
+    style D1 fill:#e74c3c,color:#fff,stroke:#333
+    style S1 fill:#27ae60,color:#fff,stroke:#333
+    style D2 fill:#e74c3c,color:#fff,stroke:#333
+    style S2 fill:#27ae60,color:#fff,stroke:#333
+    style A fill:#4a90d9,color:#fff,stroke:#333
+```
+
+| Aspect | Dense Model | MoE Model |
+|--------|:-----------:|:---------:|
+| **Parameters used per token** | All | Subset (e.g., 2 of 8 experts) |
+| **Training speed** | Baseline | 2–4x faster at same quality |
+| **Inference FLOPs** | Proportional to total params | Proportional to active params |
+| **Memory (inference)** | Proportional to total params | All experts must be loaded |
+| **Example** | Llama 3 70B (70B active) | Mixtral 8x7B (13B active / 47B total) |
+
+> "Model capacity depends on total parameters, but inference speed depends on active parameters." — HuggingFace MoE Blog
+
+## 1. MoE Architecture
+
+In a standard Transformer, each layer has a self-attention block followed by a feed-forward network (FFN). In a MoE Transformer, some or all FFN layers are replaced by **MoE layers** consisting of:
+
+1. **Multiple experts** — each expert is a standard FFN (same architecture, independently parameterized)
+2. **A router (gating network)** — a small learned network that decides which experts process each token
+
+```{mermaid}
+graph TD
+    A["Input Hidden State<br/>(per token)"] --> B["Router<br/>(Gating Network)"]
+    B -->|"weight=0.7"| E1["Expert 1<br/>(FFN)"]
+    B -->|"weight=0.3"| E2["Expert 2<br/>(FFN)"]
+    B -->|"weight=0.0"| E3["Expert 3<br/>(FFN)"]
+    B -->|"weight=0.0"| E4["Expert 4<br/>(FFN)"]
+
+    E1 --> C["Weighted Sum<br/>of Expert Outputs"]
+    E2 --> C
+
+    C --> D["Output<br/>Hidden State"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#e74c3c,color:#fff,stroke:#333
+    style E1 fill:#27ae60,color:#fff,stroke:#333
+    style E2 fill:#27ae60,color:#fff,stroke:#333
+    style E3 fill:#95a5a6,color:#fff,stroke:#333
+    style E4 fill:#95a5a6,color:#fff,stroke:#333
+    style C fill:#f5a623,color:#fff,stroke:#333
+    style D fill:#9b59b6,color:#fff,stroke:#333
+```
+
+The router computes a probability distribution over experts for each token. Only the top-k experts (typically k=1 or k=2) are activated, and their outputs are combined with the router weights:
+
+$$y = \sum_{i=1}^{N} G(x)_i \cdot E_i(x)$$
+
+where $G(x)$ is the gating function (zero for non-selected experts) and $E_i(x)$ is the output of expert $i$.
+
+### Where MoE Layers Are Placed
+
+Not every Transformer layer needs to be a MoE layer. Common patterns:
+
+| Pattern | Description | Used By |
+|---------|-------------|---------|
+| **Every layer** | All FFN layers replaced with MoE | Mixtral, OLMoE |
+| **Every other layer** | Alternating dense and MoE layers | GShard, GLaM |
+| **Every N layers** | Sparse MoE placement | ST-MoE (every 4th) |
+
+### Parameter Counting
+
+For Mixtral 8x7B:
+
+- **Total parameters**: ~47B (not 8×7B=56B, because attention layers are shared)
+- **Active parameters per token**: ~13B (shared attention + 2 selected experts)
+- **Each expert FFN**: ~5B parameters
+- **Shared layers** (attention, embeddings, LM head): ~7B parameters
+
+## 2. Routing Strategies
+
+The router is the most critical design decision in a MoE. It determines which tokens go to which experts.
+
+```{mermaid}
+graph TD
+    A{{"Routing<br/>Strategies"}} --> B["Top-K<br/>Routing"]
+    A --> C["Expert<br/>Choice"]
+    A --> D["Token<br/>Choice"]
+
+    B --> B1["Token picks top-K experts<br/>Most common approach<br/>K=1 (Switch) or K=2 (Mixtral)"]
+    C --> C1["Expert picks top-K tokens<br/>Better load balance<br/>Used by some research models"]
+    D --> D1["Soft routing / learned<br/>Differentiable assignment<br/>Emerging approach"]
+
+    style A fill:#e74c3c,color:#fff,stroke:#333
+    style B fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#f5a623,color:#fff,stroke:#333
+    style D fill:#27ae60,color:#fff,stroke:#333
+    style B1 fill:#4a90d9,color:#fff,stroke:#333
+    style C1 fill:#f5a623,color:#fff,stroke:#333
+    style D1 fill:#27ae60,color:#fff,stroke:#333
+```
+
+### Top-K Token-Choice Routing
+
+The standard approach. Each token selects its top-K experts:
+
+```python
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class TopKRouter(nn.Module):
+    """Standard top-k router for Mixture of Experts."""
+    def __init__(self, hidden_dim, num_experts, top_k=2):
+        super().__init__()
+        self.top_k = top_k
+        self.gate = nn.Linear(hidden_dim, num_experts, bias=False)
+
+    def forward(self, x):
+        # x: (batch * seq_len, hidden_dim)
+        logits = self.gate(x)  # (batch * seq_len, num_experts)
+        scores = F.softmax(logits, dim=-1)
+
+        # Select top-k experts per token
+        top_k_scores, top_k_indices = torch.topk(scores, self.top_k, dim=-1)
+
+        # Normalize selected scores to sum to 1
+        top_k_scores = top_k_scores / top_k_scores.sum(dim=-1, keepdim=True)
+
+        return top_k_scores, top_k_indices, logits
+```
+
+### Noisy Top-K Gating
+
+Adding noise during training helps with load balancing and exploration:
+
+$$H(x)_i = (x \cdot W_g)_i + \text{StandardNormal}() \cdot \text{Softplus}((x \cdot W_{noise})_i)$$
+
+$$G(x) = \text{Softmax}(\text{TopK}(H(x), k))$$
+
+### Switch Transformer: Top-1 Routing
+
+The Switch Transformer simplified routing by using only **one expert per token** (K=1):
+
+- Reduces router computation
+- Halves the batch size per expert (vs top-2)
+- Reduces communication costs
+- Quality is preserved
+
+This was counterintuitive — the original assumption was that at least two experts were needed. Switch Transformers showed top-1 can work very well, achieving a 4x pre-train speed-up over T5-XXL.
+
+## 3. Load Balancing and Training Stability
+
+Without intervention, routers converge to send most tokens to a few "popular" experts, creating a vicious cycle: favored experts train faster, get selected more, and other experts are wasted.
+
+```{mermaid}
+graph TD
+    A["Unbalanced<br/>Routing"] --> B["Popular experts<br/>get more tokens"]
+    B --> C["Popular experts<br/>train faster"]
+    C --> D["Router reinforces<br/>same experts"]
+    D --> A
+
+    E["Auxiliary<br/>Loss"] -->|"breaks the cycle"| A
+
+    style A fill:#e74c3c,color:#fff,stroke:#333
+    style B fill:#e74c3c,color:#fff,stroke:#333
+    style C fill:#e74c3c,color:#fff,stroke:#333
+    style D fill:#e74c3c,color:#fff,stroke:#333
+    style E fill:#27ae60,color:#fff,stroke:#333
+```
+
+### Auxiliary Load Balancing Loss
+
+An auxiliary loss encourages uniform expert usage. For each MoE layer, the loss penalizes imbalanced routing:
+
+```python
+def load_balancing_loss(router_logits, top_k_indices, num_experts):
+    """Compute auxiliary load balancing loss (Switch Transformer style)."""
+    # Fraction of tokens routed to each expert
+    tokens_per_expert = torch.zeros(num_experts, device=top_k_indices.device)
+    for i in range(num_experts):
+        tokens_per_expert[i] = (top_k_indices == i).float().sum()
+    fraction_tokens = tokens_per_expert / top_k_indices.numel()
+
+    # Average routing probability for each expert
+    routing_probs = F.softmax(router_logits, dim=-1)
+    fraction_probs = routing_probs.mean(dim=0)
+
+    # Load balancing loss: N * sum(f_i * P_i)
+    # Minimized when both distributions are uniform (1/N each)
+    loss = num_experts * (fraction_tokens * fraction_probs).sum()
+    return loss
+```
+
+The total training loss becomes:
+
+$$\mathcal{L} = \mathcal{L}_{LM} + \alpha \cdot \mathcal{L}_{aux}$$
+
+where $\alpha$ is typically a small constant (0.01–0.1).
+
+### Router Z-Loss
+
+Introduced by ST-MoE, the router z-loss improves stability without quality degradation by penalizing large logits entering the gating network:
+
+$$\mathcal{L}_z = \frac{1}{B} \sum_{i=1}^{B} \left(\log \sum_{j=1}^{N} e^{x_j^{(i)}}\right)^2$$
+
+This reduces roundoff errors in the softmax exponential, which is especially impactful when training in mixed precision.
+
+### Expert Capacity Factor
+
+Expert capacity limits how many tokens one expert can process:
+
+$$\text{Expert Capacity} = \frac{\text{tokens per batch}}{\text{number of experts}} \times \text{capacity factor}$$
+
+Tokens exceeding capacity are "dropped" (passed through via residual connection). Good starting points:
+
+| Capacity Factor | Trade-off |
+|:---------------:|-----------|
+| **1.0** | Efficient, some tokens dropped |
+| **1.25** | Good balance (recommended) |
+| **1.5+** | Fewer drops, higher memory/communication |
+
+## 4. Expert Specialization Strategies
+
+Different MoE architectures approach expert design differently. The key innovations come from **how experts are structured and organized**.
+
+```{mermaid}
+graph TD
+    A{{"Expert Design<br/>Strategies"}} --> B["Standard MoE<br/>(Mixtral)"]
+    A --> C["Fine-Grained MoE<br/>(DeepSeekMoE)"]
+    A --> D["Shared + Routed<br/>(DeepSeek-V2/V3)"]
+
+    B --> B1["N large experts<br/>Top-K routing<br/>e.g. 8 experts, top-2"]
+    C --> C1["mN smaller experts<br/>Top-mK routing<br/>More flexible combinations"]
+    D --> D1["K_s shared experts<br/>always active +<br/>routed experts"]
+
+    style A fill:#e74c3c,color:#fff,stroke:#333
+    style B fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#f5a623,color:#fff,stroke:#333
+    style D fill:#27ae60,color:#fff,stroke:#333
+    style B1 fill:#4a90d9,color:#fff,stroke:#333
+    style C1 fill:#f5a623,color:#fff,stroke:#333
+    style D1 fill:#27ae60,color:#fff,stroke:#333
+```
+
+### Mixtral: Standard Top-2 MoE
+
+Mixtral 8x7B uses a straightforward design:
+
+- **8 experts** per layer, each a full FFN (same size as Mistral 7B's FFN)
+- **Top-2 routing**: each token activates exactly 2 experts
+- **Every layer** is a MoE layer
+- 32k token context length
+- Outperforms Llama 2 70B while using only 13B active parameters
+
+### DeepSeekMoE: Fine-Grained Expert Segmentation
+
+DeepSeekMoE introduces two key ideas for better expert specialization:
+
+1. **Fine-grained segmentation**: Instead of N large experts with top-K routing, use $mN$ smaller experts with top-$mK$ routing. More small experts allow more flexible combinations.
+2. **Shared expert isolation**: Dedicate $K_s$ experts as "shared experts" that are always active for every token, capturing common knowledge and reducing redundancy in routed experts.
+
+Result: DeepSeekMoE 2B matches GShard 2.9B (which has 1.5x more expert parameters and compute). DeepSeekMoE 16B matches Llama 2 7B quality with only 40% of the compute.
+
+### DeepSeek-V2/V3: Shared Experts + MLA
+
+DeepSeek-V2 combines DeepSeekMoE with **Multi-head Latent Attention (MLA)** for efficient inference:
+
+- 236B total parameters, 21B activated per token
+- MLA compresses the KV cache by 93.3%
+- 128K context length
+- 5.76x faster generation than dense equivalent
+
+### OLMoE: Fully Open MoE
+
+OLMoE-1B-7B is the most practical open MoE model:
+
+- **7B total parameters, 1B active** per token
+- 64 experts per layer, top-8 routing
+- Pretrained on **5 trillion tokens**
+- Fully open: weights, training data, code, and logs
+- Outperforms models with similar active params, even larger ones like Llama2-13B-Chat
+
+## 5. Notable MoE Models Comparison
+
+| Model | Total Params | Active Params | Experts | Top-K | Key Innovation |
+|-------|:-----------:|:------------:|:-------:|:-----:|----------------|
+| **Switch Transformer** | 1.6T | varies | 2048 | 1 | Simplified routing |
+| **Mixtral 8x7B** | 47B | 13B | 8 | 2 | Strong open MoE |
+| **DeepSeekMoE 16B** | 16B | 2.8B | 64 | 6 | Fine-grained + shared experts |
+| **DeepSeek-V2** | 236B | 21B | 160 | 6 | MLA + DeepSeekMoE |
+| **DeepSeek-V3** | 671B | 37B | 256 | 8 | Multi-Token Prediction |
+| **OLMoE-1B-7B** | 7B | 1B | 64 | 8 | Fully open, small scale |
+| **Qwen3-30B-A3B** | 30B | 3B | 128 | 8 | Thinking + non-thinking |
+| **gpt-oss-20b** | 21B | 3.6B | 32 | 4 | OpenAI's open MoE |
+
+## 6. Building a MoE Layer from Scratch
+
+Here's a complete, minimal MoE implementation in PyTorch:
+
+```python
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class Expert(nn.Module):
+    """Single expert: a standard FFN with SwiGLU activation."""
+    def __init__(self, hidden_dim, intermediate_dim):
+        super().__init__()
+        self.gate_proj = nn.Linear(hidden_dim, intermediate_dim, bias=False)
+        self.up_proj = nn.Linear(hidden_dim, intermediate_dim, bias=False)
+        self.down_proj = nn.Linear(intermediate_dim, hidden_dim, bias=False)
+
+    def forward(self, x):
+        return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+
+
+class MoELayer(nn.Module):
+    """Mixture of Experts layer with top-k routing."""
+    def __init__(self, hidden_dim, intermediate_dim, num_experts, top_k=2,
+                 aux_loss_coeff=0.01):
+        super().__init__()
+        self.num_experts = num_experts
+        self.top_k = top_k
+        self.aux_loss_coeff = aux_loss_coeff
+
+        # Router
+        self.gate = nn.Linear(hidden_dim, num_experts, bias=False)
+
+        # Experts
+        self.experts = nn.ModuleList([
+            Expert(hidden_dim, intermediate_dim)
+            for _ in range(num_experts)
+        ])
+
+    def forward(self, x):
+        batch_size, seq_len, hidden_dim = x.shape
+        x_flat = x.view(-1, hidden_dim)  # (B*S, D)
+
+        # Compute routing scores
+        logits = self.gate(x_flat)  # (B*S, num_experts)
+        scores = F.softmax(logits, dim=-1)
+
+        # Select top-k experts
+        top_k_scores, top_k_indices = torch.topk(
+            scores, self.top_k, dim=-1
+        )
+        top_k_scores = top_k_scores / top_k_scores.sum(dim=-1, keepdim=True)
+
+        # Compute expert outputs
+        output = torch.zeros_like(x_flat)
+        for i, expert in enumerate(self.experts):
+            # Find tokens routed to this expert
+            mask = (top_k_indices == i).any(dim=-1)  # (B*S,)
+            if not mask.any():
+                continue
+            token_indices = mask.nonzero(as_tuple=True)[0]
+            expert_input = x_flat[token_indices]
+            expert_output = expert(expert_input)
+
+            # Weight by routing score
+            for k in range(self.top_k):
+                k_mask = top_k_indices[token_indices, k] == i
+                if k_mask.any():
+                    weight = top_k_scores[token_indices[k_mask], k]
+                    output[token_indices[k_mask]] += (
+                        weight.unsqueeze(-1) * expert_output[k_mask]
+                    )
+
+        # Auxiliary load balancing loss
+        self.aux_loss = self._load_balancing_loss(logits, top_k_indices)
+
+        return output.view(batch_size, seq_len, hidden_dim)
+
+    def _load_balancing_loss(self, logits, top_k_indices):
+        num_tokens = logits.shape[0]
+        # Fraction of tokens per expert
+        tokens_per_expert = torch.zeros(
+            self.num_experts, device=logits.device
+        )
+        for i in range(self.num_experts):
+            tokens_per_expert[i] = (top_k_indices == i).float().sum()
+        f = tokens_per_expert / (num_tokens * self.top_k)
+
+        # Mean routing probability per expert
+        p = F.softmax(logits, dim=-1).mean(dim=0)
+
+        return self.aux_loss_coeff * self.num_experts * (f * p).sum()
+```
+
+### Plugging MoE into a Transformer
+
+```python
+class MoETransformerBlock(nn.Module):
+    """Transformer block with MoE FFN."""
+    def __init__(self, hidden_dim, num_heads, intermediate_dim,
+                 num_experts, top_k):
+        super().__init__()
+        self.attn_norm = nn.RMSNorm(hidden_dim)
+        self.attention = nn.MultiheadAttention(
+            hidden_dim, num_heads, batch_first=True
+        )
+        self.ffn_norm = nn.RMSNorm(hidden_dim)
+        self.moe = MoELayer(
+            hidden_dim, intermediate_dim, num_experts, top_k
+        )
+
+    def forward(self, x):
+        # Self-attention (shared across all tokens)
+        h = self.attn_norm(x)
+        h, _ = self.attention(h, h, h)
+        x = x + h
+
+        # MoE FFN (sparse per token)
+        h = self.ffn_norm(x)
+        h = self.moe(h)
+        x = x + h
+        return x
+```
+
+### Small MoE Configuration
+
+For a practical small MoE model (~1B active, ~7B total):
+
+```python
+config = {
+    "hidden_dim": 2048,
+    "intermediate_dim": 5632,      # per expert
+    "num_layers": 16,
+    "num_heads": 16,
+    "num_experts": 8,
+    "top_k": 2,
+    "vocab_size": 32000,
+    "max_seq_length": 2048,
+}
+
+# Parameter count estimate:
+# Shared (attention + embeddings): ~1B
+# Per expert FFN: ~70M × 8 experts × 16 layers = ~9B
+# Total: ~10B, Active: ~2.3B (attention + 2 of 8 experts)
+```
+
+## 7. Sparse Upcycling: Dense to MoE
+
+Training a MoE from scratch is expensive. **Sparse upcycling** offers a practical shortcut: initialize a MoE from a pre-trained dense model checkpoint.
+
+```{mermaid}
+graph LR
+    A["Dense Model<br/>(pre-trained)"] --> B["Copy FFN weights<br/>to all experts"]
+    B --> C["Add random<br/>router weights"]
+    C --> D["Continue training<br/>as MoE"]
+    D --> E["MoE Model<br/>(better quality)"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#f5a623,color:#fff,stroke:#333
+    style C fill:#e74c3c,color:#fff,stroke:#333
+    style D fill:#9b59b6,color:#fff,stroke:#333
+    style E fill:#27ae60,color:#fff,stroke:#333
+```
+
+The process:
+
+1. Take a pre-trained dense model
+2. Copy the FFN weights to initialize every expert (all experts start identical)
+3. Add randomly initialized router weights
+4. Continue pretraining — experts will naturally diverge and specialize
+
+Sparse upcycling achieves the quality of training from scratch while using only **~50% of the original dense training compute**.
+
+### Upcycling Implementation
+
+```python
+import torch
+import copy
+
+def upcycle_dense_to_moe(dense_model, num_experts=8, top_k=2):
+    """Convert a dense transformer to MoE by duplicating FFN layers."""
+    for layer_idx, layer in enumerate(dense_model.layers):
+        # Get the original dense FFN
+        original_ffn = layer.ffn
+
+        hidden_dim = original_ffn.gate_proj.in_features
+        intermediate_dim = original_ffn.gate_proj.out_features
+
+        # Create MoE layer
+        moe = MoELayer(
+            hidden_dim=hidden_dim,
+            intermediate_dim=intermediate_dim,
+            num_experts=num_experts,
+            top_k=top_k,
+        )
+
+        # Copy dense FFN weights to ALL experts
+        for expert in moe.experts:
+            expert.load_state_dict(original_ffn.state_dict())
+
+        # Router starts with small random weights
+        nn.init.xavier_uniform_(moe.gate.weight, gain=0.01)
+
+        # Replace dense FFN with MoE
+        layer.ffn = moe
+
+    return dense_model
+```
+
+### OLMoE's Upcycling Recipe
+
+OLMoE provides a complete open-source upcycling pipeline starting from the OLMo 1B dense checkpoint:
+
+```bash
+# 1. Clone OLMoE repo
+git clone https://github.com/allenai/OLMo.git -b Muennighoff/MoE
+cd OLMo && pip install -e .
+
+# 2. Install megablocks for efficient MoE training
+pip install git+https://github.com/Muennighoff/megablocks.git@olmoe
+
+# 3. Download dense checkpoint and convert to MoE
+# (script duplicates FFN to 8 experts, adds router)
+python scripts/sparsify_ckpt_unsharded.py
+
+# 4. Continue training with MoE config
+python scripts/train.py configs/OLMoE-1B-7B-0924.yml \
+    --load_path=path_to_upcycled_ckpt \
+    --reset_optimizer_state=True \
+    --reset_trainer_state=True
+```
+
+## 8. Training a MoE from Scratch
+
+For full control, you can train a MoE from random initialization. The training loop adds the auxiliary loss:
+
+```python
+import torch
+from torch.utils.data import DataLoader
+
+# Model setup
+model = MoETransformerModel(config)  # your MoE model
+model.to("cuda")
+optimizer = torch.optim.AdamW(
+    model.parameters(),
+    lr=2e-4,
+    betas=(0.9, 0.95),
+    weight_decay=0.1,
+)
+
+# Training loop
+for step, batch in enumerate(dataloader):
+    input_ids = batch["input_ids"].to("cuda")
+    labels = batch["labels"].to("cuda")
+
+    # Forward pass
+    outputs = model(input_ids=input_ids, labels=labels)
+    lm_loss = outputs.loss
+
+    # Collect auxiliary losses from all MoE layers
+    aux_loss = sum(
+        layer.moe.aux_loss
+        for layer in model.layers
+        if hasattr(layer, "moe")
+    )
+
+    # Total loss
+    total_loss = lm_loss + aux_loss
+
+    total_loss.backward()
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+    optimizer.step()
+    optimizer.zero_grad()
+
+    if step % 100 == 0:
+        print(
+            f"Step {step} | LM Loss: {lm_loss.item():.4f} | "
+            f"Aux Loss: {aux_loss.item():.4f}"
+        )
+```
+
+### Training Hyperparameters for Small MoE Models
+
+Based on OLMoE and DeepSeekMoE recipes:
+
+| Hyperparameter | OLMoE-1B-7B | DeepSeekMoE-16B | Mixtral 8x7B |
+|----------------|:----------:|:--------------:|:-----------:|
+| **Total params** | 7B | 16B | 47B |
+| **Active params** | 1B | 2.8B | 13B |
+| **Experts** | 64 | 64 | 8 |
+| **Top-K** | 8 | 6 | 2 |
+| **Learning rate** | 3e-4 | 4.2e-4 | ~2e-4 |
+| **Batch size (tokens)** | 4M | 4.5M | ~4M |
+| **Optimizer** | AdamW | AdamW | AdamW |
+| **Training tokens** | 5T | 2T | undisclosed |
+| **Aux loss weight** | 0.01 | 0.01 | 0.01 |
+| **Context length** | 2048 → 4096 | 4096 | 32768 |
+
+### Training Stability Tips
+
+MoE training is less stable than dense training. Key practices:
+
+1. **Use router z-loss** — penalizes large router logits, prevents instability from exponentials
+2. **Selective precision** — keep router computation in full precision (fp32), even when experts use bf16
+3. **Warmup** — longer warmup helps stabilize routing (2000–5000 steps)
+4. **Monitor expert utilization** — if any expert consistently gets <1% of tokens, routing has collapsed
+5. **Auxiliary loss coefficient** — start with 0.01, increase if load is very unbalanced
+6. **Don't fine-tune the router** — during LoRA fine-tuning, Unsloth disables router updates by default
+
+## 9. Fine-tuning MoE Models with Unsloth
+
+[Unsloth](https://unsloth.ai/) provides optimized MoE training with custom Triton kernels, achieving ~12x faster training and >35% VRAM reduction compared to standard implementations.
+
+```{mermaid}
+graph TD
+    A["Pre-trained MoE<br/>(e.g. Qwen3-30B-A3B)"] --> B["Add LoRA adapters<br/>to expert layers"]
+    B --> C["Fine-tune with<br/>Unsloth + TRL"]
+    C --> D["Merge & Export<br/>(GGUF / safetensors)"]
+    D --> E["Deploy with<br/>vLLM / Ollama"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#f5a623,color:#fff,stroke:#333
+    style C fill:#e74c3c,color:#fff,stroke:#333
+    style D fill:#9b59b6,color:#fff,stroke:#333
+    style E fill:#27ae60,color:#fff,stroke:#333
+```
+
+### Setting Up MoE Fine-tuning
+
+```python
+from unsloth import FastLanguageModel
+
+# Load a MoE model (bf16 — QLoRA not supported for MoE yet)
+model, tokenizer = FastLanguageModel.from_pretrained(
+    model_name="Qwen/Qwen3-30B-A3B",
+    max_seq_length=4096,
+    load_in_4bit=False,  # MoE nn.Parameter doesn't support bnb 4bit yet
+)
+
+# Add LoRA adapters to MoE expert layers
+model = FastLanguageModel.get_peft_model(
+    model,
+    r=16,
+    target_modules=[
+        "q_proj", "k_proj", "v_proj", "o_proj",  # attention
+        "gate_up_proj", "down_proj",  # LoRA on MoE expert layers
+    ],
+    lora_alpha=32,
+    use_gradient_checkpointing="unsloth",
+    random_state=42,
+)
+```
+
+### Unsloth's Split LoRA for MoE
+
+Unsloth avoids materializing the full LoRA delta for all experts. Instead of the standard approach:
+
+$$\Delta = A \cdot B \quad \text{(materialized for all E experts)}$$
+
+Unsloth computes:
+
+$$Y = X \cdot A \quad \text{(only for routed tokens)} \rightarrow Z = Y \cdot B$$
+
+This reordering (enabled by matrix multiplication associativity) reduces memory from $O(E \cdot m \cdot n)$ to $O(k \cdot s \cdot (r + n))$, where $E$ is total experts, $k$ is active experts, $s$ is sequence length, and $r$ is LoRA rank.
+
+### Training the MoE
+
+```python
+from trl import SFTTrainer, SFTConfig
+
+# Prepare instruction dataset
+dataset = load_dataset("your_dataset", split="train")
+
+trainer = SFTTrainer(
+    model=model,
+    tokenizer=tokenizer,
+    train_dataset=dataset,
+    args=SFTConfig(
+        output_dir="qwen3-moe-finetuned",
+        per_device_train_batch_size=2,
+        gradient_accumulation_steps=4,
+        num_train_epochs=3,
+        learning_rate=2e-5,
+        max_seq_length=4096,
+        warmup_steps=100,
+        bf16=True,
+        logging_steps=10,
+        save_steps=500,
+        weight_decay=0.01,
+        lr_scheduler_type="cosine",
+        seed=42,
+    ),
+    dataset_text_field="text",
+)
+
+trainer.train()
+```
+
+### Choosing the MoE Backend
+
+Unsloth auto-selects the optimal MoE backend, but you can override:
+
+```python
+import os
+# Options: "grouped_mm" (default), "unsloth_triton", "native_torch"
+os.environ["UNSLOTH_MOE_BACKEND"] = "grouped_mm"
+```
+
+| Backend | Speed | Compatibility | Notes |
+|---------|:-----:|:-------------:|-------|
+| **grouped_mm** | Fast | T4+ (PyTorch 2.4+) | Default, good balance |
+| **unsloth_triton** | Fastest on A100 | A100/H100 | ~2.5x faster than grouped_mm on A100 |
+| **native_torch** | Slow | All hardware | For-loop fallback |
+
+### Exporting the Fine-tuned MoE
+
+```python
+# Save merged model
+model.save_pretrained_merged(
+    "qwen3-moe-merged",
+    tokenizer,
+    save_method="merged_16bit",
+)
+
+# Export to GGUF for llama.cpp / Ollama
+model.save_pretrained_gguf(
+    "qwen3-moe-gguf",
+    tokenizer,
+    quantization_method="q4_k_m",
+)
+```
+
+> For serving with Ollama or llama.cpp, see [Run LLM locally with Ollama](/posts/llm/Run%20LLM%20locally%20with%20Ollama.html) and [Deploying and Serving LLM with Llama.cpp](/posts/llm/Deploying%20and%20Serving%20LLM%20with%20Llama.cpp.html).
+
+## 10. MoE Fine-tuning Dynamics
+
+MoE models have unique fine-tuning characteristics compared to dense models:
+
+```{mermaid}
+graph TD
+    A{{"Fine-tuning<br/>Considerations"}} --> B["Overfitting"]
+    A --> C["Expert Freezing"]
+    A --> D["Instruction Tuning"]
+
+    B --> B1["MoE overfits more easily<br/>Use higher dropout<br/>Smaller batch, higher LR"]
+    C --> C1["Freeze MoE layers<br/>Update only shared layers<br/>~Same quality, faster training"]
+    D --> D1["MoE benefits MORE from<br/>instruction tuning than dense<br/>Flan-MoE >> MoE"]
+
+    style A fill:#e74c3c,color:#fff,stroke:#333
+    style B fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#f5a623,color:#fff,stroke:#333
+    style D fill:#27ae60,color:#fff,stroke:#333
+    style B1 fill:#4a90d9,color:#fff,stroke:#333
+    style C1 fill:#f5a623,color:#fff,stroke:#333
+    style D1 fill:#27ae60,color:#fff,stroke:#333
+```
+
+### Key Findings from Research
+
+| Finding | Dense | MoE |
+|---------|:-----:|:---:|
+| **Overfitting risk** | Lower | Higher (more params) |
+| **Optimal batch size** | Larger | Smaller |
+| **Optimal learning rate** | Lower | Higher |
+| **Instruction tuning benefit** | Good | Even better |
+| **Auxiliary loss at fine-tuning** | N/A | Can turn off (acts as regularization) |
+| **Freezing non-expert layers** | Hurts quality | Works ~as well as full fine-tuning |
+| **Knowledge tasks (TriviaQA)** | Good | MoE excels disproportionately |
+| **Reasoning tasks (SuperGLUE)** | Better | MoE struggles more |
+
+### Practical OLMoE Fine-tuning
+
+OLMoE provides a complete adaptation pipeline with SFT → DPO:
+
+```bash
+# SFT (Supervised Fine-Tuning)
+accelerate launch \
+    --mixed_precision bf16 \
+    --num_processes 8 \
+    --use_deepspeed \
+    open_instruct/finetune.py \
+    --model_name_or_path allenai/OLMoE-1B-7B-0924 \
+    --use_flash_attn \
+    --max_seq_length 4096 \
+    --per_device_train_batch_size 2 \
+    --gradient_accumulation_steps 8 \
+    --learning_rate 2e-5 \
+    --num_train_epochs 2 \
+    --output_dir output/olmoe-sft
+
+# DPO (Direct Preference Optimization)
+accelerate launch \
+    --mixed_precision bf16 \
+    --num_processes 8 \
+    --use_deepspeed \
+    open_instruct/dpo_tune.py \
+    --model_name_or_path allenai/OLMoE-1B-7B-0924-SFT \
+    --dataset_name argilla/ultrafeedback-binarized-preferences-cleaned \
+    --max_seq_length 4096 \
+    --per_device_train_batch_size 1 \
+    --gradient_accumulation_steps 4 \
+    --learning_rate 5e-7 \
+    --num_train_epochs 3 \
+    --dpo_beta 0.1
+```
+
+## Comparison: When to Use MoE vs Dense
+
+| Scenario | Recommendation | Why |
+|----------|:--------------:|-----|
+| **High throughput serving** | MoE | Lower per-token compute |
+| **Limited VRAM** | Dense | MoE loads all experts in memory |
+| **Fixed training budget** | MoE | Better quality per FLOP |
+| **Small fine-tuning dataset** | Dense | MoE overfits more easily |
+| **Knowledge-heavy tasks** | MoE | Experts store more knowledge |
+| **Reasoning-heavy tasks** | Dense | Dense generalizes better |
+| **Single consumer GPU** | Dense (or small MoE) | MoE VRAM is high |
+| **Multi-GPU cluster** | MoE | Expert parallelism shines |
+
+### Practical Recommendations
+
+For **single consumer GPU** (16–24 GB):
+
+1. Use a small MoE like **OLMoE-1B-7B** (fits in ~16GB with quantization)
+2. Fine-tune with **Unsloth** LoRA on expert layers
+3. Export to GGUF and serve with [Ollama](/posts/llm/Run%20LLM%20locally%20with%20Ollama.html) or [Llama.cpp](/posts/llm/Deploying%20and%20Serving%20LLM%20with%20Llama.cpp.html)
+
+For **multi-GPU setup** (4–8 GPUs):
+
+1. Start with **sparse upcycling** from a dense checkpoint (see [Pre-training LLMs from Scratch](/posts/llm/Pre-training%20LLMs%20from%20Scratch.html))
+2. Use the OLMoE or megablocks training pipeline
+3. Fine-tune with **SFT → DPO** for instruction following
+4. Deploy with [vLLM](/posts/llm/Deploying%20and%20Serving%20LLM%20with%20vLLM.html) using expert parallelism
+
+## Conclusion
+
+Mixture of Experts is the architecture behind the most capable modern LLMs — from DeepSeek-V3/R1 to GPT-4 to Qwen3. The core insight is simple: **make models bigger without making them slower** by only activating a subset of parameters per token.
+
+Key takeaways:
+
+1. **MoE replaces dense FFN layers** with multiple expert FFNs and a learned router
+2. **Routing is critical** — top-k token-choice with load balancing loss is the standard
+3. **Expert specialization** improves with fine-grained segmentation (DeepSeekMoE) and shared experts
+4. **Sparse upcycling** converts a dense model to MoE using ~50% of original training compute
+5. **Fine-tuning MoE** benefits from smaller batches, higher learning rates, and instruction tuning
+6. **Unsloth** provides optimized MoE training with ~12x speedup using Split LoRA and Triton kernels
+
+The tools are mature and open source. OLMoE provides a fully reproducible recipe for training a competitive MoE from scratch, and Unsloth makes fine-tuning accessible on consumer hardware.
+
+> For the complete pretraining pipeline, see [Pre-training LLMs from Scratch](/posts/llm/Pre-training%20LLMs%20from%20Scratch.html). For alignment techniques, see [Post-Training LLMs for Human Alignment](/posts/llm/Post-Training%20LLMs%20for%20Human%20Alignment.html). For reasoning training, see [Training LLMs for Reasoning](/posts/llm/Training%20LLMs%20for%20Reasoning.html).
+
+## References
+
+- Jiang et al., *Mixtral of Experts*, 2024. [arXiv:2401.04088](https://arxiv.org/abs/2401.04088)
+- Dai et al., *DeepSeekMoE: Towards Ultimate Expert Specialization in Mixture-of-Experts Language Models*, 2024. [arXiv:2401.06066](https://arxiv.org/abs/2401.06066)
+- DeepSeek-AI, *DeepSeek-V2: A Strong, Economical, and Efficient MoE Language Model*, 2024. [arXiv:2405.04434](https://arxiv.org/abs/2405.04434)
+- Muennighoff et al., *OLMoE: Open Mixture-of-Experts Language Models*, 2024. [arXiv:2409.02060](https://arxiv.org/abs/2409.02060)
+- Fedus et al., *Switch Transformers: Scaling to Trillion Parameter Models with Simple and Efficient Sparsity*, 2022. [arXiv:2101.03961](https://arxiv.org/abs/2101.03961)
+- Komatsuzaki et al., *Sparse Upcycling: Training Mixture-of-Experts from Dense Checkpoints*, 2022. [arXiv:2212.05055](https://arxiv.org/abs/2212.05055)
+- Zoph et al., *ST-MoE: Designing Stable and Transferable Sparse Expert Models*, 2022. [arXiv:2202.08906](https://arxiv.org/abs/2202.08906)
+- Sanseviero et al., *Mixture of Experts Explained*, HuggingFace Blog, 2023. [Blog](https://huggingface.co/blog/moe)
+- Gosthipaty et al., *Mixture of Experts (MoEs) in Transformers*, HuggingFace Blog, 2026. [Blog](https://huggingface.co/blog/moe-transformers)
+- Unsloth Team, *Fine-tune MoE Models 12x Faster*, 2026. [Docs](https://unsloth.ai/docs/new/faster-moe)
+
+## Next Steps
+
+- Try [OLMoE-1B-7B-Instruct](https://huggingface.co/allenai/OLMoE-1B-7B-0924-Instruct) — smallest open MoE that rivals much larger models
+- Explore [Unsloth MoE notebooks](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/GLM_Flash_A100(80GB).ipynb) for hands-on MoE fine-tuning
+- Read the [OLMoE paper](https://arxiv.org/abs/2409.02060) for the most detailed open MoE training recipe
+- Check [megablocks](https://github.com/stanford-futuredata/megablocks) for efficient sparse MoE GPU kernels
+- Experiment with sparse upcycling on your own dense model using the [OLMoE codebase](https://github.com/allenai/OLMoE)

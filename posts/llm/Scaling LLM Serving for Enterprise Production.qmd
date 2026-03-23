@@ -1,0 +1,731 @@
+---
+title: "Scaling LLM Serving for Enterprise Production"
+subtitle: "From a single GPU to millions of requests: hardware foundations, serving engines, parallelism strategies, load balancing, Kubernetes orchestration, and production monitoring for on-premise LLM deployment"
+image: /images/llm/scaling-llm-serving-300px.png
+date: "2024-11-10"
+---
+
+**Keywords:** LLM serving, vLLM, production deployment, tensor parallelism, pipeline parallelism, data parallelism, Kubernetes, Nginx, load balancing, autoscaling, continuous batching, PagedAttention, KV cache, InfiniBand, NVLink, GPUDirect RDMA, Prometheus, Grafana, Helm, Ray, SGLang, TGI, NVIDIA Triton
+
+![](/images/llm/scaling-llm-serving-300px.png){fig-align="center" width=300}
+
+## Introduction
+
+Serving a pretrained LLM to a handful of users on a single GPU is straightforward. Scaling that same model to handle millions of concurrent requests across an on-premise cluster is an entirely different challenge — one that spans hardware selection, memory management, distributed inference, load balancing, orchestration, and real-time monitoring.
+
+This article provides a comprehensive guide to scaling LLM serving from tens of requests per second to millions. We cover the full stack: GPU hardware, high-speed networking, serving engines (vLLM, SGLang, TGI, NVIDIA Triton), parallelism strategies for large models, multi-instance load balancing with Nginx, Kubernetes-based orchestration with the vLLM production stack, and production observability with Prometheus and Grafana.
+
+> For single-server vLLM basics (installation, offline inference, PagedAttention), see [Deploying and Serving LLM with vLLM](/posts/llm/Deploying%20and%20Serving%20LLM%20with%20vLLM.html). For model compression techniques that reduce memory footprint, see [Quantization Methods for LLMs](/posts/llm/Quantization%20Methods%20for%20LLMs.html).
+
+## 1. The Scaling Roadmap
+
+Scaling LLM serving is not a single jump — it is a progressive journey through distinct tiers, each with its own bottlenecks and solutions.
+
+```{mermaid}
+graph TD
+    T1["Tier 1: Single GPU<br/>~10-50 req/s"] --> T2["Tier 2: Multi-GPU Single Node<br/>~100-500 req/s"]
+    T2 --> T3["Tier 3: Multi-Node Cluster<br/>~1K-10K req/s"]
+    T3 --> T4["Tier 4: Load-Balanced Fleet<br/>~10K-100K req/s"]
+    T4 --> T5["Tier 5: Full Orchestration<br/>~100K-1M+ req/s"]
+
+    T1 -.- S1["vLLM on 1 GPU<br/>Continuous batching"]
+    T2 -.- S2["Tensor parallelism<br/>Pipeline parallelism"]
+    T3 -.- S3["Ray cluster<br/>InfiniBand/NVLink"]
+    T4 -.- S4["Nginx load balancer<br/>Multiple replicas"]
+    T5 -.- S5["Kubernetes + Helm<br/>Autoscaling + Monitoring"]
+
+    style T1 fill:#3498db,color:#fff,stroke:#333
+    style T2 fill:#2980b9,color:#fff,stroke:#333
+    style T3 fill:#8e44ad,color:#fff,stroke:#333
+    style T4 fill:#e67e22,color:#fff,stroke:#333
+    style T5 fill:#e74c3c,color:#fff,stroke:#333
+    style S1 fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style S2 fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style S3 fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style S4 fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style S5 fill:#ecf0f1,color:#333,stroke:#bdc3c7
+```
+
+| Tier | Scale | Key Technology | Bottleneck Solved |
+|------|:-----:|:--------------:|:-----------------:|
+| **Single GPU** | ~10-50 req/s | Continuous batching, PagedAttention | Memory fragmentation |
+| **Multi-GPU Node** | ~100-500 req/s | Tensor/pipeline parallelism | Model doesn't fit in 1 GPU |
+| **Multi-Node** | ~1K-10K req/s | Ray, InfiniBand, GPUDirect RDMA | Single node GPU limit |
+| **Load-Balanced Fleet** | ~10K-100K req/s | Nginx, multiple replicas | Single endpoint throughput |
+| **Full Orchestration** | ~100K-1M+ req/s | Kubernetes, Helm, autoscaling | Manual management, elasticity |
+
+## 2. Hardware Foundations
+
+The hardware stack is the foundation of every scaling decision. GPU choice, memory capacity, interconnect bandwidth, and network fabric all determine the upper bound of your serving throughput.
+
+### GPU Selection
+
+| GPU | VRAM | FP16 TFLOPS | Memory BW | Interconnect | Best For |
+|-----|:----:|:-----------:|:---------:|:------------:|:--------:|
+| **NVIDIA A100 80GB** | 80 GB | 312 | 2.0 TB/s | NVLink 600 GB/s | Cost-effective large models |
+| **NVIDIA H100 SXM** | 80 GB | 990 | 3.35 TB/s | NVLink 900 GB/s | Maximum throughput |
+| **NVIDIA L40S** | 48 GB | 362 | 864 GB/s | PCIe Gen4 | Budget inference nodes |
+| **NVIDIA H200** | 141 GB | 990 | 4.8 TB/s | NVLink 900 GB/s | Largest models without sharding |
+| **NVIDIA B200** | 192 GB | 2250 | 8.0 TB/s | NVLink 1800 GB/s | Next-gen ultra-scale |
+
+### Networking for Distributed Inference
+
+For multi-node deployments, the interconnect between GPUs across nodes becomes the critical bottleneck:
+
+```{mermaid}
+graph LR
+    subgraph Node1["Node 1 — 8x H100"]
+        G1["GPU 0"] <-->|"NVLink<br/>900 GB/s"| G2["GPU 1"]
+        G2 <-->|"NVLink"| G3["GPU ..."]
+        G3 <-->|"NVLink"| G4["GPU 7"]
+    end
+
+    subgraph Node2["Node 2 — 8x H100"]
+        G5["GPU 0"] <-->|"NVLink<br/>900 GB/s"| G6["GPU 1"]
+        G6 <-->|"NVLink"| G7["GPU ..."]
+        G7 <-->|"NVLink"| G8["GPU 7"]
+    end
+
+    Node1 <-->|"InfiniBand NDR<br/>400 Gbps"| Node2
+
+    style G1 fill:#27ae60,color:#fff,stroke:#333
+    style G2 fill:#27ae60,color:#fff,stroke:#333
+    style G3 fill:#27ae60,color:#fff,stroke:#333
+    style G4 fill:#27ae60,color:#fff,stroke:#333
+    style G5 fill:#27ae60,color:#fff,stroke:#333
+    style G6 fill:#27ae60,color:#fff,stroke:#333
+    style G7 fill:#27ae60,color:#fff,stroke:#333
+    style G8 fill:#27ae60,color:#fff,stroke:#333
+```
+
+| Interconnect | Bandwidth | Latency | Use Case |
+|:------------:|:---------:|:-------:|:--------:|
+| **NVLink (intra-node)** | 600-1800 GB/s | ~μs | Tensor parallelism within a node |
+| **InfiniBand NDR** | 400 Gbps | ~1-2 μs | Cross-node tensor/pipeline parallelism |
+| **InfiniBand HDR** | 200 Gbps | ~1-2 μs | Cross-node pipeline parallelism |
+| **Ethernet 100GbE** | 100 Gbps | ~5-10 μs | Data parallel replicas |
+
+**Key rule:** Use NVLink for tensor parallelism (high all-reduce frequency), InfiniBand for pipeline/tensor parallelism across nodes, and standard Ethernet for independent data-parallel replicas.
+
+### Memory Planning
+
+LLM memory consumption has two main components:
+
+$$
+\text{GPU Memory} = \text{Model Weights} + \text{KV Cache}
+$$
+
+For FP16 model weights: $\text{Weight Memory (GB)} \approx 2 \times P$ (where P is parameters in billions)
+
+The KV cache grows with batch size and sequence length:
+
+$$
+\text{KV Cache (GB)} = 2 \times L \times H \times D \times S \times B \times 2 \text{ bytes}
+$$
+
+where $L$ = layers, $H$ = attention heads, $D$ = head dimension, $S$ = sequence length, $B$ = batch size.
+
+| Model | Params | Weight Memory (FP16) | Minimum GPUs (80GB) |
+|-------|:------:|:--------------------:|:-------------------:|
+| Llama 3 8B | 8B | ~16 GB | 1 |
+| Llama 3 70B | 70B | ~140 GB | 2 |
+| Llama 3.1 405B | 405B | ~810 GB | 11+ |
+| DeepSeek-V3 | 671B | ~1.3 TB | 17+ |
+
+## 3. LLM Serving Engines
+
+Choosing the right serving engine determines the software-level efficiency of your deployment. All modern engines share two core innovations: **continuous batching** (dynamically adding/removing requests from a running batch) and **PagedAttention** (managing KV cache as virtual memory pages to eliminate fragmentation).
+
+### Engine Comparison
+
+| Feature | **vLLM** | **SGLang** | **TGI** | **NVIDIA Triton** |
+|---------|:--------:|:----------:|:-------:|:-----------------:|
+| **Continuous batching** | Yes | Yes | Yes | Yes (via backend) |
+| **PagedAttention** | Yes | Yes (RadixAttention) | Yes | Depends on backend |
+| **Tensor parallelism** | Yes | Yes | Yes | Yes |
+| **Pipeline parallelism** | Yes | Yes | Limited | Yes |
+| **OpenAI-compatible API** | Yes | Yes | Yes | Via wrapper |
+| **Speculative decoding** | Yes | Yes | Yes | Via backend |
+| **Quantization support** | AWQ, GPTQ, FP8, INT8 | AWQ, GPTQ, FP8 | AWQ, GPTQ, EETQ | All via TensorRT-LLM |
+| **Production stack** | Helm + K8s | Manual | Docker-based | Full enterprise |
+| **Multi-node** | Ray / multiprocessing | Native | Limited | NVIDIA Dynamo |
+| **Best for** | General-purpose, K8s | Complex multi-call LLM workloads | Simple HF integration | Enterprise NVIDIA stack |
+
+### vLLM: The Default Choice
+
+vLLM is the most widely adopted open-source serving engine, offering a balance of performance, ease-of-use, and production readiness. Start a basic server:
+
+```bash
+# Single GPU serving
+vllm serve meta-llama/Llama-3.1-8B-Instruct
+
+# Multi-GPU with tensor parallelism
+vllm serve meta-llama/Llama-3.1-70B-Instruct \
+    --tensor-parallel-size 4
+
+# With quantization for memory efficiency
+vllm serve meta-llama/Llama-3.1-70B-Instruct \
+    --tensor-parallel-size 2 \
+    --quantization awq
+```
+
+The served API is OpenAI-compatible:
+
+```bash
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "meta-llama/Llama-3.1-8B-Instruct",
+    "messages": [{"role": "user", "content": "Hello!"}],
+    "max_tokens": 100
+  }'
+```
+
+## 4. Parallelism Strategies for Large Models
+
+When a model exceeds the memory of a single GPU, you must split it across multiple GPUs. vLLM supports three strategies:
+
+```{mermaid}
+graph TD
+    A["Model too large for 1 GPU"] --> B{"Fits on single node?"}
+    B -->|"Yes"| C["Tensor Parallelism<br/>Split layers across GPUs"]
+    B -->|"No"| D["Pipeline Parallelism<br/>Split layers across nodes"]
+    C --> E{"GPUs have NVLink?"}
+    E -->|"Yes"| F["Use TP across all GPUs"]
+    E -->|"No (PCIe)"| G["Use PP instead of TP<br/>Less communication overhead"]
+    D --> H["Combine TP + PP<br/>TP within node, PP across nodes"]
+
+    style A fill:#e74c3c,color:#fff,stroke:#333
+    style C fill:#3498db,color:#fff,stroke:#333
+    style D fill:#8e44ad,color:#fff,stroke:#333
+    style F fill:#27ae60,color:#fff,stroke:#333
+    style G fill:#e67e22,color:#fff,stroke:#333
+    style H fill:#27ae60,color:#fff,stroke:#333
+```
+
+### Tensor Parallelism (TP)
+
+Tensor parallelism splits each layer's weight matrices across GPUs. Every GPU processes every token but only computes a portion of each layer. This requires frequent all-reduce communication between GPUs — making NVLink essential.
+
+```bash
+# 4 GPUs with tensor parallelism
+vllm serve meta-llama/Llama-3.1-70B-Instruct \
+    --tensor-parallel-size 4
+```
+
+### Pipeline Parallelism (PP)
+
+Pipeline parallelism assigns different layers to different GPUs. GPU 0 processes layers 0-15, GPU 1 processes layers 16-31, etc. Communication only happens between adjacent pipeline stages, making it suitable for PCIe-connected GPUs or cross-node setups.
+
+```bash
+# 8 GPUs: 4-way tensor parallel × 2-way pipeline parallel
+vllm serve meta-llama/Llama-3.1-405B-Instruct \
+    --tensor-parallel-size 4 \
+    --pipeline-parallel-size 2
+```
+
+### Choosing the Right Strategy
+
+| Scenario | Recommended Strategy | Example |
+|----------|:--------------------:|:-------:|
+| Model fits in 1 GPU | No parallelism | 8B model on A100 80GB |
+| Model fits in 1 node, NVLink available | Tensor parallelism | 70B on 4x H100 with `--tensor-parallel-size 4` |
+| Model fits in 1 node, PCIe only (e.g., L40S) | Pipeline parallelism | 70B on 4x L40S with `--pipeline-parallel-size 4` |
+| Model exceeds 1 node | TP within node + PP across nodes | 405B on 2 nodes × 8 GPUs: `--tp 8 --pp 2` |
+
+**Edge case:** If GPUs within a node lack NVLink (e.g., L40S), prefer pipeline parallelism even for single-node setups — it requires less inter-GPU communication bandwidth.
+
+## 5. Multi-Node Deployment
+
+When a single node is not enough — either the model is too large or you need more total GPU capacity — distribute vLLM across multiple nodes.
+
+### Option A: Ray Cluster
+
+Ray is the default distributed runtime for multi-node vLLM. Set up a Ray cluster using containers:
+
+**Head node:**
+
+```bash
+bash run_cluster.sh \
+    vllm/vllm-openai \
+    <HEAD_NODE_IP> \
+    --head \
+    /path/to/huggingface/home \
+    -e VLLM_HOST_IP=<HEAD_NODE_IP>
+```
+
+**Worker node:**
+
+```bash
+bash run_cluster.sh \
+    vllm/vllm-openai \
+    <HEAD_NODE_IP> \
+    --worker \
+    /path/to/huggingface/home \
+    -e VLLM_HOST_IP=<WORKER_NODE_IP>
+```
+
+Once the Ray cluster is running, launch vLLM as if on a single node — Ray makes all GPUs visible:
+
+```bash
+vllm serve meta-llama/Llama-3.1-405B-Instruct \
+    --tensor-parallel-size 8 \
+    --pipeline-parallel-size 2 \
+    --distributed-executor-backend ray
+```
+
+### Option B: Native Multiprocessing
+
+For simpler setups without Ray:
+
+**Head node:**
+
+```bash
+vllm serve /path/to/model \
+    --tensor-parallel-size 8 \
+    --pipeline-parallel-size 2 \
+    --nnodes 2 --node-rank 0 \
+    --master-addr <HEAD_NODE_IP>
+```
+
+**Worker node:**
+
+```bash
+vllm serve /path/to/model \
+    --tensor-parallel-size 8 \
+    --pipeline-parallel-size 2 \
+    --nnodes 2 --node-rank 1 \
+    --master-addr <HEAD_NODE_IP> --headless
+```
+
+### Optimizing Cross-Node Communication
+
+For efficient tensor parallelism across nodes, InfiniBand with GPUDirect RDMA is essential:
+
+```bash
+# Enable InfiniBand in container
+docker run --gpus all \
+    --privileged \
+    -e NCCL_IB_HCA=mlx5 \
+    --ipc=host \
+    --shm-size=16G \
+    -v /dev/shm:/dev/shm \
+    vllm/vllm-openai
+```
+
+Verify GPUDirect RDMA is active:
+
+```bash
+# Run with NCCL trace logging
+NCCL_DEBUG=TRACE vllm serve ...
+# Look for: [send] via NET/IB/GDRDMA  (efficient)
+# Bad sign:  [send] via NET/Socket     (TCP fallback)
+```
+
+## 6. Horizontal Scaling with Load Balancing
+
+For throughput beyond what a single model replica can handle, run **multiple independent replicas** behind a load balancer. Each replica is a complete vLLM instance serving the same model.
+
+```{mermaid}
+graph TD
+    Client["Client Requests"] --> LB["Nginx Load Balancer<br/>Round-Robin / Least-Conn"]
+    LB --> V1["vLLM Replica 1<br/>GPU 0"]
+    LB --> V2["vLLM Replica 2<br/>GPU 1"]
+    LB --> V3["vLLM Replica 3<br/>GPU 2"]
+    LB --> V4["vLLM Replica N<br/>GPU N"]
+
+    style Client fill:#3498db,color:#fff,stroke:#333
+    style LB fill:#e67e22,color:#fff,stroke:#333
+    style V1 fill:#27ae60,color:#fff,stroke:#333
+    style V2 fill:#27ae60,color:#fff,stroke:#333
+    style V3 fill:#27ae60,color:#fff,stroke:#333
+    style V4 fill:#27ae60,color:#fff,stroke:#333
+```
+
+### Nginx Configuration
+
+Create an Nginx config to load-balance across vLLM instances:
+
+```nginx
+upstream backend {
+    least_conn;  # Route to least busy server
+    server vllm0:8000 max_fails=3 fail_timeout=10000s;
+    server vllm1:8000 max_fails=3 fail_timeout=10000s;
+    server vllm2:8000 max_fails=3 fail_timeout=10000s;
+    server vllm3:8000 max_fails=3 fail_timeout=10000s;
+}
+
+server {
+    listen 80;
+
+    location / {
+        proxy_pass http://backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 600s;  # LLM requests can be long
+    }
+}
+```
+
+### Docker Compose Setup
+
+```yaml
+# docker-compose.yml
+services:
+  vllm0:
+    image: vllm/vllm-openai
+    command: ["--model", "meta-llama/Llama-3.1-8B-Instruct"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]
+              capabilities: [gpu]
+
+  vllm1:
+    image: vllm/vllm-openai
+    command: ["--model", "meta-llama/Llama-3.1-8B-Instruct"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["1"]
+              capabilities: [gpu]
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - vllm0
+      - vllm1
+```
+
+### Scaling Math
+
+With independent replicas, throughput scales linearly:
+
+$$
+\text{Total Throughput} = N_{\text{replicas}} \times \text{Throughput per replica}
+$$
+
+| Replicas | GPUs Used | Estimated Throughput (8B model) |
+|:--------:|:---------:|:-------------------------------:|
+| 1 | 1 | ~30-50 req/s |
+| 4 | 4 | ~120-200 req/s |
+| 16 | 16 | ~480-800 req/s |
+| 64 | 64 | ~1,920-3,200 req/s |
+| 256 | 256 | ~7,680-12,800 req/s |
+
+For larger models requiring multi-GPU replicas (e.g., 70B on 4 GPUs each), divide GPUs accordingly.
+
+## 7. Kubernetes Orchestration with vLLM Production Stack
+
+For scaling beyond manual Docker deployments to millions of requests, Kubernetes provides the orchestration layer: automated deployment, scaling, self-healing, and rolling updates.
+
+The **vLLM Production Stack** is the officially released Helm chart under the vLLM project. It wraps upstream vLLM with:
+
+- **Smart routing** — model-aware and prefix-aware request routing
+- **Multi-model support** — serve multiple models from a single endpoint
+- **KV cache offloading** — via LMCache for maximum efficiency
+- **Observability** — built-in Grafana dashboards
+
+### Installation
+
+```bash
+# Install Helm
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+# Add vLLM Helm repository
+sudo helm repo add vllm https://vllm-project.github.io/production-stack
+
+# Deploy with a configuration file
+sudo helm install vllm vllm/vllm-stack \
+    -f values.yaml
+```
+
+### Configuration (values.yaml)
+
+```yaml
+servingEngineSpec:
+  modelSpec:
+    - name: "llama-8b"
+      repository: "vllm/vllm-openai"
+      tag: "latest"
+      modelURL: "meta-llama/Llama-3.1-8B-Instruct"
+
+      replicaCount: 4
+
+      requestCPU: 4
+      requestMemory: "16Gi"
+      requestGPU: 1
+
+      pvcStorage: "50Gi"
+
+      # Tensor parallelism for larger models
+      # requestGPU: 4
+      # extraArgs: ["--tensor-parallel-size", "4"]
+```
+
+### Autoscaling with Horizontal Pod Autoscaler
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: vllm-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: vllm-deployment
+  minReplicas: 2
+  maxReplicas: 32
+  metrics:
+    - type: Pods
+      pods:
+        metric:
+          name: vllm_num_requests_running
+        target:
+          type: AverageValue
+          averageValue: "50"
+```
+
+### Architecture at Scale
+
+```{mermaid}
+graph TD
+    Users["Users / API Clients"] --> Ingress["K8s Ingress Controller"]
+    Ingress --> Router["vLLM Router Service<br/>Prefix + Model-Aware Routing"]
+    Router --> Pod1["vLLM Pod 1<br/>GPU 0-3, TP=4"]
+    Router --> Pod2["vLLM Pod 2<br/>GPU 4-7, TP=4"]
+    Router --> Pod3["vLLM Pod 3<br/>GPU 8-11, TP=4"]
+    Router --> PodN["vLLM Pod N<br/>..."]
+
+    HPA["Horizontal Pod<br/>Autoscaler"] -.->|"Scale based on<br/>queue depth"| Router
+    Prom["Prometheus"] -.->|"Collect metrics"| Pod1
+    Prom -.->|"Collect metrics"| Pod2
+    Prom -.->|"Collect metrics"| Pod3
+    Grafana["Grafana Dashboard"] -.->|"Visualize"| Prom
+
+    style Users fill:#3498db,color:#fff,stroke:#333
+    style Ingress fill:#9b59b6,color:#fff,stroke:#333
+    style Router fill:#e67e22,color:#fff,stroke:#333
+    style Pod1 fill:#27ae60,color:#fff,stroke:#333
+    style Pod2 fill:#27ae60,color:#fff,stroke:#333
+    style Pod3 fill:#27ae60,color:#fff,stroke:#333
+    style PodN fill:#27ae60,color:#fff,stroke:#333
+    style HPA fill:#e74c3c,color:#fff,stroke:#333
+    style Prom fill:#f39c12,color:#fff,stroke:#333
+    style Grafana fill:#f39c12,color:#fff,stroke:#333
+```
+
+### Validating the Deployment
+
+```bash
+# Check pod status
+kubectl get pods
+
+# Forward the router port
+kubectl port-forward svc/vllm-router-service 30080:80
+
+# Query available models
+curl http://localhost:30080/v1/models
+
+# Send a completion request
+curl -X POST http://localhost:30080/v1/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "meta-llama/Llama-3.1-8B-Instruct",
+    "prompt": "The future of AI is",
+    "max_tokens": 50
+  }'
+```
+
+## 8. Production Optimization Techniques
+
+Beyond hardware and orchestration, several software optimizations dramatically improve serving throughput and latency.
+
+### Automatic Prefix Caching
+
+When many requests share a common prefix (e.g., the same system prompt), vLLM can cache and reuse the KV cache for that prefix:
+
+```bash
+vllm serve meta-llama/Llama-3.1-8B-Instruct \
+    --enable-prefix-caching
+```
+
+This is especially effective for chatbot deployments where every request includes the same system instruction.
+
+### Speculative Decoding
+
+Use a small draft model to predict multiple tokens, then verify them in parallel with the main model. This reduces the number of forward passes:
+
+```bash
+vllm serve meta-llama/Llama-3.1-70B-Instruct \
+    --speculative-model meta-llama/Llama-3.2-1B-Instruct \
+    --num-speculative-tokens 5 \
+    --tensor-parallel-size 4
+```
+
+### Quantization for Memory Efficiency
+
+Quantization reduces model size, allowing more KV cache space (= larger batches = higher throughput):
+
+```bash
+# AWQ quantization (4-bit weights)
+vllm serve TheBloke/Llama-3.1-70B-AWQ \
+    --quantization awq \
+    --tensor-parallel-size 2
+
+# FP8 quantization (requires Ada/Hopper GPUs)
+vllm serve meta-llama/Llama-3.1-70B-Instruct \
+    --quantization fp8
+```
+
+### Disaggregated Prefilling (Experimental)
+
+Separate prefill (processing the prompt) from decode (generating tokens) across different instances. Prefill is compute-bound while decode is memory-bound — splitting them allows each to run on optimally configured hardware:
+
+```{mermaid}
+graph LR
+    R["Request"] --> PF["Prefill Instance<br/>Compute-Optimized<br/>High TFLOPS GPU"]
+    PF -->|"KV Cache Transfer"| DC["Decode Instance<br/>Memory-Optimized<br/>High BW GPU"]
+    DC --> Resp["Response Tokens"]
+
+    style R fill:#3498db,color:#fff,stroke:#333
+    style PF fill:#e74c3c,color:#fff,stroke:#333
+    style DC fill:#8e44ad,color:#fff,stroke:#333
+    style Resp fill:#27ae60,color:#fff,stroke:#333
+```
+
+### Optimization Summary
+
+| Technique | Throughput Gain | Latency Impact | Complexity |
+|-----------|:--------------:|:--------------:|:----------:|
+| **Continuous batching** | 5-10x | Slight increase | Built-in |
+| **PagedAttention** | 2-4x | None | Built-in |
+| **Prefix caching** | 2-5x (with shared prefixes) | Reduction | 1 flag |
+| **Quantization (AWQ/FP8)** | 1.5-2x | Minimal | Model-dependent |
+| **Speculative decoding** | 1.3-2x | Reduction | Needs draft model |
+| **Tensor parallelism** | Near-linear | Slight increase | Hardware-dependent |
+| **Disaggregated prefill** | 1.3-2x | Reduction for decode | Experimental |
+
+## 9. Monitoring and Observability
+
+Production LLM serving requires real-time visibility into performance, resource utilization, and error rates.
+
+### Key Metrics to Monitor
+
+vLLM exposes Prometheus-compatible metrics at `/metrics`:
+
+| Metric | Description | Alert Threshold |
+|--------|:-----------:|:---------------:|
+| `vllm_num_requests_running` | Active requests in the engine | > 80% of batch capacity |
+| `vllm_num_requests_waiting` | Queued requests | > 0 sustained |
+| `vllm_gpu_cache_usage_perc` | KV cache utilization | > 90% |
+| `vllm_avg_generation_throughput_toks_per_s` | Token generation rate | Below baseline |
+| `vllm_request_success_total` | Successful completions | Monitor for drops |
+| `vllm_e2e_request_latency_seconds` | End-to-end latency | P99 > SLA |
+
+### Prometheus + Grafana Stack
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: 'vllm'
+    scrape_interval: 5s
+    static_configs:
+      - targets:
+          - 'vllm-pod-1:8000'
+          - 'vllm-pod-2:8000'
+          - 'vllm-pod-3:8000'
+    metrics_path: /metrics
+```
+
+With Kubernetes, the vLLM production stack includes pre-built Grafana dashboards for:
+
+- Request throughput and latency distributions
+- GPU memory utilization per pod
+- KV cache hit rates (with prefix caching)
+- Queue depth and autoscaling events
+
+## 10. Putting It All Together: Architecture for Millions of Requests
+
+Here is a reference architecture for serving an LLM at enterprise scale on-premise:
+
+```{mermaid}
+graph TD
+    LB["L4/L7 Load Balancer<br/>HAProxy / F5 / MetalLB"] --> K8s["Kubernetes Cluster"]
+
+    subgraph K8s["Kubernetes Cluster"]
+        Ingress["Ingress Controller"] --> VR["vLLM Router<br/>Prefix + Model Routing"]
+        VR --> NG1["Node Group 1<br/>8x H100, TP=8<br/>Llama 405B"]
+        VR --> NG2["Node Group 2<br/>16x Replicas, 1 GPU each<br/>Llama 8B"]
+        VR --> NG3["Node Group 3<br/>8x Replicas, 4 GPUs each<br/>Llama 70B-AWQ"]
+    end
+
+    HPA2["HPA: Scale 2-32 replicas<br/>based on queue depth"] -.-> NG2
+    HPA3["HPA: Scale 2-16 replicas<br/>based on queue depth"] -.-> NG3
+
+    Monitor["Prometheus + Grafana<br/>Alertmanager"] -.-> K8s
+
+    style LB fill:#e74c3c,color:#fff,stroke:#333
+    style Ingress fill:#9b59b6,color:#fff,stroke:#333
+    style VR fill:#e67e22,color:#fff,stroke:#333
+    style NG1 fill:#2980b9,color:#fff,stroke:#333
+    style NG2 fill:#27ae60,color:#fff,stroke:#333
+    style NG3 fill:#3498db,color:#fff,stroke:#333
+    style HPA2 fill:#c0392b,color:#fff,stroke:#333
+    style HPA3 fill:#c0392b,color:#fff,stroke:#333
+    style Monitor fill:#f39c12,color:#fff,stroke:#333
+```
+
+### Capacity Planning Example
+
+To reach 1 million requests per day (~12 req/s average, ~120 req/s peak with 10x burst):
+
+| Model | GPUs per Replica | Throughput per Replica | Replicas Needed (Peak) | Total GPUs |
+|-------|:----------------:|:---------------------:|:----------------------:|:----------:|
+| Llama 3.1 8B | 1 | ~40 req/s | 3 | 3 |
+| Llama 3.1 70B (AWQ) | 2 | ~15 req/s | 8 | 16 |
+| Llama 3.1 405B | 8 | ~5 req/s | 24 | 192 |
+
+For sustained millions of requests per second (not per day), multiply accordingly and add autoscaling headroom (~30% buffer).
+
+## Conclusion
+
+Scaling LLM serving from a single GPU to millions of concurrent requests requires a systematic approach across every layer of the stack:
+
+1. **Hardware** — Select GPUs with sufficient VRAM and memory bandwidth; use NVLink within nodes and InfiniBand across nodes
+2. **Serving engine** — vLLM provides continuous batching, PagedAttention, and distributed inference out of the box
+3. **Parallelism** — Use tensor parallelism for NVLink-connected GPUs, pipeline parallelism for PCIe or cross-node, and data parallelism (multiple replicas) for throughput
+4. **Load balancing** — Nginx or HAProxy distributes traffic across replicas with health checking and failover
+5. **Orchestration** — Kubernetes with the vLLM production stack Helm chart provides deployment, autoscaling, and lifecycle management
+6. **Optimization** — Prefix caching, quantization, speculative decoding, and disaggregated prefilling each offer multiplicative throughput gains
+7. **Monitoring** — Prometheus and Grafana provide the observability needed to maintain SLAs and react to traffic patterns
+
+The key insight is that scaling is not a single technology — it is the composition of all these layers working together.
+
+## References
+
+1. Kwon, W. et al. (2023). *Efficient Memory Management for Large Language Model Serving with PagedAttention*. SOSP 2023.
+2. vLLM Documentation — Parallelism and Scaling: [https://docs.vllm.ai/en/latest/serving/parallelism_scaling/](https://docs.vllm.ai/en/latest/serving/parallelism_scaling/)
+3. vLLM Production Stack: [https://github.com/vllm-project/production-stack](https://github.com/vllm-project/production-stack)
+4. vLLM Nginx Deployment Guide: [https://docs.vllm.ai/en/latest/deployment/nginx/](https://docs.vllm.ai/en/latest/deployment/nginx/)
+5. Shoeybi, M. et al. (2019). *Megatron-LM: Training Multi-Billion Parameter Language Models Using Model Parallelism*. arXiv:1909.08053.
+6. NVIDIA H100 Tensor Core GPU Datasheet: [https://www.nvidia.com/en-us/data-center/h100/](https://www.nvidia.com/en-us/data-center/h100/)
+7. Ray Documentation — Serving LLMs: [https://docs.ray.io/en/latest/serve/llm](https://docs.ray.io/en/latest/serve/llm)
+8. SGLang: Efficient Execution of Structured Language Model Programs: [https://github.com/sgl-project/sglang](https://github.com/sgl-project/sglang)
+9. HuggingFace Text Generation Inference: [https://github.com/huggingface/text-generation-inference](https://github.com/huggingface/text-generation-inference)
+10. NVIDIA Triton Inference Server: [https://github.com/triton-inference-server/server](https://github.com/triton-inference-server/server)
+
+## Next Steps
+
+- **Fine-tune for your domain:** See [Fine-tuning LLM with Unsloth and serving it with Ollama](/posts/llm/Fine-tuning%20LLM%20with%20Unsloth%20and%20serving%20it%20with%20Ollama.html) to customize a model before deploying it at scale
+- **Optimize decoding:** See [Decoding Methods for Text Generation with LLMs](/posts/llm/Decoding%20Methods%20for%20Text%20Generation%20with%20LLMs.html) for token generation strategies that affect latency and quality
+- **Reduce model size:** See [Quantization Methods for LLMs](/posts/llm/Quantization%20Methods%20for%20LLMs.html) for detailed quantization techniques to lower memory requirements

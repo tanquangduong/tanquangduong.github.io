@@ -1,0 +1,894 @@
+---
+title: "FinOps Best Practices for LLM Applications"
+subtitle: "From prompt caching to model routing: a practical guide to cutting LLM inference costs by 10x with semantic caching, continuous batching, quantization, prompt optimization, and cost-aware architecture"
+image: /images/llm/finops-llm-300px.png
+date: "2025-01-15"
+---
+
+**Keywords:** FinOps, LLM cost optimization, prompt caching, semantic caching, KV cache, continuous batching, quantization, model routing, GPTCache, vLLM, token optimization, prompt compression, cost monitoring, autoscaling, spot instances
+
+![](/images/llm/finops-llm-300px.png){fig-align="center" width=300}
+
+## Introduction
+
+Running LLMs in production is expensive. A single GPT-4-class API call can cost $0.03–$0.06 per request, and self-hosted models require $15,000–$40,000 GPUs per node. At scale — millions of requests per day — these costs compound rapidly, often dominating the total infrastructure budget.
+
+**FinOps for LLMs** is the discipline of maximizing the value delivered per dollar spent on LLM inference. Unlike traditional cloud FinOps (focused on compute and storage), LLM FinOps targets a unique cost structure: per-token pricing for API providers and per-GPU-hour pricing for self-hosted deployments.
+
+This article covers the full spectrum of cost optimization techniques — from zero-effort wins like prompt caching to architectural strategies like model routing and semantic caching. Each technique includes implementation code, expected savings, and trade-offs.
+
+> For the full serving infrastructure stack, see [Scaling LLM Serving for Enterprise Production](/posts/llm/Scaling%20LLM%20Serving%20for%20Enterprise%20Production.html). For model compression techniques, see [Quantization Methods for LLMs](/posts/llm/Quantization%20Methods%20for%20LLMs.html).
+
+## 1. Understanding LLM Cost Structure
+
+Before optimizing, you need to understand what you're paying for. LLM costs differ fundamentally between API-based and self-hosted deployments.
+
+```{mermaid}
+graph TD
+    Cost["LLM Cost"] --> API["API-Based<br/>(OpenAI, Anthropic, etc.)"]
+    Cost --> Self["Self-Hosted<br/>(vLLM, TGI, etc.)"]
+
+    API --> InputTok["Input Tokens<br/>$1-15 / MTok"]
+    API --> OutputTok["Output Tokens<br/>$2-75 / MTok"]
+    API --> CacheTok["Cached Tokens<br/>0.1x input price"]
+
+    Self --> GPU["GPU Compute<br/>$1-4 / GPU-hour"]
+    Self --> Mem["GPU Memory<br/>Limits batch size"]
+    Self --> Net["Network & Storage<br/>Model weights, KV cache"]
+
+    style Cost fill:#e74c3c,color:#fff,stroke:#333
+    style API fill:#3498db,color:#fff,stroke:#333
+    style Self fill:#8e44ad,color:#fff,stroke:#333
+    style InputTok fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style OutputTok fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style CacheTok fill:#27ae60,color:#fff,stroke:#333
+    style GPU fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style Mem fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style Net fill:#ecf0f1,color:#333,stroke:#bdc3c7
+```
+
+### API Provider Pricing (per million tokens)
+
+| Provider / Model | Input | Cached Input | Output | Cost per 1M Requests (500 tok in, 200 tok out) |
+|-----------------|:-----:|:------------:|:------:|:-----------------------------------------------:|
+| **GPT-4o** | $2.50 | $1.25 | $10.00 | $3,250 |
+| **GPT-4o-mini** | $0.15 | $0.075 | $0.60 | $195 |
+| **Claude Sonnet 4** | $3.00 | $0.30 | $15.00 | $4,500 |
+| **Claude Haiku 3.5** | $0.80 | $0.08 | $4.00 | $1,200 |
+| **Llama 3.1 70B (self-hosted)** | ~$0 | ~$0 | ~$0 | ~$50 (GPU cost only) |
+
+**Key insight:** Output tokens cost 2–5x more than input tokens across all providers. Cached input tokens cost only **10%** of normal input tokens. This asymmetry drives most optimization strategies.
+
+### The Cost Optimization Hierarchy
+
+Not all optimizations are equal. The following hierarchy ranks techniques by ease of implementation and typical savings:
+
+| Priority | Technique | Effort | Typical Savings | Section |
+|:--------:|-----------|:------:|:---------------:|:-------:|
+| 1 | Prompt caching (provider-side) | Zero | 50-90% on input tokens | §2 |
+| 2 | Model routing (right-size models) | Low | 60-90% overall | §3 |
+| 3 | Prompt optimization (fewer tokens) | Low | 20-50% on input tokens | §4 |
+| 4 | Semantic caching | Medium | 50-80% on repeated queries | §5 |
+| 5 | Continuous batching & serving optimization | Medium | 2-10x throughput | §6 |
+| 6 | Quantization | Medium | 1.5-2x throughput | §6 |
+| 7 | Infrastructure optimization (spot, autoscaling) | High | 30-70% on compute | §7 |
+
+## 2. Prompt Caching: The Biggest Win
+
+Prompt caching is the single most impactful cost optimization for LLM applications. It works by reusing the computed KV cache from repeated prompt prefixes, avoiding redundant computation.
+
+### How Provider Prompt Caching Works
+
+```{mermaid}
+graph LR
+    R1["Request 1<br/>System + Context + Query A"] -->|"Full processing"| LLM["LLM Engine"]
+    LLM -->|"Cache system+context prefix"| Cache["KV Cache Store"]
+    R2["Request 2<br/>System + Context + Query B"] -->|"Cache hit on prefix"| Cache
+    Cache -->|"Skip prefix computation"| LLM2["LLM Engine<br/>Process only Query B"]
+
+    style R1 fill:#e74c3c,color:#fff,stroke:#333
+    style R2 fill:#27ae60,color:#fff,stroke:#333
+    style LLM fill:#3498db,color:#fff,stroke:#333
+    style LLM2 fill:#3498db,color:#fff,stroke:#333
+    style Cache fill:#f39c12,color:#fff,stroke:#333
+```
+
+All major providers now support automatic prompt caching:
+
+| Provider | Activation | Min Tokens | Cache TTL | Input Cost Reduction |
+|----------|:----------:|:----------:|:---------:|:--------------------:|
+| **OpenAI** | Automatic | 1,024 | 5-10 min (up to 1 hr) | 50% |
+| **Anthropic** | Automatic or explicit | 1,024-4,096 | 5 min (up to 1 hr) | 90% |
+| **vLLM (self-hosted)** | `--enable-prefix-caching` | None | In-memory | Reduced TTFT |
+
+### OpenAI Prompt Caching
+
+OpenAI caching is fully automatic — no code changes required. Structure your prompt with static content first:
+
+```python
+from openai import OpenAI
+
+client = OpenAI()
+
+# Static system prompt + context at the beginning (cacheable)
+# Dynamic user query at the end
+response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[
+        {
+            "role": "system",
+            "content": LONG_SYSTEM_PROMPT  # 2000+ tokens, cached automatically
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": LARGE_CONTEXT_DOCUMENT  # Cached across requests
+                }
+            ]
+        },
+        {
+            "role": "user",
+            "content": user_query  # Only this varies per request
+        }
+    ]
+)
+
+# Check cache utilization
+usage = response.usage
+cached = usage.prompt_tokens_details.cached_tokens
+total_input = usage.prompt_tokens
+print(f"Cache hit: {cached}/{total_input} tokens ({cached/total_input*100:.0f}%)")
+```
+
+### Anthropic Prompt Caching
+
+Anthropic's caching supports both automatic and explicit modes. Explicit mode gives finer control:
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+
+# Automatic caching: just add cache_control at the top level
+response = client.messages.create(
+    model="claude-sonnet-4-20250514",
+    max_tokens=1024,
+    cache_control={"type": "ephemeral"},  # Auto-cache last block
+    system="You are a helpful legal assistant specializing in contract review.",
+    messages=[
+        {"role": "user", "content": LARGE_CONTRACT_TEXT},
+        {"role": "assistant", "content": "I've reviewed the contract. What questions do you have?"},
+        {"role": "user", "content": "What are the termination clauses?"}
+    ]
+)
+
+# Explicit caching: mark specific blocks
+response = client.messages.create(
+    model="claude-sonnet-4-20250514",
+    max_tokens=1024,
+    system=[
+        {
+            "type": "text",
+            "text": LONG_INSTRUCTIONS,
+            "cache_control": {"type": "ephemeral"}  # Cache this block
+        }
+    ],
+    messages=[{"role": "user", "content": user_query}]
+)
+
+# Monitor cache performance
+print(f"Cache read: {response.usage.cache_read_input_tokens} tokens")
+print(f"Cache write: {response.usage.cache_creation_input_tokens} tokens")
+print(f"Uncached: {response.usage.input_tokens} tokens")
+```
+
+### vLLM Automatic Prefix Caching (Self-Hosted)
+
+For self-hosted deployments, vLLM's Automatic Prefix Caching (APC) eliminates redundant prefill computation:
+
+```bash
+# Enable prefix caching — single flag
+vllm serve meta-llama/Llama-3.1-8B-Instruct \
+    --enable-prefix-caching
+```
+
+APC is particularly effective for:
+
+- **Long document QA:** Same document queried repeatedly with different questions
+- **Multi-turn chat:** Each turn reuses the conversation prefix
+- **Shared system prompts:** All users share the same instruction prefix
+
+### Prompt Structure for Maximum Cache Hits
+
+```python
+# BAD: Dynamic content at the beginning breaks the cache
+messages = [
+    {"role": "system", "content": f"Today is {datetime.now()}. You are a helpful assistant."},
+    {"role": "user", "content": document + "\n\n" + question}
+]
+
+# GOOD: Static content first, dynamic content last
+messages = [
+    {"role": "system", "content": "You are a helpful assistant."},  # Stable prefix
+    {"role": "user", "content": document},                          # Cached document
+    {"role": "user", "content": question}                           # Only this changes
+]
+```
+
+## 3. Model Routing: Right Model for the Right Task
+
+Not every request needs the most powerful model. **Model routing** directs each request to the cheapest model that can handle it effectively — often saving 60-90%.
+
+```{mermaid}
+graph TD
+    Req["Incoming Request"] --> Router["Model Router<br/>Classify complexity"]
+    Router -->|"Simple: facts, formatting"| Small["Small Model<br/>GPT-4o-mini / Haiku<br/>$0.15-0.80 / MTok"]
+    Router -->|"Medium: analysis, summarization"| Med["Medium Model<br/>GPT-4o / Sonnet<br/>$2.50-3.00 / MTok"]
+    Router -->|"Complex: reasoning, code"| Large["Large Model<br/>GPT-4o / Opus<br/>$10-15 / MTok"]
+
+    Small --> Resp["Response"]
+    Med --> Resp
+    Large --> Resp
+
+    style Req fill:#3498db,color:#fff,stroke:#333
+    style Router fill:#e67e22,color:#fff,stroke:#333
+    style Small fill:#27ae60,color:#fff,stroke:#333
+    style Med fill:#f39c12,color:#fff,stroke:#333
+    style Large fill:#e74c3c,color:#fff,stroke:#333
+    style Resp fill:#ecf0f1,color:#333,stroke:#bdc3c7
+```
+
+### Implementing a Simple Model Router
+
+```python
+from openai import OpenAI
+
+client = OpenAI()
+
+# Step 1: Use a cheap model to classify request complexity
+def classify_complexity(user_message: str) -> str:
+    """Use a small model to classify the task complexity."""
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Classify the following user request as 'simple', 'medium', or 'complex'.\n"
+                    "- simple: factual lookups, formatting, translation, simple Q&A\n"
+                    "- medium: summarization, analysis, moderate reasoning\n"
+                    "- complex: multi-step reasoning, code generation, creative writing\n"
+                    "Respond with only one word."
+                )
+            },
+            {"role": "user", "content": user_message}
+        ],
+        max_tokens=5,
+        temperature=0
+    )
+    return response.choices[0].message.content.strip().lower()
+
+# Step 2: Route to the appropriate model
+MODEL_MAP = {
+    "simple": "gpt-4o-mini",
+    "medium": "gpt-4o",
+    "complex": "gpt-4o",
+}
+
+def route_request(user_message: str, system_prompt: str) -> str:
+    complexity = classify_complexity(user_message)
+    model = MODEL_MAP.get(complexity, "gpt-4o-mini")
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message}
+        ]
+    )
+    return response.choices[0].message.content
+```
+
+### Cost Impact of Model Routing
+
+| Traffic Mix | Without Routing (all GPT-4o) | With Routing | Savings |
+|:-----------:|:----------------------------:|:------------:|:-------:|
+| 70% simple, 20% medium, 10% complex | $3,250 / 1M req | $650 / 1M req | **80%** |
+| 50% simple, 30% medium, 20% complex | $3,250 / 1M req | $1,175 / 1M req | **64%** |
+| 20% simple, 40% medium, 40% complex | $3,250 / 1M req | $2,210 / 1M req | **32%** |
+
+### Cascade Pattern: Try Small First, Escalate on Failure
+
+```python
+import json
+
+def cascade_request(user_message: str, system_prompt: str) -> str:
+    """Try the cheapest model first; escalate if quality is low."""
+    # Try small model first
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message}
+        ]
+    )
+    answer = response.choices[0].message.content
+
+    # Self-check: ask the same small model if the answer is confident
+    check = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "system",
+                "content": "Rate the confidence of this answer: 'high' or 'low'. Respond with one word."
+            },
+            {"role": "user", "content": f"Question: {user_message}\nAnswer: {answer}"}
+        ],
+        max_tokens=5
+    )
+
+    if "low" in check.choices[0].message.content.lower():
+        # Escalate to larger model
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ]
+        )
+        answer = response.choices[0].message.content
+
+    return answer
+```
+
+## 4. Prompt Optimization: Fewer Tokens, Lower Cost
+
+Every token in your prompt costs money. Reducing prompt length directly reduces costs — and often improves latency too.
+
+### Token-Saving Techniques
+
+| Technique | Before | After | Token Reduction |
+|-----------|:------:|:-----:|:---------------:|
+| **Remove verbose instructions** | "Please provide a detailed answer to the following question..." | "Answer:" | ~80% |
+| **Use abbreviations in system prompt** | "You are a helpful assistant that specializes in..." | "You are a [domain] expert." | ~50% |
+| **Structured output** | "Return the data as a JSON with fields name, age, city" | JSON schema in `response_format` | ~40% |
+| **Few-shot → zero-shot** | 5 examples × 200 tokens = 1000 tokens | Clear instruction only | ~90% |
+| **Summarize context** | Full 10,000-token document | Pre-summarized 2,000-token version | ~80% |
+
+### Output Token Control
+
+Since output tokens cost 2-5x more than input tokens, limiting output length is critical:
+
+```python
+response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[
+        {
+            "role": "system",
+            "content": "Answer concisely in 1-2 sentences. No preamble."
+        },
+        {"role": "user", "content": user_query}
+    ],
+    max_tokens=150,  # Hard cap on output tokens
+    temperature=0    # Deterministic = shorter, more focused
+)
+```
+
+### Context Window Management for Multi-Turn Chat
+
+Long conversations accumulate tokens rapidly. Manage context to avoid runaway costs:
+
+```python
+def manage_conversation_context(
+    messages: list[dict],
+    max_context_tokens: int = 4000
+) -> list[dict]:
+    """Keep conversation within budget by summarizing old messages."""
+    import tiktoken
+    enc = tiktoken.encoding_for_model("gpt-4o")
+
+    # Count current tokens
+    total_tokens = sum(len(enc.encode(m["content"])) for m in messages)
+
+    if total_tokens <= max_context_tokens:
+        return messages
+
+    # Keep system prompt + last N messages, summarize the rest
+    system_msg = messages[0]  # Always keep system prompt
+    recent_messages = messages[-4:]  # Keep last 2 turns
+
+    # Summarize older messages
+    old_messages = messages[1:-4]
+    if old_messages:
+        summary_text = "\n".join(
+            f"{m['role']}: {m['content'][:200]}" for m in old_messages
+        )
+        summary = client.chat.completions.create(
+            model="gpt-4o-mini",  # Use cheap model for summarization
+            messages=[{
+                "role": "user",
+                "content": f"Summarize this conversation in 2-3 sentences:\n{summary_text}"
+            }],
+            max_tokens=150
+        ).choices[0].message.content
+
+        return [
+            system_msg,
+            {"role": "system", "content": f"Previous conversation summary: {summary}"},
+            *recent_messages
+        ]
+
+    return [system_msg, *recent_messages]
+```
+
+## 5. Semantic Caching: Reuse Answers for Similar Questions
+
+While prompt caching reuses computation for identical prefixes, **semantic caching** goes further — it returns cached answers for *semantically similar* questions, completely avoiding LLM calls.
+
+```{mermaid}
+graph TD
+    Q["User Query"] --> Embed["Generate Embedding"]
+    Embed --> Search["Vector Similarity Search"]
+    Search -->|"Similar query found<br/>(distance < threshold)"| Hit["Cache Hit<br/>Return cached answer"]
+    Search -->|"No similar query"| Miss["Cache Miss<br/>Call LLM"]
+    Miss --> Store["Store query + answer<br/>in vector DB"]
+    Store --> Resp["Return answer"]
+    Hit --> Resp
+
+    style Q fill:#3498db,color:#fff,stroke:#333
+    style Embed fill:#9b59b6,color:#fff,stroke:#333
+    style Search fill:#e67e22,color:#fff,stroke:#333
+    style Hit fill:#27ae60,color:#fff,stroke:#333
+    style Miss fill:#e74c3c,color:#fff,stroke:#333
+    style Store fill:#f39c12,color:#fff,stroke:#333
+    style Resp fill:#ecf0f1,color:#333,stroke:#bdc3c7
+```
+
+### GPTCache: Open-Source Semantic Cache
+
+GPTCache is a dedicated library for building semantic caches for LLM queries. It uses embedding models and vector stores to find similar past queries:
+
+```python
+from gptcache import cache
+from gptcache.adapter import openai
+from gptcache.embedding import Onnx
+from gptcache.manager import CacheBase, VectorBase, get_data_manager
+from gptcache.similarity_evaluation.distance import SearchDistanceEvaluation
+
+# Initialize embedding model
+onnx = Onnx()
+
+# Set up cache storage (SQLite) + vector store (FAISS)
+data_manager = get_data_manager(
+    CacheBase("sqlite"),
+    VectorBase("faiss", dimension=onnx.dimension)
+)
+
+# Initialize cache with semantic similarity
+cache.init(
+    embedding_func=onnx.to_embeddings,
+    data_manager=data_manager,
+    similarity_evaluation=SearchDistanceEvaluation()
+)
+cache.set_openai_key()
+
+# Now use OpenAI as usual — GPTCache intercepts identical/similar queries
+response = openai.ChatCompletion.create(
+    model="gpt-4o-mini",
+    messages=[{"role": "user", "content": "What is the capital of France?"}]
+)
+# Second call with similar query hits cache
+response = openai.ChatCompletion.create(
+    model="gpt-4o-mini",
+    messages=[{"role": "user", "content": "Tell me the capital city of France"}]
+)
+# ^ This returns the cached answer without calling OpenAI
+```
+
+### Building a Custom Semantic Cache
+
+For production use, a custom semantic cache gives more control:
+
+```python
+import hashlib
+import numpy as np
+from openai import OpenAI
+
+client = OpenAI()
+
+class SemanticCache:
+    def __init__(self, similarity_threshold: float = 0.92):
+        self.threshold = similarity_threshold
+        self.cache: list[dict] = []  # In production, use a vector DB
+        self.exact_cache: dict[str, str] = {}
+
+    def _get_embedding(self, text: str) -> list[float]:
+        response = client.embeddings.create(
+            model="text-embedding-3-small",  # $0.02 / 1M tokens
+            input=text
+        )
+        return response.data[0].embedding
+
+    def _cosine_similarity(self, a: list[float], b: list[float]) -> float:
+        a, b = np.array(a), np.array(b)
+        return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+    def get(self, query: str) -> str | None:
+        # Check exact match first (free)
+        key = hashlib.sha256(query.encode()).hexdigest()
+        if key in self.exact_cache:
+            return self.exact_cache[key]
+
+        # Check semantic similarity
+        query_embedding = self._get_embedding(query)
+        best_score, best_answer = 0.0, None
+
+        for entry in self.cache:
+            score = self._cosine_similarity(query_embedding, entry["embedding"])
+            if score > best_score:
+                best_score = score
+                best_answer = entry["answer"]
+
+        if best_score >= self.threshold:
+            return best_answer
+        return None
+
+    def set(self, query: str, answer: str):
+        key = hashlib.sha256(query.encode()).hexdigest()
+        self.exact_cache[key] = answer
+        self.cache.append({
+            "query": query,
+            "embedding": self._get_embedding(query),
+            "answer": answer
+        })
+
+# Usage
+sem_cache = SemanticCache(similarity_threshold=0.92)
+
+def cached_completion(query: str) -> str:
+    cached = sem_cache.get(query)
+    if cached:
+        return cached  # Free!
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": query}]
+    )
+    answer = response.choices[0].message.content
+    sem_cache.set(query, answer)
+    return answer
+```
+
+### When Semantic Caching Works Best
+
+| Scenario | Cache Hit Rate | Cost Savings |
+|----------|:--------------:|:------------:|
+| **Customer support FAQ** | 60-80% | 60-80% |
+| **Documentation Q&A** | 40-60% | 40-60% |
+| **Code explanation** | 30-50% | 30-50% |
+| **Creative writing** | 5-10% | 5-10% |
+| **Unique analysis per user** | <5% | <5% |
+
+**Trade-off:** Semantic caching can return stale or slightly mismatched answers. Set the similarity threshold conservatively (0.92+) and implement cache invalidation for time-sensitive data.
+
+## 6. Serving Optimization: More Throughput per GPU
+
+For self-hosted deployments, the cost equation is simple: **cost = GPU-hours / total requests processed**. Maximizing throughput per GPU directly reduces per-request cost.
+
+### Continuous Batching
+
+Static batching wastes GPU cycles while waiting for the longest sequence in a batch to finish. Continuous batching dynamically inserts new requests when others complete — achieving **2-23x throughput improvement**:
+
+```bash
+# vLLM uses continuous batching by default
+vllm serve meta-llama/Llama-3.1-8B-Instruct
+
+# Tune batch size for your workload
+vllm serve meta-llama/Llama-3.1-8B-Instruct \
+    --max-num-seqs 256 \        # Max concurrent sequences
+    --max-num-batched-tokens 8192  # Max tokens per batch
+```
+
+### Quantization: Fit More in Less Memory
+
+Quantization reduces model precision, allowing larger batch sizes (more requests per GPU). The throughput gain often exceeds the minor quality loss:
+
+```bash
+# AWQ 4-bit: ~2x memory savings, minimal quality loss
+vllm serve TheBloke/Llama-3.1-70B-AWQ \
+    --quantization awq \
+    --tensor-parallel-size 2  # 2 GPUs instead of 4
+
+# FP8: ~2x memory savings, near-zero quality loss (Hopper GPUs)
+vllm serve meta-llama/Llama-3.1-70B-Instruct \
+    --quantization fp8
+```
+
+> For a deep dive into quantization methods, see [Quantization Methods for LLMs](/posts/llm/Quantization%20Methods%20for%20LLMs.html).
+
+### Speculative Decoding
+
+Use a small draft model to predict multiple tokens, verified in parallel by the main model. This reduces the number of expensive forward passes:
+
+```bash
+vllm serve meta-llama/Llama-3.1-70B-Instruct \
+    --speculative-model meta-llama/Llama-3.2-1B-Instruct \
+    --num-speculative-tokens 5 \
+    --tensor-parallel-size 4
+```
+
+### Throughput Optimization Summary
+
+| Technique | Throughput Multiplier | Quality Impact | Effort |
+|-----------|:--------------------:|:--------------:|:------:|
+| **Continuous batching** (vs. static) | 2-23x | None | Built-in (vLLM) |
+| **PagedAttention** | 2-4x | None | Built-in (vLLM) |
+| **AWQ quantization** (4-bit) | 1.5-2x | Minor (<1% degradation) | 1 flag |
+| **FP8 quantization** | 1.5-2x | Negligible | 1 flag (Hopper GPUs) |
+| **Prefix caching** | 2-5x (shared prefixes) | None | 1 flag |
+| **Speculative decoding** | 1.3-2x | None | Needs draft model |
+
+## 7. Infrastructure Optimization
+
+Beyond model and prompt optimizations, infrastructure choices significantly impact cost.
+
+### Autoscaling: Don't Pay for Idle GPUs
+
+```{mermaid}
+graph LR
+    subgraph Day["Traffic Pattern"]
+        Morning["Morning<br/>Low traffic"] --> Peak["Peak Hours<br/>High traffic"]
+        Peak --> Evening["Evening<br/>Medium traffic"]
+        Evening --> Night["Night<br/>Minimal traffic"]
+    end
+
+    subgraph Scaling["GPU Allocation"]
+        S1["2 replicas"] --> S2["8 replicas"]
+        S2 --> S3["4 replicas"]
+        S3 --> S4["1 replica"]
+    end
+
+    Morning -.-> S1
+    Peak -.-> S2
+    Evening -.-> S3
+    Night -.-> S4
+
+    style Morning fill:#27ae60,color:#fff,stroke:#333
+    style Peak fill:#e74c3c,color:#fff,stroke:#333
+    style Evening fill:#e67e22,color:#fff,stroke:#333
+    style Night fill:#3498db,color:#fff,stroke:#333
+    style S1 fill:#27ae60,color:#fff,stroke:#333
+    style S2 fill:#e74c3c,color:#fff,stroke:#333
+    style S3 fill:#e67e22,color:#fff,stroke:#333
+    style S4 fill:#3498db,color:#fff,stroke:#333
+```
+
+Kubernetes HPA for vLLM based on queue depth:
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: vllm-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: vllm-deployment
+  minReplicas: 1       # Scale to zero with KEDA if needed
+  maxReplicas: 16
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60   # React quickly to spikes
+    scaleDown:
+      stabilizationWindowSeconds: 300  # Cool down slowly
+  metrics:
+    - type: Pods
+      pods:
+        metric:
+          name: vllm_num_requests_waiting
+        target:
+          type: AverageValue
+          averageValue: "5"
+```
+
+> For the full Kubernetes orchestration guide, see [Scaling LLM Serving for Enterprise Production](/posts/llm/Scaling%20LLM%20Serving%20for%20Enterprise%20Production.html).
+
+### Spot / Preemptible Instances
+
+For fault-tolerant workloads (batch processing, evaluation), spot instances offer 60-70% savings:
+
+| Instance Type | On-Demand (A100 80GB) | Spot Price | Savings |
+|:-------------:|:---------------------:|:----------:|:-------:|
+| AWS p4d.24xlarge | ~$32.77/hr | ~$10-15/hr | **55-70%** |
+| GCP a2-highgpu-8g | ~$29.39/hr | ~$8-12/hr | **60-73%** |
+| Azure ND96amsr_A100_v4 | ~$32.77/hr | ~$10-15/hr | **55-70%** |
+
+**Key requirement:** Your serving layer must handle preemption gracefully. Use Kubernetes with pod disruption budgets and multi-replica deployments.
+
+### GPU Selection for Cost Efficiency
+
+Not all GPUs are cost-efficient for inference. Memory bandwidth matters more than raw FLOPS:
+
+| GPU | $/hr (On-Demand) | Memory BW | Inference $/MTok (8B model) | Best For |
+|-----|:-----------------:|:---------:|:---------------------------:|:--------:|
+| **L4** | ~$0.80 | 300 GB/s | $0.005 | Budget inference |
+| **L40S** | ~$1.50 | 864 GB/s | $0.003 | Mid-tier inference |
+| **A100 80GB** | ~$4.00 | 2.0 TB/s | $0.002 | Large models |
+| **H100 SXM** | ~$8.00 | 3.35 TB/s | $0.001 | Maximum throughput |
+
+**Rule of thumb:** L4s offer the best $/token for small models (≤13B). A100s win for 70B+ models. H100s win at scale when GPU utilization is kept high (>80%).
+
+## 8. Cost Monitoring and Alerting
+
+You can't optimize what you don't measure. Build observability into your LLM pipeline:
+
+### Key Metrics to Track
+
+| Metric | Formula | Target |
+|--------|:-------:|:------:|
+| **Cost per request** | Total spend / total requests | < your SLA threshold |
+| **Cost per token** | Total spend / total tokens | Trending down |
+| **Cache hit rate** | Cached tokens / total input tokens | > 50% |
+| **Model routing ratio** | Cheap model calls / total calls | > 60% |
+| **GPU utilization** | Active GPU time / total GPU time | > 70% |
+| **Tokens per GPU-second** | Total tokens / total GPU-seconds | Trending up |
+
+### Implementing Cost Tracking
+
+```python
+import time
+from dataclasses import dataclass, field
+
+@dataclass
+class CostTracker:
+    """Track LLM costs across your application."""
+    # Pricing per million tokens (customize per provider)
+    pricing: dict = field(default_factory=lambda: {
+        "gpt-4o": {"input": 2.50, "cached": 1.25, "output": 10.00},
+        "gpt-4o-mini": {"input": 0.15, "cached": 0.075, "output": 0.60},
+    })
+    total_cost: float = 0.0
+    total_requests: int = 0
+    cache_hits: int = 0
+
+    def track(self, model: str, input_tokens: int, output_tokens: int,
+              cached_tokens: int = 0):
+        prices = self.pricing.get(model, self.pricing["gpt-4o-mini"])
+
+        uncached_input = input_tokens - cached_tokens
+        cost = (
+            uncached_input * prices["input"] / 1_000_000
+            + cached_tokens * prices["cached"] / 1_000_000
+            + output_tokens * prices["output"] / 1_000_000
+        )
+
+        self.total_cost += cost
+        self.total_requests += 1
+        if cached_tokens > 0:
+            self.cache_hits += 1
+
+        return cost
+
+    def report(self):
+        avg_cost = self.total_cost / max(self.total_requests, 1)
+        hit_rate = self.cache_hits / max(self.total_requests, 1) * 100
+        return {
+            "total_cost": f"${self.total_cost:.4f}",
+            "total_requests": self.total_requests,
+            "avg_cost_per_request": f"${avg_cost:.6f}",
+            "cache_hit_rate": f"{hit_rate:.1f}%"
+        }
+
+# Usage
+tracker = CostTracker()
+
+response = client.chat.completions.create(model="gpt-4o", messages=[...])
+tracker.track(
+    model="gpt-4o",
+    input_tokens=response.usage.prompt_tokens,
+    output_tokens=response.usage.completion_tokens,
+    cached_tokens=response.usage.prompt_tokens_details.cached_tokens
+)
+print(tracker.report())
+```
+
+### Setting Budget Alerts
+
+```python
+import os
+
+class BudgetGuard:
+    """Prevent runaway LLM costs."""
+    def __init__(self, daily_budget: float = 100.0):
+        self.daily_budget = daily_budget
+        self.daily_spend = 0.0
+
+    def check(self, estimated_cost: float) -> bool:
+        if self.daily_spend + estimated_cost > self.daily_budget:
+            raise RuntimeError(
+                f"Daily budget exceeded: ${self.daily_spend:.2f} / ${self.daily_budget:.2f}"
+            )
+        self.daily_spend += estimated_cost
+        return True
+```
+
+## 9. Putting It All Together: A Cost-Optimized LLM Pipeline
+
+Here is a reference architecture combining all the techniques:
+
+```{mermaid}
+graph TD
+    User["User Request"] --> Guard["Budget Guard<br/>Check daily limit"]
+    Guard --> SC["Semantic Cache<br/>Check for similar queries"]
+    SC -->|"Cache hit"| Resp["Response"]
+    SC -->|"Cache miss"| Router["Model Router<br/>Classify complexity"]
+    Router -->|"Simple"| Small["Small Model<br/>gpt-4o-mini"]
+    Router -->|"Complex"| Large["Large Model<br/>gpt-4o"]
+    Small --> PC["Prompt Caching<br/>Reuse prefix KV cache"]
+    Large --> PC
+    PC --> LLM["LLM Inference"]
+    LLM --> Track["Cost Tracker<br/>Log tokens + cost"]
+    Track --> Store["Store in Cache"]
+    Store --> Resp
+
+    style User fill:#3498db,color:#fff,stroke:#333
+    style Guard fill:#e74c3c,color:#fff,stroke:#333
+    style SC fill:#f39c12,color:#fff,stroke:#333
+    style Router fill:#e67e22,color:#fff,stroke:#333
+    style Small fill:#27ae60,color:#fff,stroke:#333
+    style Large fill:#8e44ad,color:#fff,stroke:#333
+    style PC fill:#2980b9,color:#fff,stroke:#333
+    style LLM fill:#3498db,color:#fff,stroke:#333
+    style Track fill:#95a5a6,color:#fff,stroke:#333
+    style Store fill:#f39c12,color:#fff,stroke:#333
+    style Resp fill:#ecf0f1,color:#333,stroke:#bdc3c7
+```
+
+### Expected Combined Savings
+
+Starting from a baseline of **$10,000/month** on GPT-4o for 3M requests:
+
+| Optimization | Monthly Cost | Savings vs. Baseline |
+|:------------:|:------------:|:--------------------:|
+| Baseline (all GPT-4o, no optimization) | $10,000 | — |
+| + Prompt caching (60% hit rate) | $6,400 | 36% |
+| + Model routing (70% to mini) | $2,100 | 79% |
+| + Semantic caching (40% hit rate) | $1,260 | 87% |
+| + Prompt optimization (30% fewer tokens) | $880 | **91%** |
+
+## Conclusion
+
+LLM FinOps is not a single technique — it is a layered strategy where each optimization compounds on the previous:
+
+1. **Prompt caching** — Free, automatic, and delivers 50-90% savings on repeated prefixes. Structure prompts with static content first.
+2. **Model routing** — Match model capability to task complexity. Most requests don't need the most powerful model.
+3. **Prompt optimization** — Fewer tokens means lower cost. Control output length, summarize context, eliminate verbosity.
+4. **Semantic caching** — Avoid LLM calls entirely for similar questions. High-value for FAQ and support workloads.
+5. **Serving optimization** — Continuous batching, quantization, and speculative decoding maximize throughput per GPU.
+6. **Infrastructure** — Autoscaling, spot instances, and GPU selection minimize idle compute.
+7. **Monitoring** — Track cost per request, cache hit rates, and model routing ratios to continuously improve.
+
+The key insight is that **the cheapest LLM call is the one you never make**. Cache aggressively, route intelligently, and monitor relentlessly.
+
+## References
+
+1. OpenAI Prompt Caching Guide: [https://developers.openai.com/api/docs/guides/prompt-caching](https://developers.openai.com/api/docs/guides/prompt-caching)
+2. Anthropic Prompt Caching Documentation: [https://platform.claude.com/docs/en/docs/build-with-claude/prompt-caching](https://platform.claude.com/docs/en/docs/build-with-claude/prompt-caching)
+3. GPTCache — Semantic Cache for LLM Queries: [https://github.com/zilliztech/GPTCache](https://github.com/zilliztech/GPTCache)
+4. vLLM Automatic Prefix Caching: [https://docs.vllm.ai/en/latest/features/automatic_prefix_caching.html](https://docs.vllm.ai/en/latest/features/automatic_prefix_caching.html)
+5. Anyscale — How Continuous Batching Enables 23x Throughput: [https://www.anyscale.com/blog/continuous-batching-llm-inference](https://www.anyscale.com/blog/continuous-batching-llm-inference)
+6. Kwon, W. et al. (2023). *Efficient Memory Management for Large Language Model Serving with PagedAttention*. SOSP 2023.
+7. Yu, G. et al. (2022). *Orca: A Distributed Serving System for Transformer-Based Generative Models*. OSDI '22.
+8. OpenAI Pricing: [https://openai.com/pricing](https://openai.com/pricing)
+9. Anthropic Pricing: [https://www.anthropic.com/pricing](https://www.anthropic.com/pricing)
+10. FinOps Foundation — AI Cost Management Working Group: [https://www.finops.org/wg/ai-cost-management/](https://www.finops.org/wg/ai-cost-management/)
+
+## Next Steps
+
+- **Scale your serving layer:** See [Scaling LLM Serving for Enterprise Production](/posts/llm/Scaling%20LLM%20Serving%20for%20Enterprise%20Production.html) for Kubernetes orchestration, load balancing, and multi-node deployment
+- **Compress your models:** See [Quantization Methods for LLMs](/posts/llm/Quantization%20Methods%20for%20LLMs.html) for AWQ, GPTQ, and FP8 quantization to reduce GPU memory and increase throughput
+- **Protect your endpoints:** See [Guardrails for LLM Applications with Giskard](/posts/llm/Guardrails%20for%20LLM%20Applications%20with%20Giskard.html) for safety screening that prevents costly misuse
+- **Optimize decoding:** See [Decoding Methods for Text Generation with LLMs](/posts/llm/Decoding%20Methods%20for%20Text%20Generation%20with%20LLMs.html) for generation strategies that balance quality and token count
