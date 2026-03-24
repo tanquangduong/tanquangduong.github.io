@@ -1,0 +1,1980 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.36">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2025-07-20">
+
+<title>Observability for Multi-Turn LLM Conversations with LangSmith – Quang Duong</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../..//images/favicon.ico" rel="icon">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dbc92dda8186f57fa2e333fbb71d6a9d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-23f3439e4bd86aeeff5ff0174c43dd13.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/all.css" rel="stylesheet">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/latex-fontsize.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="../../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="../../styles.css">
+<meta property="og:title" content="Observability for Multi-Turn LLM Conversations with LangSmith – Quang Duong">
+<meta property="og:description" content="End-to-end guide: trace, monitor, and debug multi-turn agentic conversations with LangChain, LangGraph, and LangSmith — covering threads, runs, tool use, token cost, latency, and error tracking">
+<meta property="og:image" content="https://tanquangduong.github.io//images/llm/observability-multi-turn-300px.png">
+<meta property="og:site_name" content="Quang Duong">
+<meta property="og:image:height" content="200">
+<meta property="og:image:width" content="300">
+<meta name="twitter:title" content="Observability for Multi-Turn LLM Conversations with LangSmith – Quang Duong">
+<meta name="twitter:description" content="End-to-end guide: trace, monitor, and debug multi-turn agentic conversations with LangChain, LangGraph, and LangSmith — covering threads, runs, tool use, token cost, latency, and error tracking">
+<meta name="twitter:image" content="https://tanquangduong.github.io//images/llm/observability-multi-turn-300px.png">
+<meta name="twitter:image-height" content="200">
+<meta name="twitter:image-width" content="300">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+
+<body class="nav-sidebar docked quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">
+      Quang Duong
+      </li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../../">Quang Duong</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://www.linkedin.com/in/tanquangduong/" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-linkedin"></i></a>
+    <a href="https://github.com/tanquangduong" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">AI Engineering</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">LLM</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/rag.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">RAG</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/agent.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Agent</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/stack.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Stack</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/article.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Article</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title"><strong>Sections</strong></h2>
+   
+  <ul class="collapse">
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#langsmith-observability-concepts" id="toc-langsmith-observability-concepts" class="nav-link" data-scroll-target="#langsmith-observability-concepts">1. LangSmith Observability Concepts</a></li>
+  <li><a href="#setup-and-installation" id="toc-setup-and-installation" class="nav-link" data-scroll-target="#setup-and-installation">2. Setup and Installation</a></li>
+  <li><a href="#tracing-a-langgraph-agent-with-tool-use" id="toc-tracing-a-langgraph-agent-with-tool-use" class="nav-link" data-scroll-target="#tracing-a-langgraph-agent-with-tool-use">3. Tracing a LangGraph Agent with Tool Use</a></li>
+  <li><a href="#multi-turn-conversation-threading" id="toc-multi-turn-conversation-threading" class="nav-link" data-scroll-target="#multi-turn-conversation-threading">4. Multi-Turn Conversation Threading</a></li>
+  <li><a href="#tracking-token-usage-and-cost" id="toc-tracking-token-usage-and-cost" class="nav-link" data-scroll-target="#tracking-token-usage-and-cost">5. Tracking Token Usage and Cost</a></li>
+  <li><a href="#latency-tracking-and-optimization" id="toc-latency-tracking-and-optimization" class="nav-link" data-scroll-target="#latency-tracking-and-optimization">6. Latency Tracking and Optimization</a></li>
+  <li><a href="#error-tracking-and-debugging" id="toc-error-tracking-and-debugging" class="nav-link" data-scroll-target="#error-tracking-and-debugging">7. Error Tracking and Debugging</a></li>
+  <li><a href="#custom-instrumentation-with-traceable" id="toc-custom-instrumentation-with-traceable" class="nav-link" data-scroll-target="#custom-instrumentation-with-traceable">8. Custom Instrumentation with <code>@traceable</code></a></li>
+  <li><a href="#wrapping-openai-for-automatic-tracing" id="toc-wrapping-openai-for-automatic-tracing" class="nav-link" data-scroll-target="#wrapping-openai-for-automatic-tracing">9. Wrapping OpenAI for Automatic Tracing</a></li>
+  <li><a href="#online-evaluation-for-production-quality" id="toc-online-evaluation-for-production-quality" class="nav-link" data-scroll-target="#online-evaluation-for-production-quality">10. Online Evaluation for Production Quality</a></li>
+  <li><a href="#production-monitoring-dashboard" id="toc-production-monitoring-dashboard" class="nav-link" data-scroll-target="#production-monitoring-dashboard">11. Production Monitoring Dashboard</a></li>
+  <li><a href="#complete-example-observable-multi-turn-agent" id="toc-complete-example-observable-multi-turn-agent" class="nav-link" data-scroll-target="#complete-example-observable-multi-turn-agent">12. Complete Example: Observable Multi-Turn Agent</a></li>
+  <li><a href="#observability-checklist-for-production" id="toc-observability-checklist-for-production" class="nav-link" data-scroll-target="#observability-checklist-for-production">13. Observability Checklist for Production</a></li>
+  <li><a href="#langsmith-vs-other-observability-tools" id="toc-langsmith-vs-other-observability-tools" class="nav-link" data-scroll-target="#langsmith-vs-other-observability-tools">LangSmith vs Other Observability Tools</a></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
+  <li><a href="#next-steps" id="toc-next-steps" class="nav-link" data-scroll-target="#next-steps">Next Steps</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Observability for Multi-Turn LLM Conversations with LangSmith</h1>
+<p class="subtitle lead">End-to-end guide: trace, monitor, and debug multi-turn agentic conversations with LangChain, LangGraph, and LangSmith — covering threads, runs, tool use, token cost, latency, and error tracking</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">July 20, 2025</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p><strong>Keywords:</strong> LLM observability, LangSmith, LangChain, LangGraph, multi-turn conversation, tracing, threads, runs, tool use, token usage, cost tracking, latency, error monitoring, production monitoring, agentic workflows, online evaluation</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../..\images/llm/observability-multi-turn-300px.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="300"></p>
+</figure>
+</div>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>Building an LLM-powered chatbot or agent that handles a single request is straightforward. Making it <strong>observable in production</strong> — across multi-turn conversations, tool calls, retries, and thousands of concurrent users — is an entirely different challenge.</p>
+<p><strong>Observability</strong> is the ability to understand what your LLM application is doing at every step: what prompts were sent, what the model returned, which tools were invoked, how many tokens were consumed, how much it cost, how long each step took, and where errors occurred. Without it, debugging a failed conversation turn at 3 AM becomes guesswork.</p>
+<p>The <strong>LangChain ecosystem</strong> provides a complete observability stack:</p>
+<ul>
+<li><strong>LangChain</strong> — The framework for building LLM applications with chains, tools, and retrieval</li>
+<li><strong>LangGraph</strong> — The agent orchestration framework for stateful, multi-step, multi-turn workflows</li>
+<li><strong>LangSmith</strong> — The observability and evaluation platform for tracing, monitoring, and debugging</li>
+</ul>
+<p>This article covers the full observability pipeline for multi-turn agentic conversations:</p>
+<ol type="1">
+<li>Core concepts: projects, traces, runs, threads</li>
+<li>Instrumenting LangGraph agents with tracing</li>
+<li>Tracking tool use, tokens, cost, and latency</li>
+<li>Multi-turn conversation threading</li>
+<li>Error tracking and debugging</li>
+<li>Online evaluation and production monitoring</li>
+<li>Dashboards and alerting</li>
+</ol>
+<blockquote class="blockquote">
+<p>For deploying and serving the LLM itself, see <a href="../..\posts/llm/Deploying and Serving LLM with vLLM.html">Deploying and Serving LLM with vLLM</a>. For scaling to production traffic, see <a href="../..\posts/llm/Scaling LLM Serving for Enterprise Production.html">Scaling LLM Serving for Enterprise Production</a>. For cost optimization strategies, see <a href="../..\posts/llm/FinOps Best Practices for LLM Applications.html">FinOps Best Practices for LLM Applications</a>. For runtime safety layers, see <a href="../..\posts/llm/Guardrails for LLM Applications with Giskard.html">Guardrails for LLM Applications with Giskard</a>.</p>
+</blockquote>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    A["User Message&lt;br/&gt;(Turn N)"] --&gt; B["LangGraph Agent"]
+    B --&gt; C["LLM Call"]
+    B --&gt; D["Tool Call"]
+    B --&gt; E["Retrieval"]
+    C --&gt; F["Response"]
+    D --&gt; F
+    E --&gt; F
+    F --&gt; G["LangSmith&lt;br/&gt;Trace + Thread"]
+
+    G --&gt; H["Tokens &amp; Cost"]
+    G --&gt; I["Latency"]
+    G --&gt; J["Errors"]
+    G --&gt; K["Feedback"]
+
+    style A fill:#ffce67,stroke:#333
+    style B fill:#6cc3d5,stroke:#333,color:#fff
+    style G fill:#56cc9d,stroke:#333,color:#fff
+    style H fill:#f8f9fa,stroke:#333
+    style I fill:#f8f9fa,stroke:#333
+    style J fill:#e74c3c,stroke:#333,color:#fff
+    style K fill:#f8f9fa,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="langsmith-observability-concepts" class="level2">
+<h2 class="anchored" data-anchor-id="langsmith-observability-concepts">1. LangSmith Observability Concepts</h2>
+<p>Before instrumenting your application, you need to understand the four core primitives that LangSmith uses to organize observability data.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    P["Project&lt;br/&gt;(container for all traces)"] --&gt; T1["Trace 1&lt;br/&gt;(Turn 1)"]
+    P --&gt; T2["Trace 2&lt;br/&gt;(Turn 2)"]
+    P --&gt; T3["Trace 3&lt;br/&gt;(Turn 3)"]
+
+    T1 --&gt; R1["Run: Agent"]
+    R1 --&gt; R2["Run: LLM Call"]
+    R1 --&gt; R3["Run: Tool Call"]
+    R3 --&gt; R4["Run: Search API"]
+
+    T1 -.-&gt;|"thread_id: conv-123"| TH["Thread&lt;br/&gt;(multi-turn conversation)"]
+    T2 -.-&gt;|"thread_id: conv-123"| TH
+    T3 -.-&gt;|"thread_id: conv-123"| TH
+
+    style P fill:#8e44ad,color:#fff,stroke:#333
+    style TH fill:#56cc9d,stroke:#333,color:#fff
+    style T1 fill:#3498db,color:#fff,stroke:#333
+    style T2 fill:#3498db,color:#fff,stroke:#333
+    style T3 fill:#3498db,color:#fff,stroke:#333
+    style R1 fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style R2 fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style R3 fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style R4 fill:#ecf0f1,color:#333,stroke:#bdc3c7
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="the-four-primitives" class="level3">
+<h3 class="anchored" data-anchor-id="the-four-primitives">The Four Primitives</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 39%">
+<col style="width: 27%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Primitive</th>
+<th>Description</th>
+<th>Analogy</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Run</strong></td>
+<td>A single unit of work — one LLM call, one tool invocation, one chain step</td>
+<td>A span in OpenTelemetry</td>
+</tr>
+<tr class="even">
+<td><strong>Trace</strong></td>
+<td>A collection of runs for a single request — from input to final output</td>
+<td>A trace in OpenTelemetry</td>
+</tr>
+<tr class="odd">
+<td><strong>Thread</strong></td>
+<td>A sequence of traces representing a multi-turn conversation</td>
+<td>A chat session</td>
+</tr>
+<tr class="even">
+<td><strong>Project</strong></td>
+<td>A container for all traces from a single application or service</td>
+<td>A service/microservice</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="how-they-map-to-a-chatbot" class="level3">
+<h3 class="anchored" data-anchor-id="how-they-map-to-a-chatbot">How They Map to a Chatbot</h3>
+<p>Consider a customer support chatbot where the user asks: <em>“What’s my order status?”</em> → the agent calls a tool → returns the answer → then the user follows up with <em>“Can you cancel it?”</em></p>
+<ul>
+<li><strong>Turn 1</strong> (“What’s my order status?”) = <strong>Trace 1</strong> containing:
+<ul>
+<li>Run: <code>agent</code> (top-level orchestration)</li>
+<li>Run: <code>ChatOpenAI</code> (LLM decides to call a tool)</li>
+<li>Run: <code>lookup_order</code> (tool execution)</li>
+<li>Run: <code>ChatOpenAI</code> (LLM generates the final answer)</li>
+</ul></li>
+<li><strong>Turn 2</strong> (“Can you cancel it?”) = <strong>Trace 2</strong> containing similar runs</li>
+<li>Both traces are linked by a shared <code>thread_id</code> = <strong>Thread</strong></li>
+<li>All threads live in a single <strong>Project</strong> (e.g., <code>customer-support-prod</code>)</li>
+</ul>
+</section>
+</section>
+<section id="setup-and-installation" class="level2">
+<h2 class="anchored" data-anchor-id="setup-and-installation">2. Setup and Installation</h2>
+<section id="install-dependencies" class="level3">
+<h3 class="anchored" data-anchor-id="install-dependencies">Install Dependencies</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install langchain langchain-openai langgraph langsmith</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="configure-environment" class="level3">
+<h3 class="anchored" data-anchor-id="configure-environment">Configure Environment</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">LANGSMITH_TRACING</span><span class="op">=</span>true</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">LANGSMITH_API_KEY</span><span class="op">=&lt;</span>your-langsmith-api-key<span class="op">&gt;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">LANGSMITH_PROJECT</span><span class="op">=</span>my-agent-project</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">OPENAI_API_KEY</span><span class="op">=&lt;</span>your-openai-api-key<span class="op">&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Variable</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>LANGSMITH_TRACING</code></td>
+<td>Enables/disables tracing globally</td>
+</tr>
+<tr class="even">
+<td><code>LANGSMITH_API_KEY</code></td>
+<td>Your LangSmith API key</td>
+</tr>
+<tr class="odd">
+<td><code>LANGSMITH_PROJECT</code></td>
+<td>Default project name for all traces</td>
+</tr>
+<tr class="even">
+<td><code>OPENAI_API_KEY</code></td>
+<td>Your LLM provider API key</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="verify-connection" class="level3">
+<h3 class="anchored" data-anchor-id="verify-connection">Verify Connection</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langsmith <span class="im">import</span> Client</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> Client()</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(client.list_projects())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="tracing-a-langgraph-agent-with-tool-use" class="level2">
+<h2 class="anchored" data-anchor-id="tracing-a-langgraph-agent-with-tool-use">3. Tracing a LangGraph Agent with Tool Use</h2>
+<p>This section builds a complete LangGraph agent with tools and shows how every step is automatically traced in LangSmith.</p>
+<section id="define-tools" class="level3">
+<h3 class="anchored" data-anchor-id="define-tools">Define Tools</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain.tools <span class="im">import</span> tool</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> search_orders(customer_id: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Look up recent orders for a customer."""</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Simulated database lookup</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    orders <span class="op">=</span> {</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>        <span class="st">"cust-001"</span>: <span class="st">"Order #1234 — Shipped, arriving tomorrow"</span>,</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>        <span class="st">"cust-002"</span>: <span class="st">"Order #5678 — Processing, expected in 3 days"</span>,</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> orders.get(customer_id, <span class="st">"No orders found."</span>)</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> cancel_order(order_id: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Cancel a specific order."""</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="ss">f"Order </span><span class="sc">{</span>order_id<span class="sc">}</span><span class="ss"> has been cancelled successfully."</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_product_info(product_name: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Get information about a product."""</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="ss">f"</span><span class="sc">{</span>product_name<span class="sc">}</span><span class="ss">: $49.99, in stock, free shipping over $50."</span></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>tools <span class="op">=</span> [search_orders, cancel_order, get_product_info]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="build-the-langgraph-agent" class="level3">
+<h3 class="anchored" data-anchor-id="build-the-langgraph-agent">Build the LangGraph Agent</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> Literal</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_openai <span class="im">import</span> ChatOpenAI</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain.messages <span class="im">import</span> HumanMessage</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.prebuilt <span class="im">import</span> ToolNode</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.graph <span class="im">import</span> StateGraph, MessagesState</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Initialize LLM with tools</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> ChatOpenAI(model<span class="op">=</span><span class="st">"gpt-4.1-mini"</span>, temperature<span class="op">=</span><span class="dv">0</span>).bind_tools(tools)</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>tool_node <span class="op">=</span> ToolNode(tools)</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> should_continue(state: MessagesState) <span class="op">-&gt;</span> Literal[<span class="st">"tools"</span>, <span class="st">"__end__"</span>]:</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Route to tools if the model wants to call one, otherwise end."""</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    last_message <span class="op">=</span> state[<span class="st">"messages"</span>][<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> last_message.tool_calls:</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"tools"</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="st">"__end__"</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> call_model(state: MessagesState):</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Invoke the LLM with the current message history."""</span></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> model.invoke(state[<span class="st">"messages"</span>])</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"messages"</span>: [response]}</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a><span class="co"># Build the graph</span></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>workflow <span class="op">=</span> StateGraph(MessagesState)</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>workflow.add_node(<span class="st">"agent"</span>, call_model)</span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>workflow.add_node(<span class="st">"tools"</span>, tool_node)</span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>workflow.add_edge(<span class="st">"__start__"</span>, <span class="st">"agent"</span>)</span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>workflow.add_conditional_edges(<span class="st">"agent"</span>, should_continue)</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>workflow.add_edge(<span class="st">"tools"</span>, <span class="st">"agent"</span>)</span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>app <span class="op">=</span> workflow.<span class="bu">compile</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="run-with-tracing" class="level3">
+<h3 class="anchored" data-anchor-id="run-with-tracing">Run with Tracing</h3>
+<p>With <code>LANGSMITH_TRACING=true</code>, every invocation is automatically traced:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> app.invoke(</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"messages"</span>: [HumanMessage(content<span class="op">=</span><span class="st">"What's the status of order for customer cust-001?"</span>)]},</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(result[<span class="st">"messages"</span>][<span class="op">-</span><span class="dv">1</span>].content)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>In LangSmith, you will see a trace tree like:</p>
+<pre><code>├── RunnableSequence (agent graph)
+│   ├── agent (call_model)
+│   │   └── ChatOpenAI (decides to call search_orders)
+│   ├── tools (tool_node)
+│   │   └── search_orders (executes tool)
+│   └── agent (call_model)
+│       └── ChatOpenAI (generates final answer)</code></pre>
+</section>
+</section>
+<section id="multi-turn-conversation-threading" class="level2">
+<h2 class="anchored" data-anchor-id="multi-turn-conversation-threading">4. Multi-Turn Conversation Threading</h2>
+<p>The key to observability for multi-turn conversations is <strong>threads</strong>. A thread links multiple traces together so you can see an entire conversation — not just isolated requests.</p>
+<section id="configuring-threads" class="level3">
+<h3 class="anchored" data-anchor-id="configuring-threads">Configuring Threads</h3>
+<p>To group traces into a thread, pass a <code>thread_id</code> (or <code>session_id</code> or <code>conversation_id</code>) in the metadata:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> uuid</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>THREAD_ID <span class="op">=</span> <span class="bu">str</span>(uuid.uuid4())</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Turn 1</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> app.invoke(</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"messages"</span>: [HumanMessage(content<span class="op">=</span><span class="st">"What's the status of order for customer cust-001?"</span>)]},</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    config<span class="op">=</span>{</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>        <span class="st">"metadata"</span>: {<span class="st">"thread_id"</span>: THREAD_ID},</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>        <span class="st">"configurable"</span>: {<span class="st">"thread_id"</span>: THREAD_ID},</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Turn 1:"</span>, result[<span class="st">"messages"</span>][<span class="op">-</span><span class="dv">1</span>].content)</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Turn 2 — continues the same conversation</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> app.invoke(</span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"messages"</span>: [</span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>        HumanMessage(content<span class="op">=</span><span class="st">"What's the status of order for customer cust-001?"</span>),</span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>        result[<span class="st">"messages"</span>][<span class="op">-</span><span class="dv">1</span>],</span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>        HumanMessage(content<span class="op">=</span><span class="st">"Can you cancel order #1234?"</span>),</span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>    ]},</span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>    config<span class="op">=</span>{</span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>        <span class="st">"metadata"</span>: {<span class="st">"thread_id"</span>: THREAD_ID},</span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>        <span class="st">"configurable"</span>: {<span class="st">"thread_id"</span>: THREAD_ID},</span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Turn 2:"</span>, result[<span class="st">"messages"</span>][<span class="op">-</span><span class="dv">1</span>].content)</span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a><span class="co"># Turn 3</span></span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> app.invoke(</span>
+<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"messages"</span>: [</span>
+<span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a>        <span class="op">*</span>result[<span class="st">"messages"</span>],</span>
+<span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a>        HumanMessage(content<span class="op">=</span><span class="st">"What do you have in the way of headphones?"</span>),</span>
+<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a>    ]},</span>
+<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a>    config<span class="op">=</span>{</span>
+<span id="cb8-36"><a href="#cb8-36" aria-hidden="true" tabindex="-1"></a>        <span class="st">"metadata"</span>: {<span class="st">"thread_id"</span>: THREAD_ID},</span>
+<span id="cb8-37"><a href="#cb8-37" aria-hidden="true" tabindex="-1"></a>        <span class="st">"configurable"</span>: {<span class="st">"thread_id"</span>: THREAD_ID},</span>
+<span id="cb8-38"><a href="#cb8-38" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb8-39"><a href="#cb8-39" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-40"><a href="#cb8-40" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Turn 3:"</span>, result[<span class="st">"messages"</span>][<span class="op">-</span><span class="dv">1</span>].content)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="what-you-see-in-langsmith" class="level3">
+<h3 class="anchored" data-anchor-id="what-you-see-in-langsmith">What You See in LangSmith</h3>
+<p>In the <strong>Threads</strong> tab of your project, you will see:</p>
+<ul>
+<li>A thread with 3 traces, each representing one conversation turn</li>
+<li>A chatbot-like UI showing the conversation history</li>
+<li>Token counts, latency, and feedback aggregated per thread</li>
+<li>The ability to drill into any individual trace to see runs</li>
+</ul>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph Thread["Thread: conv-abc123"]
+        T1["Trace 1: Turn 1&lt;br/&gt;What's the status of order...?&lt;br/&gt;🔧 search_orders → shipped"]
+        T2["Trace 2: Turn 2&lt;br/&gt;Can you cancel order #1234?&lt;br/&gt;🔧 cancel_order → cancelled"]
+        T3["Trace 3: Turn 3&lt;br/&gt;What do you have in headphones?&lt;br/&gt;🔧 get_product_info → $49.99"]
+    end
+
+    T1 --&gt; T2 --&gt; T3
+
+    style Thread fill:#f8f9fa,stroke:#333
+    style T1 fill:#3498db,color:#fff,stroke:#333
+    style T2 fill:#3498db,color:#fff,stroke:#333
+    style T3 fill:#3498db,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="thread-metadata-propagation" class="level3">
+<h3 class="anchored" data-anchor-id="thread-metadata-propagation">Thread Metadata Propagation</h3>
+<p>To ensure <strong>all child runs</strong> within a trace are included in thread-level filtering and token counting, propagate the <code>thread_id</code> metadata to child runs:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langsmith <span class="im">import</span> traceable</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="at">@traceable</span>(name<span class="op">=</span><span class="st">"Custom Processing Step"</span>)</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> process_step(data: <span class="bu">str</span>, thread_id: <span class="bu">str</span>):</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""A custom processing step that also carries thread metadata."""</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    <span class="co"># The thread_id must propagate to child runs</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> data.upper()</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="co"># When calling with langsmith_extra:</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>process_step(</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>    <span class="st">"some data"</span>,</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>    thread_id<span class="op">=</span>THREAD_ID,</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>    langsmith_extra<span class="op">=</span>{<span class="st">"metadata"</span>: {<span class="st">"thread_id"</span>: THREAD_ID}},</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<blockquote class="blockquote">
+<p><strong>Important:</strong> If child runs don’t have the <code>thread_id</code> metadata, they won’t be included when filtering runs by thread, calculating token usage for a thread, or aggregating costs across a thread.</p>
+</blockquote>
+</section>
+</section>
+<section id="tracking-token-usage-and-cost" class="level2">
+<h2 class="anchored" data-anchor-id="tracking-token-usage-and-cost">5. Tracking Token Usage and Cost</h2>
+<p>LangSmith automatically captures token usage for supported LLM providers (OpenAI, Anthropic, etc.). This enables cost tracking at multiple levels.</p>
+<section id="what-is-captured-automatically" class="level3">
+<h3 class="anchored" data-anchor-id="what-is-captured-automatically">What Is Captured Automatically</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 28%">
+<col style="width: 46%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>Description</th>
+<th>Level</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Input tokens</strong></td>
+<td>Tokens in the prompt (system + user + history)</td>
+<td>Per LLM run</td>
+</tr>
+<tr class="even">
+<td><strong>Output tokens</strong></td>
+<td>Tokens generated by the model</td>
+<td>Per LLM run</td>
+</tr>
+<tr class="odd">
+<td><strong>Total tokens</strong></td>
+<td>Input + output tokens</td>
+<td>Per LLM run</td>
+</tr>
+<tr class="even">
+<td><strong>Latency</strong></td>
+<td>Wall-clock time for each run</td>
+<td>Per run</td>
+</tr>
+<tr class="odd">
+<td><strong>Time to first token</strong></td>
+<td>Time until streaming begins</td>
+<td>Per LLM run</td>
+</tr>
+<tr class="even">
+<td><strong>Token throughput</strong></td>
+<td>Tokens per second</td>
+<td>Per LLM run</td>
+</tr>
+<tr class="odd">
+<td><strong>Cost</strong></td>
+<td>Estimated cost based on model pricing</td>
+<td>Per LLM run</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="viewing-token-usage-in-traces" class="level3">
+<h3 class="anchored" data-anchor-id="viewing-token-usage-in-traces">Viewing Token Usage in Traces</h3>
+<p>When you click on an LLM run in LangSmith, you see:</p>
+<ul>
+<li><strong>Input</strong>: The full prompt with all messages</li>
+<li><strong>Output</strong>: The model’s response (including tool calls)</li>
+<li><strong>Token Usage</strong>: Input tokens, output tokens, total tokens</li>
+<li><strong>Latency</strong>: Total time, time to first token</li>
+<li><strong>Model</strong>: Which model was used</li>
+<li><strong>Cost</strong>: Estimated cost for the call</li>
+</ul>
+</section>
+<section id="aggregating-cost-across-conversations" class="level3">
+<h3 class="anchored" data-anchor-id="aggregating-cost-across-conversations">Aggregating Cost Across Conversations</h3>
+<p>Use the LangSmith SDK to query token usage and cost programmatically:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langsmith <span class="im">import</span> Client</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> Client()</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Get all runs for a specific thread</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>runs <span class="op">=</span> <span class="bu">list</span>(client.list_runs(</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    project_name<span class="op">=</span><span class="st">"my-agent-project"</span>,</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>    <span class="bu">filter</span><span class="op">=</span><span class="st">'has(metadata, </span><span class="ch">\'</span><span class="st">{"thread_id": "your-thread-id"}</span><span class="ch">\'</span><span class="st">)'</span>,</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>))</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Aggregate token usage</span></span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>total_input_tokens <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>total_output_tokens <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>total_cost <span class="op">=</span> <span class="fl">0.0</span></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> run <span class="kw">in</span> runs:</span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> run.run_type <span class="op">==</span> <span class="st">"llm"</span> <span class="kw">and</span> run.total_tokens:</span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>        total_input_tokens <span class="op">+=</span> run.prompt_tokens <span class="kw">or</span> <span class="dv">0</span></span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>        total_output_tokens <span class="op">+=</span> run.completion_tokens <span class="kw">or</span> <span class="dv">0</span></span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>        total_cost <span class="op">+=</span> run.total_cost <span class="kw">or</span> <span class="fl">0.0</span></span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Thread token usage:"</span>)</span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Input tokens:  </span><span class="sc">{</span>total_input_tokens<span class="sc">:,}</span><span class="ss">"</span>)</span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Output tokens: </span><span class="sc">{</span>total_output_tokens<span class="sc">:,}</span><span class="ss">"</span>)</span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"  Total cost:    $</span><span class="sc">{</span>total_cost<span class="sc">:.4f}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="cost-per-conversation-turn" class="level3">
+<h3 class="anchored" data-anchor-id="cost-per-conversation-turn">Cost Per Conversation Turn</h3>
+<p>Understanding cost distribution across turns is critical for optimization:</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph CostBreakdown["Cost Breakdown per Turn"]
+        T1["Turn 1&lt;br/&gt;500 input tok&lt;br/&gt;120 output tok&lt;br/&gt;$0.0032"]
+        T2["Turn 2&lt;br/&gt;1,200 input tok&lt;br/&gt;85 output tok&lt;br/&gt;$0.0061"]
+        T3["Turn 3&lt;br/&gt;2,100 input tok&lt;br/&gt;200 output tok&lt;br/&gt;$0.0115"]
+    end
+
+    T1 --&gt; T2 --&gt; T3
+
+    Note["Cost grows with&lt;br/&gt;conversation history!"]
+
+    style T1 fill:#27ae60,color:#fff,stroke:#333
+    style T2 fill:#f39c12,color:#fff,stroke:#333
+    style T3 fill:#e74c3c,color:#fff,stroke:#333
+    style Note fill:#ecf0f1,color:#333,stroke:#bdc3c7
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p><strong>Key insight:</strong> In multi-turn conversations, input token cost grows with each turn because the full conversation history is included in every request. This is why techniques like conversation summarization and sliding window memory are critical — see <a href="../..\posts/llm/FinOps Best Practices for LLM Applications.html">FinOps Best Practices for LLM Applications</a> for optimization strategies.</p>
+</section>
+</section>
+<section id="latency-tracking-and-optimization" class="level2">
+<h2 class="anchored" data-anchor-id="latency-tracking-and-optimization">6. Latency Tracking and Optimization</h2>
+<section id="latency-breakdown-per-run" class="level3">
+<h3 class="anchored" data-anchor-id="latency-breakdown-per-run">Latency Breakdown per Run</h3>
+<p>LangSmith provides latency data for every run, enabling you to identify bottlenecks:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Run Type</th>
+<th style="text-align: center;">Typical Latency</th>
+<th style="text-align: center;">What Affects It</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>LLM call</td>
+<td style="text-align: center;">500ms–5s</td>
+<td style="text-align: center;">Model size, token count, provider load</td>
+</tr>
+<tr class="even">
+<td>Tool call (API)</td>
+<td style="text-align: center;">50ms–2s</td>
+<td style="text-align: center;">External API latency</td>
+</tr>
+<tr class="odd">
+<td>Tool call (DB)</td>
+<td style="text-align: center;">10ms–500ms</td>
+<td style="text-align: center;">Query complexity, database load</td>
+</tr>
+<tr class="even">
+<td>Retrieval (vector search)</td>
+<td style="text-align: center;">20ms–200ms</td>
+<td style="text-align: center;">Index size, embedding model</td>
+</tr>
+<tr class="odd">
+<td>Output parsing</td>
+<td style="text-align: center;">1ms–50ms</td>
+<td style="text-align: center;">Response complexity</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="identifying-slow-steps" class="level3">
+<h3 class="anchored" data-anchor-id="identifying-slow-steps">Identifying Slow Steps</h3>
+<p>Use the LangSmith SDK to find runs that exceed latency thresholds:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langsmith <span class="im">import</span> Client</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datetime <span class="im">import</span> datetime, timedelta</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> Client()</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Find slow LLM calls in the last 24 hours</span></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>slow_runs <span class="op">=</span> <span class="bu">list</span>(client.list_runs(</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>    project_name<span class="op">=</span><span class="st">"my-agent-project"</span>,</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>    run_type<span class="op">=</span><span class="st">"llm"</span>,</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>    <span class="bu">filter</span><span class="op">=</span><span class="st">'gt(latency, "5s")'</span>,</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>    start_time<span class="op">=</span>datetime.now() <span class="op">-</span> timedelta(hours<span class="op">=</span><span class="dv">24</span>),</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>))</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> run <span class="kw">in</span> slow_runs:</span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Run: </span><span class="sc">{</span>run<span class="sc">.</span>name<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Latency: </span><span class="sc">{</span>run<span class="sc">.</span>latency<span class="sc">}</span><span class="ss">s"</span>)</span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Tokens: </span><span class="sc">{</span>run<span class="sc">.</span>total_tokens<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Error: </span><span class="sc">{</span>run<span class="sc">.</span>error<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"---"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="adding-custom-latency-annotations" class="level3">
+<h3 class="anchored" data-anchor-id="adding-custom-latency-annotations">Adding Custom Latency Annotations</h3>
+<p>For custom steps not automatically tracked, use the <code>@traceable</code> decorator:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langsmith <span class="im">import</span> traceable</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="at">@traceable</span>(run_type<span class="op">=</span><span class="st">"tool"</span>, name<span class="op">=</span><span class="st">"Vector Search"</span>)</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> search_knowledge_base(query: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">list</span>[<span class="bu">str</span>]:</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Search the knowledge base — latency is automatically tracked."""</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> time.time()</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    <span class="co"># ... your vector search logic ...</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>    results <span class="op">=</span> [<span class="st">"doc1"</span>, <span class="st">"doc2"</span>, <span class="st">"doc3"</span>]</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> results</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="error-tracking-and-debugging" class="level2">
+<h2 class="anchored" data-anchor-id="error-tracking-and-debugging">7. Error Tracking and Debugging</h2>
+<section id="automatic-error-capture" class="level3">
+<h3 class="anchored" data-anchor-id="automatic-error-capture">Automatic Error Capture</h3>
+<p>LangSmith automatically captures errors at every level:</p>
+<ul>
+<li><strong>LLM errors</strong>: Rate limits (<code>429</code>), context length exceeded, API timeouts</li>
+<li><strong>Tool errors</strong>: Failed API calls, validation errors, permission issues</li>
+<li><strong>Graph errors</strong>: Invalid state transitions, infinite loops, timeout</li>
+<li><strong>Parsing errors</strong>: Malformed tool calls, JSON decode failures</li>
+</ul>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    E["Error in Run"] --&gt; C1{"Error Type"}
+
+    C1 --&gt;|"429 Rate Limit"| A1["LLM Provider&lt;br/&gt;Throttling"]
+    C1 --&gt;|"Context Length"| A2["Token Limit&lt;br/&gt;Exceeded"]
+    C1 --&gt;|"Tool Failure"| A3["External API&lt;br/&gt;Down"]
+    C1 --&gt;|"Parse Error"| A4["Malformed LLM&lt;br/&gt;Output"]
+    C1 --&gt;|"Timeout"| A5["Agent Loop&lt;br/&gt;Too Long"]
+
+    A1 --&gt; F1["Retry with backoff"]
+    A2 --&gt; F2["Truncate history"]
+    A3 --&gt; F3["Return fallback"]
+    A4 --&gt; F4["Re-prompt model"]
+    A5 --&gt; F5["Set max iterations"]
+
+    style E fill:#e74c3c,color:#fff,stroke:#333
+    style A1 fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style A2 fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style A3 fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style A4 fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style A5 fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style F1 fill:#27ae60,color:#fff,stroke:#333
+    style F2 fill:#27ae60,color:#fff,stroke:#333
+    style F3 fill:#27ae60,color:#fff,stroke:#333
+    style F4 fill:#27ae60,color:#fff,stroke:#333
+    style F5 fill:#27ae60,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="filtering-error-traces" class="level3">
+<h3 class="anchored" data-anchor-id="filtering-error-traces">Filtering Error Traces</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langsmith <span class="im">import</span> Client</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> Client()</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Find all errored runs in the last hour</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>error_runs <span class="op">=</span> <span class="bu">list</span>(client.list_runs(</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>    project_name<span class="op">=</span><span class="st">"my-agent-project"</span>,</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>    is_error<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>    start_time<span class="op">=</span>datetime.now() <span class="op">-</span> timedelta(hours<span class="op">=</span><span class="dv">1</span>),</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>))</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> run <span class="kw">in</span> error_runs:</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Run: </span><span class="sc">{</span>run<span class="sc">.</span>name<span class="sc">}</span><span class="ss"> (</span><span class="sc">{</span>run<span class="sc">.</span>run_type<span class="sc">}</span><span class="ss">)"</span>)</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Error: </span><span class="sc">{</span>run<span class="sc">.</span>error<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Trace ID: </span><span class="sc">{</span>run<span class="sc">.</span>trace_id<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  Thread: </span><span class="sc">{</span>run<span class="sc">.</span>metadata<span class="sc">.</span>get(<span class="st">'thread_id'</span>, <span class="st">'N/A'</span>)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"---"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="debugging-a-failed-conversation-turn" class="level3">
+<h3 class="anchored" data-anchor-id="debugging-a-failed-conversation-turn">Debugging a Failed Conversation Turn</h3>
+<p>When a user reports an issue, you can trace back through the full conversation:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Find the thread for a specific user</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>thread_runs <span class="op">=</span> <span class="bu">list</span>(client.list_runs(</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    project_name<span class="op">=</span><span class="st">"my-agent-project"</span>,</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    <span class="bu">filter</span><span class="op">=</span><span class="st">'has(metadata, </span><span class="ch">\'</span><span class="st">{"thread_id": "user-reported-thread-id"}</span><span class="ch">\'</span><span class="st">)'</span>,</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>))</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Print the full conversation flow</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> run <span class="kw">in</span> <span class="bu">sorted</span>(thread_runs, key<span class="op">=</span><span class="kw">lambda</span> r: r.start_time):</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>    status <span class="op">=</span> <span class="st">"ERROR"</span> <span class="cf">if</span> run.error <span class="cf">else</span> <span class="st">"OK"</span></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"[</span><span class="sc">{</span>status<span class="sc">}</span><span class="ss">] </span><span class="sc">{</span>run<span class="sc">.</span>start_time<span class="sc">}</span><span class="ss"> | </span><span class="sc">{</span>run<span class="sc">.</span>run_type<span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>run<span class="sc">.</span>name<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> run.error:</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"    Error: </span><span class="sc">{</span>run<span class="sc">.</span>error<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> run.run_type <span class="op">==</span> <span class="st">"llm"</span>:</span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"    Tokens: </span><span class="sc">{</span>run<span class="sc">.</span>total_tokens<span class="sc">}</span><span class="ss"> | Latency: </span><span class="sc">{</span>run<span class="sc">.</span>latency<span class="sc">}</span><span class="ss">s"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="custom-instrumentation-with-traceable" class="level2">
+<h2 class="anchored" data-anchor-id="custom-instrumentation-with-traceable">8. Custom Instrumentation with <code>@traceable</code></h2>
+<p>For non-LangChain code (custom tools, business logic, external APIs), use the <code>@traceable</code> decorator to include them in your traces.</p>
+<section id="tracing-custom-functions" class="level3">
+<h3 class="anchored" data-anchor-id="tracing-custom-functions">Tracing Custom Functions</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langsmith <span class="im">import</span> traceable</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="at">@traceable</span>(run_type<span class="op">=</span><span class="st">"chain"</span>, name<span class="op">=</span><span class="st">"Order Pipeline"</span>)</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> process_order_request(user_message: <span class="bu">str</span>, customer_id: <span class="bu">str</span>):</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Top-level pipeline — creates a trace."""</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    context <span class="op">=</span> retrieve_customer_context(customer_id)</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> generate_response(user_message, context)</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> response</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a><span class="at">@traceable</span>(run_type<span class="op">=</span><span class="st">"retriever"</span>, name<span class="op">=</span><span class="st">"Customer Context Retrieval"</span>)</span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> retrieve_customer_context(customer_id: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Retrieval step — creates a child run."""</span></span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {</span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>        <span class="st">"customer_id"</span>: customer_id,</span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>        <span class="st">"plan"</span>: <span class="st">"premium"</span>,</span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>        <span class="st">"recent_orders"</span>: [<span class="st">"#1234"</span>, <span class="st">"#5678"</span>],</span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a><span class="at">@traceable</span>(run_type<span class="op">=</span><span class="st">"llm"</span>, name<span class="op">=</span><span class="st">"Response Generation"</span>)</span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> generate_response(message: <span class="bu">str</span>, context: <span class="bu">dict</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""LLM call — creates a child run with token tracking."""</span></span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> openai <span class="im">import</span> Client</span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a>    client <span class="op">=</span> Client()</span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> client.chat.completions.create(</span>
+<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a>        model<span class="op">=</span><span class="st">"gpt-4.1-mini"</span>,</span>
+<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a>        messages<span class="op">=</span>[</span>
+<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a>            {<span class="st">"role"</span>: <span class="st">"system"</span>, <span class="st">"content"</span>: <span class="ss">f"Customer context: </span><span class="sc">{</span>context<span class="sc">}</span><span class="ss">"</span>},</span>
+<span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a>            {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: message},</span>
+<span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a>        ],</span>
+<span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb15-31"><a href="#cb15-31" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> response.choices[<span class="dv">0</span>].message.content</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="run-types" class="level3">
+<h3 class="anchored" data-anchor-id="run-types">Run Types</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 23%">
+<col style="width: 30%">
+<col style="width: 45%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Run Type</th>
+<th>When to Use</th>
+<th>LangSmith Rendering</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>chain</code></td>
+<td>General orchestration, pipelines</td>
+<td>Default view</td>
+</tr>
+<tr class="even">
+<td><code>llm</code></td>
+<td>LLM calls (enables token counting)</td>
+<td>Shows token usage, latency, model info</td>
+</tr>
+<tr class="odd">
+<td><code>tool</code></td>
+<td>Tool/function invocations</td>
+<td>Shows tool name, input/output</td>
+</tr>
+<tr class="even">
+<td><code>retriever</code></td>
+<td>Vector search, document retrieval</td>
+<td>Shows retrieved documents</td>
+</tr>
+<tr class="odd">
+<td><code>prompt</code></td>
+<td>Prompt formatting steps</td>
+<td>Shows template variables</td>
+</tr>
+<tr class="even">
+<td><code>embedding</code></td>
+<td>Embedding generation</td>
+<td>Shows embedding dimensions</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="adding-metadata-and-tags" class="level3">
+<h3 class="anchored" data-anchor-id="adding-metadata-and-tags">Adding Metadata and Tags</h3>
+<p>Enrich traces with metadata for filtering and analysis:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langsmith <span class="im">import</span> traceable</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="at">@traceable</span>(</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    run_type<span class="op">=</span><span class="st">"chain"</span>,</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"Customer Support Agent"</span>,</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    tags<span class="op">=</span>[<span class="st">"production"</span>, <span class="st">"customer-support"</span>],</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>    metadata<span class="op">=</span>{</span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>        <span class="st">"app_version"</span>: <span class="st">"2.1.0"</span>,</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>        <span class="st">"environment"</span>: <span class="st">"production"</span>,</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>        <span class="st">"region"</span>: <span class="st">"us-east-1"</span>,</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> customer_support_pipeline(message: <span class="bu">str</span>, thread_id: <span class="bu">str</span>):</span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Your pipeline logic...</span></span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">pass</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="wrapping-openai-for-automatic-tracing" class="level2">
+<h2 class="anchored" data-anchor-id="wrapping-openai-for-automatic-tracing">9. Wrapping OpenAI for Automatic Tracing</h2>
+<p>If you use the OpenAI SDK directly (outside LangChain), wrap it for automatic tracing:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> openai</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langsmith.wrappers <span class="im">import</span> wrap_openai</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Wrap the OpenAI client — all calls are now traced</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> wrap_openai(openai.Client())</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a><span class="co"># This call is automatically traced with token usage, latency, cost</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> client.chat.completions.create(</span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span><span class="st">"gpt-4.1-mini"</span>,</span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>    messages<span class="op">=</span>[</span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"system"</span>, <span class="st">"content"</span>: <span class="st">"You are a helpful assistant."</span>},</span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"What is observability?"</span>},</span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>    ],</span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Attach metadata for filtering</span></span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>    langsmith_extra<span class="op">=</span>{</span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a>        <span class="st">"project_name"</span>: <span class="st">"my-agent-project"</span>,</span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a>        <span class="st">"metadata"</span>: {<span class="st">"thread_id"</span>: <span class="st">"conv-123"</span>, <span class="st">"user_id"</span>: <span class="st">"user-456"</span>},</span>
+<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a>        <span class="st">"tags"</span>: [<span class="st">"production"</span>],</span>
+<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb17-20"><a href="#cb17-20" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb17-21"><a href="#cb17-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-22"><a href="#cb17-22" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(response.choices[<span class="dv">0</span>].message.content)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="online-evaluation-for-production-quality" class="level2">
+<h2 class="anchored" data-anchor-id="online-evaluation-for-production-quality">10. Online Evaluation for Production Quality</h2>
+<p>Online evaluations run <strong>automatically on production traces</strong> to monitor quality in real time.</p>
+<section id="llm-as-a-judge-evaluators" class="level3">
+<h3 class="anchored" data-anchor-id="llm-as-a-judge-evaluators">LLM-as-a-Judge Evaluators</h3>
+<p>Set up evaluators in the LangSmith UI that score every trace (or a sample) against criteria:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 28%">
+<col style="width: 44%">
+<col style="width: 26%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Evaluator</th>
+<th>What It Measures</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Correctness</strong></td>
+<td>Is the answer factually correct?</td>
+<td>RAG applications</td>
+</tr>
+<tr class="even">
+<td><strong>Helpfulness</strong></td>
+<td>Did the response address the user’s need?</td>
+<td>Customer support</td>
+</tr>
+<tr class="odd">
+<td><strong>Relevance</strong></td>
+<td>Is the response on-topic?</td>
+<td>Domain-specific assistants</td>
+</tr>
+<tr class="even">
+<td><strong>Safety</strong></td>
+<td>Does the response violate safety policies?</td>
+<td>Public-facing chatbots</td>
+</tr>
+<tr class="odd">
+<td><strong>Coherence</strong></td>
+<td>Is the response logically consistent?</td>
+<td>Multi-turn conversations</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="setting-up-online-evaluators" class="level3">
+<h3 class="anchored" data-anchor-id="setting-up-online-evaluators">Setting Up Online Evaluators</h3>
+<ol type="1">
+<li>Navigate to your project in the LangSmith UI</li>
+<li>Click <strong>+ New</strong> → <strong>New Evaluator</strong></li>
+<li>Configure the evaluator (e.g., LLM-as-a-judge correctness)</li>
+<li>Apply filters (e.g., only evaluate traces with negative user feedback)</li>
+<li>Set a sampling rate (e.g., 10% of traces to control cost)</li>
+</ol>
+</section>
+<section id="multi-turn-conversation-evaluation" class="level3">
+<h3 class="anchored" data-anchor-id="multi-turn-conversation-evaluation">Multi-Turn Conversation Evaluation</h3>
+<p>For multi-turn conversations, LangSmith supports <strong>thread-level evaluators</strong> that assess the entire conversation, not just individual turns:</p>
+<ul>
+<li><strong>Resolution rate</strong>: Did the agent resolve the user’s issue?</li>
+<li><strong>Conversation coherence</strong>: Was the conversation logically consistent across turns?</li>
+<li><strong>Escalation detection</strong>: Did the conversation require human handoff?</li>
+</ul>
+</section>
+<section id="programmatic-feedback" class="level3">
+<h3 class="anchored" data-anchor-id="programmatic-feedback">Programmatic Feedback</h3>
+<p>Attach feedback from your application (e.g., thumbs up/down from users):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langsmith <span class="im">import</span> Client</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> Client()</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Attach user feedback to a specific run</span></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>client.create_feedback(</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>    run_id<span class="op">=</span><span class="st">"&lt;run-id&gt;"</span>,</span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>    key<span class="op">=</span><span class="st">"user-rating"</span>,</span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>    score<span class="op">=</span><span class="fl">1.0</span>,  <span class="co"># 1.0 = positive, 0.0 = negative</span></span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>    comment<span class="op">=</span><span class="st">"The response was helpful!"</span>,</span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="production-monitoring-dashboard" class="level2">
+<h2 class="anchored" data-anchor-id="production-monitoring-dashboard">11. Production Monitoring Dashboard</h2>
+<p>LangSmith provides dashboards for monitoring your LLM application at scale.</p>
+<section id="key-metrics-to-monitor" class="level3">
+<h3 class="anchored" data-anchor-id="key-metrics-to-monitor">Key Metrics to Monitor</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    D["Production Dashboard"] --&gt; M1["Trace Volume&lt;br/&gt;Requests/min"]
+    D --&gt; M2["Error Rate&lt;br/&gt;% failed traces"]
+    D --&gt; M3["P50 / P99 Latency&lt;br/&gt;Response time"]
+    D --&gt; M4["Token Usage&lt;br/&gt;Input + Output"]
+    D --&gt; M5["Cost&lt;br/&gt;$ per hour/day"]
+    D --&gt; M6["Feedback Scores&lt;br/&gt;User satisfaction"]
+
+    style D fill:#8e44ad,color:#fff,stroke:#333
+    style M1 fill:#3498db,color:#fff,stroke:#333
+    style M2 fill:#e74c3c,color:#fff,stroke:#333
+    style M3 fill:#f39c12,color:#fff,stroke:#333
+    style M4 fill:#27ae60,color:#fff,stroke:#333
+    style M5 fill:#e67e22,color:#fff,stroke:#333
+    style M6 fill:#56cc9d,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 21%">
+<col style="width: 36%">
+<col style="width: 42%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th style="text-align: center;">What to Watch</th>
+<th style="text-align: center;">Alert Threshold</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Trace volume</strong></td>
+<td style="text-align: center;">Requests per minute</td>
+<td style="text-align: center;">Sudden drops (outage) or spikes (abuse)</td>
+</tr>
+<tr class="even">
+<td><strong>Error rate</strong></td>
+<td style="text-align: center;">% of traces with errors</td>
+<td style="text-align: center;">&gt; 5%</td>
+</tr>
+<tr class="odd">
+<td><strong>P99 latency</strong></td>
+<td style="text-align: center;">99th percentile response time</td>
+<td style="text-align: center;">&gt; 10s for chat, &gt; 30s for complex agents</td>
+</tr>
+<tr class="even">
+<td><strong>Token usage</strong></td>
+<td style="text-align: center;">Total tokens consumed per hour</td>
+<td style="text-align: center;">Budget-dependent</td>
+</tr>
+<tr class="odd">
+<td><strong>Cost</strong></td>
+<td style="text-align: center;">Estimated spend per day</td>
+<td style="text-align: center;">Budget-dependent</td>
+</tr>
+<tr class="even">
+<td><strong>Feedback scores</strong></td>
+<td style="text-align: center;">Average user satisfaction</td>
+<td style="text-align: center;">&lt; 0.7 (on 0–1 scale)</td>
+</tr>
+<tr class="odd">
+<td><strong>Tool failure rate</strong></td>
+<td style="text-align: center;">% of tool calls that error</td>
+<td style="text-align: center;">&gt; 1%</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="automations-and-alerts" class="level3">
+<h3 class="anchored" data-anchor-id="automations-and-alerts">Automations and Alerts</h3>
+<p>LangSmith supports <strong>automation rules</strong> that trigger actions based on trace properties:</p>
+<ul>
+<li><strong>Auto-tag</strong> traces that match certain patterns</li>
+<li><strong>Send webhooks</strong> when error rates spike</li>
+<li><strong>Route to annotation queues</strong> for human review</li>
+<li><strong>Auto-upgrade data retention</strong> for important traces</li>
+</ul>
+</section>
+</section>
+<section id="complete-example-observable-multi-turn-agent" class="level2">
+<h2 class="anchored" data-anchor-id="complete-example-observable-multi-turn-agent">12. Complete Example: Observable Multi-Turn Agent</h2>
+<p>Putting it all together — a production-ready, fully observable LangGraph agent:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> uuid</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> Literal</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain.messages <span class="im">import</span> HumanMessage</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain.tools <span class="im">import</span> tool</span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_openai <span class="im">import</span> ChatOpenAI</span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.graph <span class="im">import</span> StateGraph, MessagesState</span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.prebuilt <span class="im">import</span> ToolNode</span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Environment ─────────────────────────────</span></span>
+<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a>os.environ[<span class="st">"LANGSMITH_TRACING"</span>] <span class="op">=</span> <span class="st">"true"</span></span>
+<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a>os.environ[<span class="st">"LANGSMITH_PROJECT"</span>] <span class="op">=</span> <span class="st">"support-agent-prod"</span></span>
+<span id="cb19-14"><a href="#cb19-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-15"><a href="#cb19-15" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Tools ───────────────────────────────────</span></span>
+<span id="cb19-16"><a href="#cb19-16" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb19-17"><a href="#cb19-17" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> search_orders(customer_id: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb19-18"><a href="#cb19-18" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Look up recent orders for a customer."""</span></span>
+<span id="cb19-19"><a href="#cb19-19" aria-hidden="true" tabindex="-1"></a>    orders <span class="op">=</span> {</span>
+<span id="cb19-20"><a href="#cb19-20" aria-hidden="true" tabindex="-1"></a>        <span class="st">"cust-001"</span>: <span class="st">"Order #1234 — Shipped, arriving tomorrow"</span>,</span>
+<span id="cb19-21"><a href="#cb19-21" aria-hidden="true" tabindex="-1"></a>        <span class="st">"cust-002"</span>: <span class="st">"Order #5678 — Processing, expected in 3 days"</span>,</span>
+<span id="cb19-22"><a href="#cb19-22" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb19-23"><a href="#cb19-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> orders.get(customer_id, <span class="st">"No orders found."</span>)</span>
+<span id="cb19-24"><a href="#cb19-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-25"><a href="#cb19-25" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb19-26"><a href="#cb19-26" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> cancel_order(order_id: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb19-27"><a href="#cb19-27" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Cancel a specific order by ID."""</span></span>
+<span id="cb19-28"><a href="#cb19-28" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="ss">f"Order </span><span class="sc">{</span>order_id<span class="sc">}</span><span class="ss"> has been cancelled successfully."</span></span>
+<span id="cb19-29"><a href="#cb19-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-30"><a href="#cb19-30" aria-hidden="true" tabindex="-1"></a>tools <span class="op">=</span> [search_orders, cancel_order]</span>
+<span id="cb19-31"><a href="#cb19-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-32"><a href="#cb19-32" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Agent Graph ─────────────────────────────</span></span>
+<span id="cb19-33"><a href="#cb19-33" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> ChatOpenAI(model<span class="op">=</span><span class="st">"gpt-4.1-mini"</span>, temperature<span class="op">=</span><span class="dv">0</span>).bind_tools(tools)</span>
+<span id="cb19-34"><a href="#cb19-34" aria-hidden="true" tabindex="-1"></a>tool_node <span class="op">=</span> ToolNode(tools)</span>
+<span id="cb19-35"><a href="#cb19-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-36"><a href="#cb19-36" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> should_continue(state: MessagesState) <span class="op">-&gt;</span> Literal[<span class="st">"tools"</span>, <span class="st">"__end__"</span>]:</span>
+<span id="cb19-37"><a href="#cb19-37" aria-hidden="true" tabindex="-1"></a>    last_message <span class="op">=</span> state[<span class="st">"messages"</span>][<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb19-38"><a href="#cb19-38" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> last_message.tool_calls:</span>
+<span id="cb19-39"><a href="#cb19-39" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"tools"</span></span>
+<span id="cb19-40"><a href="#cb19-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="st">"__end__"</span></span>
+<span id="cb19-41"><a href="#cb19-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-42"><a href="#cb19-42" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> call_model(state: MessagesState):</span>
+<span id="cb19-43"><a href="#cb19-43" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> model.invoke(state[<span class="st">"messages"</span>])</span>
+<span id="cb19-44"><a href="#cb19-44" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"messages"</span>: [response]}</span>
+<span id="cb19-45"><a href="#cb19-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-46"><a href="#cb19-46" aria-hidden="true" tabindex="-1"></a>workflow <span class="op">=</span> StateGraph(MessagesState)</span>
+<span id="cb19-47"><a href="#cb19-47" aria-hidden="true" tabindex="-1"></a>workflow.add_node(<span class="st">"agent"</span>, call_model)</span>
+<span id="cb19-48"><a href="#cb19-48" aria-hidden="true" tabindex="-1"></a>workflow.add_node(<span class="st">"tools"</span>, tool_node)</span>
+<span id="cb19-49"><a href="#cb19-49" aria-hidden="true" tabindex="-1"></a>workflow.add_edge(<span class="st">"__start__"</span>, <span class="st">"agent"</span>)</span>
+<span id="cb19-50"><a href="#cb19-50" aria-hidden="true" tabindex="-1"></a>workflow.add_conditional_edges(<span class="st">"agent"</span>, should_continue)</span>
+<span id="cb19-51"><a href="#cb19-51" aria-hidden="true" tabindex="-1"></a>workflow.add_edge(<span class="st">"tools"</span>, <span class="st">"agent"</span>)</span>
+<span id="cb19-52"><a href="#cb19-52" aria-hidden="true" tabindex="-1"></a>app <span class="op">=</span> workflow.<span class="bu">compile</span>()</span>
+<span id="cb19-53"><a href="#cb19-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-54"><a href="#cb19-54" aria-hidden="true" tabindex="-1"></a><span class="co"># ── Multi-Turn Conversation ─────────────────</span></span>
+<span id="cb19-55"><a href="#cb19-55" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> run_conversation():</span>
+<span id="cb19-56"><a href="#cb19-56" aria-hidden="true" tabindex="-1"></a>    thread_id <span class="op">=</span> <span class="bu">str</span>(uuid.uuid4())</span>
+<span id="cb19-57"><a href="#cb19-57" aria-hidden="true" tabindex="-1"></a>    config <span class="op">=</span> {</span>
+<span id="cb19-58"><a href="#cb19-58" aria-hidden="true" tabindex="-1"></a>        <span class="st">"metadata"</span>: {<span class="st">"thread_id"</span>: thread_id, <span class="st">"customer_id"</span>: <span class="st">"cust-001"</span>},</span>
+<span id="cb19-59"><a href="#cb19-59" aria-hidden="true" tabindex="-1"></a>        <span class="st">"tags"</span>: [<span class="st">"production"</span>, <span class="st">"customer-support"</span>],</span>
+<span id="cb19-60"><a href="#cb19-60" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb19-61"><a href="#cb19-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-62"><a href="#cb19-62" aria-hidden="true" tabindex="-1"></a>    messages <span class="op">=</span> []</span>
+<span id="cb19-63"><a href="#cb19-63" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-64"><a href="#cb19-64" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Turn 1</span></span>
+<span id="cb19-65"><a href="#cb19-65" aria-hidden="true" tabindex="-1"></a>    messages.append(HumanMessage(content<span class="op">=</span><span class="st">"What's the status of my order? My customer ID is cust-001."</span>))</span>
+<span id="cb19-66"><a href="#cb19-66" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> app.invoke({<span class="st">"messages"</span>: messages}, config<span class="op">=</span>config)</span>
+<span id="cb19-67"><a href="#cb19-67" aria-hidden="true" tabindex="-1"></a>    messages <span class="op">=</span> result[<span class="st">"messages"</span>]</span>
+<span id="cb19-68"><a href="#cb19-68" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Turn 1: </span><span class="sc">{</span>messages[<span class="op">-</span><span class="dv">1</span>]<span class="sc">.</span>content<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb19-69"><a href="#cb19-69" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-70"><a href="#cb19-70" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Turn 2</span></span>
+<span id="cb19-71"><a href="#cb19-71" aria-hidden="true" tabindex="-1"></a>    messages.append(HumanMessage(content<span class="op">=</span><span class="st">"Please cancel order #1234."</span>))</span>
+<span id="cb19-72"><a href="#cb19-72" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> app.invoke({<span class="st">"messages"</span>: messages}, config<span class="op">=</span>config)</span>
+<span id="cb19-73"><a href="#cb19-73" aria-hidden="true" tabindex="-1"></a>    messages <span class="op">=</span> result[<span class="st">"messages"</span>]</span>
+<span id="cb19-74"><a href="#cb19-74" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Turn 2: </span><span class="sc">{</span>messages[<span class="op">-</span><span class="dv">1</span>]<span class="sc">.</span>content<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb19-75"><a href="#cb19-75" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-76"><a href="#cb19-76" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Turn 3</span></span>
+<span id="cb19-77"><a href="#cb19-77" aria-hidden="true" tabindex="-1"></a>    messages.append(HumanMessage(content<span class="op">=</span><span class="st">"Thanks! That's all I needed."</span>))</span>
+<span id="cb19-78"><a href="#cb19-78" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> app.invoke({<span class="st">"messages"</span>: messages}, config<span class="op">=</span>config)</span>
+<span id="cb19-79"><a href="#cb19-79" aria-hidden="true" tabindex="-1"></a>    messages <span class="op">=</span> result[<span class="st">"messages"</span>]</span>
+<span id="cb19-80"><a href="#cb19-80" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Turn 3: </span><span class="sc">{</span>messages[<span class="op">-</span><span class="dv">1</span>]<span class="sc">.</span>content<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb19-81"><a href="#cb19-81" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-82"><a href="#cb19-82" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Thread ID: </span><span class="sc">{</span>thread_id<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb19-83"><a href="#cb19-83" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"View in LangSmith: https://smith.langchain.com → Threads tab"</span>)</span>
+<span id="cb19-84"><a href="#cb19-84" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-85"><a href="#cb19-85" aria-hidden="true" tabindex="-1"></a>run_conversation()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="observability-checklist-for-production" class="level2">
+<h2 class="anchored" data-anchor-id="observability-checklist-for-production">13. Observability Checklist for Production</h2>
+<p>Before deploying your LLM application to production, ensure every item is covered:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 47%">
+<col style="width: 28%">
+<col style="width: 23%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Category</th>
+<th>Item</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Tracing</strong></td>
+<td>All LLM calls traced</td>
+<td><code>LANGSMITH_TRACING=true</code></td>
+</tr>
+<tr class="even">
+<td><strong>Tracing</strong></td>
+<td>Custom tools traced</td>
+<td><code>@traceable(run_type="tool")</code></td>
+</tr>
+<tr class="odd">
+<td><strong>Tracing</strong></td>
+<td>External APIs traced</td>
+<td><code>@traceable</code> or <code>wrap_openai</code></td>
+</tr>
+<tr class="even">
+<td><strong>Threading</strong></td>
+<td>Multi-turn conversations linked</td>
+<td><code>metadata={"thread_id": ...}</code> on all runs</td>
+</tr>
+<tr class="odd">
+<td><strong>Metadata</strong></td>
+<td>Environment tagged</td>
+<td><code>metadata={"env": "prod"}</code></td>
+</tr>
+<tr class="even">
+<td><strong>Metadata</strong></td>
+<td>App version tagged</td>
+<td><code>metadata={"version": "2.1.0"}</code></td>
+</tr>
+<tr class="odd">
+<td><strong>Cost</strong></td>
+<td>Token usage tracked</td>
+<td>Automatic with LangChain/OpenAI</td>
+</tr>
+<tr class="even">
+<td><strong>Cost</strong></td>
+<td>Budget alerts configured</td>
+<td>LangSmith dashboard</td>
+</tr>
+<tr class="odd">
+<td><strong>Latency</strong></td>
+<td>P99 latency monitored</td>
+<td>LangSmith dashboard</td>
+</tr>
+<tr class="even">
+<td><strong>Errors</strong></td>
+<td>Error rate monitored</td>
+<td>LangSmith dashboard</td>
+</tr>
+<tr class="odd">
+<td><strong>Quality</strong></td>
+<td>Online evaluators configured</td>
+<td>LLM-as-a-judge in LangSmith UI</td>
+</tr>
+<tr class="even">
+<td><strong>Feedback</strong></td>
+<td>User feedback attached</td>
+<td><code>client.create_feedback()</code></td>
+</tr>
+<tr class="odd">
+<td><strong>Retention</strong></td>
+<td>Data retention policy set</td>
+<td>LangSmith project settings</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="langsmith-vs-other-observability-tools" class="level2">
+<h2 class="anchored" data-anchor-id="langsmith-vs-other-observability-tools">LangSmith vs Other Observability Tools</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 15%">
+<col style="width: 19%">
+<col style="width: 29%">
+<col style="width: 17%">
+<col style="width: 17%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Feature</th>
+<th style="text-align: center;">LangSmith</th>
+<th style="text-align: center;">Phoenix (Arize)</th>
+<th style="text-align: center;">Langfuse</th>
+<th style="text-align: center;">Helicone</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>LangChain/LangGraph integration</td>
+<td style="text-align: center;">Native</td>
+<td style="text-align: center;">Plugin</td>
+<td style="text-align: center;">Plugin</td>
+<td style="text-align: center;">Proxy</td>
+</tr>
+<tr class="even">
+<td>Multi-turn threading</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Limited</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr class="odd">
+<td>Token/cost tracking</td>
+<td style="text-align: center;">Automatic</td>
+<td style="text-align: center;">Manual</td>
+<td style="text-align: center;">Automatic</td>
+<td style="text-align: center;">Automatic</td>
+</tr>
+<tr class="even">
+<td>Online evaluation</td>
+<td style="text-align: center;">LLM-as-a-judge</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr class="odd">
+<td>Self-hosted option</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+</tr>
+<tr class="even">
+<td>Annotation queues</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr class="odd">
+<td>Dataset management</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr class="even">
+<td>Deployment (Agent Server)</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">No</td>
+</tr>
+<tr class="odd">
+<td>Best for</td>
+<td style="text-align: center;">LangChain ecosystem</td>
+<td style="text-align: center;">General ML</td>
+<td style="text-align: center;">Open-source focus</td>
+<td style="text-align: center;">API proxy</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="conclusion" class="level2">
+<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
+<p>Observability is not optional for production LLM applications — it is the difference between shipping a chatbot that works and one you can <strong>debug, optimize, and trust</strong>.</p>
+<p>The LangChain + LangGraph + LangSmith stack provides:</p>
+<ul>
+<li><strong>Automatic tracing</strong> of every LLM call, tool invocation, and retrieval step</li>
+<li><strong>Multi-turn threading</strong> to follow entire conversations across turns</li>
+<li><strong>Token and cost tracking</strong> at the run, trace, and thread level</li>
+<li><strong>Latency monitoring</strong> to identify bottlenecks before users notice</li>
+<li><strong>Error tracking</strong> with full context for rapid debugging</li>
+<li><strong>Online evaluation</strong> for continuous quality monitoring</li>
+<li><strong>Production dashboards</strong> for real-time operational visibility</li>
+</ul>
+<p>The observability patterns in this article apply whether you’re running a simple chatbot or a complex multi-agent system with dozens of tools and retrieval sources.</p>
+</section>
+<section id="next-steps" class="level2">
+<h2 class="anchored" data-anchor-id="next-steps">Next Steps</h2>
+<ul>
+<li>Add <strong>guardrails</strong> to your agent — see <a href="../..\posts/llm/Guardrails for LLM Applications with Giskard.html">Guardrails for LLM Applications with Giskard</a></li>
+<li>Optimize <strong>token cost</strong> across conversations — see <a href="../..\posts/llm/FinOps Best Practices for LLM Applications.html">FinOps Best Practices for LLM Applications</a></li>
+<li>Scale your serving infrastructure — see <a href="../..\posts/llm/Scaling LLM Serving for Enterprise Production.html">Scaling LLM Serving for Enterprise Production</a></li>
+<li>Master <strong>prompt and context design</strong> — see <a href="../..\posts/llm/Prompt Engineering vs Context Engineering.html">Prompt Engineering vs Context Engineering</a></li>
+<li>Deploy your model with vLLM — see <a href="../..\posts/llm/Deploying and Serving LLM with vLLM.html">Deploying and Serving LLM with vLLM</a></li>
+<li>Set up offline evaluation with <a href="https://docs.langchain.com/langsmith/evaluate-llm-application">LangSmith datasets and evaluators</a></li>
+<li>Explore <a href="https://docs.langchain.com/langsmith/polly">LangSmith Polly</a> for AI-powered trace analysis</li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/tanquangduong\.github\.io\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> Copyright 2025, Quang T. Duong</p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
