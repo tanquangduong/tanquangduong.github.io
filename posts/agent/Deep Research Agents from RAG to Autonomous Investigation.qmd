@@ -1,0 +1,1077 @@
+---
+title: "Deep Research Agents: from RAG to Autonomous Investigation"
+subtitle: "Iterative retrieval loops, web search integration, self-reflection, source triangulation, and automated report generation"
+image: /images/llm/deep-research-agents-autonomous-investigation-300px.png
+date: "2025-07-16"
+---
+
+**Keywords:** deep research agent, autonomous research, iterative retrieval, web search integration, self-reflection, source triangulation, report generation, STORM, GPT Researcher, LangGraph, multi-agent research, plan-and-execute, Tavily, agentic reasoning, knowledge synthesis
+
+![](/images/llm/deep-research-agents-autonomous-investigation-300px.png){fig-align="center" width=300}
+
+## Introduction
+
+Standard RAG retrieves a handful of chunks from a vector store and generates an answer in a single pass. That works for factual questions with clear answers — but it collapses when the task requires **investigation**: synthesizing information across dozens of sources, cross-checking claims, following citation chains, and producing a structured report with proper attribution.
+
+**Deep research agents** close this gap. They extend the [ReAct](/posts/agent/Building%20a%20ReAct%20Agent%20from%20Scratch.html) loop into a full research workflow: plan what to investigate, search iteratively across the web and local documents, reflect on whether findings are sufficient, triangulate claims across multiple sources, and compile everything into a comprehensive report.
+
+OpenAI, Anthropic, Google, and Perplexity all ship deep research products. Open-source implementations — GPT Researcher, LangChain's Open Deep Research, and STORM — demonstrate that the pattern is reproducible with commodity LLMs and search APIs.
+
+This article covers the full architecture: from the limitations of single-pass RAG, through the core design patterns (iterative retrieval, self-reflection, source triangulation), to working implementations with **LangGraph** and **LlamaIndex**. We build a complete deep research agent from scratch, explore multi-agent research orchestration, and discuss production considerations.
+
+## Why Single-Pass RAG Is Not Enough
+
+### The Research Gap
+
+Consider the query: *"Compare the approaches to AI safety taken by leading labs and summarize the key disagreements."*
+
+A standard RAG pipeline would:
+
+1. Embed the query
+2. Retrieve 5–10 chunks from a vector store
+3. Generate an answer from those chunks
+
+The result is shallow — it can only reference whatever happens to be in the top-k results. Complex research tasks require fundamentally different behavior:
+
+| Capability | Single-Pass RAG | Deep Research Agent |
+|:-----------|:----------------|:-------------------|
+| **Source breadth** | 5–10 chunks from one index | 20–100+ sources from web + local |
+| **Search strategy** | One query, one retrieval | Iterative: refine queries based on findings |
+| **Cross-verification** | None — trusts single source | Triangulates claims across multiple sources |
+| **Decomposition** | None — single query | Breaks question into sub-questions |
+| **Self-reflection** | None | Evaluates completeness, identifies gaps |
+| **Output format** | Short answer | Structured report with citations |
+| **Time budget** | Seconds | Minutes to tens of minutes |
+
+```{mermaid}
+graph LR
+    subgraph RAG["Standard RAG"]
+        A1["Query"] --> B1["Retrieve"] --> C1["Generate"] --> D1["Answer"]
+    end
+
+    subgraph DR["Deep Research Agent"]
+        A2["Query"] --> B2["Plan"]
+        B2 --> C2["Search<br/>Iteratively"]
+        C2 --> D2["Reflect:<br/>Gaps?"]
+        D2 -->|Yes| C2
+        D2 -->|No| E2["Triangulate<br/>Sources"]
+        E2 --> F2["Write<br/>Report"]
+    end
+
+    style RAG fill:#F2F2F2,stroke:#D9D9D9
+    style DR fill:#F2F2F2,stroke:#D9D9D9
+    style D1 fill:#e74c3c,color:#fff,stroke:#333
+    style F2 fill:#27ae60,color:#fff,stroke:#333
+```
+
+### When You Need Deep Research
+
+Deep research agents are the right choice when:
+
+- The question requires **synthesis** across multiple topics or perspectives
+- Answers must be **grounded in sources** with proper citations
+- The research scope is **open-ended** — you don't know all the sub-topics in advance
+- **Accuracy** matters more than speed — the user can wait minutes for a thorough report
+- The output is a **deliverable** (report, briefing, comparison) rather than a quick answer
+
+## Core Design Patterns
+
+Deep research agents combine five interlocking patterns. Each addresses a specific failure mode of simple retrieval.
+
+### Pattern 1: Iterative Retrieval Loops
+
+Instead of one-shot retrieval, the agent searches **multiple times**, using each round's results to refine subsequent queries. This is the difference between a student who reads the first Google result and one who follows citation chains.
+
+```{mermaid}
+graph TD
+    A["Research Question"] --> B["Generate<br/>Search Queries"]
+    B --> C["Execute<br/>Searches"]
+    C --> D["Extract<br/>Key Findings"]
+    D --> E{"Sufficient<br/>Coverage?"}
+    E -->|No| F["Generate<br/>Follow-up Queries"]
+    F --> C
+    E -->|Yes| G["Compile<br/>Findings"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style E fill:#f5a623,color:#fff,stroke:#333
+    style G fill:#27ae60,color:#fff,stroke:#333
+```
+
+The key insight: later queries are **informed by earlier results**. If the first search reveals "RLHF" as a key concept, the agent generates a targeted follow-up query about RLHF — something the original query wouldn't have surfaced.
+
+```python
+from openai import OpenAI
+from tavily import TavilyClient
+
+client = OpenAI()
+tavily = TavilyClient()
+
+
+def iterative_research(
+    question: str,
+    max_rounds: int = 3,
+    queries_per_round: int = 3,
+) -> dict:
+    """Research a question through multiple rounds of search."""
+    all_findings = []
+    all_sources = []
+    search_history = []
+
+    for round_num in range(max_rounds):
+        # Generate search queries based on question + prior findings
+        query_prompt = f"""Given the research question and findings so far,
+generate {queries_per_round} targeted search queries.
+
+Research Question: {question}
+
+Previous findings:
+{chr(10).join(f'- {f}' for f in all_findings[-10:]) if all_findings else 'None yet'}
+
+Previous queries (avoid repeating):
+{chr(10).join(f'- {q}' for q in search_history)}
+
+Return exactly {queries_per_round} search queries, one per line."""
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": query_prompt}],
+            temperature=0.7,
+        )
+        queries = [
+            q.strip().lstrip("0123456789.-) ")
+            for q in response.choices[0].message.content.strip().split("\n")
+            if q.strip()
+        ][:queries_per_round]
+        search_history.extend(queries)
+
+        # Execute searches
+        for query in queries:
+            results = tavily.search(query=query, max_results=5)
+            for result in results.get("results", []):
+                all_sources.append({
+                    "url": result["url"],
+                    "title": result.get("title", ""),
+                    "content": result["content"],
+                    "query": query,
+                    "round": round_num,
+                })
+
+        # Extract findings from this round
+        extraction_prompt = f"""Based on these search results, extract key findings
+relevant to: {question}
+
+Results:
+{chr(10).join(r['content'][:500] for r in all_sources[-15:])}
+
+List the most important findings as bullet points."""
+
+        extraction = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": extraction_prompt}],
+        )
+        round_findings = extraction.choices[0].message.content.strip()
+        all_findings.append(f"[Round {round_num + 1}] {round_findings}")
+
+        # Check if we have enough coverage
+        sufficiency_check = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": f"""Rate research completeness
+for the question: {question}
+
+Findings so far:
+{chr(10).join(all_findings)}
+
+Reply with SUFFICIENT or INSUFFICIENT and a brief explanation."""}],
+        )
+        if "SUFFICIENT" in sufficiency_check.choices[0].message.content:
+            break
+
+    return {
+        "findings": all_findings,
+        "sources": all_sources,
+        "rounds_completed": round_num + 1,
+    }
+```
+
+### Pattern 2: Web Search Integration
+
+Deep research agents need access to the live web — not just a pre-built vector store. **Tavily** provides a search API optimized for AI agents, returning cleaned content rather than raw HTML:
+
+```python
+from tavily import TavilyClient
+
+tavily = TavilyClient()
+
+# Basic search
+results = tavily.search(
+    query="latest advances in retrieval augmented generation 2025",
+    max_results=10,
+    search_depth="advanced",       # More thorough crawling
+    include_raw_content=True,      # Full page content
+)
+
+# Extract — returns a focused answer with sources
+extract = tavily.extract(
+    urls=["https://arxiv.org/abs/2005.11401"]
+)
+
+# Research — full autonomous research workflow
+research = tavily.research(
+    "What are the key differences between RLHF and DPO for LLM alignment?",
+)
+```
+
+For hybrid research over both web and local documents, combine web search with a vector store retriever:
+
+```python
+from langchain_core.tools import tool
+from langchain_community.retrievers import TavilySearchAPIRetriever
+from langchain_community.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings
+
+
+# Web search tool
+@tool
+def web_search(query: str) -> str:
+    """Search the web for current information on a topic."""
+    retriever = TavilySearchAPIRetriever(k=5)
+    docs = retriever.invoke(query)
+    return "\n\n".join(
+        f"Source: {d.metadata.get('source', 'unknown')}\n{d.page_content}"
+        for d in docs
+    )
+
+
+# Local document search tool
+vector_store = FAISS.load_local("./research_index", OpenAIEmbeddings())
+
+
+@tool
+def local_search(query: str) -> str:
+    """Search internal documents and prior research reports."""
+    docs = vector_store.similarity_search(query, k=5)
+    return "\n\n".join(
+        f"Source: {d.metadata.get('source', 'unknown')}\n{d.page_content}"
+        for d in docs
+    )
+```
+
+### Pattern 3: Self-Reflection and Gap Analysis
+
+After each retrieval round, the agent evaluates what it has found and identifies what's missing. This prevents premature report generation from incomplete evidence.
+
+```python
+def reflect_on_findings(
+    question: str,
+    findings: list[str],
+    research_brief: str,
+) -> dict:
+    """Evaluate research completeness and identify gaps."""
+    prompt = f"""You are a research quality evaluator. Assess whether the gathered
+findings are sufficient to answer the research question comprehensively.
+
+Research Brief: {research_brief}
+Research Question: {question}
+
+Findings:
+{chr(10).join(findings)}
+
+Evaluate:
+1. COVERAGE: What percentage of the research brief is addressed? (0-100)
+2. GAPS: What specific sub-topics or perspectives are missing?
+3. CONTRADICTIONS: Are there conflicting claims that need resolution?
+4. SOURCE_QUALITY: Are the sources authoritative and diverse?
+5. VERDICT: SUFFICIENT or NEEDS_MORE_RESEARCH
+
+Respond in JSON format."""
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        response_format={"type": "json_object"},
+    )
+    return json.loads(response.choices[0].message.content)
+```
+
+The reflection loop is what separates a deep research agent from a simple multi-step RAG pipeline. It closes the feedback loop: **search → evaluate → decide → search again or proceed**.
+
+### Pattern 4: Source Triangulation
+
+Triangulation means verifying claims by finding them in **multiple independent sources**. This is how human researchers build confidence in findings and detect misinformation.
+
+```python
+def triangulate_claims(claims: list[dict], sources: list[dict]) -> list[dict]:
+    """Cross-reference claims against multiple sources."""
+    prompt = f"""You are a fact-checking agent. For each claim below, determine
+how many of the provided sources support, contradict, or are neutral on it.
+
+Claims:
+{json.dumps(claims, indent=2)}
+
+Sources:
+{json.dumps([{"url": s["url"], "content": s["content"][:300]} for s in sources], indent=2)}
+
+For each claim, respond with:
+- claim: the original claim
+- support_count: number of sources supporting it
+- contradict_count: number of sources contradicting it
+- confidence: HIGH / MEDIUM / LOW
+- supporting_urls: list of URLs that support this claim
+- notes: any important caveats
+
+Respond as a JSON array."""
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        response_format={"type": "json_object"},
+    )
+    return json.loads(response.choices[0].message.content).get("claims", [])
+```
+
+### Pattern 5: Automated Report Generation
+
+The final step transforms raw findings into a structured report with sections, citations, and a coherent narrative. The report is generated **after all research is complete**, using the full findings as context.
+
+```python
+def generate_report(
+    question: str,
+    findings: list[str],
+    sources: list[dict],
+    triangulated_claims: list[dict],
+) -> str:
+    """Generate a structured research report from findings."""
+    # Deduplicate and format sources
+    unique_sources = {}
+    for s in sources:
+        if s["url"] not in unique_sources:
+            unique_sources[s["url"]] = s
+
+    numbered_sources = list(unique_sources.values())
+
+    prompt = f"""Write a comprehensive research report answering: {question}
+
+## Instructions
+- Use the findings and source material below.
+- Structure the report with clear sections and subsections.
+- Cite sources using numbered references [1], [2], etc.
+- Flag claims with LOW confidence from triangulation.
+- Include a "Sources" section at the end with numbered URLs.
+- Be objective — present multiple perspectives where they exist.
+
+## Research Findings
+{chr(10).join(findings)}
+
+## Triangulated Claims (confidence-rated)
+{json.dumps(triangulated_claims, indent=2)}
+
+## Available Sources
+{chr(10).join(f'[{i+1}] {s["title"]} — {s["url"]}' for i, s in enumerate(numbered_sources))}
+
+Write the report now."""
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=4096,
+    )
+    return response.choices[0].message.content
+```
+
+## Deep Research Agent with LangGraph
+
+LangGraph's graph-based architecture is ideal for deep research — the workflow has clear phases (plan → research → reflect → write) with conditional loops.
+
+### Architecture
+
+```{mermaid}
+graph TD
+    A["User Query"] --> B["Scope &<br/>Brief Generation"]
+    B --> C["Research<br/>Supervisor"]
+    C --> D["Spawn<br/>Sub-Agents"]
+    D --> E1["Sub-Agent 1:<br/>Subtopic A"]
+    D --> E2["Sub-Agent 2:<br/>Subtopic B"]
+    D --> E3["Sub-Agent N:<br/>Subtopic N"]
+    E1 --> F["Collect &<br/>Clean Findings"]
+    E2 --> F
+    E3 --> F
+    F --> G{"Sufficient<br/>Coverage?"}
+    G -->|No| C
+    G -->|Yes| H["Write<br/>Report"]
+    H --> I["Final Report<br/>with Citations"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#9b59b6,color:#fff,stroke:#333
+    style E1 fill:#e67e22,color:#fff,stroke:#333
+    style E2 fill:#e67e22,color:#fff,stroke:#333
+    style E3 fill:#e67e22,color:#fff,stroke:#333
+    style G fill:#f5a623,color:#fff,stroke:#333
+    style I fill:#27ae60,color:#fff,stroke:#333
+```
+
+This follows the three-phase architecture from LangChain's Open Deep Research: **Scope** (clarify and create a research brief), **Research** (supervisor delegates to sub-agents), and **Write** (compile findings into a report).
+
+### State Definition
+
+```python
+from typing import TypedDict, Annotated
+from langgraph.graph import StateGraph, END
+from langgraph.graph.message import add_messages
+
+
+class ResearchState(TypedDict):
+    query: str                                # Original user query
+    research_brief: str                       # Structured research plan
+    sub_topics: list[str]                     # Decomposed sub-questions
+    findings: Annotated[list[dict], lambda x, y: x + y]  # Accumulated findings
+    sources: Annotated[list[dict], lambda x, y: x + y]   # All sources
+    reflection: dict                          # Gap analysis results
+    iteration: int                            # Current research round
+    max_iterations: int                       # Safety limit
+    report: str                               # Final output
+```
+
+### Phase 1: Scope and Brief Generation
+
+```python
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+
+def generate_brief(state: ResearchState) -> dict:
+    """Convert user query into a structured research brief."""
+    response = llm.invoke(f"""Convert this research request into a structured brief.
+
+Query: {state["query"]}
+
+Create a research brief with:
+1. OBJECTIVE: What specific question(s) must be answered
+2. SCOPE: What's in scope and out of scope
+3. SUB_TOPICS: 3-5 specific sub-questions to investigate
+4. SUCCESS_CRITERIA: How to know when research is sufficient
+5. OUTPUT_FORMAT: What the final report should look like
+
+Be specific and actionable.""")
+
+    # Parse sub-topics from brief
+    sub_topics_response = llm.invoke(
+        f"""Extract just the sub-topic questions from this brief as a JSON array of strings:
+{response.content}"""
+    )
+
+    import json
+    try:
+        sub_topics = json.loads(sub_topics_response.content)
+    except json.JSONDecodeError:
+        sub_topics = [state["query"]]
+
+    return {
+        "research_brief": response.content,
+        "sub_topics": sub_topics,
+        "iteration": 0,
+    }
+```
+
+### Phase 2: Research with Sub-Agents
+
+Each sub-topic gets its own research sub-agent with an **isolated context window** — a key architectural lesson from production deep research systems. This prevents context pollution between unrelated sub-topics.
+
+```python
+from langchain_core.tools import tool
+from langgraph.prebuilt import create_react_agent
+from tavily import TavilyClient
+
+tavily = TavilyClient()
+
+
+@tool
+def web_search(query: str) -> str:
+    """Search the web for information on a topic. Returns relevant content with source URLs."""
+    results = tavily.search(query=query, max_results=5, search_depth="advanced")
+    formatted = []
+    for r in results.get("results", []):
+        formatted.append(f"Source: {r['url']}\nTitle: {r.get('title', '')}\n{r['content']}")
+    return "\n\n---\n\n".join(formatted) if formatted else "No results found."
+
+
+@tool
+def extract_page(url: str) -> str:
+    """Extract the full content of a web page for detailed analysis."""
+    result = tavily.extract(urls=[url])
+    if result.get("results"):
+        return result["results"][0].get("raw_content", "")[:5000]
+    return "Could not extract content from URL."
+
+
+# Create a research sub-agent
+research_sub_agent = create_react_agent(
+    model=ChatOpenAI(model="gpt-4o-mini", temperature=0),
+    tools=[web_search, extract_page],
+    prompt="""You are a focused research agent. Your job is to thoroughly
+research ONE specific sub-topic. Search multiple times to get comprehensive
+coverage. After researching, summarize your findings with specific citations.
+
+Always cite your sources with URLs. Search at least 2-3 times with different
+queries to get broad coverage.""",
+)
+
+
+def research_subtopics(state: ResearchState) -> dict:
+    """Run research sub-agents for each sub-topic."""
+    new_findings = []
+    new_sources = []
+
+    for subtopic in state["sub_topics"]:
+        # Each sub-agent gets a clean context
+        result = research_sub_agent.invoke({
+            "messages": [{"role": "user", "content": f"Research this topic thoroughly: {subtopic}"}]
+        })
+
+        # Extract the final answer from the agent
+        final_msg = result["messages"][-1].content
+
+        new_findings.append({
+            "subtopic": subtopic,
+            "content": final_msg,
+            "iteration": state["iteration"],
+        })
+
+        # Extract source URLs from tool call results
+        for msg in result["messages"]:
+            if hasattr(msg, "content") and "Source: http" in str(msg.content):
+                for line in str(msg.content).split("\n"):
+                    if line.startswith("Source: http"):
+                        url = line.replace("Source: ", "").strip()
+                        new_sources.append({
+                            "url": url,
+                            "subtopic": subtopic,
+                        })
+
+    return {
+        "findings": new_findings,
+        "sources": new_sources,
+        "iteration": state["iteration"] + 1,
+    }
+```
+
+### Phase 3: Reflection and Gap Analysis
+
+```python
+def reflect_on_research(state: ResearchState) -> dict:
+    """Evaluate research completeness and identify gaps."""
+    findings_text = "\n\n".join(
+        f"### {f['subtopic']}\n{f['content']}" for f in state["findings"]
+    )
+
+    response = llm.invoke(f"""Evaluate the research completeness.
+
+Research Brief:
+{state['research_brief']}
+
+Findings So Far:
+{findings_text}
+
+Assess:
+1. What percentage of the brief is covered? (0-100)
+2. What specific gaps remain?
+3. Are there contradictions that need resolution?
+4. What follow-up queries would fill the gaps?
+
+Respond in JSON with keys: coverage_pct, gaps, contradictions, follow_up_queries, verdict (SUFFICIENT or NEEDS_MORE)""")
+
+    import json
+    try:
+        reflection = json.loads(response.content)
+    except json.JSONDecodeError:
+        reflection = {"verdict": "SUFFICIENT", "coverage_pct": 80, "gaps": []}
+
+    # Update sub-topics with follow-up queries if more research needed
+    new_sub_topics = reflection.get("follow_up_queries", [])
+
+    return {
+        "reflection": reflection,
+        "sub_topics": new_sub_topics if new_sub_topics else state["sub_topics"],
+    }
+
+
+def should_continue_research(state: ResearchState) -> str:
+    """Decide whether to continue researching or write the report."""
+    reflection = state.get("reflection", {})
+    verdict = reflection.get("verdict", "SUFFICIENT")
+
+    if state["iteration"] >= state["max_iterations"]:
+        return "write_report"
+    if verdict == "NEEDS_MORE" and state.get("sub_topics"):
+        return "research"
+    return "write_report"
+```
+
+### Phase 4: Report Writing
+
+```python
+def write_report(state: ResearchState) -> dict:
+    """Compile findings into a structured report."""
+    findings_text = "\n\n".join(
+        f"### {f['subtopic']}\n{f['content']}" for f in state["findings"]
+    )
+
+    # Deduplicate sources
+    unique_sources = list({s["url"]: s for s in state["sources"]}.values())
+    sources_text = "\n".join(
+        f"[{i+1}] {s['url']}" for i, s in enumerate(unique_sources)
+    )
+
+    report_llm = ChatOpenAI(model="gpt-4o", temperature=0)
+    response = report_llm.invoke(f"""Write a comprehensive research report.
+
+Research Brief:
+{state['research_brief']}
+
+Research Findings:
+{findings_text}
+
+Available Sources:
+{sources_text}
+
+Instructions:
+- Write a well-structured report with sections and subsections
+- Cite sources using [1], [2], etc. matching the source list above
+- Present multiple perspectives where they exist
+- Flag uncertain claims
+- End with a numbered Sources section
+- Aim for thoroughness and clarity""")
+
+    return {"report": response.content}
+```
+
+### Assembling the Graph
+
+```python
+# Build the graph
+graph = StateGraph(ResearchState)
+
+graph.add_node("generate_brief", generate_brief)
+graph.add_node("research", research_subtopics)
+graph.add_node("reflect", reflect_on_research)
+graph.add_node("write_report", write_report)
+
+graph.set_entry_point("generate_brief")
+graph.add_edge("generate_brief", "research")
+graph.add_edge("research", "reflect")
+graph.add_conditional_edges(
+    "reflect",
+    should_continue_research,
+    {"research": "research", "write_report": "write_report"},
+)
+graph.add_edge("write_report", END)
+
+app = graph.compile()
+
+# Run research
+result = app.invoke({
+    "query": "Compare the approaches to AI safety across leading labs",
+    "max_iterations": 3,
+    "findings": [],
+    "sources": [],
+})
+
+print(result["report"])
+```
+
+### Streaming Research Progress
+
+For real-time feedback during long-running research:
+
+```python
+async for event in app.astream(
+    {
+        "query": "What are the key trends in LLM inference optimization?",
+        "max_iterations": 3,
+        "findings": [],
+        "sources": [],
+    },
+    stream_mode="updates",
+):
+    for node_name, state_update in event.items():
+        if node_name == "research":
+            print(f"📚 Completed research round, found {len(state_update.get('findings', []))} topics")
+        elif node_name == "reflect":
+            reflection = state_update.get("reflection", {})
+            print(f"🔍 Coverage: {reflection.get('coverage_pct', '?')}%")
+            print(f"   Gaps: {reflection.get('gaps', [])}")
+        elif node_name == "write_report":
+            print(f"📝 Report generated ({len(state_update.get('report', ''))} chars)")
+```
+
+## Deep Research Agent with LlamaIndex
+
+LlamaIndex's workflow system and built-in RAG tools make it well-suited for deep research over both local documents and web sources.
+
+### Research Agent with Query Engine Tools
+
+```python
+from llama_index.llms.openai import OpenAI
+from llama_index.core.agent.workflow import ReActAgent
+from llama_index.core.tools import FunctionTool, QueryEngineTool
+from llama_index.core.workflow import Context
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+
+
+# Build a local knowledge base
+documents = SimpleDirectoryReader("./research_papers").load_data()
+index = VectorStoreIndex.from_documents(documents)
+local_engine = index.as_query_engine(similarity_top_k=10)
+
+local_tool = QueryEngineTool.from_defaults(
+    query_engine=local_engine,
+    name="local_research",
+    description="Search local research papers and documents. "
+                "Use for finding specific technical details, prior research, "
+                "and internal knowledge.",
+)
+
+
+# Web search tool
+def search_web(query: str) -> str:
+    """Search the web for current information, news, and external sources."""
+    from tavily import TavilyClient
+    tavily = TavilyClient()
+    results = tavily.search(query=query, max_results=5, search_depth="advanced")
+    formatted = []
+    for r in results.get("results", []):
+        formatted.append(f"[{r.get('title', '')}]({r['url']}): {r['content']}")
+    return "\n\n".join(formatted) if formatted else "No results found."
+
+
+web_tool = FunctionTool.from_defaults(fn=search_web)
+
+
+# Reflection tool
+def evaluate_findings(findings_summary: str, original_question: str) -> str:
+    """Evaluate whether the current findings sufficiently answer the question.
+    Returns gaps and suggested follow-up queries."""
+    llm = OpenAI(model="gpt-4o-mini")
+    response = llm.complete(
+        f"""Evaluate these research findings for completeness:
+
+Question: {original_question}
+Findings: {findings_summary}
+
+Identify:
+1. Coverage gaps
+2. Unsupported claims
+3. Missing perspectives
+4. Suggested follow-up searches
+
+Be specific about what's missing."""
+    )
+    return str(response)
+
+
+reflection_tool = FunctionTool.from_defaults(fn=evaluate_findings)
+
+
+# Create the research agent
+research_agent = ReActAgent(
+    tools=[local_tool, web_tool, reflection_tool],
+    llm=OpenAI(model="gpt-4o", temperature=0),
+    system_prompt="""You are a thorough research agent. For each question:
+
+1. PLAN: Break the question into sub-topics
+2. SEARCH: Use both local_research and search_web for each sub-topic
+3. REFLECT: Use evaluate_findings to check completeness
+4. ITERATE: Search again for any gaps identified
+5. SYNTHESIZE: Compile a comprehensive answer with citations
+
+Always search at least 3 times before reflecting. Always cite your sources.""",
+)
+
+ctx = Context(research_agent)
+response = await research_agent.run(
+    "What are the state-of-the-art approaches to reducing LLM hallucination?",
+    ctx=ctx,
+)
+print(response)
+```
+
+### Multi-Step Research Workflow
+
+For more control over the research process, use a structured workflow:
+
+```python
+from llama_index.llms.openai import OpenAI
+from llama_index.core.tools import FunctionTool
+from llama_index.core.agent.workflow import ReActAgent, AgentWorkflow
+
+
+# Planner agent — decomposes the question
+planner = ReActAgent(
+    name="planner",
+    description="Breaks research questions into sub-topics and creates a research plan.",
+    tools=[],
+    llm=OpenAI(model="gpt-4o-mini"),
+    system_prompt="""You are a research planner. Given a question, break it into
+3-5 specific sub-questions that together would provide a comprehensive answer.
+For each sub-question, suggest what type of source would be best (academic, web, internal docs).
+When done, hand off to 'researcher' with your plan.""",
+    can_handoff_to=["researcher"],
+)
+
+# Researcher agent — executes searches
+researcher = ReActAgent(
+    name="researcher",
+    description="Executes search queries and gathers evidence from multiple sources.",
+    tools=[web_tool, local_tool],
+    llm=OpenAI(model="gpt-4o-mini"),
+    system_prompt="""You are a research executor. Follow the research plan provided.
+For each sub-question, search at least 2 different sources. Record all source URLs.
+When research is complete, hand off to 'writer' with your findings.""",
+    can_handoff_to=["writer", "planner"],
+)
+
+# Writer agent — compiles the report
+writer = ReActAgent(
+    name="writer",
+    description="Synthesizes research findings into a structured report with citations.",
+    tools=[reflection_tool],
+    llm=OpenAI(model="gpt-4o"),
+    system_prompt="""You are a research report writer. Given research findings:
+1. Use evaluate_findings to check for gaps
+2. If gaps exist, hand back to 'researcher' with specific follow-up questions
+3. If sufficient, write a structured report with:
+   - Executive summary
+   - Detailed findings by topic
+   - Numbered source citations
+   - Conclusion""",
+    can_handoff_to=["researcher"],
+)
+
+# Create the multi-agent workflow
+workflow = AgentWorkflow(
+    agents=[planner, researcher, writer],
+    root_agent="planner",
+)
+
+ctx = Context(workflow)
+result = await workflow.run(
+    "What are the most effective techniques for reducing latency in LLM serving?",
+    ctx=ctx,
+)
+```
+
+## Open-Source Deep Research Systems
+
+### GPT Researcher
+
+GPT Researcher is the most mature open-source deep research agent. Its architecture follows the Plan-and-Execute pattern:
+
+```{mermaid}
+graph TD
+    A["Research Query"] --> B["Planner Agent:<br/>Generate Sub-Questions"]
+    B --> C1["Crawler Agent 1"]
+    B --> C2["Crawler Agent 2"]
+    B --> C3["Crawler Agent N"]
+    C1 --> D["Summarize &<br/>Track Sources"]
+    C2 --> D
+    C3 --> D
+    D --> E["Filter &<br/>Aggregate"]
+    E --> F["Publisher:<br/>Generate Report"]
+    F --> G["Report<br/>(PDF/Docx/MD)"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#9b59b6,color:#fff,stroke:#333
+    style C1 fill:#e67e22,color:#fff,stroke:#333
+    style C2 fill:#e67e22,color:#fff,stroke:#333
+    style C3 fill:#e67e22,color:#fff,stroke:#333
+    style G fill:#27ae60,color:#fff,stroke:#333
+```
+
+Key design decisions:
+
+- **Parallel crawlers**: Multiple agents search simultaneously for different sub-questions, then their findings are aggregated
+- **Source diversity**: Scrapes 20+ sources per research task to minimize bias
+- **Deep research mode**: Tree-like recursive exploration with configurable depth and breadth (~5 min, ~$0.40 per run with `o3-mini`)
+
+```python
+from gpt_researcher import GPTResearcher
+
+researcher = GPTResearcher(
+    query="What are the implications of multimodal LLMs for autonomous driving?",
+    report_type="research_report",
+)
+
+# Conduct research (iterative search + analysis)
+research_result = await researcher.conduct_research()
+
+# Generate the final report
+report = await researcher.write_report()
+print(report)
+```
+
+### STORM: Synthesis Through Multi-Perspective QA
+
+STORM (Stanford/Shao et al., 2024) takes a different approach: it simulates **conversations between domain experts** to generate Wikipedia-style articles. The process:
+
+1. **Discover perspectives**: Identify different angles on the topic (e.g., for "climate change": scientist, economist, policymaker)
+2. **Simulate interviews**: Each perspective asks questions to a "topic expert" grounded in web sources
+3. **Curate outline**: Organize collected information into a structured outline
+4. **Write article**: Generate from the outline with proper citations
+
+```{mermaid}
+graph TD
+    A["Topic"] --> B["Discover<br/>Perspectives"]
+    B --> C1["Expert 1<br/>asks questions"]
+    B --> C2["Expert 2<br/>asks questions"]
+    B --> C3["Expert 3<br/>asks questions"]
+    C1 --> D["Topic Expert<br/>(grounded in web)"]
+    C2 --> D
+    C3 --> D
+    D --> E["Curate<br/>Outline"]
+    E --> F["Write<br/>Article"]
+    F --> G["Wikipedia-style<br/>Article"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style D fill:#9b59b6,color:#fff,stroke:#333
+    style G fill:#27ae60,color:#fff,stroke:#333
+```
+
+STORM's key insight: **multi-perspective questioning** produces more comprehensive articles than single-perspective research. Evaluation showed STORM articles were rated 25% more organized and 10% broader in coverage compared to standard outline-driven RAG.
+
+### LangChain Open Deep Research
+
+LangChain's open-source implementation follows a three-phase approach with a **research supervisor** that orchestrates sub-agents:
+
+| Phase | Purpose | Key Technique |
+|:------|:--------|:-------------|
+| **Scope** | Clarify query, generate brief | User clarification → research brief compression |
+| **Research** | Gather evidence | Supervisor spawns parallel sub-agents with isolated contexts |
+| **Write** | Produce final report | One-shot generation from brief + all findings |
+
+Lessons from their production deployment:
+
+1. **Multi-agent only for parallelizable research** — writing in parallel produces disjoint reports; write in one shot after all research
+2. **Context isolation** — sub-agents with separate contexts avoid cross-contamination between unrelated subtopics
+3. **Context engineering** — compress chat history into briefs, prune raw tool outputs before returning to supervisor to avoid token bloat
+
+## Architecture Comparison
+
+| System | Architecture | Search Strategy | Multi-Agent | Report Quality |
+|:-------|:------------|:----------------|:-----------|:--------------|
+| **OpenAI Deep Research** | RL-trained agent with browser + Python | Reinforcement-learned browsing | Single agent | Highest — with embedded images, citations |
+| **GPT Researcher** | Plan-and-Execute | Parallel crawlers, 20+ sources | Planner + crawler agents | Long-form with PDF/Docx export |
+| **STORM** | Multi-perspective QA | Simulated expert interviews | Multiple "expert" personas | Wikipedia-style articles |
+| **LangChain Open Deep Research** | Supervisor + sub-agents | Supervisor-delegated parallel search | Supervisor → N sub-agents | Brief-driven comprehensive reports |
+| **Custom LangGraph** | State graph with reflection | Iterative with gap analysis | Configurable | Depends on implementation |
+| **Custom LlamaIndex** | Workflow-based agent | ReAct with hybrid local + web | AgentWorkflow handoffs | Depends on implementation |
+
+## Production Considerations
+
+### Cost Management
+
+Deep research is token-intensive. A single research task can consume 50K–200K tokens across planning, searching, reflecting, and writing:
+
+| Operation | Approximate Tokens | Cost (GPT-4o-mini) |
+|:----------|:-----------------|:------------------|
+| Brief generation | 2K–5K | ~$0.002 |
+| Per sub-agent research round | 10K–30K | ~$0.01 |
+| Reflection per round | 3K–8K | ~$0.003 |
+| Report writing (GPT-4o) | 10K–20K | ~$0.10 |
+| **Total (3 rounds, 4 subtopics)** | **80K–200K** | **$0.15–$0.50** |
+
+**Optimization strategies:**
+
+- Use `gpt-4o-mini` for planning, search, and reflection; `gpt-4o` only for final report
+- Compress sub-agent findings before returning to supervisor (remove raw HTML, irrelevant results)
+- Cache search results to avoid redundant API calls
+- Set token budgets per sub-agent and abort early if exceeded
+
+### Latency
+
+Deep research takes minutes, not seconds. Set user expectations:
+
+- **3–5 subtopics × 2–3 search rounds × 5–10 seconds per search** = 30–150 seconds for research alone
+- Parallelize sub-agent execution to reduce wall-clock time
+- Stream progress updates (current subtopic, search round, gap analysis results) for real-time feedback
+
+### Quality Control
+
+```python
+def quality_gate(report: str, brief: str) -> dict:
+    """Final quality check before delivering the report."""
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": f"""Evaluate this research report:
+
+Brief: {brief}
+Report: {report}
+
+Check:
+1. Does it address all points in the brief?
+2. Are all claims cited with sources?
+3. Are there any hallucinated facts (claims with no source)?
+4. Is the structure clear and logical?
+5. Score (1-10) for: completeness, accuracy, clarity
+
+Respond in JSON."""}],
+        response_format={"type": "json_object"},
+    )
+    return json.loads(response.choices[0].message.content)
+```
+
+### Handling Contradictory Sources
+
+Real-world research frequently encounters conflicting information. The agent should:
+
+1. **Flag contradictions** during reflection
+2. **Present both sides** in the report with source attribution
+3. **Assess source authority** — prefer primary sources, peer-reviewed papers, official documentation
+4. **Note confidence levels** — clearly mark uncertain claims
+
+## Common Pitfalls
+
+| Pitfall | Symptom | Fix |
+|:--------|:--------|:----|
+| **Context window overflow** | Agent crashes on long research sessions | Compress findings per round; use sub-agents with isolated contexts |
+| **Search query repetition** | Agent searches the same thing in every round | Track search history; enforce diversity in query generation |
+| **Source bias** | Report only reflects one perspective | Explicitly prompt for multiple perspectives; verify source diversity |
+| **Infinite research loops** | Agent never decides findings are sufficient | Set max iterations; implement coverage scoring with a concrete threshold |
+| **Citation hallucination** | Sources cited in report don't match actual URLs | Pass numbered source list to report writer; validate citations post-generation |
+| **Token cost explosion** | Research costs dollars instead of cents | Budget per sub-agent; compress raw content; cache search results |
+| **Shallow sub-agent research** | Sub-agents make one search and stop | Prompt sub-agents to search at least 2–3 times; require evidence from multiple sources |
+
+## Conclusion
+
+Deep research agents represent the natural evolution from single-pass RAG to **autonomous investigation**. The core pattern is consistent across all implementations:
+
+**Key takeaways:**
+
+- **Plan → Search → Reflect → Write** is the fundamental loop. The reflection step — evaluating completeness and identifying gaps — is what makes research *deep* rather than just broad.
+- **Iterative retrieval** outperforms single-shot retrieval by allowing later queries to be informed by earlier findings. Each round narrows the knowledge gap.
+- **Source triangulation** catches misinformation by cross-referencing claims across multiple independent sources. Never trust a single source for important claims.
+- **Multi-agent architectures** with isolated contexts scale better than single-agent approaches for multi-topic research. Use sub-agents for research; write the final report in one pass.
+- **Context engineering** is critical — compress chat history into briefs, prune raw tool outputs, and set token budgets to avoid context window limits and cost explosion.
+- **LangGraph** excels at building custom research workflows with explicit state management, conditional loops, and streaming progress updates. **LlamaIndex** shines when combining local RAG indices with web search in a ReAct agent.
+
+Start with a simple iterative retrieval loop, verify it improves answer quality for your use case, then layer on reflection, triangulation, and multi-agent orchestration as needed.
+
+## References
+
+- OpenAI, *Introducing Deep Research*, February 2025. [Blog](https://openai.com/index/introducing-deep-research/)
+- LangChain, *Open Deep Research*, July 2025. [Blog](https://blog.langchain.com/open-deep-research/)
+- Shao et al., *Assisting in Writing Wikipedia-like Articles From Scratch with Large Language Models (STORM)*, NAACL 2024. [arXiv:2402.14207](https://arxiv.org/abs/2402.14207)
+- Wu et al., *Agentic Reasoning: A Streamlined Framework for Enhancing LLM Reasoning with Agentic Tools*, ACL 2025. [arXiv:2502.04644](https://arxiv.org/abs/2502.04644)
+- Elovic, *GPT Researcher: Autonomous Agent for Comprehensive Online Research*, 2024. [GitHub](https://github.com/assafelovic/gpt-researcher)
+- Wang et al., *Plan-and-Solve Prompting: Improving Zero-Shot Chain-of-Thought Reasoning*, ACL 2023. [arXiv:2305.04091](https://arxiv.org/abs/2305.04091)
+- LangGraph Documentation, *Open Deep Research Repository*, 2025. [GitHub](https://github.com/langchain-ai/open_deep_research)
+- Tavily Documentation, *Research API Reference*, 2026. [Docs](https://docs.tavily.com/documentation/api-reference/endpoint/research)
+
+## Read More
+
+- Build the foundational agent loop with [Building a ReAct Agent from Scratch](/posts/agent/Building%20a%20ReAct%20Agent%20from%20Scratch.html) — the Thought-Action-Observation pattern that underpins deep research agents.
+- Add [tool calling and function calling](/posts/agent/Tool%20Use%20and%20Function%20Calling%20for%20Retrieval%20Agents.html) for structured interactions with search APIs and retrieval tools.
+- Design the state graph backbone with [Building Agents with LangGraph](/posts/agent/Building%20Agents%20with%20LangGraph.html) — nodes, edges, and conditional routing.
+- Orchestrate multiple research sub-agents using [Multi-Agent RAG Orchestration Patterns](/posts/agent/Multi-Agent%20RAG%20Orchestration%20Patterns.html).
+- Add persistent context across research sessions with [Memory Systems for Long-Running Retrieval Agents](/posts/agent/Memory%20Systems%20for%20Long-Running%20Retrieval%20Agents.html).
+- Decompose complex research questions with [Planning and Query Decomposition for Complex Retrieval](/posts/agent/Planning%20and%20Query%20Decomposition%20for%20Complex%20Retrieval.html).
+- Ground your research agent in domain documents with [Building a RAG Pipeline from Scratch](/posts/rag/Building%20a%20RAG%20Pipeline%20from%20Scratch.html) and evaluate result quality with [Evaluating RAG Systems](/posts/rag/Evaluating%20RAG%20Systems.html).

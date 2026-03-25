@@ -1,0 +1,1142 @@
+---
+title: "Building a ReAct Agent from Scratch"
+subtitle: "Implementing the Reason-Act loop with tool calling, observation parsing, and stopping conditions in LangGraph and LlamaIndex"
+image: /images/llm/react-agent-from-scratch-300px.png
+date: "2025-06-04"
+---
+
+**Keywords:** ReAct agent, reasoning and acting, tool calling, function calling, LangGraph, LlamaIndex, agent loop, observation parsing, stopping conditions, LLM agent, thought-action-observation, ReAct prompting, state machine, agent architecture
+
+![](/images/llm/react-agent-from-scratch-300px.png){fig-align="center" width=300}
+
+## Introduction
+
+Large language models can reason (chain-of-thought) and they can act (call tools, query APIs). But these two capabilities are exponentially more powerful **when interleaved**. That insight is the foundation of the **ReAct** pattern — Reasoning and Acting — introduced by [Yao et al. (2022)](https://arxiv.org/abs/2210.03629) at Princeton and Google Brain.
+
+A ReAct agent doesn't just think through a problem and produce an answer. It **thinks, acts, observes the result, then thinks again** — repeating this loop until it has enough information to respond. This is the same cognitive pattern humans use: formulate a plan, take a step, check the outcome, adjust.
+
+The result is an agent that can:
+
+- **Decompose** complex questions into tool-calling steps
+- **Ground** its reasoning in real observations rather than hallucinating
+- **Recover** from errors by re-planning after unexpected results
+- **Explain** its logic through visible thought traces
+
+This article builds a ReAct agent from scratch — first as a raw prompt loop to understand the mechanics, then with **LangGraph** and **LlamaIndex** for production use. We cover tool definition, the Thought-Action-Observation cycle, parsing strategies, stopping conditions, and streaming.
+
+## The ReAct Pattern
+
+### Reasoning vs. Acting: Why Both Matter
+
+Before ReAct, LLM capabilities were studied along two separate tracks:
+
+| Approach | Capability | Limitation |
+|:---------|:-----------|:-----------|
+| **Chain-of-Thought (CoT)** | Multi-step reasoning, math, logic | No access to external information — hallucinates when knowledge is insufficient |
+| **Action Generation** | Tool calling, API interaction, environment control | No explicit reasoning — can't plan multi-step strategies or recover from errors |
+
+ReAct's key insight: **interleaving reasoning traces with actions** creates a synergy where reasoning helps plan and interpret actions, while actions ground reasoning in real observations.
+
+```{mermaid}
+graph TD
+    subgraph CoT["Chain-of-Thought Only"]
+        A1["Think"] --> A2["Think"] --> A3["Think"] --> A4["Answer"]
+    end
+
+    subgraph Act["Action Only"]
+        B1["Act"] --> B2["Observe"] --> B3["Act"] --> B4["Observe"]
+    end
+
+    subgraph ReAct["ReAct"]
+        C1["Think"] --> C2["Act"] --> C3["Observe"] --> C4["Think"] --> C5["Act"] --> C6["Observe"] --> C7["Answer"]
+    end
+
+    CoT ~~~ Act 
+    Act ~~~ ReAct
+
+    style CoT fill:#F2F2F2,stroke:#D9D9D9
+    style Act fill:#F2F2F2,stroke:#D9D9D9
+    style ReAct fill:#F2F2F2,stroke:#D9D9D9
+    style A4 fill:#e74c3c,color:#fff,stroke:#333
+    style B4 fill:#e74c3c,color:#fff,stroke:#333
+    style C7 fill:#27ae60,color:#fff,stroke:#333
+```
+
+On HotpotQA (multi-hop question answering), ReAct overcame hallucination and error propagation by interacting with a Wikipedia API. On ALFWorld and WebShop (interactive decision-making), ReAct outperformed imitation and reinforcement learning methods by 34% and 10% absolute success rate respectively — with only one or two in-context examples.
+
+### The Thought-Action-Observation Loop
+
+Every ReAct agent cycle follows three steps:
+
+```{mermaid}
+graph TD
+    A["User Query"] --> B["Thought<br/>Reason about what to do next"]
+    B --> C["Action<br/>Call a tool with specific inputs"]
+    C --> D["Observation<br/>Receive the tool's output"]
+    D --> E{"Enough info<br/>to answer?"}
+    E -->|No| B
+    E -->|Yes| F["Final Answer"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#9b59b6,color:#fff,stroke:#333
+    style C fill:#e67e22,color:#fff,stroke:#333
+    style D fill:#27ae60,color:#fff,stroke:#333
+    style E fill:#f5a623,color:#fff,stroke:#333
+    style F fill:#1abc9c,color:#fff,stroke:#333
+```
+
+**Thought**: The LLM reasons about the current state — what it knows, what it still needs, and which tool to call next. This is the "chain-of-thought" component.
+
+**Action**: The LLM emits a structured tool call — a tool name and its arguments. This is the "acting" component.
+
+**Observation**: The tool executes and returns its output. This new information is appended to the conversation context.
+
+The loop repeats until the LLM decides it has enough information, at which point it emits a **final answer** instead of another action.
+
+### A Concrete Example
+
+> **Query**: "What is the population of the capital of France?"
+
+| Step | Type | Content |
+|:-----|:-----|:--------|
+| 1 | **Thought** | I need to find the capital of France first, then look up its population. |
+| 2 | **Action** | `search("capital of France")` |
+| 3 | **Observation** | Paris is the capital of France. |
+| 4 | **Thought** | Now I know the capital is Paris. I need to find the population of Paris. |
+| 5 | **Action** | `search("population of Paris")` |
+| 6 | **Observation** | The population of Paris is approximately 2.1 million in the city proper. |
+| 7 | **Thought** | I now have enough information to answer the question. |
+| 8 | **Answer** | The capital of France is Paris, with a population of approximately 2.1 million. |
+
+Notice how each thought explicitly states what the agent knows and what it still needs — making the reasoning fully transparent and debuggable.
+
+## Building a ReAct Agent from Scratch
+
+Before using any framework, let's build a minimal ReAct agent with raw OpenAI API calls to understand the mechanics.
+
+### Step 1: Define Tools
+
+Tools are Python functions with clear docstrings that the LLM will reference:
+
+```python
+import json
+import math
+import httpx
+
+
+def search_wikipedia(query: str) -> str:
+    """Search Wikipedia for a query and return the first paragraph of the result."""
+    url = "https://en.wikipedia.org/w/api.php"
+    params = {
+        "action": "query",
+        "list": "search",
+        "srsearch": query,
+        "format": "json",
+        "srlimit": 1,
+    }
+    resp = httpx.get(url, params=params, timeout=10)
+    results = resp.json().get("query", {}).get("search", [])
+    if not results:
+        return "No results found."
+    # Fetch the page extract
+    page_id = results[0]["pageid"]
+    extract_resp = httpx.get(url, params={
+        "action": "query",
+        "prop": "extracts",
+        "exintro": True,
+        "explaintext": True,
+        "pageids": page_id,
+        "format": "json",
+    }, timeout=10)
+    pages = extract_resp.json().get("query", {}).get("pages", {})
+    return pages.get(str(page_id), {}).get("extract", "No extract available.")
+
+
+def calculator(expression: str) -> str:
+    """Evaluate a mathematical expression and return the result.
+    Only supports basic arithmetic: +, -, *, /, **, sqrt(), abs()."""
+    allowed = set("0123456789+-*/.() sqrtab")
+    if not all(c in allowed for c in expression.replace(" ", "")):
+        return "Error: invalid characters in expression"
+    try:
+        result = eval(expression, {"__builtins__": {}}, {"sqrt": math.sqrt, "abs": abs})
+        return str(result)
+    except Exception as e:
+        return f"Error: {e}"
+
+
+def get_current_weather(city: str) -> str:
+    """Get the current weather for a city. Returns temperature and conditions."""
+    # Stub for demonstration — replace with real API call
+    weather_data = {
+        "paris": "15°C, partly cloudy",
+        "london": "12°C, rainy",
+        "tokyo": "22°C, sunny",
+        "new york": "18°C, clear",
+    }
+    return weather_data.get(city.lower(), f"Weather data not available for {city}")
+
+
+# Tool registry
+TOOLS = {
+    "search_wikipedia": search_wikipedia,
+    "calculator": calculator,
+    "get_current_weather": get_current_weather,
+}
+```
+
+### Step 2: The ReAct System Prompt
+
+The prompt defines the Thought-Action-Observation format and available tools:
+
+```python
+def build_react_prompt(tools: dict) -> str:
+    tool_descriptions = "\n".join(
+        f"- {name}: {func.__doc__}" for name, func in tools.items()
+    )
+    return f"""You are a helpful assistant that answers questions by reasoning
+step-by-step and using tools when needed.
+
+## Available Tools
+{tool_descriptions}
+
+## Output Format
+Always use this exact format:
+
+Thought: <your reasoning about what to do next>
+Action: <tool_name>
+Action Input: <input string for the tool>
+
+After receiving a tool result, it will appear as:
+Observation: <tool output>
+
+Continue the Thought/Action/Observation cycle until you have enough
+information. Then respond with:
+
+Thought: I now have enough information to answer.
+Answer: <your final answer>
+
+## Rules
+- ALWAYS start with a Thought.
+- Use exactly ONE tool per Action step.
+- If a tool returns an error, reason about it and try a different approach.
+- Never make up information — use tools to verify facts.
+- Stop after at most 8 reasoning steps.
+"""
+```
+
+### Step 3: The Agent Loop
+
+The core loop: send the conversation to the LLM, parse its output, execute any tool calls, and append the observation:
+
+```python
+from openai import OpenAI
+import re
+
+client = OpenAI()
+
+
+def parse_react_output(text: str) -> dict:
+    """Parse LLM output into thought, action, action_input, or answer."""
+    # Check for final answer
+    answer_match = re.search(r"Answer:\s*(.+)", text, re.DOTALL)
+    if answer_match:
+        return {"type": "answer", "content": answer_match.group(1).strip()}
+
+    # Check for action
+    action_match = re.search(r"Action:\s*(\w+)", text)
+    input_match = re.search(r"Action Input:\s*(.+?)(?:\n|$)", text)
+
+    if action_match and input_match:
+        return {
+            "type": "action",
+            "tool": action_match.group(1).strip(),
+            "input": input_match.group(1).strip(),
+        }
+
+    # If parsing fails, treat as a thought that needs continuation
+    return {"type": "continue", "content": text}
+
+
+def run_react_agent(
+    query: str,
+    tools: dict = TOOLS,
+    model: str = "gpt-4o-mini",
+    max_steps: int = 8,
+    verbose: bool = True,
+) -> str:
+    """Run a ReAct agent loop until it produces a final answer or hits max steps."""
+    system_prompt = build_react_prompt(tools)
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": query},
+    ]
+
+    for step in range(max_steps):
+        # Call the LLM
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=0,
+            max_tokens=1024,
+        )
+        assistant_msg = response.choices[0].message.content.strip()
+        messages.append({"role": "assistant", "content": assistant_msg})
+
+        if verbose:
+            print(f"\n--- Step {step + 1} ---")
+            print(assistant_msg)
+
+        # Parse the output
+        parsed = parse_react_output(assistant_msg)
+
+        if parsed["type"] == "answer":
+            return parsed["content"]
+
+        if parsed["type"] == "action":
+            tool_name = parsed["tool"]
+            tool_input = parsed["input"]
+
+            if tool_name not in tools:
+                observation = f"Error: Unknown tool '{tool_name}'. Available: {list(tools.keys())}"
+            else:
+                try:
+                    observation = tools[tool_name](tool_input)
+                except Exception as e:
+                    observation = f"Error executing {tool_name}: {e}"
+
+            # Append observation to conversation
+            messages.append({"role": "user", "content": f"Observation: {observation}"})
+            if verbose:
+                print(f"Observation: {observation[:200]}...")
+
+    return "Agent reached maximum steps without producing a final answer."
+```
+
+### Step 4: Run It
+
+```python
+answer = run_react_agent("What is the population of the capital of France?")
+print(f"\nFinal Answer: {answer}")
+```
+
+```
+--- Step 1 ---
+Thought: I need to find the capital of France first, then look up its population.
+Action: search_wikipedia
+Action Input: capital of France
+Observation: Paris is the capital and largest city of France...
+
+--- Step 2 ---
+Thought: Paris is the capital. Now I need its population.
+Action: search_wikipedia
+Action Input: population of Paris
+Observation: The City of Paris has a population of 2,048,472 (2024)...
+
+--- Step 3 ---
+Thought: I now have enough information to answer.
+Answer: The capital of France is Paris, with a population of approximately 2.05 million (2024).
+
+Final Answer: The capital of France is Paris, with a population of approximately 2.05 million (2024).
+```
+
+## ReAct Agent with OpenAI Function Calling
+
+The raw text-parsing approach works but is fragile. Modern LLMs support **structured function calling** (tool use) natively, which eliminates parsing errors entirely.
+
+### Define Tools as OpenAI Function Schemas
+
+```python
+TOOL_SCHEMAS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "search_wikipedia",
+            "description": "Search Wikipedia for a query and return the first paragraph.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "The search query"}
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "calculator",
+            "description": "Evaluate a mathematical expression.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "expression": {"type": "string", "description": "Math expression to evaluate"}
+                },
+                "required": ["expression"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_current_weather",
+            "description": "Get current weather for a city.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city": {"type": "string", "description": "City name"}
+                },
+                "required": ["city"],
+            },
+        },
+    },
+]
+```
+
+### The Function-Calling Agent Loop
+
+With native function calling, the LLM returns structured `tool_calls` objects instead of text to parse:
+
+```python
+def run_function_calling_agent(
+    query: str,
+    tools: dict = TOOLS,
+    tool_schemas: list = TOOL_SCHEMAS,
+    model: str = "gpt-4o-mini",
+    max_steps: int = 8,
+    verbose: bool = True,
+) -> str:
+    """ReAct agent using OpenAI's native function calling."""
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant. Use tools to answer questions accurately."},
+        {"role": "user", "content": query},
+    ]
+
+    for step in range(max_steps):
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            tools=tool_schemas,
+            tool_choice="auto",
+            temperature=0,
+        )
+
+        msg = response.choices[0].message
+        messages.append(msg)
+
+        # If no tool calls, we have a final answer
+        if not msg.tool_calls:
+            if verbose:
+                print(f"\n--- Step {step + 1}: Final Answer ---")
+                print(msg.content)
+            return msg.content
+
+        # Process each tool call
+        for tool_call in msg.tool_calls:
+            name = tool_call.function.name
+            args = json.loads(tool_call.function.arguments)
+
+            if verbose:
+                print(f"\n--- Step {step + 1}: Tool Call ---")
+                print(f"  Tool: {name}")
+                print(f"  Args: {args}")
+
+            if name in tools:
+                result = tools[name](**args)
+            else:
+                result = f"Error: Unknown tool '{name}'"
+
+            if verbose:
+                print(f"  Result: {result[:200]}...")
+
+            # Append the tool result
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": str(result),
+            })
+
+    return "Agent reached maximum steps."
+```
+
+### Text Parsing vs. Function Calling
+
+| Aspect | Text Parsing (Raw ReAct) | Native Function Calling |
+|:-------|:-------------------------|:-----------------------|
+| **Reliability** | Fragile — regex can break on format variations | Robust — structured JSON output |
+| **Model compatibility** | Works with any LLM (including open-source) | Requires function-calling support (OpenAI, Anthropic, etc.) |
+| **Parallel tool calls** | One tool per step | Can call multiple tools in one step |
+| **Transparency** | Explicit `Thought:` traces visible | Thoughts may be hidden in internal reasoning |
+| **Latency** | One LLM call per step | Same, but can batch parallel calls |
+
+**Recommendation**: Use **native function calling** for production agents with supported models. Use **text-parsed ReAct** when working with open-source models or when you need explicit thought visibility.
+
+## ReAct Agent with LangGraph
+
+LangGraph models the ReAct loop as a **state graph** — nodes are processing steps, edges define the flow, and conditional edges handle the "should I call a tool or return?" decision.
+
+### Architecture
+
+```{mermaid}
+graph TD
+    A["__start__"] --> B["agent"]
+    B --> C{"Tool calls<br/>in response?"}
+    C -->|Yes| D["tools"]
+    C -->|No| E["__end__"]
+    D --> B
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#9b59b6,color:#fff,stroke:#333
+    style C fill:#f5a623,color:#fff,stroke:#333
+    style D fill:#e67e22,color:#fff,stroke:#333
+    style E fill:#1abc9c,color:#fff,stroke:#333
+```
+
+The graph has two nodes:
+
+1. **agent**: Calls the LLM with the current messages and tools
+2. **tools**: Executes any tool calls from the LLM's response
+
+A conditional edge after the agent node checks if the response contains tool calls. If yes, route to the tools node (which loops back to agent). If no, route to end.
+
+### Using the Prebuilt `create_react_agent`
+
+LangGraph provides a prebuilt ReAct agent that handles the graph construction:
+
+```python
+from langgraph.prebuilt import create_react_agent
+from langchain_openai import ChatOpenAI
+from langchain_core.tools import tool
+
+
+# Define tools using LangChain's @tool decorator
+@tool
+def search_wikipedia(query: str) -> str:
+    """Search Wikipedia for a query and return the first paragraph of the result."""
+    import httpx
+    url = "https://en.wikipedia.org/w/api.php"
+    params = {
+        "action": "query",
+        "list": "search",
+        "srsearch": query,
+        "format": "json",
+        "srlimit": 1,
+    }
+    resp = httpx.get(url, params=params, timeout=10)
+    results = resp.json().get("query", {}).get("search", [])
+    if not results:
+        return "No results found."
+    page_id = results[0]["pageid"]
+    extract_resp = httpx.get(url, params={
+        "action": "query",
+        "prop": "extracts",
+        "exintro": True,
+        "explaintext": True,
+        "pageids": page_id,
+        "format": "json",
+    }, timeout=10)
+    pages = extract_resp.json().get("query", {}).get("pages", {})
+    return pages.get(str(page_id), {}).get("extract", "No extract available.")
+
+
+@tool
+def calculator(expression: str) -> str:
+    """Evaluate a mathematical expression. Supports +, -, *, /, **."""
+    import math
+    try:
+        result = eval(expression, {"__builtins__": {}}, {"sqrt": math.sqrt, "abs": abs})
+        return str(result)
+    except Exception as e:
+        return f"Error: {e}"
+
+
+@tool
+def get_current_weather(city: str) -> str:
+    """Get the current weather for a city. Returns temperature and conditions."""
+    weather_data = {
+        "paris": "15°C, partly cloudy",
+        "london": "12°C, rainy",
+        "tokyo": "22°C, sunny",
+        "new york": "18°C, clear",
+    }
+    return weather_data.get(city.lower(), f"Weather data not available for {city}")
+
+
+# Create the agent
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+tools = [search_wikipedia, calculator, get_current_weather]
+
+agent = create_react_agent(
+    model=llm,
+    tools=tools,
+)
+
+# Run the agent
+result = agent.invoke({
+    "messages": [{"role": "user", "content": "What is 25 * 4 + the square root of 144?"}]
+})
+
+# Print all messages
+for msg in result["messages"]:
+    print(f"{msg.type}: {msg.content[:200] if msg.content else '[tool_calls]'}")
+```
+
+### Building the Graph Manually
+
+For full control, here's how to build the same graph from scratch:
+
+```python
+from typing import TypedDict, Annotated
+from langgraph.graph import StateGraph, END
+from langgraph.graph.message import add_messages
+from langgraph.prebuilt import ToolNode
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import AIMessage
+
+
+# 1. Define the state
+class AgentState(TypedDict):
+    messages: Annotated[list, add_messages]
+
+
+# 2. Define the agent node
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+llm_with_tools = llm.bind_tools(tools)
+
+
+def agent_node(state: AgentState) -> dict:
+    """Call the LLM with current messages and tools."""
+    response = llm_with_tools.invoke(state["messages"])
+    return {"messages": [response]}
+
+
+# 3. Define the conditional edge
+def should_continue(state: AgentState) -> str:
+    """Check if the last message has tool calls."""
+    last_message = state["messages"][-1]
+    if isinstance(last_message, AIMessage) and last_message.tool_calls:
+        return "tools"
+    return END
+
+
+# 4. Build the graph
+graph = StateGraph(AgentState)
+graph.add_node("agent", agent_node)
+graph.add_node("tools", ToolNode(tools))
+
+graph.set_entry_point("agent")
+graph.add_conditional_edges("agent", should_continue, {"tools": "tools", END: END})
+graph.add_edge("tools", "agent")
+
+# 5. Compile and run
+app = graph.compile()
+
+result = app.invoke({
+    "messages": [{"role": "user", "content": "What's the weather in Tokyo and what is 15 * 7?"}]
+})
+```
+
+### Adding Memory with Checkpointing
+
+LangGraph supports persistent memory through checkpointers — enabling multi-turn conversations:
+
+```python
+from langgraph.checkpoint.memory import MemorySaver
+
+# Compile with memory
+checkpointer = MemorySaver()
+app = graph.compile(checkpointer=checkpointer)
+
+# First turn
+config = {"configurable": {"thread_id": "user-123"}}
+result1 = app.invoke(
+    {"messages": [{"role": "user", "content": "What's the weather in Paris?"}]},
+    config=config,
+)
+
+# Second turn — agent remembers the conversation
+result2 = app.invoke(
+    {"messages": [{"role": "user", "content": "How about London?"}]},
+    config=config,
+)
+```
+
+### Streaming Agent Steps
+
+For real-time UI feedback, stream each step as it happens:
+
+```python
+async for event in app.astream_events(
+    {"messages": [{"role": "user", "content": "What is the population of Tokyo?"}]},
+    version="v2",
+):
+    kind = event["event"]
+    if kind == "on_chat_model_stream":
+        # Token-level streaming from the LLM
+        content = event["data"]["chunk"].content
+        if content:
+            print(content, end="", flush=True)
+    elif kind == "on_tool_start":
+        print(f"\n🔧 Calling tool: {event['name']}")
+    elif kind == "on_tool_end":
+        print(f"📋 Result: {event['data'].output[:200]}")
+```
+
+### Customizing the Prebuilt Agent
+
+The `create_react_agent` accepts several customization parameters:
+
+```python
+from langgraph.prebuilt import create_react_agent
+from langchain_core.prompts import ChatPromptTemplate
+
+# Custom system prompt
+agent = create_react_agent(
+    model=llm,
+    tools=tools,
+    prompt="You are a research assistant. Always cite your sources. "
+           "If you're unsure, say so rather than guessing.",
+)
+
+# With a maximum number of tool-calling steps
+agent = create_react_agent(
+    model=llm,
+    tools=tools,
+    prompt="You are a helpful assistant.",
+)
+```
+
+## ReAct Agent with LlamaIndex
+
+LlamaIndex provides `ReActAgent` as part of its agent workflow system. It uses text-based ReAct prompting (Thought/Action/Observation format) rather than native function calling, making it compatible with **any LLM** — including open-source models that don't support function calling.
+
+### Basic ReAct Agent
+
+```python
+from llama_index.llms.openai import OpenAI
+from llama_index.core.agent.workflow import ReActAgent
+from llama_index.core.tools import FunctionTool
+from llama_index.core.workflow import Context
+
+
+# Define tools
+def search_wikipedia(query: str) -> str:
+    """Search Wikipedia for a query and return the first paragraph of the result."""
+    import httpx
+    url = "https://en.wikipedia.org/w/api.php"
+    params = {
+        "action": "query",
+        "list": "search",
+        "srsearch": query,
+        "format": "json",
+        "srlimit": 1,
+    }
+    resp = httpx.get(url, params=params, timeout=10)
+    results = resp.json().get("query", {}).get("search", [])
+    if not results:
+        return "No results found."
+    page_id = results[0]["pageid"]
+    extract_resp = httpx.get(url, params={
+        "action": "query",
+        "prop": "extracts",
+        "exintro": True,
+        "explaintext": True,
+        "pageids": page_id,
+        "format": "json",
+    }, timeout=10)
+    pages = extract_resp.json().get("query", {}).get("pages", {})
+    return pages.get(str(page_id), {}).get("extract", "No extract available.")
+
+
+def calculator(expression: str) -> str:
+    """Evaluate a mathematical expression and return the result."""
+    import math
+    try:
+        result = eval(expression, {"__builtins__": {}}, {"sqrt": math.sqrt, "abs": abs})
+        return str(result)
+    except Exception as e:
+        return f"Error: {e}"
+
+
+# Wrap as FunctionTools
+search_tool = FunctionTool.from_defaults(fn=search_wikipedia)
+calc_tool = FunctionTool.from_defaults(fn=calculator)
+
+# Create the agent
+llm = OpenAI(model="gpt-4o-mini", temperature=0)
+agent = ReActAgent(
+    tools=[search_tool, calc_tool],
+    llm=llm,
+)
+
+# Run with a context for conversation state
+ctx = Context(agent)
+response = await agent.run("What is 20 + (2 * 4)?", ctx=ctx)
+print(response)
+```
+
+### Streaming the ReAct Trace
+
+LlamaIndex streams the full Thought-Action-Observation trace:
+
+```python
+from llama_index.core.agent.workflow import AgentStream, ToolCallResult
+
+handler = agent.run("What is the population of Japan?", ctx=ctx)
+
+async for ev in handler.stream_events():
+    if isinstance(ev, ToolCallResult):
+        print(f"\n🔧 Called {ev.tool_name}({ev.tool_kwargs})")
+        print(f"📋 Result: {ev.tool_output}")
+    if isinstance(ev, AgentStream):
+        print(ev.delta, end="", flush=True)
+
+response = await handler
+```
+
+Output:
+```
+Thought: I need to search for the current population of Japan.
+Action: search_wikipedia
+Action Input: {"query": "population of Japan"}
+
+🔧 Called search_wikipedia({'query': 'population of Japan'})
+📋 Result: Japan has a population of approximately 123 million...
+
+Thought: I can answer without using any more tools.
+Answer: Japan has a population of approximately 123 million people.
+```
+
+### The ReAct Prompt Under the Hood
+
+LlamaIndex's `ReActAgent` uses a specific prompt format:
+
+```
+Thought: The current language of the user is: English. I need to use a tool
+         to help me answer the question.
+Action: tool_name
+Action Input: {"param": "value"}
+```
+
+After receiving the tool output:
+```
+Observation: <tool output>
+```
+
+The agent continues until it reaches:
+```
+Thought: I can answer without using any more tools.
+Answer: <final answer>
+```
+
+### Connecting RAG Tools to a ReAct Agent
+
+The real power of ReAct agents emerges when you connect retrieval tools:
+
+```python
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+from llama_index.core.tools import QueryEngineTool
+
+# Build a RAG index
+documents = SimpleDirectoryReader("./docs").load_data()
+index = VectorStoreIndex.from_documents(documents)
+query_engine = index.as_query_engine(similarity_top_k=5)
+
+# Wrap as a tool
+rag_tool = QueryEngineTool.from_defaults(
+    query_engine=query_engine,
+    name="knowledge_base",
+    description="Search the internal knowledge base for technical documentation. "
+                "Use this for questions about our products, APIs, and procedures.",
+)
+
+# Create agent with RAG + other tools
+agent = ReActAgent(
+    tools=[rag_tool, search_tool, calc_tool],
+    llm=OpenAI(model="gpt-4o-mini"),
+)
+
+ctx = Context(agent)
+response = await agent.run(
+    "What is the rate limit for our API and how many requests "
+    "can I make per hour if the limit is per minute?",
+    ctx=ctx,
+)
+```
+
+The agent will:
+
+1. **Think**: I need to find the rate limit from the knowledge base
+2. **Act**: Call `knowledge_base` with the rate limit query
+3. **Observe**: "Rate limit is 60 requests per minute"
+4. **Think**: Now I need to calculate requests per hour
+5. **Act**: Call `calculator` with "60 * 60"
+6. **Observe**: "3600"
+7. **Answer**: The API rate limit is 60 requests per minute, which allows 3,600 requests per hour
+
+## Stopping Conditions and Safety
+
+### Why Stopping Conditions Matter
+
+Without proper stopping conditions, an agent can:
+
+- **Loop infinitely** — calling the same tool repeatedly with the same query
+- **Burn tokens and money** — each step costs an LLM call
+- **Hallucinate actions** — inventing tool names that don't exist
+- **Spiral** — each error leads to more errors
+
+### Essential Stopping Conditions
+
+```{mermaid}
+graph TD
+    A["Agent Step"] --> B{"Max steps<br/>reached?"}
+    B -->|Yes| C["Force stop:<br/>Return best answer so far"]
+    B -->|No| D{"Same tool + input<br/>as last N steps?"}
+    D -->|Yes| E["Break loop:<br/>Try different approach"]
+    D -->|No| F{"Token budget<br/>exceeded?"}
+    F -->|Yes| G["Stop: Budget limit"]
+    F -->|No| H{"Final answer<br/>emitted?"}
+    H -->|Yes| I["Return answer ✓"]
+    H -->|No| A
+
+    style C fill:#e74c3c,color:#fff,stroke:#333
+    style E fill:#f5a623,color:#fff,stroke:#333
+    style G fill:#e74c3c,color:#fff,stroke:#333
+    style I fill:#27ae60,color:#fff,stroke:#333
+```
+
+### Implementing Robust Stopping
+
+```python
+from collections import Counter
+
+
+def run_react_agent_safe(
+    query: str,
+    tools: dict,
+    model: str = "gpt-4o-mini",
+    max_steps: int = 8,
+    max_repeated_calls: int = 2,
+    max_tokens_budget: int = 50000,
+) -> str:
+    """ReAct agent with comprehensive stopping conditions."""
+    system_prompt = build_react_prompt(tools)
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": query},
+    ]
+    call_history = []
+    total_tokens = 0
+
+    for step in range(max_steps):
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=0,
+            max_tokens=1024,
+        )
+        total_tokens += response.usage.total_tokens
+        assistant_msg = response.choices[0].message.content.strip()
+        messages.append({"role": "assistant", "content": assistant_msg})
+
+        parsed = parse_react_output(assistant_msg)
+
+        # Stop condition 1: Final answer
+        if parsed["type"] == "answer":
+            return parsed["content"]
+
+        # Stop condition 2: Token budget
+        if total_tokens > max_tokens_budget:
+            return f"Budget exceeded ({total_tokens} tokens). Last state: {assistant_msg}"
+
+        if parsed["type"] == "action":
+            call_key = f"{parsed['tool']}:{parsed['input']}"
+            call_history.append(call_key)
+
+            # Stop condition 3: Repeated identical calls
+            recent_calls = call_history[-3:]
+            if len(recent_calls) >= max_repeated_calls and len(set(recent_calls)) == 1:
+                messages.append({
+                    "role": "user",
+                    "content": "Observation: You've made the same tool call multiple times. "
+                               "Please try a different approach or provide your best answer.",
+                })
+                continue
+
+            # Execute the tool
+            if parsed["tool"] in tools:
+                result = tools[parsed["tool"]](parsed["input"])
+            else:
+                result = f"Error: Unknown tool '{parsed['tool']}'. Available: {list(tools.keys())}"
+
+            messages.append({"role": "user", "content": f"Observation: {result}"})
+
+    # Stop condition 4: Max steps
+    return "Agent reached maximum steps. Unable to produce a final answer."
+```
+
+### Stopping Condition Summary
+
+| Condition | Why It's Needed | Default Value |
+|:----------|:---------------|:-------------|
+| **Max steps** | Prevent infinite loops | 8–15 steps |
+| **Final answer detection** | Normal termination | Parse `Answer:` or no tool calls |
+| **Repeated call detection** | Break degenerate loops | 2–3 identical consecutive calls |
+| **Token/cost budget** | Cost control | Project-dependent |
+| **Timeout** | Wall-clock time limit | 30–120 seconds |
+| **Tool error threshold** | Fail gracefully | 3 consecutive errors |
+
+## LangGraph vs. LlamaIndex: Comparison
+
+| Feature | LangGraph | LlamaIndex ReActAgent |
+|:--------|:----------|:---------------------|
+| **Architecture** | State graph with nodes and edges | Workflow-based agent loop |
+| **Tool calling** | Native function calling via `bind_tools` | Text-parsed ReAct format (Thought/Action/Observation) |
+| **LLM compatibility** | Requires function-calling support | Works with any LLM |
+| **State management** | Explicit `TypedDict` state, checkpointers | `Context` object for conversation state |
+| **Memory** | Built-in checkpointers (SQLite, Postgres) | Context-based session memory |
+| **Streaming** | `astream_events` with event types | `stream_events` with `AgentStream`, `ToolCallResult` |
+| **Customization** | Full graph control — add any nodes/edges | Custom prompts, tool definitions |
+| **Human-in-the-loop** | `interrupt_before`/`interrupt_after` on nodes | Workflow step handlers |
+| **Multi-agent** | Native — multiple graphs, sub-graphs | `AgentWorkflow` with agent handoffs |
+| **Prebuilt** | `create_react_agent` one-liner | `ReActAgent` constructor |
+| **Best for** | Complex stateful workflows, production agents | RAG-centric agents, rapid prototyping |
+
+### When to Use Which
+
+**Choose LangGraph when:**
+
+- You need complex control flow (loops, branches, human approval)
+- You want persistent state across sessions (checkpointers)
+- You're building multi-agent systems with sub-graphs
+- You need production features (streaming, interrupts, deployment)
+
+**Choose LlamaIndex ReActAgent when:**
+
+- You're building RAG-centric agents with query engine tools
+- You want to use open-source LLMs without function calling
+- You need visible Thought/Action/Observation traces for debugging
+- You want rapid prototyping with minimal boilerplate
+
+## Beyond Basic ReAct: Advanced Patterns
+
+### ReAct + Self-Reflection
+
+Add a reflection step where the agent evaluates its own answer quality:
+
+```python
+@tool
+def self_check(answer: str, question: str) -> str:
+    """Check if an answer fully addresses the question. Returns feedback."""
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{
+            "role": "user",
+            "content": f"Question: {question}\nAnswer: {answer}\n\n"
+                       f"Does this answer fully address the question? "
+                       f"If not, what's missing? Be specific.",
+        }],
+        temperature=0,
+    )
+    return response.choices[0].message.content
+```
+
+### ReAct + Query Decomposition
+
+For multi-part questions, decompose before entering the ReAct loop:
+
+```python
+@tool
+def decompose_query(complex_query: str) -> str:
+    """Break a complex question into simpler sub-questions."""
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{
+            "role": "user",
+            "content": f"Break this question into 2-4 simple sub-questions "
+                       f"that can each be answered independently:\n\n{complex_query}",
+        }],
+        temperature=0,
+    )
+    return response.choices[0].message.content
+```
+
+### ReAct + Multiple Retrieval Sources
+
+Route to different tools based on the query type:
+
+```python
+from llama_index.core.tools import QueryEngineTool
+
+# Different RAG indices for different data sources
+docs_tool = QueryEngineTool.from_defaults(
+    query_engine=docs_index.as_query_engine(),
+    name="technical_docs",
+    description="Search technical documentation for API references, configuration, and how-to guides.",
+)
+
+tickets_tool = QueryEngineTool.from_defaults(
+    query_engine=tickets_index.as_query_engine(),
+    name="support_tickets",
+    description="Search resolved support tickets for known issues and workarounds.",
+)
+
+changelog_tool = QueryEngineTool.from_defaults(
+    query_engine=changelog_index.as_query_engine(),
+    name="changelog",
+    description="Search release notes and changelogs for version-specific changes.",
+)
+
+agent = ReActAgent(
+    tools=[docs_tool, tickets_tool, changelog_tool, calc_tool],
+    llm=OpenAI(model="gpt-4o-mini"),
+)
+```
+
+The agent will reason about which source to query for each sub-question — routing API questions to `technical_docs`, bug reports to `support_tickets`, and version questions to `changelog`.
+
+## Common Pitfalls and How to Fix Them
+
+| Pitfall | Symptom | Fix |
+|:--------|:--------|:----|
+| **Infinite loops** | Agent keeps calling the same tool | Add repeated-call detection and max steps |
+| **Tool hallucination** | Agent invents tool names | Validate tool names before execution; include available tools in error message |
+| **Overly verbose thoughts** | Agent writes paragraphs of reasoning per step | Add "Be concise in your thoughts" to system prompt |
+| **Ignoring observations** | Agent doesn't use tool output in next thought | Add "You MUST reference the Observation in your next Thought" |
+| **Premature answers** | Agent answers before gathering enough info | Add "Do NOT answer until you have verified the facts with tools" |
+| **JSON parsing failures** | Action Input is malformed | Use native function calling instead of text parsing |
+| **Cost explosion** | Complex queries use 20+ steps | Set token budgets and max step limits |
+| **Context window overflow** | Long conversations exceed model limits | Summarize older messages or use context compression |
+
+## Conclusion
+
+The ReAct pattern is the foundation of modern AI agents. By interleaving reasoning traces with tool actions and observations, it produces agents that are **grounded** (they verify facts), **transparent** (you can follow their logic), and **robust** (they recover from errors).
+
+**Key takeaways:**
+
+- **ReAct = Think + Act + Observe**, repeated until done. The thought traces make the agent's decision process fully inspectable.
+- **Text-parsed ReAct** works with any LLM but requires careful output parsing. **Function calling** is more reliable but requires model support.
+- **LangGraph** models the agent as a state graph — ideal for complex workflows with branching, memory, and human-in-the-loop. Use `create_react_agent` for a quick start or build the graph manually for full control.
+- **LlamaIndex ReActAgent** excels at RAG-centric agents, works with any LLM, and provides visible thought traces. Wrap your RAG index as a `QueryEngineTool` and the agent handles routing automatically.
+- **Stopping conditions are critical** — always implement max steps, repeated-call detection, and token budgets to prevent runaway agents.
+- **The real power** comes from connecting retrieval tools — once a ReAct agent can query vector stores, databases, and APIs, it becomes a general-purpose reasoning system that grounds its answers in real data.
+
+Start with the simplest version that works (prebuilt `create_react_agent` or `ReActAgent`), verify it handles your use cases, then add complexity (custom graphs, memory, multi-agent) only when needed.
+
+
+## References
+
+- Yao et al., [ReAct: Synergizing Reasoning and Acting in Language Models](https://arxiv.org/abs/2210.03629), ICLR 2023 — the foundational paper introducing the Thought-Action-Observation loop.
+- Yang et al., [HotpotQA: A Dataset for Diverse, Explainable Multi-hop Question Answering](https://arxiv.org/abs/1809.09600), EMNLP 2018 — multi-hop QA benchmark used to evaluate ReAct.
+- Shridhar et al., [ALFWorld: Aligning Text and Embodied Environments for Interactive Learning](https://arxiv.org/abs/2010.03768), ICLR 2021 — interactive decision-making benchmark.
+- Yao et al., [WebShop: Towards Scalable Real-World Web Interaction with Grounded Language Agents](https://arxiv.org/abs/2207.01206), NeurIPS 2022 — web interaction benchmark.
+- LangChain, [LangGraph create_react_agent](https://langchain-ai.github.io/langgraph/reference/prebuilt/#langgraph.prebuilt.create_react_agent) — prebuilt ReAct agent documentation.
+- LlamaIndex, [ReActAgent Workflow](https://docs.llamaindex.ai/en/stable/module_guides/deploying/agents/) — LlamaIndex agent documentation.
+
+
+## Read More
+
+- Connect your ReAct agent to multiple retrieval sources with [Agentic RAG](/posts/rag/Agentic%20RAG%20When%20Retrieval%20Needs%20Reasoning.html) patterns for query routing, self-reflection, and iterative refinement.
+- Add structured knowledge retrieval with [GraphRAG](/posts/rag/GraphRAG%20Knowledge%20Graphs%20Meet%20Retrieval-Augmented%20Generation.html) as a tool for entity-relationship queries.
+- Implement [guardrails](/posts/llm/Guardrails%20for%20LLM%20Applications%20with%20Giskard.html) to validate tool inputs and agent outputs before they reach users.
+- Monitor agent behavior in production with [observability](/posts/llm/Observability%20for%20Multi-Turn%20LLM%20Conversations.html) tools that trace every Thought-Action-Observation step.

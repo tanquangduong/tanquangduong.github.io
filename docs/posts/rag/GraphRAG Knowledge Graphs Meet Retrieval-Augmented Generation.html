@@ -1,0 +1,1676 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.36">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2025-04-16">
+
+<title>GraphRAG: Knowledge Graphs Meet Retrieval-Augmented Generation – Quang Duong</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../..//images/favicon.ico" rel="icon">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dbc92dda8186f57fa2e333fbb71d6a9d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-b981e3f33a8ad6ba97cc0b6118e04959.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/all.css" rel="stylesheet">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/latex-fontsize.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="../../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="../../styles.css">
+<meta property="og:title" content="GraphRAG: Knowledge Graphs Meet Retrieval-Augmented Generation – Quang Duong">
+<meta property="og:description" content="Building and querying knowledge graphs for RAG with Neo4j, LlamaIndex, and Microsoft GraphRAG — from entity extraction to community summarization">
+<meta property="og:image" content="https://tanquangduong.github.io//images/llm/graphrag-knowledge-graphs-rag-300px.png">
+<meta property="og:site_name" content="Quang Duong">
+<meta name="twitter:title" content="GraphRAG: Knowledge Graphs Meet Retrieval-Augmented Generation – Quang Duong">
+<meta name="twitter:description" content="Building and querying knowledge graphs for RAG with Neo4j, LlamaIndex, and Microsoft GraphRAG — from entity extraction to community summarization">
+<meta name="twitter:image" content="https://tanquangduong.github.io//images/llm/graphrag-knowledge-graphs-rag-300px.png">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+
+<body class="nav-sidebar docked quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">
+      Quang Duong
+      </li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../../">Quang Duong</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://www.linkedin.com/in/tanquangduong/" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-linkedin"></i></a>
+    <a href="https://github.com/tanquangduong" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">AI Engineering</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">LLM</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/rag.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">RAG</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/agent.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Agent</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/stack.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Stack</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/article.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Article</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title"><strong>Sections</strong></h2>
+   
+  <ul class="collapse">
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#why-vector-only-rag-fails" id="toc-why-vector-only-rag-fails" class="nav-link" data-scroll-target="#why-vector-only-rag-fails">Why Vector-Only RAG Fails</a></li>
+  <li><a href="#knowledge-graph-fundamentals" id="toc-knowledge-graph-fundamentals" class="nav-link" data-scroll-target="#knowledge-graph-fundamentals">Knowledge Graph Fundamentals</a></li>
+  <li><a href="#microsoft-graphrag-from-local-to-global" id="toc-microsoft-graphrag-from-local-to-global" class="nav-link" data-scroll-target="#microsoft-graphrag-from-local-to-global">Microsoft GraphRAG: From Local to Global</a></li>
+  <li><a href="#llamaindex-propertygraphindex" id="toc-llamaindex-propertygraphindex" class="nav-link" data-scroll-target="#llamaindex-propertygraphindex">LlamaIndex PropertyGraphIndex</a></li>
+  <li><a href="#neo4j-langchain-graphcypherqachain" id="toc-neo4j-langchain-graphcypherqachain" class="nav-link" data-scroll-target="#neo4j-langchain-graphcypherqachain">Neo4j + LangChain: GraphCypherQAChain</a></li>
+  <li><a href="#building-a-knowledge-graph-from-documents" id="toc-building-a-knowledge-graph-from-documents" class="nav-link" data-scroll-target="#building-a-knowledge-graph-from-documents">Building a Knowledge Graph from Documents</a></li>
+  <li><a href="#comparison-graphrag-approaches" id="toc-comparison-graphrag-approaches" class="nav-link" data-scroll-target="#comparison-graphrag-approaches">Comparison: GraphRAG Approaches</a></li>
+  <li><a href="#when-to-use-graphrag" id="toc-when-to-use-graphrag" class="nav-link" data-scroll-target="#when-to-use-graphrag">When to Use GraphRAG</a></li>
+  <li><a href="#common-pitfalls-and-practical-advice" id="toc-common-pitfalls-and-practical-advice" class="nav-link" data-scroll-target="#common-pitfalls-and-practical-advice">Common Pitfalls and Practical Advice</a></li>
+  <li><a href="#evaluation-metrics-for-graphrag" id="toc-evaluation-metrics-for-graphrag" class="nav-link" data-scroll-target="#evaluation-metrics-for-graphrag">Evaluation Metrics for GraphRAG</a></li>
+  <li><a href="#summary" id="toc-summary" class="nav-link" data-scroll-target="#summary">Summary</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  <li><a href="#read-more" id="toc-read-more" class="nav-link" data-scroll-target="#read-more">Read More</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">GraphRAG: Knowledge Graphs Meet Retrieval-Augmented Generation</h1>
+<p class="subtitle lead">Building and querying knowledge graphs for RAG with Neo4j, LlamaIndex, and Microsoft GraphRAG — from entity extraction to community summarization</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">April 16, 2025</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p><strong>Keywords:</strong> GraphRAG, knowledge graph, RAG, Neo4j, LlamaIndex, LangChain, entity extraction, community summarization, Leiden algorithm, property graph, Cypher, graph retrieval, Microsoft GraphRAG, DRIFT search, hybrid search</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../../images/llm/graphrag-knowledge-graphs-rag-300px.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="300"></p>
+</figure>
+</div>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>Standard RAG works by embedding document chunks into vectors and retrieving the most similar ones at query time. This handles <strong>specific, fact-seeking questions</strong> well — “What is the maximum batch size for model X?” — but fails on <strong>global, analytical questions</strong> that require reasoning across many documents: “What are the main themes in this corpus?” or “How do the microservices in this system depend on each other?”</p>
+<p>The core limitation is structural. Vector search finds <strong>similar text</strong>, not <strong>connected concepts</strong>. It cannot aggregate, traverse relationships, or reason over the shape of your data. When the answer lives in the <strong>connections between entities</strong> rather than inside any single chunk, vector-only RAG falls short.</p>
+<p><strong>GraphRAG</strong> addresses this by introducing a <strong>knowledge graph</strong> as the retrieval backbone. Instead of treating documents as isolated chunks, GraphRAG extracts <strong>entities and relationships</strong>, organizes them into a graph, and retrieves information by <strong>traversing that graph</strong> — combining structured reasoning with semantic search.</p>
+<p>This article covers the full landscape: why vector-only RAG breaks, how knowledge graphs work, Microsoft’s GraphRAG architecture with community summarization, LlamaIndex’s <code>PropertyGraphIndex</code>, Neo4j with LangChain’s <code>GraphCypherQAChain</code>, and practical guidance on when each approach fits.</p>
+</section>
+<section id="why-vector-only-rag-fails" class="level2">
+<h2 class="anchored" data-anchor-id="why-vector-only-rag-fails">Why Vector-Only RAG Fails</h2>
+<section id="the-global-question-problem" class="level3">
+<h3 class="anchored" data-anchor-id="the-global-question-problem">The Global Question Problem</h3>
+<p>Consider a corpus of 1,000 research papers. A user asks: <em>“What are the top five research themes across these papers?”</em></p>
+<p>Vector search will retrieve the 5–10 chunks most similar to the query embedding. But the answer requires <strong>synthesizing information across all 1,000 documents</strong> — no single chunk contains it. This is <strong>query-focused summarization (QFS)</strong>, not information retrieval, and it’s fundamentally incompatible with top-k similarity search.</p>
+<p>Microsoft’s GraphRAG paper (Edge et al., 2024) demonstrated that baseline RAG showed <strong>substantial degradation</strong> on global sensemaking questions over datasets exceeding 1 million tokens, while GraphRAG maintained comprehensiveness and diversity.</p>
+</section>
+<section id="structural-limitations-of-flat-retrieval" class="level3">
+<h3 class="anchored" data-anchor-id="structural-limitations-of-flat-retrieval">Structural Limitations of Flat Retrieval</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 22%">
+<col style="width: 33%">
+<col style="width: 44%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Limitation</th>
+<th style="text-align: left;">Example Question</th>
+<th style="text-align: left;">Why Vector Search Fails</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Aggregation</strong></td>
+<td style="text-align: left;">“How many open tickets are assigned to Team A?”</td>
+<td style="text-align: left;">Cannot count or group — returns k nearest chunks regardless</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Multi-hop reasoning</strong></td>
+<td style="text-align: left;">“Which services will break if Database goes down?”</td>
+<td style="text-align: left;">Requires traversing dependency chains across entities</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Global summarization</strong></td>
+<td style="text-align: left;">“What are the main themes in this dataset?”</td>
+<td style="text-align: left;">Answer spans the entire corpus, not any single chunk</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Relationship queries</strong></td>
+<td style="text-align: left;">“Who collaborated with Author X on topic Y?”</td>
+<td style="text-align: left;">Relationships aren’t encoded in flat embeddings</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Explainability</strong></td>
+<td style="text-align: left;">“Why did you retrieve this context?”</td>
+<td style="text-align: left;">Vector similarity is opaque — no traceable reasoning path</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="from-chunks-to-graphs" class="level3">
+<h3 class="anchored" data-anchor-id="from-chunks-to-graphs">From Chunks to Graphs</h3>
+<p>The shift from vector-only to graph-augmented retrieval means moving from:</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph VOR["Vector-Only RAG"]
+        A["Query"] --&gt; B["Encode"]
+        B --&gt; C["Top-k ANN Search"]
+        C --&gt; D["Flat Chunk List"]
+        D --&gt; E["LLM"]
+    end
+
+    subgraph GRAG["GraphRAG"]
+        F["Query"] --&gt; G["Entity&lt;br/&gt;Recognition"]
+        G --&gt; H["Graph&lt;br/&gt;Traversal"]
+        H --&gt; I["Structured&lt;br/&gt;Context"]
+        F --&gt; J["Vector&lt;br/&gt;Search"]
+        J --&gt; I
+        I --&gt; K["LLM"]
+    end
+
+    VOR ~~~ GRAG
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#9b59b6,color:#fff,stroke:#333
+    style C fill:#e67e22,color:#fff,stroke:#333
+    style D fill:#e74c3c,color:#fff,stroke:#333
+    style E fill:#C8CFEA,color:#fff,stroke:#333
+    style F fill:#4a90d9,color:#fff,stroke:#333
+    style G fill:#27ae60,color:#fff,stroke:#333
+    style H fill:#27ae60,color:#fff,stroke:#333
+    style I fill:#f5a623,color:#fff,stroke:#333
+    style J fill:#9b59b6,color:#fff,stroke:#333
+    style K fill:#C8CFEA,color:#fff,stroke:#333
+    style VOR fill:#F2F2F2,stroke:#D9D9D9
+    style GRAG fill:#F2F2F2,stroke:#D9D9D9
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="knowledge-graph-fundamentals" class="level2">
+<h2 class="anchored" data-anchor-id="knowledge-graph-fundamentals">Knowledge Graph Fundamentals</h2>
+<section id="what-is-a-knowledge-graph" class="level3">
+<h3 class="anchored" data-anchor-id="what-is-a-knowledge-graph">What Is a Knowledge Graph?</h3>
+<p>A knowledge graph represents information as a network of <strong>entities</strong> (nodes) and <strong>relationships</strong> (edges), where each relationship carries a <strong>type</strong> and optional <strong>properties</strong>. The atomic unit is a <strong>triple</strong>: <code>(subject, predicate, object)</code>.</p>
+<pre><code>(Neo4j, IS_A, Graph Database)
+(GraphRAG, USES, Knowledge Graph)
+(Microsoft, PUBLISHED, GraphRAG Paper)
+(GraphRAG Paper, AUTHORED_BY, Darren Edge)</code></pre>
+</section>
+<section id="graph-vs.-vector-representations" class="level3">
+<h3 class="anchored" data-anchor-id="graph-vs.-vector-representations">Graph vs.&nbsp;Vector Representations</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 35%">
+<col style="width: 43%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Aspect</th>
+<th style="text-align: left;">Vector Store</th>
+<th style="text-align: left;">Knowledge Graph</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Data model</strong></td>
+<td style="text-align: left;">Flat vectors with metadata</td>
+<td style="text-align: left;">Nodes, edges, properties</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Query paradigm</strong></td>
+<td style="text-align: left;">Similarity (cosine, dot product)</td>
+<td style="text-align: left;">Pattern matching (Cypher, SPARQL)</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Relationships</strong></td>
+<td style="text-align: left;">Implicit in embedding space</td>
+<td style="text-align: left;">Explicit, typed, traversable</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Aggregation</strong></td>
+<td style="text-align: left;">Not supported natively</td>
+<td style="text-align: left;">Native (COUNT, GROUP BY, path length)</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Explainability</strong></td>
+<td style="text-align: left;">Low — “these vectors are close”</td>
+<td style="text-align: left;">High — “followed this path”</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Scalability</strong></td>
+<td style="text-align: left;">Billions of vectors with ANN</td>
+<td style="text-align: left;">Billions of edges with graph engines</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Best for</strong></td>
+<td style="text-align: left;">Semantic similarity, fuzzy matching</td>
+<td style="text-align: left;">Structured reasoning, multi-hop queries</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="knowledge-graph-construction-from-text" class="level3">
+<h3 class="anchored" data-anchor-id="knowledge-graph-construction-from-text">Knowledge Graph Construction from Text</h3>
+<p>The key challenge is <strong>extracting structured triples from unstructured text</strong>. Modern approaches use LLMs as extractors:</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["Raw Document"] --&gt; B["Chunking"]
+    B --&gt; C["LLM Entity/Relation&lt;br/&gt;Extraction"]
+    C --&gt; D["(Entity A, REL, Entity B)&lt;br/&gt;Triples"]
+    D --&gt; E["Entity Resolution&lt;br/&gt;&amp; Deduplication"]
+    E --&gt; F["Knowledge Graph"]
+    F --&gt; G["Graph Database&lt;br/&gt;(Neo4j, etc.)"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#f5a623,color:#fff,stroke:#333
+    style C fill:#9b59b6,color:#fff,stroke:#333
+    style D fill:#e67e22,color:#fff,stroke:#333
+    style E fill:#e74c3c,color:#fff,stroke:#333
+    style F fill:#27ae60,color:#fff,stroke:#333
+    style G fill:#C8CFEA,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="microsoft-graphrag-from-local-to-global" class="level2">
+<h2 class="anchored" data-anchor-id="microsoft-graphrag-from-local-to-global">Microsoft GraphRAG: From Local to Global</h2>
+<p>Microsoft’s GraphRAG (Edge et al., 2024) introduced a fundamentally different architecture: instead of retrieving chunks, it <strong>pre-builds a hierarchical community structure</strong> over a knowledge graph and uses <strong>community summaries</strong> to answer global questions.</p>
+<section id="architecture-overview" class="level3">
+<h3 class="anchored" data-anchor-id="architecture-overview">Architecture Overview</h3>
+<p>The system operates in two phases: <strong>indexing</strong> and <strong>querying</strong>.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph IP["Indexing Phase"]
+        A["Source Documents"] --&gt; B["Split into&lt;br/&gt;TextUnits"]
+        B --&gt; C["LLM extracts&lt;br/&gt;Entities &amp; Relations"]
+        C --&gt; D["Build Entity&lt;br/&gt;Knowledge Graph"]
+        D --&gt; E["Leiden Hierarchical&lt;br/&gt;Clustering"]
+        E --&gt; F["Generate Community&lt;br/&gt;Summaries"]
+    end
+
+    subgraph QP["Query Phase"]
+        G["User Query"] --&gt; H{Query Type}
+        H --&gt;|Global| I["Map: Each Community&lt;br/&gt;Summary → Partial Answer"]
+        I --&gt; J["Reduce: Combine&lt;br/&gt;Partial Answers"]
+        H --&gt;|Local| K["Find Relevant Entities&lt;br/&gt;→ Traverse Neighbors"]
+        H --&gt;|DRIFT| L["Entity Search +&lt;br/&gt;Community Context"]
+        J --&gt; M["Final Response"]
+        K --&gt; M
+        L --&gt; M
+    end
+
+    IP ~~~ QP
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#f5a623,color:#fff,stroke:#333
+    style C fill:#9b59b6,color:#fff,stroke:#333
+    style D fill:#27ae60,color:#fff,stroke:#333
+    style E fill:#e67e22,color:#fff,stroke:#333
+    style F fill:#1abc9c,color:#fff,stroke:#333
+    style G fill:#4a90d9,color:#fff,stroke:#333
+    style H fill:#f5a623,color:#fff,stroke:#333
+    style I fill:#9b59b6,color:#fff,stroke:#333
+    style J fill:#9b59b6,color:#fff,stroke:#333
+    style K fill:#27ae60,color:#fff,stroke:#333
+    style IP fill:#F2F2F2,stroke:#D9D9D9
+    style QP fill:#F2F2F2,stroke:#D9D9D9
+    style L fill:#e67e22,color:#fff,stroke:#333
+    style M fill:#C8CFEA,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="step-1-textunit-extraction" class="level3">
+<h3 class="anchored" data-anchor-id="step-1-textunit-extraction">Step 1: TextUnit Extraction</h3>
+<p>Source documents are split into <strong>TextUnits</strong> — chunks of text that serve as the atomic unit for entity extraction. Each TextUnit maintains a reference back to its source document for traceability.</p>
+</section>
+<section id="step-2-entity-and-relationship-extraction" class="level3">
+<h3 class="anchored" data-anchor-id="step-2-entity-and-relationship-extraction">Step 2: Entity and Relationship Extraction</h3>
+<p>An LLM processes each TextUnit and extracts:</p>
+<ul>
+<li><strong>Entities</strong>: named things with a type (Person, Organization, Technology, etc.)</li>
+<li><strong>Relationships</strong>: typed connections between entities (USES, AUTHORED_BY, DEPENDS_ON, etc.)</li>
+<li><strong>Claims</strong>: factual assertions associated with entities</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Conceptual extraction prompt (simplified)</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>EXTRACTION_PROMPT <span class="op">=</span> <span class="st">"""</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="st">Given the following text, extract all entities and relationships.</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="st">For each entity, provide:</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="st">- name: The entity name</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="st">- type: The entity type (Person, Organization, Technology, Concept, etc.)</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="st">- description: A brief description</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="st">For each relationship, provide:</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="st">- source: The source entity name</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="st">- target: The target entity name</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="st">- type: The relationship type</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="st">- description: A brief description</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="st">Text: </span><span class="sc">{text}</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="st">"""</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="step-3-leiden-hierarchical-clustering" class="level3">
+<h3 class="anchored" data-anchor-id="step-3-leiden-hierarchical-clustering">Step 3: Leiden Hierarchical Clustering</h3>
+<p>Once the knowledge graph is built, GraphRAG applies the <strong>Leiden algorithm</strong> — a community detection method that identifies groups of densely connected entities. Crucially, it produces a <strong>hierarchy</strong>: coarse-grained communities at the top, fine-grained ones at the bottom.</p>
+<pre><code>Level 0: Entire graph (1 community)
+Level 1: 5 broad theme communities
+Level 2: 25 sub-topic communities
+Level 3: 100+ fine-grained entity clusters</code></pre>
+<p>Each community represents a <strong>cluster of closely related entities and their relationships</strong>. This hierarchy is the key innovation — it enables answering questions at different levels of granularity.</p>
+</section>
+<section id="step-4-community-summary-generation" class="level3">
+<h3 class="anchored" data-anchor-id="step-4-community-summary-generation">Step 4: Community Summary Generation</h3>
+<p>For each community at each level, an LLM generates a <strong>summary</strong> capturing the key entities, relationships, and themes in that community. These summaries are generated <strong>bottom-up</strong>: leaf-level communities are summarized first, then their summaries feed into higher-level community summaries.</p>
+</section>
+<section id="query-modes" class="level3">
+<h3 class="anchored" data-anchor-id="query-modes">Query Modes</h3>
+<p>Microsoft GraphRAG supports four query modes:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 22%">
+<col style="width: 37%">
+<col style="width: 40%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Mode</th>
+<th style="text-align: left;">Best For</th>
+<th style="text-align: left;">Mechanism</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Global Search</strong></td>
+<td style="text-align: left;">Holistic, thematic questions</td>
+<td style="text-align: left;">Map-reduce over community summaries at chosen level</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Local Search</strong></td>
+<td style="text-align: left;">Specific entity questions</td>
+<td style="text-align: left;">Find entity → traverse neighbors → return subgraph context</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>DRIFT Search</strong></td>
+<td style="text-align: left;">Hybrid specificity</td>
+<td style="text-align: left;">Entity matching + community context expansion</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Basic Search</strong></td>
+<td style="text-align: left;">Standard similarity lookup</td>
+<td style="text-align: left;">Traditional vector top-k over TextUnits</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Global Search</strong> is the signature mode. It works as a <strong>map-reduce</strong>:</p>
+<ol type="1">
+<li><strong>Map</strong>: Each community summary at the selected hierarchy level independently generates a partial answer to the query</li>
+<li><strong>Reduce</strong>: All partial answers are combined into a final, comprehensive response</li>
+</ol>
+<p>This enables answering questions like “What are the main themes?” without retrieving every chunk — because the themes are already encoded in the community summaries.</p>
+</section>
+<section id="using-microsoft-graphrag" class="level3">
+<h3 class="anchored" data-anchor-id="using-microsoft-graphrag">Using Microsoft GraphRAG</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Install</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install graphrag</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Initialize a project</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="ex">graphrag</span> init <span class="at">--root</span> ./my_project</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Place source documents in ./my_project/input/</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Run prompt tuning (strongly recommended)</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="ex">graphrag</span> prompt-tune <span class="at">--root</span> ./my_project</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Build the index</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="ex">graphrag</span> index <span class="at">--root</span> ./my_project</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Query - Global Search</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a><span class="ex">graphrag</span> query <span class="at">--root</span> ./my_project <span class="dt">\</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">--method</span> global <span class="dt">\</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">--query</span> <span class="st">"What are the main themes in this dataset?"</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a><span class="co"># Query - Local Search</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a><span class="ex">graphrag</span> query <span class="at">--root</span> ./my_project <span class="dt">\</span></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">--method</span> local <span class="dt">\</span></span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">--query</span> <span class="st">"Tell me about Entity X and its relationships"</span></span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a><span class="co"># Query - DRIFT Search</span></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a><span class="ex">graphrag</span> query <span class="at">--root</span> ./my_project <span class="dt">\</span></span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>    <span class="at">--method</span> drift <span class="dt">\</span></span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>    <span class="at">--query</span> <span class="st">"How does Entity X relate to Theme Y?"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Key practical notes:</strong></p>
+<ul>
+<li><strong>Prompt tuning</strong> is strongly recommended — it adapts extraction prompts to your specific domain, significantly improving entity and relationship quality</li>
+<li>Indexing is <strong>LLM-intensive</strong> — expect significant API costs for large corpora, as every TextUnit goes through entity extraction</li>
+<li>Re-run <code>graphrag init</code> between version bumps to pick up configuration changes</li>
+</ul>
+</section>
+</section>
+<section id="llamaindex-propertygraphindex" class="level2">
+<h2 class="anchored" data-anchor-id="llamaindex-propertygraphindex">LlamaIndex PropertyGraphIndex</h2>
+<p>LlamaIndex provides a <code>PropertyGraphIndex</code> that <strong>extracts a knowledge graph directly from documents</strong> and supports both graph traversal and vector retrieval.</p>
+<section id="construction" class="level3">
+<h3 class="anchored" data-anchor-id="construction">Construction</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> llama_index.core <span class="im">import</span> SimpleDirectoryReader, PropertyGraphIndex</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> llama_index.embeddings.openai <span class="im">import</span> OpenAIEmbedding</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> llama_index.llms.openai <span class="im">import</span> OpenAI</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Load documents</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>documents <span class="op">=</span> SimpleDirectoryReader(<span class="st">"./data/"</span>).load_data()</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Build the property graph index</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="co"># This will:</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Parse documents into nodes</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Extract entities and relationships via LLM</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. Generate embeddings for graph nodes</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>index <span class="op">=</span> PropertyGraphIndex.from_documents(</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    documents,</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>    llm<span class="op">=</span>OpenAI(model<span class="op">=</span><span class="st">"gpt-4o-mini"</span>, temperature<span class="op">=</span><span class="fl">0.0</span>),</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    embed_model<span class="op">=</span>OpenAIEmbedding(model_name<span class="op">=</span><span class="st">"text-embedding-3-small"</span>),</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>    show_progress<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Under the hood, <code>from_documents()</code> runs four stages:</p>
+<ol type="1">
+<li><strong>Parsing nodes</strong> — splits documents into chunks</li>
+<li><strong>Extracting paths from text</strong> — LLM generates knowledge graph triples (entity → relationship → entity)</li>
+<li><strong>Extracting implicit paths</strong> — infers relationships from document structure (e.g., parent-child node relationships)</li>
+<li><strong>Generating embeddings</strong> — embeds both text nodes and graph entity nodes</li>
+</ol>
+</section>
+<section id="customizing-extraction" class="level3">
+<h3 class="anchored" data-anchor-id="customizing-extraction">Customizing Extraction</h3>
+<p>For finer control, use explicit <code>kg_extractors</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> llama_index.core.indices.property_graph <span class="im">import</span> (</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    ImplicitPathExtractor,</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    SimpleLLMPathExtractor,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>index <span class="op">=</span> PropertyGraphIndex.from_documents(</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    documents,</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    embed_model<span class="op">=</span>OpenAIEmbedding(model_name<span class="op">=</span><span class="st">"text-embedding-3-small"</span>),</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    kg_extractors<span class="op">=</span>[</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>        ImplicitPathExtractor(),</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>        SimpleLLMPathExtractor(</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>            llm<span class="op">=</span>OpenAI(model<span class="op">=</span><span class="st">"gpt-4o-mini"</span>, temperature<span class="op">=</span><span class="fl">0.0</span>),</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>            num_workers<span class="op">=</span><span class="dv">4</span>,</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>            max_paths_per_chunk<span class="op">=</span><span class="dv">10</span>,</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>        ),</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>    ],</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>    show_progress<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="querying-the-graph" class="level3">
+<h3 class="anchored" data-anchor-id="querying-the-graph">Querying the Graph</h3>
+<p>Retrieval combines <strong>synonym/keyword expansion</strong> (LLM generates related terms) and <strong>vector retrieval</strong> (embedding similarity on graph nodes). Once nodes are found, adjacent paths (triples) and optionally the original source text are returned.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Retrieve triples only (no source text)</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>retriever <span class="op">=</span> index.as_retriever(include_text<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>nodes <span class="op">=</span> retriever.retrieve(<span class="st">"What happened at Interleaf and Viaweb?"</span>)</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> node <span class="kw">in</span> nodes:</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(node.text)</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Output: entity-relationship triples like</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Interleaf -&gt; Built -&gt; Impressive technology</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Interleaf -&gt; Got crushed by -&gt; Moore's law</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Paul Graham -&gt; Started -&gt; Viaweb</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Full query engine with source text</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>query_engine <span class="op">=</span> index.as_query_engine(include_text<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> query_engine.query(<span class="st">"What happened at Interleaf and Viaweb?"</span>)</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="bu">str</span>(response))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="storage-with-neo4j" class="level3">
+<h3 class="anchored" data-anchor-id="storage-with-neo4j">Storage with Neo4j</h3>
+<p>LlamaIndex integrates with Neo4j as a graph store backend:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> llama_index.graph_stores.neo4j <span class="im">import</span> Neo4jPropertyGraphStore</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>graph_store <span class="op">=</span> Neo4jPropertyGraphStore(</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    username<span class="op">=</span><span class="st">"neo4j"</span>,</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    password<span class="op">=</span><span class="st">"your-password"</span>,</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    url<span class="op">=</span><span class="st">"bolt://localhost:7687"</span>,</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>index <span class="op">=</span> PropertyGraphIndex.from_documents(</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>    documents,</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>    llm<span class="op">=</span>OpenAI(model<span class="op">=</span><span class="st">"gpt-4o-mini"</span>, temperature<span class="op">=</span><span class="fl">0.0</span>),</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>    embed_model<span class="op">=</span>OpenAIEmbedding(model_name<span class="op">=</span><span class="st">"text-embedding-3-small"</span>),</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>    property_graph_store<span class="op">=</span>graph_store,</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>    show_progress<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>You can also use a separate vector store alongside the graph store:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> llama_index.vector_stores.chroma <span class="im">import</span> ChromaVectorStore</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> chromadb</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> chromadb.PersistentClient(<span class="st">"./chroma_db"</span>)</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>collection <span class="op">=</span> client.get_or_create_collection(<span class="st">"my_graph_vector_db"</span>)</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>index <span class="op">=</span> PropertyGraphIndex.from_documents(</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>    documents,</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>    embed_model<span class="op">=</span>OpenAIEmbedding(model_name<span class="op">=</span><span class="st">"text-embedding-3-small"</span>),</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>    property_graph_store<span class="op">=</span>graph_store,</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>    vector_store<span class="op">=</span>ChromaVectorStore(collection<span class="op">=</span>collection),</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>    show_progress<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="neo4j-langchain-graphcypherqachain" class="level2">
+<h2 class="anchored" data-anchor-id="neo4j-langchain-graphcypherqachain">Neo4j + LangChain: GraphCypherQAChain</h2>
+<p>LangChain provides a direct integration with Neo4j through <code>GraphCypherQAChain</code>, which <strong>translates natural language questions into Cypher queries</strong> — the structured query language for graph databases.</p>
+<section id="setup" class="level3">
+<h3 class="anchored" data-anchor-id="setup">Setup</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_neo4j <span class="im">import</span> Neo4jGraph</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>graph <span class="op">=</span> Neo4jGraph(</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    url<span class="op">=</span><span class="st">"neo4j+s://your-instance.databases.neo4j.io"</span>,</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    username<span class="op">=</span><span class="st">"neo4j"</span>,</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    password<span class="op">=</span><span class="st">"your-password"</span>,</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="vector-index-on-graph-nodes" class="level3">
+<h3 class="anchored" data-anchor-id="vector-index-on-graph-nodes">Vector Index on Graph Nodes</h3>
+<p>Neo4j supports native vector search on graph nodes. You can embed node properties and search by similarity:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_neo4j <span class="im">import</span> Neo4jVector</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_openai <span class="im">import</span> OpenAIEmbeddings, ChatOpenAI</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Create vector index from existing graph nodes</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>vector_index <span class="op">=</span> Neo4jVector.from_existing_graph(</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    OpenAIEmbeddings(),</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    url<span class="op">=</span><span class="st">"neo4j+s://your-instance.databases.neo4j.io"</span>,</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    username<span class="op">=</span><span class="st">"neo4j"</span>,</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>    password<span class="op">=</span><span class="st">"your-password"</span>,</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    index_name<span class="op">=</span><span class="st">"tasks"</span>,</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>    node_label<span class="op">=</span><span class="st">"Task"</span>,</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>    text_node_properties<span class="op">=</span>[<span class="st">"name"</span>, <span class="st">"description"</span>, <span class="st">"status"</span>],</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>    embedding_node_property<span class="op">=</span><span class="st">"embedding"</span>,</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Similarity search</span></span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> vector_index.similarity_search(</span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>    <span class="st">"How will RecommendationService be updated?"</span></span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(response[<span class="dv">0</span>].page_content)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="cypher-query-generation" class="level3">
+<h3 class="anchored" data-anchor-id="cypher-query-generation">Cypher Query Generation</h3>
+<p>The real power comes from <code>GraphCypherQAChain</code>, which lets an LLM <strong>generate and execute Cypher queries</strong> against the graph:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain.chains <span class="im">import</span> GraphCypherQAChain</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>graph.refresh_schema()</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>cypher_chain <span class="op">=</span> GraphCypherQAChain.from_llm(</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>    cypher_llm<span class="op">=</span>ChatOpenAI(temperature<span class="op">=</span><span class="dv">0</span>, model_name<span class="op">=</span><span class="st">"gpt-4o"</span>),</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>    qa_llm<span class="op">=</span>ChatOpenAI(temperature<span class="op">=</span><span class="dv">0</span>, model_name<span class="op">=</span><span class="st">"gpt-4o-mini"</span>),</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>    graph<span class="op">=</span>graph,</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>    verbose<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Aggregation query — impossible with vector search alone</span></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>cypher_chain.run(<span class="st">"How many open tickets are there?"</span>)</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a><span class="co"># LLM generates: MATCH (t:Task {status: 'Open'}) RETURN count(*)</span></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Result: 5</span></span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Graph traversal query</span></span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>cypher_chain.run(<span class="st">"Which services depend on Database directly?"</span>)</span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a><span class="co"># LLM generates: MATCH (s)-[:DEPENDS_ON]-&gt;(:Service {name: 'Database'}) RETURN s.name</span></span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a><span class="co"># Multi-hop traversal</span></span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a>cypher_chain.run(<span class="st">"Which services depend on Database indirectly?"</span>)</span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a><span class="co"># LLM generates variable-length path query</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Tip</strong>: Use a stronger model (GPT-4o) for Cypher generation and a lighter model (GPT-4o-mini) for final answer synthesis. Cypher generation requires precise syntax understanding.</p>
+</section>
+<section id="hybrid-agent-vector-graph" class="level3">
+<h3 class="anchored" data-anchor-id="hybrid-agent-vector-graph">Hybrid Agent: Vector + Graph</h3>
+<p>Combine both retrieval modes with a LangChain agent that routes queries to the appropriate tool:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain.agents <span class="im">import</span> initialize_agent, Tool</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>tools <span class="op">=</span> [</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    Tool(</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>        name<span class="op">=</span><span class="st">"Vector Search"</span>,</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>        func<span class="op">=</span>vector_qa.run,</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>        description<span class="op">=</span><span class="st">"Use for semantic similarity questions about task "</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>        <span class="st">"descriptions and content. Good for 'what' and 'how' questions."</span>,</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>    Tool(</span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>        name<span class="op">=</span><span class="st">"Graph Cypher Search"</span>,</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>        func<span class="op">=</span>cypher_chain.run,</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>        description<span class="op">=</span><span class="st">"Use for structured questions requiring aggregation, "</span></span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>        <span class="st">"counting, relationship traversal, or dependency analysis. "</span></span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Good for 'how many', 'which ones', and 'who/what depends on' questions."</span>,</span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>agent <span class="op">=</span> initialize_agent(</span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>    tools,</span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>    ChatOpenAI(temperature<span class="op">=</span><span class="dv">0</span>, model_name<span class="op">=</span><span class="st">"gpt-4o"</span>),</span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a>    agent<span class="op">=</span><span class="st">"zero-shot-react-description"</span>,</span>
+<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a>    verbose<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a><span class="co"># The agent will route to the right tool</span></span>
+<span id="cb14-27"><a href="#cb14-27" aria-hidden="true" tabindex="-1"></a>agent.run(<span class="st">"How many open tickets are there?"</span>)       <span class="co"># → Graph Cypher</span></span>
+<span id="cb14-28"><a href="#cb14-28" aria-hidden="true" tabindex="-1"></a>agent.run(<span class="st">"What is the billing service about?"</span>)      <span class="co"># → Vector Search</span></span>
+<span id="cb14-29"><a href="#cb14-29" aria-hidden="true" tabindex="-1"></a>agent.run(<span class="st">"Which services depend on Auth service?"</span>)  <span class="co"># → Graph Cypher</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="building-a-knowledge-graph-from-documents" class="level2">
+<h2 class="anchored" data-anchor-id="building-a-knowledge-graph-from-documents">Building a Knowledge Graph from Documents</h2>
+<p>Whether you use Microsoft GraphRAG, LlamaIndex, or a custom pipeline, the entity extraction step is critical. Here’s a general-purpose approach.</p>
+<section id="llm-based-entity-extraction" class="level3">
+<h3 class="anchored" data-anchor-id="llm-based-entity-extraction">LLM-Based Entity Extraction</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pydantic <span class="im">import</span> BaseModel</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Entity(BaseModel):</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>    name: <span class="bu">str</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">type</span>: <span class="bu">str</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    description: <span class="bu">str</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Relationship(BaseModel):</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>    source: <span class="bu">str</span></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>    target: <span class="bu">str</span></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>    <span class="bu">type</span>: <span class="bu">str</span></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>    description: <span class="bu">str</span></span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> ExtractionResult(BaseModel):</span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>    entities: <span class="bu">list</span>[Entity]</span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>    relationships: <span class="bu">list</span>[Relationship]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> openai <span class="im">import</span> OpenAI</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> OpenAI()</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> extract_graph_elements(text: <span class="bu">str</span>) <span class="op">-&gt;</span> ExtractionResult:</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> client.beta.chat.completions.parse(</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>        model<span class="op">=</span><span class="st">"gpt-4o-mini"</span>,</span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>        messages<span class="op">=</span>[</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>            {</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>                <span class="st">"role"</span>: <span class="st">"system"</span>,</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>                <span class="st">"content"</span>: (</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"Extract all entities and relationships from the text. "</span></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"Entities should have a name, type, and description. "</span></span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"Relationships should connect two entities with a typed edge."</span></span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>                ),</span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>            },</span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>            {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: text},</span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>        ],</span>
+<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a>        response_format<span class="op">=</span>ExtractionResult,</span>
+<span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> response.choices[<span class="dv">0</span>].message.parsed</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="entity-resolution" class="level3">
+<h3 class="anchored" data-anchor-id="entity-resolution">Entity Resolution</h3>
+<p>Raw extraction produces <strong>duplicates and variants</strong> — “GPT-4”, “gpt4”, “GPT4o” may all refer to related entities. Entity resolution is essential:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> resolve_entities(entities: <span class="bu">list</span>[Entity]) <span class="op">-&gt;</span> <span class="bu">list</span>[Entity]:</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Group entities by normalized name and merge descriptions."""</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> collections <span class="im">import</span> defaultdict</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>    groups <span class="op">=</span> defaultdict(<span class="bu">list</span>)</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> entity <span class="kw">in</span> entities:</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Normalize: lowercase, strip whitespace, remove hyphens</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>        key <span class="op">=</span> entity.name.lower().strip().replace(<span class="st">"-"</span>, <span class="st">""</span>).replace(<span class="st">" "</span>, <span class="st">""</span>)</span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>        groups[key].append(entity)</span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>    resolved <span class="op">=</span> []</span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> key, group <span class="kw">in</span> groups.items():</span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Take the most common name form</span></span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>        names <span class="op">=</span> [e.name <span class="cf">for</span> e <span class="kw">in</span> group]</span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>        canonical_name <span class="op">=</span> <span class="bu">max</span>(<span class="bu">set</span>(names), key<span class="op">=</span>names.count)</span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Merge descriptions</span></span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a>        all_descriptions <span class="op">=</span> <span class="st">" "</span>.join(e.description <span class="cf">for</span> e <span class="kw">in</span> group)</span>
+<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a>        resolved.append(Entity(</span>
+<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a>            name<span class="op">=</span>canonical_name,</span>
+<span id="cb17-20"><a href="#cb17-20" aria-hidden="true" tabindex="-1"></a>            <span class="bu">type</span><span class="op">=</span>group[<span class="dv">0</span>].<span class="bu">type</span>,</span>
+<span id="cb17-21"><a href="#cb17-21" aria-hidden="true" tabindex="-1"></a>            description<span class="op">=</span>all_descriptions,</span>
+<span id="cb17-22"><a href="#cb17-22" aria-hidden="true" tabindex="-1"></a>        ))</span>
+<span id="cb17-23"><a href="#cb17-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> resolved</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="loading-into-neo4j" class="level3">
+<h3 class="anchored" data-anchor-id="loading-into-neo4j">Loading into Neo4j</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> neo4j <span class="im">import</span> GraphDatabase</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>driver <span class="op">=</span> GraphDatabase.driver(</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">"bolt://localhost:7687"</span>, auth<span class="op">=</span>(<span class="st">"neo4j"</span>, <span class="st">"password"</span>)</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> load_graph(entities, relationships):</span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">with</span> driver.session() <span class="im">as</span> session:</span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Create entities</span></span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> entity <span class="kw">in</span> entities:</span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>            session.run(</span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>                <span class="st">"MERGE (e:Entity {name: $name}) "</span></span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>                <span class="st">"SET e.type = $type, e.description = $description"</span>,</span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a>                name<span class="op">=</span>entity.name,</span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a>                <span class="bu">type</span><span class="op">=</span>entity.<span class="bu">type</span>,</span>
+<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a>                description<span class="op">=</span>entity.description,</span>
+<span id="cb18-17"><a href="#cb18-17" aria-hidden="true" tabindex="-1"></a>            )</span>
+<span id="cb18-18"><a href="#cb18-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-19"><a href="#cb18-19" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Create relationships</span></span>
+<span id="cb18-20"><a href="#cb18-20" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> rel <span class="kw">in</span> relationships:</span>
+<span id="cb18-21"><a href="#cb18-21" aria-hidden="true" tabindex="-1"></a>            session.run(</span>
+<span id="cb18-22"><a href="#cb18-22" aria-hidden="true" tabindex="-1"></a>                <span class="st">"MATCH (a:Entity {name: $source}) "</span></span>
+<span id="cb18-23"><a href="#cb18-23" aria-hidden="true" tabindex="-1"></a>                <span class="st">"MATCH (b:Entity {name: $target}) "</span></span>
+<span id="cb18-24"><a href="#cb18-24" aria-hidden="true" tabindex="-1"></a>                <span class="st">"MERGE (a)-[r:RELATES_TO {type: $type}]-&gt;(b) "</span></span>
+<span id="cb18-25"><a href="#cb18-25" aria-hidden="true" tabindex="-1"></a>                <span class="st">"SET r.description = $description"</span>,</span>
+<span id="cb18-26"><a href="#cb18-26" aria-hidden="true" tabindex="-1"></a>                source<span class="op">=</span>rel.source,</span>
+<span id="cb18-27"><a href="#cb18-27" aria-hidden="true" tabindex="-1"></a>                target<span class="op">=</span>rel.target,</span>
+<span id="cb18-28"><a href="#cb18-28" aria-hidden="true" tabindex="-1"></a>                <span class="bu">type</span><span class="op">=</span>rel.<span class="bu">type</span>,</span>
+<span id="cb18-29"><a href="#cb18-29" aria-hidden="true" tabindex="-1"></a>                description<span class="op">=</span>rel.description,</span>
+<span id="cb18-30"><a href="#cb18-30" aria-hidden="true" tabindex="-1"></a>            )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="comparison-graphrag-approaches" class="level2">
+<h2 class="anchored" data-anchor-id="comparison-graphrag-approaches">Comparison: GraphRAG Approaches</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 11%">
+<col style="width: 25%">
+<col style="width: 38%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Feature</th>
+<th style="text-align: left;">Microsoft GraphRAG</th>
+<th style="text-align: left;">LlamaIndex PropertyGraphIndex</th>
+<th style="text-align: left;">Neo4j + LangChain</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Primary strength</strong></td>
+<td style="text-align: left;">Global summarization via communities</td>
+<td style="text-align: left;">Integrated graph + vector retrieval</td>
+<td style="text-align: left;">Structured Cypher queries</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Graph construction</strong></td>
+<td style="text-align: left;">LLM extraction → Leiden clustering</td>
+<td style="text-align: left;">LLM extraction → property graph</td>
+<td style="text-align: left;">Manual or LLM-assisted</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Query approach</strong></td>
+<td style="text-align: left;">Map-reduce over community summaries</td>
+<td style="text-align: left;">Keyword expansion + vector on graph</td>
+<td style="text-align: left;">LLM-generated Cypher</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Best query type</strong></td>
+<td style="text-align: left;">“Main themes?”, global questions</td>
+<td style="text-align: left;">Entity-centric + semantic questions</td>
+<td style="text-align: left;">Aggregation, traversal, filtering</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Storage backend</strong></td>
+<td style="text-align: left;">File-based (Parquet), configurable</td>
+<td style="text-align: left;">In-memory, Neo4j, or custom</td>
+<td style="text-align: left;">Neo4j</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Indexing cost</strong></td>
+<td style="text-align: left;">High (every chunk → LLM extraction + community summaries)</td>
+<td style="text-align: left;">Moderate (extraction + embedding)</td>
+<td style="text-align: left;">Low (once graph exists)</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Setup complexity</strong></td>
+<td style="text-align: left;">CLI-based, project structure</td>
+<td style="text-align: left;">Pythonic, integrates with LlamaIndex ecosystem</td>
+<td style="text-align: left;">Requires Neo4j instance</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Community detection</strong></td>
+<td style="text-align: left;">Yes (Leiden algorithm, hierarchical)</td>
+<td style="text-align: left;">No</td>
+<td style="text-align: left;">No (manual or via GDS library)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="when-to-use-graphrag" class="level2">
+<h2 class="anchored" data-anchor-id="when-to-use-graphrag">When to Use GraphRAG</h2>
+<section id="graphrag-fits-when" class="level3">
+<h3 class="anchored" data-anchor-id="graphrag-fits-when">GraphRAG Fits When…</h3>
+<ul>
+<li>Your questions require <strong>reasoning across multiple documents</strong> (“What are the main themes?”)</li>
+<li>Your domain has <strong>rich entity relationships</strong> (org charts, dependency graphs, supply chains, research networks)</li>
+<li>You need <strong>explainable retrieval paths</strong> (compliance, audit, regulated industries)</li>
+<li>Your data is <strong>inherently structured or semi-structured</strong> (knowledge bases, wikis, technical documentation)</li>
+<li>Users ask <strong>aggregation queries</strong> (“How many?”, “Which teams?”, “What depends on X?”)</li>
+</ul>
+</section>
+<section id="vector-only-rag-is-sufficient-when" class="level3">
+<h3 class="anchored" data-anchor-id="vector-only-rag-is-sufficient-when">Vector-Only RAG Is Sufficient When…</h3>
+<ul>
+<li>Questions are <strong>specific and fact-seeking</strong> (“What is the default timeout for service X?”)</li>
+<li>Your corpus is <strong>homogeneous</strong> (all similar document types)</li>
+<li>You need <strong>minimal setup and low latency</strong></li>
+<li>The answer typically lives <strong>within a single chunk</strong></li>
+</ul>
+</section>
+<section id="hybrid-the-best-of-both-worlds" class="level3">
+<h3 class="anchored" data-anchor-id="hybrid-the-best-of-both-worlds">Hybrid: The Best of Both Worlds</h3>
+<p>For most production systems, the answer is <strong>hybrid retrieval</strong>: use vector search for semantic questions and graph traversal for structured ones, with an agent or router that selects the appropriate tool.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["User Query"] --&gt; B["Router / Agent"]
+    B --&gt;|Semantic question| C["Vector Search&lt;br/&gt;(Embeddings)"]
+    B --&gt;|Structured question| D["Graph Search&lt;br/&gt;(Cypher / Traversal)"]
+    B --&gt;|Global question| E["Community Summaries&lt;br/&gt;(Microsoft GraphRAG)"]
+    C --&gt; F["Merge &amp; Deduplicate&lt;br/&gt;Context"]
+    D --&gt; F
+    E --&gt; F
+    F --&gt; G["LLM Generation"]
+    G --&gt; H["Response with&lt;br/&gt;Source Attribution"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#f5a623,color:#fff,stroke:#333
+    style C fill:#9b59b6,color:#fff,stroke:#333
+    style D fill:#27ae60,color:#fff,stroke:#333
+    style E fill:#e67e22,color:#fff,stroke:#333
+    style F fill:#e74c3c,color:#fff,stroke:#333
+    style G fill:#C8CFEA,color:#fff,stroke:#333
+    style H fill:#1abc9c,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="common-pitfalls-and-practical-advice" class="level2">
+<h2 class="anchored" data-anchor-id="common-pitfalls-and-practical-advice">Common Pitfalls and Practical Advice</h2>
+<section id="poor-entity-extraction-quality" class="level3">
+<h3 class="anchored" data-anchor-id="poor-entity-extraction-quality">1. Poor Entity Extraction Quality</h3>
+<p><strong>Problem</strong>: LLMs may extract inconsistent entity types, miss relationships, or hallucinate connections.</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li><strong>Prompt tune</strong> your extraction prompts for your domain (Microsoft GraphRAG provides a built-in <code>prompt-tune</code> command)</li>
+<li>Use structured output formats (Pydantic models, JSON schema) to constrain extraction</li>
+<li>Include few-shot examples of expected triples in your extraction prompt</li>
+<li>Run entity resolution to merge duplicates</li>
+</ul>
+</section>
+<section id="indexing-cost-explosion" class="level3">
+<h3 class="anchored" data-anchor-id="indexing-cost-explosion">2. Indexing Cost Explosion</h3>
+<p><strong>Problem</strong>: GraphRAG indexing sends every TextUnit through LLM extraction, which is expensive at scale.</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Use cheaper models (GPT-4o-mini) for extraction, stronger models for synthesis</li>
+<li>Pre-filter documents — don’t index boilerplate, headers, or navigation content</li>
+<li>Use incremental indexing where your pipeline supports it</li>
+<li>Estimate costs before running: <code>(num_chunks × avg_tokens_per_chunk × price_per_token)</code></li>
+</ul>
+</section>
+<section id="graph-becomes-too-sparse-or-too-dense" class="level3">
+<h3 class="anchored" data-anchor-id="graph-becomes-too-sparse-or-too-dense">3. Graph Becomes Too Sparse or Too Dense</h3>
+<p><strong>Sparse graph</strong>: Too few entities extracted → graph traversal returns nothing useful. Increase <code>max_paths_per_chunk</code> or use a more capable extraction model.</p>
+<p><strong>Dense graph</strong>: Too many low-quality triples → noisy traversal results. Add extraction confidence thresholds, filter by relationship type, or limit traversal depth.</p>
+</section>
+<section id="cypher-generation-errors" class="level3">
+<h3 class="anchored" data-anchor-id="cypher-generation-errors">4. Cypher Generation Errors</h3>
+<p><strong>Problem</strong>: LLMs generate syntactically incorrect or semantically wrong Cypher queries.</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Always pass the <strong>graph schema</strong> to the LLM (LangChain’s <code>graph.refresh_schema()</code> handles this)</li>
+<li>Use GPT-4o or similar for Cypher generation — smaller models struggle with query syntax</li>
+<li>Add validation: catch Cypher syntax errors and retry with error context</li>
+<li>For critical paths, use <strong>pre-defined query templates</strong> rather than free-form generation</li>
+</ul>
+</section>
+<section id="scaling-graph-storage" class="level3">
+<h3 class="anchored" data-anchor-id="scaling-graph-storage">5. Scaling Graph Storage</h3>
+<p>For production deployments:</p>
+<ul>
+<li>Use <strong>Neo4j AuraDB</strong> (managed cloud) or Neo4j 5.11+ (self-hosted) for graph storage</li>
+<li>Leverage Neo4j’s <strong>native vector index</strong> to avoid maintaining separate vector stores</li>
+<li>Consider <strong>graph partitioning</strong> for very large knowledge graphs (millions of nodes)</li>
+</ul>
+</section>
+</section>
+<section id="evaluation-metrics-for-graphrag" class="level2">
+<h2 class="anchored" data-anchor-id="evaluation-metrics-for-graphrag">Evaluation Metrics for GraphRAG</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 19%">
+<col style="width: 42%">
+<col style="width: 38%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Metric</th>
+<th style="text-align: left;">What It Measures</th>
+<th style="text-align: left;">How to Compute</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Comprehensiveness</strong></td>
+<td style="text-align: left;">Does the answer cover all relevant aspects?</td>
+<td style="text-align: left;">LLM-as-judge comparison against reference</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Diversity</strong></td>
+<td style="text-align: left;">Does the answer represent different perspectives?</td>
+<td style="text-align: left;">Topic diversity scoring across answer segments</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Entity Recall</strong></td>
+<td style="text-align: left;">How many ground-truth entities appear in extracted graph?</td>
+<td style="text-align: left;"><code>extracted ∩ ground_truth / ground_truth</code></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Relationship Precision</strong></td>
+<td style="text-align: left;">How many extracted relationships are correct?</td>
+<td style="text-align: left;">Manual or LLM-verified sampling</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Answer Faithfulness</strong></td>
+<td style="text-align: left;">Is the answer grounded in retrieved context?</td>
+<td style="text-align: left;">RAGAS faithfulness metric</td>
+</tr>
+</tbody>
+</table>
+<p>Microsoft’s evaluation showed GraphRAG achieved <strong>significantly higher comprehensiveness and diversity</strong> on global sensemaking questions compared to baseline RAG, while maintaining competitive performance on specific, local queries.</p>
+</section>
+<section id="summary" class="level2">
+<h2 class="anchored" data-anchor-id="summary">Summary</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 39%">
+<col style="width: 60%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Concept</th>
+<th style="text-align: left;">Key Takeaway</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Vector-only RAG limitation</strong></td>
+<td style="text-align: left;">Fails on global, aggregation, and multi-hop questions</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Knowledge graph value</strong></td>
+<td style="text-align: left;">Explicit entities and relationships enable structured reasoning</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Microsoft GraphRAG</strong></td>
+<td style="text-align: left;">Leiden clustering + community summaries for global question answering</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>LlamaIndex PropertyGraphIndex</strong></td>
+<td style="text-align: left;">Integrated graph extraction + hybrid retrieval in Python</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Neo4j + LangChain</strong></td>
+<td style="text-align: left;">Cypher query generation for structured graph queries</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Entity extraction</strong></td>
+<td style="text-align: left;">LLM-powered, needs prompt tuning and entity resolution</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Production recommendation</strong></td>
+<td style="text-align: left;">Hybrid retrieval — vector for semantic, graph for structured, agent to route</td>
+</tr>
+</tbody>
+</table>
+<p>GraphRAG represents a fundamental shift in how we think about retrieval: from <strong>finding similar text</strong> to <strong>reasoning over connected knowledge</strong>. For domains where relationships matter — and they usually do — adding graph structure to your RAG pipeline delivers more comprehensive, explainable, and accurate answers.</p>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li>Edge et al., <em>From Local to Global: A Graph RAG Approach to Query-Focused Summarization</em>, Microsoft Research, 2024. <a href="https://arxiv.org/abs/2404.16130">arXiv:2404.16130</a></li>
+<li>Traag, Waltman &amp; van Eck, <em>From Louvain to Leiden: guaranteeing well-connected communities</em>, 2019. <a href="https://arxiv.org/abs/1810.08473">arXiv:1810.08473</a></li>
+<li>Neo4j Documentation, <em>Graph Database Fundamentals</em>, 2026. <a href="https://neo4j.com/docs/">Docs</a></li>
+<li>LlamaIndex Documentation, <em>PropertyGraphIndex</em>, 2026. <a href="https://developers.llamaindex.ai/python/framework/property_graph_index/">Docs</a></li>
+<li>LangChain Documentation, <em>GraphCypherQAChain</em>, 2026. <a href="https://docs.langchain.com/oss/python/langchain/graph_qa/">Docs</a></li>
+<li>Microsoft GraphRAG Documentation, <em>Getting Started</em>, 2026. <a href="https://microsoft.github.io/graphrag/">Docs</a></li>
+</ul>
+</section>
+<section id="read-more" class="level2">
+<h2 class="anchored" data-anchor-id="read-more">Read More</h2>
+<ul>
+<li>Add <a href="../../posts/rag/Evaluating RAG Systems.html">evaluation metrics</a> to measure graph retrieval quality against standard vector search.</li>
+<li>Combine graph reasoning with <a href="../../posts/rag/Agentic RAG When Retrieval Needs Reasoning.html">agentic RAG</a> to let the agent decide when to query the graph vs.&nbsp;the vector store.</li>
+<li>Handle <strong>multimodal documents</strong> with <a href="../../posts/rag/Retrieval over Images Tables and PDFs.html">image and table retrieval</a> alongside graph-based knowledge.</li>
+<li>Scale your GraphRAG pipeline to production with <a href="../../posts/rag/RAG in Production Scaling Caching and Observability.html">caching, observability, and cost optimization</a>.</li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/tanquangduong\.github\.io\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> Copyright 2025, Quang T. Duong</p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

@@ -1,0 +1,783 @@
+---
+title: "Fine-tuning RAG Components: Embeddings, Retrievers, and Generators"
+subtitle: "Domain-adaptive training for each RAG stage — from contrastive embedding fine-tuning to retrieval-aware LLM training with RAFT"
+image: /images/llm/fine-tuning-rag-components-300px.png
+date: "2025-05-21"
+---
+
+**Keywords:** RAG fine-tuning, embedding fine-tuning, contrastive learning, Sentence Transformers, hard negatives mining, cross-encoder training, RAFT, retrieval-augmented fine-tuning, LoRA, QLoRA, domain adaptation, synthetic query generation, LlamaIndex, LangChain, MultipleNegativesRankingLoss, reranker training
+
+![](/images/llm/fine-tuning-rag-components-300px.png){fig-align="center" width=300}
+
+## Introduction
+
+Off-the-shelf RAG pipelines work surprisingly well — until you deploy them on domain-specific data. Medical literature, legal contracts, financial filings, and internal codebases all contain vocabulary and reasoning patterns that general-purpose models have never seen during pre-training. The result: embeddings that push semantically related domain documents apart, retrievers that rank irrelevant passages above relevant ones, and generators that hallucinate rather than ground answers in retrieved context.
+
+The fix is **fine-tuning each RAG component for your domain**: the embedding model, the reranker, and the generator LLM. Each has different training data requirements, different loss functions, and different compute budgets — but the payoff is dramatic. Fine-tuned embeddings can improve retrieval hit rate by 5–15%, domain-trained rerankers sharpen precision on the hardest negatives, and retrieval-aware generator training (RAFT) teaches the LLM to cite evidence and ignore distractors.
+
+This article walks through fine-tuning strategies for all three stages with practical code in **LlamaIndex** and **LangChain**, covering data generation, training loops, and evaluation.
+
+
+## Why Fine-Tune RAG Components?
+
+```{mermaid}
+graph TD
+    Q1["Domain Query"] --> E1["General Embeddings"]
+    E1 --> R1["Low Recall 😟"]
+    R1 --> G1["Generic LLM"]
+    G1 --> A1["Hallucinated Answer"]
+
+    Q1["Domain Query"] --> E2["Fine-Tuned Embeddings"]
+    E2 --> R2["High Recall ✅"]
+    R2 --> G2["RAFT-Trained LLM"]
+    G2 --> A2["Cited, Grounded Answer"]
+
+    style R1 fill:#f99,stroke:#c00
+    style A1 fill:#f99,stroke:#c00
+    style R2 fill:#9f9,stroke:#0a0
+    style A2 fill:#9f9,stroke:#0a0
+```
+
+The **domain gap** manifests differently at each stage:
+
+| Stage | Problem with Generic Models | Fine-Tuning Fix |
+|-------|---------------------------|-----------------|
+| **Embeddings** | Domain terms (e.g., "troponin elevation") map far from related concepts | Contrastive learning on domain query-passage pairs pulls relevant pairs together |
+| **Reranker** | Cross-encoder can't distinguish subtle domain relevance | Training on domain hard negatives sharpens discrimination |
+| **Generator** | LLM ignores retrieved context or can't extract key facts | RAFT teaches the model to quote evidence and reason over documents |
+
+The following decision tree helps determine which components to fine-tune:
+
+```{mermaid}
+graph TD
+    A["Low RAG Performance"] --> B{"Retrieval recall < 80%?"}
+    B -->|Yes| C{"Enough labeled pairs?"}
+    C -->|"Yes (>1k pairs)"| D["Fine-Tune Embeddings"]
+    C -->|"No"| E["Generate Synthetic Queries"]
+    E --> D
+    B -->|No| F{"Precision low?<br/>Wrong docs in top-k?"}
+    F -->|Yes| G["Fine-Tune Reranker"]
+    F -->|No| H{"LLM ignores context?<br/>Hallucinations?"}
+    H -->|Yes| I["RAFT Generator Training"]
+    H -->|No| J["Improve Chunking/<br/>Prompt Engineering"]
+```
+
+## Generating Training Data for RAG Fine-Tuning
+
+Before fine-tuning any component, you need training pairs. Most teams don't have thousands of manually labeled query-document pairs, so **synthetic data generation** is the standard approach.
+
+### Synthetic Query Generation with an LLM
+
+The core idea: take each document chunk, ask an LLM to generate questions that the chunk would answer, and use (question, chunk) as a positive pair.
+
+**LlamaIndex — Synthetic Pair Generation:**
+
+```python
+from llama_index.core import SimpleDirectoryReader
+from llama_index.core.node_parser import SentenceSplitter
+from llama_index.finetuning import generate_qa_embedding_pairs
+from llama_index.core.evaluation import EmbeddingQAFinetuneDataset
+from llama_index.llms.openai import OpenAI
+
+# 1. Load and chunk your domain documents
+reader = SimpleDirectoryReader(input_dir="./domain_docs")
+docs = reader.load_data()
+
+splitter = SentenceSplitter(chunk_size=512, chunk_overlap=64)
+nodes = splitter.get_nodes_from_documents(docs, show_progress=True)
+
+# 2. Split into train/val
+train_nodes = nodes[:int(len(nodes) * 0.8)]
+val_nodes = nodes[int(len(nodes) * 0.8):]
+
+# 3. Generate synthetic query-document pairs
+llm = OpenAI(model="gpt-4o-mini")
+
+train_dataset = generate_qa_embedding_pairs(
+    llm=llm,
+    nodes=train_nodes,
+    output_path="train_dataset.json",
+    num_questions_per_chunk=2,
+)
+
+val_dataset = generate_qa_embedding_pairs(
+    llm=llm,
+    nodes=val_nodes,
+    output_path="val_dataset.json",
+    num_questions_per_chunk=2,
+)
+```
+
+**LangChain — Custom Synthetic Query Pipeline:**
+
+```python
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import DirectoryLoader
+import json
+
+# 1. Load and chunk documents
+loader = DirectoryLoader("./domain_docs", glob="**/*.pdf")
+docs = loader.load()
+splitter = RecursiveCharacterTextSplitter(chunk_size=512, chunk_overlap=64)
+chunks = splitter.split_documents(docs)
+
+# 2. Generate synthetic queries
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
+prompt = ChatPromptTemplate.from_template(
+    "Given the following passage, generate {n} diverse questions "
+    "that this passage would answer. Return only the questions, one per line.\n\n"
+    "Passage: {passage}\n\nQuestions:"
+)
+chain = prompt | llm
+
+pairs = []
+for chunk in chunks:
+    response = chain.invoke({"passage": chunk.page_content, "n": 2})
+    questions = [q.strip() for q in response.content.strip().split("\n") if q.strip()]
+    for q in questions:
+        pairs.append({"query": q, "document": chunk.page_content})
+
+# 3. Save training pairs
+with open("training_pairs.json", "w") as f:
+    json.dump(pairs, f, indent=2)
+```
+
+### Mining Hard Negatives
+
+Hard negatives are documents that *look* relevant but don't actually answer the query. Training on them is critical — especially for reranker fine-tuning.
+
+```python
+from sentence_transformers import SentenceTransformer
+from sentence_transformers.util import mine_hard_negatives
+from datasets import Dataset
+
+# Load your query-document pairs as a Dataset
+dataset = Dataset.from_dict({
+    "query": [p["query"] for p in pairs],
+    "answer": [p["document"] for p in pairs],
+})
+
+# Mine hard negatives using a base embedding model
+embedding_model = SentenceTransformer("BAAI/bge-small-en-v1.5")
+hard_neg_dataset = mine_hard_negatives(
+    dataset,
+    embedding_model,
+    num_negatives=5,
+    range_min=10,       # skip top-10 most similar (likely positives)
+    range_max=100,      # consider top-100 candidates
+    max_score=0.85,     # reject if too similar to positive
+    sampling_strategy="top",
+    batch_size=512,
+    use_faiss=True,
+)
+
+print(hard_neg_dataset)
+# Dataset with columns: query, answer, negative_1, ..., negative_5
+```
+
+## Fine-Tuning Embedding Models
+
+Embedding fine-tuning adapts the vector space so that domain-specific queries land close to their relevant passages. The dominant approach is **contrastive learning** — pulling positive pairs together while pushing negatives apart.
+
+### The Contrastive Learning Pipeline
+
+```{mermaid}
+graph LR
+    subgraph TB["Training Batch"]
+        Q["Query"] --> QE["Query Embedding"]
+        P["Positive Doc"] --> PE["Positive Embedding"]
+        N1["Hard Neg 1"] --> NE1["Neg Embedding 1"]
+        N2["Hard Neg 2"] --> NE2["Neg Embedding 2"]
+    end
+    QE --> L["Contrastive Loss<br/>(MNR, InfoNCE)"]
+    PE --> L
+    NE1 --> L
+    NE2 --> L
+    L --> U["Update Encoder Weights"]
+
+    style TB fill:#F2F2F2,stroke:#D9D9D9
+
+    style L fill:#ffd,stroke:#aa0
+```
+
+**Key loss functions for embedding fine-tuning:**
+
+| Loss Function | Data Required | Best For |
+|---------------|--------------|----------|
+| **MultipleNegativesRankingLoss** | (query, positive) pairs — uses in-batch negatives | General retrieval, largest performance gains |
+| **TripletLoss** | (anchor, positive, negative) triplets | When you have manually curated negatives |
+| **CoSENTLoss** | (text_a, text_b, similarity_score) | Similarity regression tasks |
+| **MatryoshkaLoss** | Wraps any loss — enables variable-dimension embeddings | Production with mixed dimension requirements |
+
+### Fine-Tuning with Sentence Transformers
+
+```python
+from datasets import load_dataset, Dataset
+from sentence_transformers import (
+    SentenceTransformer,
+    SentenceTransformerTrainer,
+    SentenceTransformerTrainingArguments,
+)
+from sentence_transformers.losses import MultipleNegativesRankingLoss
+from sentence_transformers.training_args import BatchSamplers
+from sentence_transformers.evaluation import InformationRetrievalEvaluator
+
+# 1. Load a base embedding model
+model = SentenceTransformer("BAAI/bge-small-en-v1.5")
+
+# 2. Prepare training dataset (query, positive_passage)
+train_dataset = Dataset.from_dict({
+    "query": [p["query"] for p in train_pairs],
+    "positive": [p["document"] for p in train_pairs],
+})
+
+# 3. Define contrastive loss
+loss = MultipleNegativesRankingLoss(model)
+
+# 4. Training arguments
+args = SentenceTransformerTrainingArguments(
+    output_dir="models/domain-bge-finetuned",
+    num_train_epochs=3,
+    per_device_train_batch_size=32,
+    learning_rate=2e-5,
+    warmup_ratio=0.1,
+    fp16=True,
+    batch_sampler=BatchSamplers.NO_DUPLICATES,
+    eval_strategy="steps",
+    eval_steps=100,
+    save_strategy="steps",
+    save_steps=100,
+    save_total_limit=2,
+    logging_steps=50,
+)
+
+# 5. Create trainer and train
+trainer = SentenceTransformerTrainer(
+    model=model,
+    args=args,
+    train_dataset=train_dataset,
+    loss=loss,
+)
+trainer.train()
+
+# 6. Save
+model.save_pretrained("models/domain-bge-finetuned/final")
+```
+
+### Fine-Tuning with LlamaIndex
+
+LlamaIndex wraps `SentenceTransformersFinetuneEngine` for a streamlined experience:
+
+```python
+from llama_index.finetuning import SentenceTransformersFinetuneEngine
+from llama_index.core.evaluation import EmbeddingQAFinetuneDataset
+
+# Load previously generated datasets
+train_dataset = EmbeddingQAFinetuneDataset.from_json("train_dataset.json")
+val_dataset = EmbeddingQAFinetuneDataset.from_json("val_dataset.json")
+
+# Fine-tune
+finetune_engine = SentenceTransformersFinetuneEngine(
+    train_dataset,
+    model_id="BAAI/bge-small-en-v1.5",
+    model_output_path="domain_embedding_model",
+    val_dataset=val_dataset,
+    epochs=3,
+    batch_size=32,
+)
+
+finetune_engine.finetune()
+
+# Get the fine-tuned model for immediate use in LlamaIndex
+embed_model = finetune_engine.get_finetuned_model()
+```
+
+### Evaluating Embedding Fine-Tuning
+
+```python
+from llama_index.core import VectorStoreIndex
+from llama_index.core.schema import TextNode
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+
+def evaluate_hit_rate(dataset, embed_model, top_k=5):
+    """Measure what % of queries retrieve the correct document in top-k."""
+    nodes = [TextNode(id_=id_, text=text) for id_, text in dataset.corpus.items()]
+    index = VectorStoreIndex(nodes, embed_model=embed_model, show_progress=True)
+    retriever = index.as_retriever(similarity_top_k=top_k)
+
+    hits = 0
+    for query_id, query in dataset.queries.items():
+        results = retriever.retrieve(query)
+        retrieved_ids = [node.node.node_id for node in results]
+        expected_id = dataset.relevant_docs[query_id][0]
+        if expected_id in retrieved_ids:
+            hits += 1
+    return hits / len(dataset.queries)
+
+# Compare base vs fine-tuned
+base_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
+finetuned_model = HuggingFaceEmbedding(model_name="domain_embedding_model")
+
+base_hr = evaluate_hit_rate(val_dataset, base_model)
+ft_hr = evaluate_hit_rate(val_dataset, finetuned_model)
+
+print(f"Base hit rate:       {base_hr:.3f}")
+print(f"Fine-tuned hit rate: {ft_hr:.3f}")
+# Typical improvement: 0.79 → 0.88 (~10 points)
+```
+
+## Fine-Tuning Rerankers (Cross-Encoders)
+
+While embedding models do a fast first-pass retrieval, **cross-encoder rerankers** examine each query-document pair jointly and produce a more accurate relevance score. Fine-tuning a reranker on domain data is especially impactful when the top-k results from retrieval contain **hard negatives** — documents that look relevant but aren't.
+
+### Cross-Encoder Architecture
+
+```{mermaid}
+graph LR
+    Q["Query"] --> C["[CLS] Query [SEP] Doc [SEP]"]
+    D["Document"] --> C
+    C --> T["Transformer<br/>(joint attention)"]
+    T --> S["Relevance Score"]
+
+    style T fill:#F2F2F2,stroke:#D9D9D9
+```
+
+Unlike bi-encoders which encode query and document separately, cross-encoders process them **together** through full self-attention — making them slower but more accurate.
+
+### Training a Domain Reranker
+
+```python
+from datasets import load_dataset, Dataset
+from sentence_transformers.cross_encoder import (
+    CrossEncoder,
+    CrossEncoderTrainer,
+    CrossEncoderTrainingArguments,
+)
+from sentence_transformers.cross_encoder.losses import BinaryCrossEntropyLoss
+from sentence_transformers.cross_encoder.evaluation import (
+    CrossEncoderRerankingEvaluator,
+)
+
+# 1. Initialize cross-encoder from a pretrained reranker
+model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L6-v2")
+
+# 2. Prepare labeled dataset with hard negatives
+# Format: (query, passage, label) where label is 0 or 1
+train_dataset = Dataset.from_dict({
+    "query": queries,
+    "passage": passages,
+    "label": labels,  # 1.0 for relevant, 0.0 for irrelevant
+})
+
+# 3. Define loss
+loss = BinaryCrossEntropyLoss(model)
+
+# 4. Training arguments
+args = CrossEncoderTrainingArguments(
+    output_dir="models/domain-reranker",
+    num_train_epochs=3,
+    per_device_train_batch_size=16,
+    learning_rate=2e-5,
+    warmup_ratio=0.1,
+    fp16=True,
+    eval_strategy="steps",
+    eval_steps=200,
+    save_strategy="steps",
+    save_steps=200,
+    save_total_limit=2,
+    logging_steps=50,
+    load_best_model_at_end=True,
+    metric_for_best_model="eval_loss",
+)
+
+# 5. Train
+trainer = CrossEncoderTrainer(
+    model=model,
+    args=args,
+    train_dataset=train_dataset,
+    loss=loss,
+)
+trainer.train()
+
+# 6. Save
+model.save_pretrained("models/domain-reranker/final")
+```
+
+### Using a Fine-Tuned Reranker in LlamaIndex
+
+```python
+from llama_index.core.postprocessor import SentenceTransformerRerank
+
+reranker = SentenceTransformerRerank(
+    model="models/domain-reranker/final",
+    top_n=5,
+)
+
+# Use in a query engine
+from llama_index.core import VectorStoreIndex
+
+index = VectorStoreIndex(nodes, embed_model=finetuned_embed_model)
+query_engine = index.as_query_engine(
+    similarity_top_k=20,              # retrieve more candidates
+    node_postprocessors=[reranker],   # rerank to top 5
+)
+
+response = query_engine.query("What are the side effects of metformin?")
+```
+
+### Using a Fine-Tuned Reranker in LangChain
+
+```python
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain_community.cross_encoders import HuggingFaceCrossEncoder
+from langchain.retrievers.document_compressors import CrossEncoderReranker
+
+# Load fine-tuned reranker
+cross_encoder = HuggingFaceCrossEncoder(model_name="models/domain-reranker/final")
+compressor = CrossEncoderReranker(model=cross_encoder, top_n=5)
+
+# Wrap retriever with reranker
+compression_retriever = ContextualCompressionRetriever(
+    base_compressor=compressor,
+    base_retriever=vectorstore.as_retriever(search_kwargs={"k": 20}),
+)
+
+results = compression_retriever.invoke("What are the side effects of metformin?")
+```
+
+## Fine-Tuning the Generator: RAFT
+
+The most novel approach to generator fine-tuning for RAG is **RAFT (Retrieval Augmented Fine Tuning)**, introduced by Zhang et al. (2024) at UC Berkeley. RAFT trains the LLM to be a better "open-book exam taker" — one that can identify the right document from a set of retrieved results (which may include irrelevant distractors), extract the relevant evidence, and produce a chain-of-thought answer with direct quotes.
+
+### The RAFT Training Recipe
+
+```{mermaid}
+graph TD
+    subgraph TDP["Training Data Preparation"]
+        Q["Question Q"] --> D["Retrieved Documents"]
+        D --> O["Oracle Doc D*<br/>(contains answer)"]
+        D --> DI["Distractor Docs D1...Dk<br/>(irrelevant)"]
+    end
+
+    subgraph TM["Training Mix"]
+        M1["P% of samples:<br/>Q + D* + D1...Dk → CoT Answer"]
+        M2["(1-P)% of samples:<br/>Q + D1...Dk → CoT Answer<br/>(oracle removed)"]
+    end
+
+    subgraph CAF["CoT Answer Format"]
+        COT["##Reason: The document states<br/>##begin_quote## ... ##end_quote##<br/>Therefore...<br/>##Answer: Delhi"]
+    end
+
+    O --> M1
+    DI --> M1
+    DI --> M2
+    M1 --> COT
+    M2 --> COT
+
+    style TDP fill:#F2F2F2,stroke:#D9D9D9
+    style TM fill:#F2F2F2,stroke:#D9D9D9
+    style CAF fill:#F2F2F2,stroke:#D9D9D9
+    style O fill:#9f9,stroke:#0a0
+    style DI fill:#f99,stroke:#c00
+```
+
+**Key design decisions in RAFT:**
+
+1. **Include distractor documents** — The model learns to ignore irrelevant retrieved content
+2. **Remove oracle docs from some training samples** — Forces the model to memorize domain knowledge rather than always relying on retrieval
+3. **Chain-of-thought with direct quotes** — Uses `##begin_quote##` and `##end_quote##` markers to ground answers in evidence
+
+### Preparing RAFT Training Data
+
+```python
+import json
+from openai import OpenAI
+
+client = OpenAI()
+
+def generate_raft_training_example(
+    question: str,
+    oracle_doc: str,
+    distractor_docs: list[str],
+    include_oracle: bool = True,
+) -> dict:
+    """Generate a single RAFT training example."""
+    # Build context with oracle + distractors (or just distractors)
+    if include_oracle:
+        all_docs = [oracle_doc] + distractor_docs
+    else:
+        all_docs = distractor_docs
+
+    context = "\n\n".join(
+        f"[Document {i+1}]: {doc}" for i, doc in enumerate(all_docs)
+    )
+
+    # Generate CoT answer using a strong teacher model
+    prompt = f"""Given the question and the provided context documents, generate a detailed
+chain-of-thought answer. Use ##begin_quote## and ##end_quote## to cite exact quotes
+from the documents that support your reasoning. Format your answer as:
+
+##Reason: <your chain-of-thought reasoning with citations>
+##Answer: <concise final answer>
+
+Question: {question}
+
+Context:
+{context}"""
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3,
+    )
+
+    return {
+        "instruction": f"Answer the question using the provided documents.\n\n"
+                       f"Question: {question}\n\nContext:\n{context}",
+        "output": response.choices[0].message.content,
+    }
+
+
+def build_raft_dataset(
+    qa_pairs: list[dict],     # [{"question": ..., "oracle_doc": ..., "distractor_docs": [...]}]
+    oracle_fraction: float = 0.8,  # P% that include the oracle doc
+) -> list[dict]:
+    """Build complete RAFT training dataset."""
+    import random
+    dataset = []
+
+    for pair in qa_pairs:
+        # P% of time: include oracle document
+        include_oracle = random.random() < oracle_fraction
+        example = generate_raft_training_example(
+            question=pair["question"],
+            oracle_doc=pair["oracle_doc"],
+            distractor_docs=pair["distractor_docs"],
+            include_oracle=include_oracle,
+        )
+        dataset.append(example)
+
+    return dataset
+```
+
+### Fine-Tuning with LoRA for RAFT
+
+Once you have RAFT-formatted training data, fine-tune with parameter-efficient methods:
+
+```python
+from datasets import Dataset
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from trl import SFTTrainer, SFTConfig
+import torch
+
+# 1. Load base model with 4-bit quantization (QLoRA)
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.bfloat16,
+    bnb_4bit_use_double_quant=True,
+)
+
+model_id = "meta-llama/Llama-3.1-8B-Instruct"
+model = AutoModelForCausalLM.from_pretrained(
+    model_id,
+    quantization_config=bnb_config,
+    device_map="auto",
+)
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+tokenizer.pad_token = tokenizer.eos_token
+
+# 2. Configure LoRA
+lora_config = LoraConfig(
+    r=16,
+    lora_alpha=32,
+    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
+    lora_dropout=0.05,
+    bias="none",
+    task_type="CAUSAL_LM",
+)
+
+model = prepare_model_for_kbit_training(model)
+model = get_peft_model(model, lora_config)
+model.print_trainable_parameters()
+# trainable params: 13.6M || all params: 8.0B || 0.17%
+
+# 3. Prepare dataset
+def format_raft_example(example):
+    return f"### Instruction:\n{example['instruction']}\n\n### Response:\n{example['output']}"
+
+train_data = Dataset.from_list(raft_training_data)
+
+# 4. Train with SFTTrainer
+training_args = SFTConfig(
+    output_dir="models/raft-llama-domain",
+    num_train_epochs=3,
+    per_device_train_batch_size=4,
+    gradient_accumulation_steps=4,
+    learning_rate=2e-4,
+    warmup_ratio=0.1,
+    lr_scheduler_type="cosine",
+    logging_steps=25,
+    save_strategy="steps",
+    save_steps=100,
+    bf16=True,
+    max_seq_length=2048,
+)
+
+trainer = SFTTrainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_data,
+    formatting_func=format_raft_example,
+    tokenizer=tokenizer,
+)
+
+trainer.train()
+
+# 5. Save LoRA adapter
+trainer.save_model("models/raft-llama-domain/final")
+```
+
+### RAFT vs. Other Approaches
+
+| Approach | Method | Pros | Cons |
+|----------|--------|------|------|
+| **RAG only** | Retrieve + prompt LLM | No training needed, flexible | LLM may ignore context, hallucinate |
+| **Fine-tune only** (DSF) | SFT on domain Q&A without docs | Bakes in domain knowledge | Can't handle new documents, expensive |
+| **DSF + RAG** | Fine-tune, then add retrieval at inference | Combines memorized + retrieved knowledge | Model not trained to handle distractors |
+| **RAFT** | Train with oracle + distractor docs, CoT answers | Best accuracy, handles distractors, cites evidence | Requires careful data preparation |
+
+RAFT consistently outperforms alternatives on domain benchmarks. On PubMed QA, RAFT improved accuracy by **5.7 points** over DSF+RAG, and on HotpotQA by **35.3 points** over standard RAG with Llama2-7B.
+
+## End-to-End Fine-Tuning Strategy
+
+### The Three-Stage Pipeline
+
+```{mermaid}
+graph TD
+    subgraph S1["Stage 1: Embeddings"]
+        D["Domain Corpus"] --> SQ["Synthetic Query<br/>Generation"]
+        SQ --> CL["Contrastive<br/>Learning"]
+        CL --> FE["Fine-Tuned<br/>Embeddings"]
+    end
+
+    subgraph S2["Stage 2: Reranker"]
+        HN["Hard Negative<br/>Mining"]
+        HN --> RT["Cross-Encoder<br/>Training"]
+        RT --> FR["Fine-Tuned<br/>Reranker"]
+    end
+
+    subgraph S3["Stage 3: Generator"]
+        RD["RAFT Data<br/>Preparation"]
+        RD --> LT["LoRA/QLoRA<br/>Training"]
+        LT --> FG["Fine-Tuned<br/>Generator"]
+    end
+
+    FE --> HN
+    FR --> RD
+
+    style FE fill:#d4edda,stroke:#28a745
+    style FR fill:#d4edda,stroke:#28a745
+    style FG fill:#d4edda,stroke:#28a745
+    style S1 fill:#F2F2F2,stroke:#D9D9D9
+    style S2 fill:#F2F2F2,stroke:#D9D9D9
+    style S3 fill:#F2F2F2,stroke:#D9D9D9
+```
+
+**Why this order matters:**
+
+1. **Embeddings first** — Improved embeddings produce better retrieval results, which means better hard negatives for reranker training
+2. **Reranker second** — With fine-tuned embeddings providing candidates, the reranker's hard negatives are more realistic
+3. **Generator last** — RAFT training uses the full retrieval pipeline (fine-tuned embeddings + reranker) to generate training data with realistic distractor documents
+
+### Putting It All Together
+
+```python
+from llama_index.core import VectorStoreIndex, Settings
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.core.postprocessor import SentenceTransformerRerank
+from llama_index.llms.huggingface import HuggingFaceLLM
+
+# Load all fine-tuned components
+Settings.embed_model = HuggingFaceEmbedding(
+    model_name="models/domain-bge-finetuned/final"
+)
+
+reranker = SentenceTransformerRerank(
+    model="models/domain-reranker/final",
+    top_n=5,
+)
+
+Settings.llm = HuggingFaceLLM(
+    model_name="models/raft-llama-domain/final",
+    tokenizer_name="meta-llama/Llama-3.1-8B-Instruct",
+    context_window=4096,
+    max_new_tokens=512,
+)
+
+# Build the index and query
+index = VectorStoreIndex(nodes)
+query_engine = index.as_query_engine(
+    similarity_top_k=20,
+    node_postprocessors=[reranker],
+)
+
+response = query_engine.query(
+    "What is the recommended HbA1c target for elderly diabetic patients?"
+)
+print(response)
+```
+
+## When NOT to Fine-Tune
+
+Fine-tuning is powerful but not always the right move:
+
+| Situation | Better Alternative |
+|-----------|--------------------|
+| **Small corpus (< 50 docs)** | Improve chunking, use a strong off-the-shelf model | 
+| **General-domain queries** | Use top MTEB models directly |
+| **Rapid iteration / prototyping** | Better prompts, few-shot examples |
+| **No evaluation framework** | Build evaluation first — see [Evaluating RAG Systems](/posts/rag/Evaluating%20RAG%20Systems.html) |
+| **Data changes frequently** | Invest in better retrieval (hybrid search, reranking) |
+| **Budget constraints** | Fine-tune only embeddings (cheapest, highest ROI) |
+
+The **highest-ROI fine-tuning** is almost always **embeddings first**: it's the cheapest to train (small models, fast convergence), requires minimal data (even 1,000 synthetic pairs help), and improves every downstream component by feeding them better retrieved content.
+
+## Comparison of Fine-Tuning Approaches
+
+| Aspect | Embedding Fine-Tuning | Reranker Fine-Tuning | Generator (RAFT) |
+|--------|----------------------|---------------------|------------------|
+| **Model Size** | 33M–335M params | 22M–335M params | 7B–70B params |
+| **Training Data** | (query, doc) pairs | (query, doc, label) triples | (Q, docs, CoT answer) |
+| **Min. Samples** | ~1,000 pairs | ~5,000 triples | ~2,000 examples |
+| **Compute** | 1 GPU, ~1 hour | 1 GPU, ~2 hours | 1–4 GPUs, ~4–8 hours |
+| **Training Method** | Contrastive (MNRL) | BCE / ListNet | SFT with LoRA/QLoRA |
+| **Impact** | +5–15% hit rate | +3–8% precision@k | Reduced hallucination, citations |
+| **Complexity** | Low | Medium | High |
+
+## Conclusion
+
+Fine-tuning transforms a generic RAG system into a domain expert. The three-stage approach — **embeddings → reranker → generator** — follows a natural progression where each stage builds on the improvements of the previous one.
+
+Start with embedding fine-tuning: it requires the least data, the smallest compute budget, and delivers the biggest relative improvement. If precision remains an issue after embedding fine-tuning, train a domain reranker on hard negatives. And when the generator still struggles with context grounding, RAFT teaches it to reason over documents like a skilled researcher — citing evidence, ignoring distractors, and producing chain-of-thought answers.
+
+The key insight from RAFT is that LLMs in RAG systems can be trained the same way students prepare for open-book exams: not just by memorizing facts, but by learning to efficiently find and cite the right information from reference material.
+
+## References
+
+- Zhang et al., *RAFT: Adapting Language Model to Domain Specific RAG*, 2024. [arXiv:2403.10131](https://arxiv.org/abs/2403.10131)
+- Reimers & Gurevych, *Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks*, 2019. [arXiv:1908.10084](https://arxiv.org/abs/1908.10084)
+- Sentence Transformers Documentation, *Training Overview*, 2026. [Docs](https://www.sbert.net/docs/sentence_transformer/training_overview/index.html)
+- Hu et al., *LoRA: Low-Rank Adaptation of Large Language Models*, 2021. [arXiv:2106.09685](https://arxiv.org/abs/2106.09685)
+- LlamaIndex Documentation, *Fine-Tuning Embeddings*, 2026. [Docs](https://developers.llamaindex.ai/python/framework/finetune_embeddings/)
+- Hugging Face TRL Documentation, *SFTTrainer*, 2026. [Docs](https://huggingface.co/docs/trl/sft_trainer)
+
+## Read More
+
+- Evaluate fine-tuning gains quantitatively with [RAGAS, DeepEval, and LangSmith](/posts/rag/Evaluating%20RAG%20Systems.html).
+- Apply fine-tuned components in [agentic RAG](/posts/rag/Agentic%20RAG%20When%20Retrieval%20Needs%20Reasoning.html) workflows with query planning and tool routing.
+- Add [corrective RAG](/posts/rag/Hybrid%20and%20Corrective%20RAG%20Architectures.html) patterns to catch cases where even fine-tuned retrieval fails.
+- Scale your fine-tuned pipeline to production with [caching, routing, and observability](/posts/rag/RAG%20in%20Production%20Scaling%20Caching%20and%20Observability.html).
