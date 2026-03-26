@@ -1,0 +1,1626 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.36">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2025-06-15">
+
+<title>Build and Deploy MCP Server from Scratch – Quang Duong</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../..//images/favicon.ico" rel="icon">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dbc92dda8186f57fa2e333fbb71d6a9d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-b981e3f33a8ad6ba97cc0b6118e04959.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/all.css" rel="stylesheet">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/latex-fontsize.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="../../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="../../styles.css">
+<meta property="og:title" content="Build and Deploy MCP Server from Scratch – Quang Duong">
+<meta property="og:description" content="A hands-on guide to building, testing, and deploying Model Context Protocol servers with Python — tools, resources, prompts, transports, and production hosting">
+<meta property="og:image" content="https://tanquangduong.github.io//images/llm/build-deploy-mcp-server-300px.png">
+<meta property="og:site_name" content="Quang Duong">
+<meta name="twitter:title" content="Build and Deploy MCP Server from Scratch – Quang Duong">
+<meta name="twitter:description" content="A hands-on guide to building, testing, and deploying Model Context Protocol servers with Python — tools, resources, prompts, transports, and production hosting">
+<meta name="twitter:image" content="https://tanquangduong.github.io//images/llm/build-deploy-mcp-server-300px.png">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+
+<body class="nav-sidebar docked quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">
+      Quang Duong
+      </li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../../">Quang Duong</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://www.linkedin.com/in/tanquangduong/" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-linkedin"></i></a>
+    <a href="https://github.com/tanquangduong" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">AI Engineering</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">LLM</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/rag.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">RAG</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/agent.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Agent</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/stack.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Stack</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/article.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Article</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title"><strong>Sections</strong></h2>
+   
+  <ul class="collapse">
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#mcp-architecture-overview" id="toc-mcp-architecture-overview" class="nav-link" data-scroll-target="#mcp-architecture-overview">MCP Architecture Overview</a></li>
+  <li><a href="#setting-up-the-development-environment" id="toc-setting-up-the-development-environment" class="nav-link" data-scroll-target="#setting-up-the-development-environment">Setting Up the Development Environment</a></li>
+  <li><a href="#building-your-first-mcp-server" id="toc-building-your-first-mcp-server" class="nav-link" data-scroll-target="#building-your-first-mcp-server">Building Your First MCP Server</a></li>
+  <li><a href="#lifecycle-and-communication-flow" id="toc-lifecycle-and-communication-flow" class="nav-link" data-scroll-target="#lifecycle-and-communication-flow">Lifecycle and Communication Flow</a></li>
+  <li><a href="#transport-mechanisms" id="toc-transport-mechanisms" class="nav-link" data-scroll-target="#transport-mechanisms">Transport Mechanisms</a></li>
+  <li><a href="#testing-your-mcp-server" id="toc-testing-your-mcp-server" class="nav-link" data-scroll-target="#testing-your-mcp-server">Testing Your MCP Server</a></li>
+  <li><a href="#building-a-real-world-example-project-knowledge-server" id="toc-building-a-real-world-example-project-knowledge-server" class="nav-link" data-scroll-target="#building-a-real-world-example-project-knowledge-server">Building a Real-World Example: Project Knowledge Server</a></li>
+  <li><a href="#integrating-with-mistral-ai" id="toc-integrating-with-mistral-ai" class="nav-link" data-scroll-target="#integrating-with-mistral-ai">Integrating with Mistral AI</a></li>
+  <li><a href="#deploying-to-production" id="toc-deploying-to-production" class="nav-link" data-scroll-target="#deploying-to-production">Deploying to Production</a></li>
+  <li><a href="#comparison-mcp-vs.-direct-function-calling" id="toc-comparison-mcp-vs.-direct-function-calling" class="nav-link" data-scroll-target="#comparison-mcp-vs.-direct-function-calling">Comparison: MCP vs.&nbsp;Direct Function Calling</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  <li><a href="#read-more" id="toc-read-more" class="nav-link" data-scroll-target="#read-more">Read More</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Build and Deploy MCP Server from Scratch</h1>
+<p class="subtitle lead">A hands-on guide to building, testing, and deploying Model Context Protocol servers with Python — tools, resources, prompts, transports, and production hosting</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">June 15, 2025</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p><strong>Keywords:</strong> MCP server, Model Context Protocol, FastMCP, tool calling, resources, prompts, stdio transport, Streamable HTTP, JSON-RPC, MCP Inspector, Claude Desktop, VS Code, Mistral AI, deployment, Docker, production</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../../images/llm/build-deploy-mcp-server-300px.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="300"></p>
+</figure>
+</div>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>The <strong>Model Context Protocol (MCP)</strong> is an open standard — originally created by Anthropic and now governed by the Linux Foundation — that defines how AI applications connect to external data sources, tools, and workflows. Think of MCP as a <strong>USB-C port for AI</strong>: just as USB-C gives every device a single connector, MCP gives every AI application a single protocol for context exchange.</p>
+<p>Before MCP, every integration between an AI assistant and an external system required a bespoke adapter — one for Slack, another for a database, another for GitHub. With <em>N</em> AI applications and <em>M</em> tools, that’s <em>N × M</em> integrations. MCP collapses this to <em>N + M</em>: every application speaks one protocol, every tool exposes one interface.</p>
+<p>This article walks through building an MCP server <strong>from scratch</strong> in Python, covering the full journey from a single-tool prototype to a production-deployed server with multiple tools, resources, and prompts. We also explore how leading AI platforms — including <strong>Mistral AI</strong>, which recently hosted an <a href="https://hackathon.mistral.ai">MCP Hackathon</a> to encourage community-built MCP servers — are adopting and extending the protocol.</p>
+</section>
+<section id="mcp-architecture-overview" class="level2">
+<h2 class="anchored" data-anchor-id="mcp-architecture-overview">MCP Architecture Overview</h2>
+<section id="participants" class="level3">
+<h3 class="anchored" data-anchor-id="participants">Participants</h3>
+<p>MCP follows a <strong>client-server architecture</strong> with three key participants:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 46%">
+<col style="width: 21%">
+<col style="width: 32%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Participant</th>
+<th style="text-align: left;">Role</th>
+<th style="text-align: left;">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>MCP Host</strong></td>
+<td style="text-align: left;">AI application that coordinates one or more MCP clients</td>
+<td style="text-align: left;">Claude Desktop, VS Code Copilot, Cursor, ChatGPT</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>MCP Client</strong></td>
+<td style="text-align: left;">Maintains a dedicated connection to one MCP server</td>
+<td style="text-align: left;">Created by the host at runtime</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>MCP Server</strong></td>
+<td style="text-align: left;">Exposes tools, resources, and prompts to clients</td>
+<td style="text-align: left;">Your custom Python/TypeScript server</td>
+</tr>
+</tbody>
+</table>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    Host["MCP Host&lt;br/&gt;(AI Application)"]
+    Host --&gt; C1["MCP Client 1"]
+    Host --&gt; C2["MCP Client 2"]
+    Host --&gt; C3["MCP Client 3"]
+    C1 --&gt;|"Dedicated&lt;br/&gt;Connection"| S1["MCP Server A&lt;br/&gt;(Local - Filesystem)"]
+    C2 --&gt;|"Dedicated&lt;br/&gt;Connection"| S2["MCP Server B&lt;br/&gt;(Local - Database)"]
+    C3 --&gt;|"Dedicated&lt;br/&gt;Connection"| S3["MCP Server C&lt;br/&gt;(Remote - API)"]
+
+    style Host fill:#4A90D9,color:#fff
+    style C1 fill:#7B68EE,color:#fff
+    style C2 fill:#7B68EE,color:#fff
+    style C3 fill:#7B68EE,color:#fff
+    style S1 fill:#2ECC71,color:#fff
+    style S2 fill:#2ECC71,color:#fff
+    style S3 fill:#E67E22,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="protocol-layers" class="level3">
+<h3 class="anchored" data-anchor-id="protocol-layers">Protocol Layers</h3>
+<p>MCP is composed of two layers:</p>
+<ol type="1">
+<li><strong>Data Layer</strong> — Defines the JSON-RPC 2.0 based protocol for client-server communication, including lifecycle management and the three core primitives (tools, resources, prompts).</li>
+<li><strong>Transport Layer</strong> — Manages communication channels (stdio or Streamable HTTP), connection establishment, message framing, and authentication.</li>
+</ol>
+</section>
+<section id="core-primitives" class="level3">
+<h3 class="anchored" data-anchor-id="core-primitives">Core Primitives</h3>
+<p>MCP servers expose three types of primitives:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 26%">
+<col style="width: 21%">
+<col style="width: 26%">
+<col style="width: 26%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Primitive</th>
+<th style="text-align: left;">Purpose</th>
+<th style="text-align: left;">Discovery</th>
+<th style="text-align: left;">Execution</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Tools</strong></td>
+<td style="text-align: left;">Executable functions the LLM can invoke</td>
+<td style="text-align: left;"><code>tools/list</code></td>
+<td style="text-align: left;"><code>tools/call</code></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Resources</strong></td>
+<td style="text-align: left;">Read-only data sources providing context</td>
+<td style="text-align: left;"><code>resources/list</code></td>
+<td style="text-align: left;"><code>resources/read</code></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Prompts</strong></td>
+<td style="text-align: left;">Reusable interaction templates</td>
+<td style="text-align: left;"><code>prompts/list</code></td>
+<td style="text-align: left;"><code>prompts/get</code></td>
+</tr>
+</tbody>
+</table>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph Server["MCP Server"]
+        T["🔧 Tools&lt;br/&gt;Executable Functions"]
+        R["📄 Resources&lt;br/&gt;Context Data"]
+        P["📝 Prompts&lt;br/&gt;Interaction Templates"]
+    end
+
+    Client["MCP Client"] --&gt;|"tools/list → tools/call"| T
+    Client --&gt;|"resources/list → resources/read"| R
+    Client --&gt;|"prompts/list → prompts/get"| P
+
+    style Server fill:#f0f4ff,stroke:#4A90D9
+    style Client fill:#4A90D9,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="setting-up-the-development-environment" class="level2">
+<h2 class="anchored" data-anchor-id="setting-up-the-development-environment">Setting Up the Development Environment</h2>
+<section id="prerequisites" class="level3">
+<h3 class="anchored" data-anchor-id="prerequisites">Prerequisites</h3>
+<ul>
+<li>Python 3.10+</li>
+<li><code>uv</code> package manager (recommended) or <code>pip</code></li>
+<li>An MCP-compatible host for testing (Claude Desktop, VS Code, or the MCP Inspector)</li>
+</ul>
+</section>
+<section id="project-scaffolding" class="level3">
+<h3 class="anchored" data-anchor-id="project-scaffolding">Project Scaffolding</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Create project directory</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> my-mcp-server <span class="kw">&amp;&amp;</span> <span class="bu">cd</span> my-mcp-server</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Initialize with uv</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> init</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> venv <span class="kw">&amp;&amp;</span> <span class="bu">source</span> .venv/bin/activate</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Install dependencies</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="ex">uv</span> add <span class="st">"mcp[cli]"</span> httpx</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Create server file</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="fu">touch</span> server.py</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The <code>mcp[cli]</code> package includes <code>FastMCP</code>, MCP’s high-level Python SDK that auto-generates tool definitions from type hints and docstrings.</p>
+</section>
+</section>
+<section id="building-your-first-mcp-server" class="level2">
+<h2 class="anchored" data-anchor-id="building-your-first-mcp-server">Building Your First MCP Server</h2>
+<section id="step-1-initialize-fastmcp" class="level3">
+<h3 class="anchored" data-anchor-id="step-1-initialize-fastmcp">Step 1: Initialize FastMCP</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mcp.server.fastmcp <span class="im">import</span> FastMCP</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Create the MCP server instance</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>mcp <span class="op">=</span> FastMCP(<span class="st">"my-knowledge-server"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>FastMCP</code> is the recommended entry point. It wraps the low-level JSON-RPC 2.0 protocol handling and provides decorator-based APIs for tools, resources, and prompts.</p>
+</section>
+<section id="step-2-define-tools" class="level3">
+<h3 class="anchored" data-anchor-id="step-2-define-tools">Step 2: Define Tools</h3>
+<p>Tools are functions the LLM can call. The key principle: <strong>tools should be model-controlled</strong> — the AI decides when and how to invoke them.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> httpx</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> Any</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="at">@mcp.tool</span>()</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> search_documentation(query: <span class="bu">str</span>, max_results: <span class="bu">int</span> <span class="op">=</span> <span class="dv">5</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Search the project documentation for relevant articles.</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="co">        query: The search query string</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="co">        max_results: Maximum number of results to return (default: 5)</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="cf">with</span> httpx.AsyncClient() <span class="im">as</span> client:</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>        response <span class="op">=</span> <span class="cf">await</span> client.get(</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>            <span class="st">"https://api.example.com/search"</span>,</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>            params<span class="op">=</span>{<span class="st">"q"</span>: query, <span class="st">"limit"</span>: max_results},</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>            timeout<span class="op">=</span><span class="fl">30.0</span>,</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>        response.raise_for_status()</span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>        results <span class="op">=</span> response.json()</span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> results[<span class="st">"items"</span>]:</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"No documentation found for this query."</span></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>    formatted <span class="op">=</span> []</span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> item <span class="kw">in</span> results[<span class="st">"items"</span>]:</span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>        formatted.append(</span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>            <span class="ss">f"**</span><span class="sc">{</span>item[<span class="st">'title'</span>]<span class="sc">}</span><span class="ss">**</span><span class="ch">\n</span><span class="sc">{</span>item[<span class="st">'snippet'</span>]<span class="sc">}</span><span class="ch">\n</span><span class="ss">URL: </span><span class="sc">{</span>item[<span class="st">'url'</span>]<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="st">"</span><span class="ch">\n</span><span class="st">---</span><span class="ch">\n</span><span class="st">"</span>.join(formatted)</span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a><span class="at">@mcp.tool</span>()</span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> run_sql_query(query: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Execute a read-only SQL query against the analytics database.</span></span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a><span class="co">        query: SQL SELECT query to execute (write operations are blocked)</span></span>
+<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> query.strip().upper().startswith(<span class="st">"SELECT"</span>):</span>
+<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"Error: Only SELECT queries are allowed for safety."</span></span>
+<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Execute query against your database</span></span>
+<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a>    results <span class="op">=</span> <span class="cf">await</span> execute_readonly_query(query)</span>
+<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> format_as_table(results)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The <code>@mcp.tool()</code> decorator registers the function as an MCP tool. FastMCP extracts the function name, docstring, and type hints to generate the JSON Schema that clients use for tool discovery.</p>
+</section>
+<section id="step-3-define-resources" class="level3">
+<h3 class="anchored" data-anchor-id="step-3-define-resources">Step 3: Define Resources</h3>
+<p>Resources provide <strong>read-only context data</strong> to the client. Unlike tools, resources are typically <strong>user-controlled</strong> — the user or application decides which resources to attach to the conversation.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="at">@mcp.resource</span>(<span class="st">"config://app-settings"</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_app_settings() <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Return the current application configuration."""</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    <span class="im">import</span> json</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    settings <span class="op">=</span> {</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"version"</span>: <span class="st">"2.1.0"</span>,</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>        <span class="st">"environment"</span>: <span class="st">"production"</span>,</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>        <span class="st">"features"</span>: [<span class="st">"search"</span>, <span class="st">"analytics"</span>, <span class="st">"notifications"</span>],</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>        <span class="st">"rate_limits"</span>: {<span class="st">"requests_per_minute"</span>: <span class="dv">60</span>},</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> json.dumps(settings, indent<span class="op">=</span><span class="dv">2</span>)</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="at">@mcp.resource</span>(<span class="st">"schema://database/</span><span class="sc">{table_name}</span><span class="st">"</span>)</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_table_schema(table_name: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Return the schema definition for a database table.</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a><span class="co">        table_name: Name of the database table</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>    schemas <span class="op">=</span> load_database_schemas()</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> table_name <span class="kw">not</span> <span class="kw">in</span> schemas:</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="ss">f"Table '</span><span class="sc">{</span>table_name<span class="sc">}</span><span class="ss">' not found."</span></span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> schemas[table_name]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Resource URIs use a scheme-based format. The <code>{table_name}</code> placeholder creates a <strong>resource template</strong> — a dynamic resource whose content depends on the parameter.</p>
+</section>
+<section id="step-4-define-prompts" class="level3">
+<h3 class="anchored" data-anchor-id="step-4-define-prompts">Step 4: Define Prompts</h3>
+<p>Prompts are <strong>reusable interaction templates</strong> that structure how users interact with the LLM through your server’s capabilities.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="at">@mcp.prompt</span>()</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> debug_error(error_message: <span class="bu">str</span>, stack_trace: <span class="bu">str</span> <span class="op">=</span> <span class="st">""</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Create a debugging prompt for analyzing errors.</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="co">        error_message: The error message to analyze</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="co">        stack_trace: Optional stack trace for context</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    context <span class="op">=</span> <span class="ss">f"Error: </span><span class="sc">{</span>error_message<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> stack_trace:</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>        context <span class="op">+=</span> <span class="ss">f"</span><span class="ch">\n\n</span><span class="ss">Stack Trace:</span><span class="ch">\n</span><span class="sc">{</span>stack_trace<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="ss">f"""You are a senior software engineer debugging an issue.</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="ss">Analyze the following error and provide:</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="ss">1. Root cause analysis</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="ss">2. Step-by-step fix</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a><span class="ss">3. Prevention recommendations</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a><span class="sc">{</span>context<span class="sc">}</span><span class="ss">"""</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="step-5-run-the-server" class="level3">
+<h3 class="anchored" data-anchor-id="step-5-run-the-server">Step 5: Run the Server</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="va">__name__</span> <span class="op">==</span> <span class="st">"__main__"</span>:</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    mcp.run(transport<span class="op">=</span><span class="st">"stdio"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The complete server in a single file:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># server.py</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mcp.server.fastmcp <span class="im">import</span> FastMCP</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> httpx</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> json</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>mcp <span class="op">=</span> FastMCP(<span class="st">"my-knowledge-server"</span>)</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="at">@mcp.tool</span>()</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> search_documentation(query: <span class="bu">str</span>, max_results: <span class="bu">int</span> <span class="op">=</span> <span class="dv">5</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Search the project documentation for relevant articles.</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="co">        query: The search query string</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="co">        max_results: Maximum number of results to return</span></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>    <span class="co"># ... implementation</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="st">"Search results here"</span></span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a><span class="at">@mcp.resource</span>(<span class="st">"config://app-settings"</span>)</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_app_settings() <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Return the current application configuration."""</span></span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> json.dumps({<span class="st">"version"</span>: <span class="st">"2.1.0"</span>, <span class="st">"environment"</span>: <span class="st">"production"</span>}, indent<span class="op">=</span><span class="dv">2</span>)</span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a><span class="at">@mcp.prompt</span>()</span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> debug_error(error_message: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Create a debugging prompt for analyzing errors."""</span></span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="ss">f"Analyze this error and suggest a fix:</span><span class="ch">\n</span><span class="sc">{</span>error_message<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="va">__name__</span> <span class="op">==</span> <span class="st">"__main__"</span>:</span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a>    mcp.run(transport<span class="op">=</span><span class="st">"stdio"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="lifecycle-and-communication-flow" class="level2">
+<h2 class="anchored" data-anchor-id="lifecycle-and-communication-flow">Lifecycle and Communication Flow</h2>
+<p>Every MCP session follows a structured lifecycle governed by JSON-RPC 2.0 messages:</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">sequenceDiagram
+    participant Client as MCP Client
+    participant Server as MCP Server
+
+    Note over Client,Server: 1. Initialization
+    Client-&gt;&gt;Server: initialize (protocolVersion, capabilities, clientInfo)
+    Server-&gt;&gt;Client: InitializeResult (capabilities, serverInfo)
+    Client-&gt;&gt;Server: notifications/initialized
+
+    Note over Client,Server: 2. Discovery
+    Client-&gt;&gt;Server: tools/list
+    Server-&gt;&gt;Client: Tool definitions (name, schema, description)
+
+    Note over Client,Server: 3. Execution
+    Client-&gt;&gt;Server: tools/call (name, arguments)
+    Server-&gt;&gt;Client: Result (content array)
+
+    Note over Client,Server: 4. Notifications
+    Server-&gt;&gt;Client: notifications/tools/list_changed
+    Client-&gt;&gt;Server: tools/list (refresh)
+
+    Note over Client,Server: 5. Shutdown
+    Client-&gt;&gt;Server: Close connection
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p><strong>Capability negotiation</strong> happens during initialization — both client and server declare which primitives they support. For example, a server might declare <code>"tools": {"listChanged": true}</code> to indicate it supports tools and can send change notifications.</p>
+</section>
+<section id="transport-mechanisms" class="level2">
+<h2 class="anchored" data-anchor-id="transport-mechanisms">Transport Mechanisms</h2>
+<p>MCP supports two standard transports. Choosing the right one depends on your deployment model:</p>
+<section id="stdio-transport" class="level3">
+<h3 class="anchored" data-anchor-id="stdio-transport">Stdio Transport</h3>
+<p>The simplest transport: the client launches the server as a <strong>subprocess</strong> and communicates over stdin/stdout.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Run with stdio (default for local servers)</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>mcp.run(transport<span class="op">=</span><span class="st">"stdio"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Key constraints:</strong></p>
+<ul>
+<li>Never write to <code>stdout</code> from your server code (it corrupts JSON-RPC messages)</li>
+<li>Use <code>logging</code> or <code>print(..., file=sys.stderr)</code> for debug output</li>
+<li>Single client per server process</li>
+</ul>
+<p><strong>Best for:</strong> Local integrations with Claude Desktop, VS Code, Cursor.</p>
+</section>
+<section id="streamable-http-transport" class="level3">
+<h3 class="anchored" data-anchor-id="streamable-http-transport">Streamable HTTP Transport</h3>
+<p>For <strong>remote servers</strong> serving multiple clients over the network:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Run with HTTP transport</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>mcp.run(transport<span class="op">=</span><span class="st">"streamable-http"</span>, host<span class="op">=</span><span class="st">"0.0.0.0"</span>, port<span class="op">=</span><span class="dv">8080</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Streamable HTTP uses a single endpoint (e.g., <code>https://example.com/mcp</code>) supporting both POST and GET:</p>
+<ul>
+<li><strong>POST</strong>: Client sends JSON-RPC requests; server responds with JSON or opens an SSE stream</li>
+<li><strong>GET</strong>: Client opens an SSE stream for server-initiated messages</li>
+</ul>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 27%">
+<col style="width: 21%">
+<col style="width: 51%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Feature</th>
+<th style="text-align: left;">Stdio</th>
+<th style="text-align: left;">Streamable HTTP</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Deployment</strong></td>
+<td style="text-align: left;">Local subprocess</td>
+<td style="text-align: left;">Remote server</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Clients</strong></td>
+<td style="text-align: left;">Single</td>
+<td style="text-align: left;">Multiple concurrent</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Network</strong></td>
+<td style="text-align: left;">No network overhead</td>
+<td style="text-align: left;">HTTP-based</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Auth</strong></td>
+<td style="text-align: left;">Process-level</td>
+<td style="text-align: left;">Bearer tokens, OAuth, API keys</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Use case</strong></td>
+<td style="text-align: left;">Desktop integrations</td>
+<td style="text-align: left;">Cloud-hosted services, multi-tenant</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="testing-your-mcp-server" class="level2">
+<h2 class="anchored" data-anchor-id="testing-your-mcp-server">Testing Your MCP Server</h2>
+<section id="using-the-mcp-inspector" class="level3">
+<h3 class="anchored" data-anchor-id="using-the-mcp-inspector">Using the MCP Inspector</h3>
+<p>The <a href="https://github.com/modelcontextprotocol/inspector">MCP Inspector</a> is the official visual testing tool:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Launch the inspector with your server</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="ex">npx</span> @modelcontextprotocol/inspector uv run server.py</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The Inspector provides a web UI where you can:</p>
+<ul>
+<li>Browse all tools, resources, and prompts</li>
+<li>Execute tools with custom arguments</li>
+<li>View raw JSON-RPC messages</li>
+<li>Test error handling</li>
+</ul>
+</section>
+<section id="configuring-claude-desktop" class="level3">
+<h3 class="anchored" data-anchor-id="configuring-claude-desktop">Configuring Claude Desktop</h3>
+<p>Add your server to <code>~/.config/Claude/claude_desktop_config.json</code> (Linux) or the equivalent path on macOS/Windows:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"mcpServers"</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"my-knowledge-server"</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"command"</span><span class="fu">:</span> <span class="st">"uv"</span><span class="fu">,</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"args"</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"--directory"</span><span class="ot">,</span></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"/absolute/path/to/my-mcp-server"</span><span class="ot">,</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>        <span class="st">"run"</span><span class="ot">,</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>        <span class="st">"server.py"</span></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>      <span class="ot">]</span></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="configuring-vs-code" class="level3">
+<h3 class="anchored" data-anchor-id="configuring-vs-code">Configuring VS Code</h3>
+<p>Add to <code>.vscode/mcp.json</code> in your workspace:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"servers"</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">"my-knowledge-server"</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"command"</span><span class="fu">:</span> <span class="st">"uv"</span><span class="fu">,</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">"args"</span><span class="fu">:</span> <span class="ot">[</span><span class="st">"--directory"</span><span class="ot">,</span> <span class="st">"${workspaceFolder}"</span><span class="ot">,</span> <span class="st">"run"</span><span class="ot">,</span> <span class="st">"server.py"</span><span class="ot">]</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="building-a-real-world-example-project-knowledge-server" class="level2">
+<h2 class="anchored" data-anchor-id="building-a-real-world-example-project-knowledge-server">Building a Real-World Example: Project Knowledge Server</h2>
+<p>Let’s build a complete MCP server that provides an AI assistant with deep context about a software project — combining tools, resources, and prompts:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co"># project_server.py</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> json</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> subprocess</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pathlib <span class="im">import</span> Path</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mcp.server.fastmcp <span class="im">import</span> FastMCP</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>mcp <span class="op">=</span> FastMCP(<span class="st">"project-knowledge"</span>)</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>PROJECT_ROOT <span class="op">=</span> Path(<span class="st">"/path/to/your/project"</span>)</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a><span class="co"># ─── Tools ──────────────────────────────────────────</span></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a><span class="at">@mcp.tool</span>()</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> search_codebase(pattern: <span class="bu">str</span>, file_glob: <span class="bu">str</span> <span class="op">=</span> <span class="st">"**/*.py"</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Search the codebase using grep for a pattern.</span></span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a><span class="co">        pattern: Regex pattern to search for</span></span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a><span class="co">        file_glob: File glob to limit search scope (default: all Python files)</span></span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a>        result <span class="op">=</span> subprocess.run(</span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a>            [<span class="st">"grep"</span>, <span class="st">"-rn"</span>, <span class="st">"--include"</span>, file_glob, pattern, <span class="bu">str</span>(PROJECT_ROOT)],</span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a>            capture_output<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a>            text<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a>            timeout<span class="op">=</span><span class="dv">30</span>,</span>
+<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb13-28"><a href="#cb13-28" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> result.stdout.strip():</span>
+<span id="cb13-29"><a href="#cb13-29" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="ss">f"No matches found for pattern: </span><span class="sc">{</span>pattern<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb13-30"><a href="#cb13-30" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Limit output to avoid overwhelming the LLM</span></span>
+<span id="cb13-31"><a href="#cb13-31" aria-hidden="true" tabindex="-1"></a>        lines <span class="op">=</span> result.stdout.strip().split(<span class="st">"</span><span class="ch">\n</span><span class="st">"</span>)[:<span class="dv">20</span>]</span>
+<span id="cb13-32"><a href="#cb13-32" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"</span><span class="ch">\n</span><span class="st">"</span>.join(lines)</span>
+<span id="cb13-33"><a href="#cb13-33" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> subprocess.TimeoutExpired:</span>
+<span id="cb13-34"><a href="#cb13-34" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"Search timed out. Try a more specific pattern."</span></span>
+<span id="cb13-35"><a href="#cb13-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-36"><a href="#cb13-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-37"><a href="#cb13-37" aria-hidden="true" tabindex="-1"></a><span class="at">@mcp.tool</span>()</span>
+<span id="cb13-38"><a href="#cb13-38" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> read_file(file_path: <span class="bu">str</span>, start_line: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>, end_line: <span class="bu">int</span> <span class="op">=</span> <span class="dv">100</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb13-39"><a href="#cb13-39" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Read a file from the project with optional line range.</span></span>
+<span id="cb13-40"><a href="#cb13-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-41"><a href="#cb13-41" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb13-42"><a href="#cb13-42" aria-hidden="true" tabindex="-1"></a><span class="co">        file_path: Relative path from project root</span></span>
+<span id="cb13-43"><a href="#cb13-43" aria-hidden="true" tabindex="-1"></a><span class="co">        start_line: First line to read (1-indexed)</span></span>
+<span id="cb13-44"><a href="#cb13-44" aria-hidden="true" tabindex="-1"></a><span class="co">        end_line: Last line to read (inclusive)</span></span>
+<span id="cb13-45"><a href="#cb13-45" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb13-46"><a href="#cb13-46" aria-hidden="true" tabindex="-1"></a>    target <span class="op">=</span> PROJECT_ROOT <span class="op">/</span> file_path</span>
+<span id="cb13-47"><a href="#cb13-47" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Security: prevent path traversal</span></span>
+<span id="cb13-48"><a href="#cb13-48" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> target.resolve().is_relative_to(PROJECT_ROOT.resolve()):</span>
+<span id="cb13-49"><a href="#cb13-49" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"Error: Access denied — path is outside the project."</span></span>
+<span id="cb13-50"><a href="#cb13-50" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> target.exists():</span>
+<span id="cb13-51"><a href="#cb13-51" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="ss">f"File not found: </span><span class="sc">{</span>file_path<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb13-52"><a href="#cb13-52" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-53"><a href="#cb13-53" aria-hidden="true" tabindex="-1"></a>    lines <span class="op">=</span> target.read_text().splitlines()</span>
+<span id="cb13-54"><a href="#cb13-54" aria-hidden="true" tabindex="-1"></a>    selected <span class="op">=</span> lines[start_line <span class="op">-</span> <span class="dv">1</span> : end_line]</span>
+<span id="cb13-55"><a href="#cb13-55" aria-hidden="true" tabindex="-1"></a>    numbered <span class="op">=</span> [<span class="ss">f"</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>line<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> i, line <span class="kw">in</span> <span class="bu">enumerate</span>(selected, start<span class="op">=</span>start_line)]</span>
+<span id="cb13-56"><a href="#cb13-56" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="st">"</span><span class="ch">\n</span><span class="st">"</span>.join(numbered)</span>
+<span id="cb13-57"><a href="#cb13-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-58"><a href="#cb13-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-59"><a href="#cb13-59" aria-hidden="true" tabindex="-1"></a><span class="at">@mcp.tool</span>()</span>
+<span id="cb13-60"><a href="#cb13-60" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> list_directory(dir_path: <span class="bu">str</span> <span class="op">=</span> <span class="st">"."</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb13-61"><a href="#cb13-61" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""List files and directories at the given path.</span></span>
+<span id="cb13-62"><a href="#cb13-62" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-63"><a href="#cb13-63" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb13-64"><a href="#cb13-64" aria-hidden="true" tabindex="-1"></a><span class="co">        dir_path: Relative path from project root (default: root)</span></span>
+<span id="cb13-65"><a href="#cb13-65" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb13-66"><a href="#cb13-66" aria-hidden="true" tabindex="-1"></a>    target <span class="op">=</span> PROJECT_ROOT <span class="op">/</span> dir_path</span>
+<span id="cb13-67"><a href="#cb13-67" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> target.resolve().is_relative_to(PROJECT_ROOT.resolve()):</span>
+<span id="cb13-68"><a href="#cb13-68" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"Error: Access denied — path is outside the project."</span></span>
+<span id="cb13-69"><a href="#cb13-69" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> target.is_dir():</span>
+<span id="cb13-70"><a href="#cb13-70" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="ss">f"Not a directory: </span><span class="sc">{</span>dir_path<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb13-71"><a href="#cb13-71" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-72"><a href="#cb13-72" aria-hidden="true" tabindex="-1"></a>    entries <span class="op">=</span> <span class="bu">sorted</span>(target.iterdir())</span>
+<span id="cb13-73"><a href="#cb13-73" aria-hidden="true" tabindex="-1"></a>    formatted <span class="op">=</span> []</span>
+<span id="cb13-74"><a href="#cb13-74" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> entry <span class="kw">in</span> entries[:<span class="dv">50</span>]:</span>
+<span id="cb13-75"><a href="#cb13-75" aria-hidden="true" tabindex="-1"></a>        prefix <span class="op">=</span> <span class="st">"📁"</span> <span class="cf">if</span> entry.is_dir() <span class="cf">else</span> <span class="st">"📄"</span></span>
+<span id="cb13-76"><a href="#cb13-76" aria-hidden="true" tabindex="-1"></a>        formatted.append(<span class="ss">f"</span><span class="sc">{</span>prefix<span class="sc">}</span><span class="ss"> </span><span class="sc">{</span>entry<span class="sc">.</span>name<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb13-77"><a href="#cb13-77" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="st">"</span><span class="ch">\n</span><span class="st">"</span>.join(formatted)</span>
+<span id="cb13-78"><a href="#cb13-78" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-79"><a href="#cb13-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-80"><a href="#cb13-80" aria-hidden="true" tabindex="-1"></a><span class="at">@mcp.tool</span>()</span>
+<span id="cb13-81"><a href="#cb13-81" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> run_tests(test_path: <span class="bu">str</span> <span class="op">=</span> <span class="st">""</span>, verbose: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb13-82"><a href="#cb13-82" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Run project tests using pytest.</span></span>
+<span id="cb13-83"><a href="#cb13-83" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-84"><a href="#cb13-84" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb13-85"><a href="#cb13-85" aria-hidden="true" tabindex="-1"></a><span class="co">        test_path: Specific test file or directory (default: all tests)</span></span>
+<span id="cb13-86"><a href="#cb13-86" aria-hidden="true" tabindex="-1"></a><span class="co">        verbose: Whether to show verbose output</span></span>
+<span id="cb13-87"><a href="#cb13-87" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb13-88"><a href="#cb13-88" aria-hidden="true" tabindex="-1"></a>    cmd <span class="op">=</span> [<span class="st">"python"</span>, <span class="st">"-m"</span>, <span class="st">"pytest"</span>, <span class="st">"--tb=short"</span>, <span class="st">"-q"</span>]</span>
+<span id="cb13-89"><a href="#cb13-89" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> verbose:</span>
+<span id="cb13-90"><a href="#cb13-90" aria-hidden="true" tabindex="-1"></a>        cmd.append(<span class="st">"-v"</span>)</span>
+<span id="cb13-91"><a href="#cb13-91" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> test_path:</span>
+<span id="cb13-92"><a href="#cb13-92" aria-hidden="true" tabindex="-1"></a>        cmd.append(<span class="bu">str</span>(PROJECT_ROOT <span class="op">/</span> test_path))</span>
+<span id="cb13-93"><a href="#cb13-93" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb13-94"><a href="#cb13-94" aria-hidden="true" tabindex="-1"></a>        cmd.append(<span class="bu">str</span>(PROJECT_ROOT <span class="op">/</span> <span class="st">"tests"</span>))</span>
+<span id="cb13-95"><a href="#cb13-95" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-96"><a href="#cb13-96" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb13-97"><a href="#cb13-97" aria-hidden="true" tabindex="-1"></a>        result <span class="op">=</span> subprocess.run(</span>
+<span id="cb13-98"><a href="#cb13-98" aria-hidden="true" tabindex="-1"></a>            cmd, capture_output<span class="op">=</span><span class="va">True</span>, text<span class="op">=</span><span class="va">True</span>, timeout<span class="op">=</span><span class="dv">120</span>, cwd<span class="op">=</span><span class="bu">str</span>(PROJECT_ROOT)</span>
+<span id="cb13-99"><a href="#cb13-99" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb13-100"><a href="#cb13-100" aria-hidden="true" tabindex="-1"></a>        output <span class="op">=</span> result.stdout <span class="op">+</span> result.stderr</span>
+<span id="cb13-101"><a href="#cb13-101" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Truncate if too long</span></span>
+<span id="cb13-102"><a href="#cb13-102" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">len</span>(output) <span class="op">&gt;</span> <span class="dv">3000</span>:</span>
+<span id="cb13-103"><a href="#cb13-103" aria-hidden="true" tabindex="-1"></a>            output <span class="op">=</span> output[:<span class="dv">3000</span>] <span class="op">+</span> <span class="st">"</span><span class="ch">\n</span><span class="st">... (truncated)"</span></span>
+<span id="cb13-104"><a href="#cb13-104" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> output</span>
+<span id="cb13-105"><a href="#cb13-105" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> subprocess.TimeoutExpired:</span>
+<span id="cb13-106"><a href="#cb13-106" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"Tests timed out after 120 seconds."</span></span>
+<span id="cb13-107"><a href="#cb13-107" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-108"><a href="#cb13-108" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-109"><a href="#cb13-109" aria-hidden="true" tabindex="-1"></a><span class="co"># ─── Resources ──────────────────────────────────────</span></span>
+<span id="cb13-110"><a href="#cb13-110" aria-hidden="true" tabindex="-1"></a><span class="at">@mcp.resource</span>(<span class="st">"project://readme"</span>)</span>
+<span id="cb13-111"><a href="#cb13-111" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_readme() <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb13-112"><a href="#cb13-112" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Return the project README."""</span></span>
+<span id="cb13-113"><a href="#cb13-113" aria-hidden="true" tabindex="-1"></a>    readme <span class="op">=</span> PROJECT_ROOT <span class="op">/</span> <span class="st">"README.md"</span></span>
+<span id="cb13-114"><a href="#cb13-114" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> readme.exists():</span>
+<span id="cb13-115"><a href="#cb13-115" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> readme.read_text()</span>
+<span id="cb13-116"><a href="#cb13-116" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="st">"No README.md found."</span></span>
+<span id="cb13-117"><a href="#cb13-117" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-118"><a href="#cb13-118" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-119"><a href="#cb13-119" aria-hidden="true" tabindex="-1"></a><span class="at">@mcp.resource</span>(<span class="st">"project://structure"</span>)</span>
+<span id="cb13-120"><a href="#cb13-120" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_project_structure() <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb13-121"><a href="#cb13-121" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Return a tree view of the project structure."""</span></span>
+<span id="cb13-122"><a href="#cb13-122" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb13-123"><a href="#cb13-123" aria-hidden="true" tabindex="-1"></a>        result <span class="op">=</span> subprocess.run(</span>
+<span id="cb13-124"><a href="#cb13-124" aria-hidden="true" tabindex="-1"></a>            [<span class="st">"find"</span>, <span class="bu">str</span>(PROJECT_ROOT), <span class="st">"-type"</span>, <span class="st">"f"</span>, <span class="st">"-not"</span>, <span class="st">"-path"</span>, <span class="st">"*/.git/*"</span>,</span>
+<span id="cb13-125"><a href="#cb13-125" aria-hidden="true" tabindex="-1"></a>             <span class="st">"-not"</span>, <span class="st">"-path"</span>, <span class="st">"*/__pycache__/*"</span>, <span class="st">"-not"</span>, <span class="st">"-path"</span>, <span class="st">"*/.venv/*"</span>],</span>
+<span id="cb13-126"><a href="#cb13-126" aria-hidden="true" tabindex="-1"></a>            capture_output<span class="op">=</span><span class="va">True</span>, text<span class="op">=</span><span class="va">True</span>, timeout<span class="op">=</span><span class="dv">10</span>,</span>
+<span id="cb13-127"><a href="#cb13-127" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb13-128"><a href="#cb13-128" aria-hidden="true" tabindex="-1"></a>        files <span class="op">=</span> <span class="bu">sorted</span>(result.stdout.strip().split(<span class="st">"</span><span class="ch">\n</span><span class="st">"</span>))[:<span class="dv">100</span>]</span>
+<span id="cb13-129"><a href="#cb13-129" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"</span><span class="ch">\n</span><span class="st">"</span>.join(f.replace(<span class="bu">str</span>(PROJECT_ROOT) <span class="op">+</span> <span class="st">"/"</span>, <span class="st">""</span>) <span class="cf">for</span> f <span class="kw">in</span> files)</span>
+<span id="cb13-130"><a href="#cb13-130" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span>:</span>
+<span id="cb13-131"><a href="#cb13-131" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"Unable to generate project structure."</span></span>
+<span id="cb13-132"><a href="#cb13-132" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-133"><a href="#cb13-133" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-134"><a href="#cb13-134" aria-hidden="true" tabindex="-1"></a><span class="at">@mcp.resource</span>(<span class="st">"project://dependencies"</span>)</span>
+<span id="cb13-135"><a href="#cb13-135" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_dependencies() <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb13-136"><a href="#cb13-136" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Return the project dependencies."""</span></span>
+<span id="cb13-137"><a href="#cb13-137" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> dep_file <span class="kw">in</span> [<span class="st">"pyproject.toml"</span>, <span class="st">"requirements.txt"</span>, <span class="st">"package.json"</span>]:</span>
+<span id="cb13-138"><a href="#cb13-138" aria-hidden="true" tabindex="-1"></a>        path <span class="op">=</span> PROJECT_ROOT <span class="op">/</span> dep_file</span>
+<span id="cb13-139"><a href="#cb13-139" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> path.exists():</span>
+<span id="cb13-140"><a href="#cb13-140" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="ss">f"# </span><span class="sc">{</span>dep_file<span class="sc">}</span><span class="ch">\n</span><span class="sc">{</span>path<span class="sc">.</span>read_text()<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb13-141"><a href="#cb13-141" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="st">"No dependency file found."</span></span>
+<span id="cb13-142"><a href="#cb13-142" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-143"><a href="#cb13-143" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-144"><a href="#cb13-144" aria-hidden="true" tabindex="-1"></a><span class="co"># ─── Prompts ────────────────────────────────────────</span></span>
+<span id="cb13-145"><a href="#cb13-145" aria-hidden="true" tabindex="-1"></a><span class="at">@mcp.prompt</span>()</span>
+<span id="cb13-146"><a href="#cb13-146" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> code_review(file_path: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb13-147"><a href="#cb13-147" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Generate a prompt for reviewing a specific file.</span></span>
+<span id="cb13-148"><a href="#cb13-148" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-149"><a href="#cb13-149" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb13-150"><a href="#cb13-150" aria-hidden="true" tabindex="-1"></a><span class="co">        file_path: Path to the file to review</span></span>
+<span id="cb13-151"><a href="#cb13-151" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb13-152"><a href="#cb13-152" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="ss">f"""You are a senior engineer conducting a code review.</span></span>
+<span id="cb13-153"><a href="#cb13-153" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-154"><a href="#cb13-154" aria-hidden="true" tabindex="-1"></a><span class="ss">Review the file at `</span><span class="sc">{</span>file_path<span class="sc">}</span><span class="ss">` and provide feedback on:</span></span>
+<span id="cb13-155"><a href="#cb13-155" aria-hidden="true" tabindex="-1"></a><span class="ss">1. Code quality and readability</span></span>
+<span id="cb13-156"><a href="#cb13-156" aria-hidden="true" tabindex="-1"></a><span class="ss">2. Potential bugs or edge cases</span></span>
+<span id="cb13-157"><a href="#cb13-157" aria-hidden="true" tabindex="-1"></a><span class="ss">3. Performance considerations</span></span>
+<span id="cb13-158"><a href="#cb13-158" aria-hidden="true" tabindex="-1"></a><span class="ss">4. Security concerns</span></span>
+<span id="cb13-159"><a href="#cb13-159" aria-hidden="true" tabindex="-1"></a><span class="ss">5. Suggestions for improvement</span></span>
+<span id="cb13-160"><a href="#cb13-160" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-161"><a href="#cb13-161" aria-hidden="true" tabindex="-1"></a><span class="ss">Use the read_file tool to examine the code, and search_codebase to understand</span></span>
+<span id="cb13-162"><a href="#cb13-162" aria-hidden="true" tabindex="-1"></a><span class="ss">how it integrates with the rest of the project."""</span></span>
+<span id="cb13-163"><a href="#cb13-163" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-164"><a href="#cb13-164" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-165"><a href="#cb13-165" aria-hidden="true" tabindex="-1"></a><span class="at">@mcp.prompt</span>()</span>
+<span id="cb13-166"><a href="#cb13-166" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> investigate_bug(description: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb13-167"><a href="#cb13-167" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Generate a prompt for investigating a bug.</span></span>
+<span id="cb13-168"><a href="#cb13-168" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-169"><a href="#cb13-169" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb13-170"><a href="#cb13-170" aria-hidden="true" tabindex="-1"></a><span class="co">        description: Description of the bug</span></span>
+<span id="cb13-171"><a href="#cb13-171" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb13-172"><a href="#cb13-172" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="ss">f"""You are debugging a reported issue in the project.</span></span>
+<span id="cb13-173"><a href="#cb13-173" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-174"><a href="#cb13-174" aria-hidden="true" tabindex="-1"></a><span class="ss">Bug description: </span><span class="sc">{</span>description<span class="sc">}</span></span>
+<span id="cb13-175"><a href="#cb13-175" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-176"><a href="#cb13-176" aria-hidden="true" tabindex="-1"></a><span class="ss">Approach:</span></span>
+<span id="cb13-177"><a href="#cb13-177" aria-hidden="true" tabindex="-1"></a><span class="ss">1. Use search_codebase to find relevant code</span></span>
+<span id="cb13-178"><a href="#cb13-178" aria-hidden="true" tabindex="-1"></a><span class="ss">2. Use read_file to examine suspicious areas</span></span>
+<span id="cb13-179"><a href="#cb13-179" aria-hidden="true" tabindex="-1"></a><span class="ss">3. Use run_tests to verify behavior</span></span>
+<span id="cb13-180"><a href="#cb13-180" aria-hidden="true" tabindex="-1"></a><span class="ss">4. Provide a root cause analysis and suggested fix"""</span></span>
+<span id="cb13-181"><a href="#cb13-181" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-182"><a href="#cb13-182" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-183"><a href="#cb13-183" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="va">__name__</span> <span class="op">==</span> <span class="st">"__main__"</span>:</span>
+<span id="cb13-184"><a href="#cb13-184" aria-hidden="true" tabindex="-1"></a>    mcp.run(transport<span class="op">=</span><span class="st">"stdio"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="integrating-with-mistral-ai" class="level2">
+<h2 class="anchored" data-anchor-id="integrating-with-mistral-ai">Integrating with Mistral AI</h2>
+<p>Mistral AI has embraced MCP as a first-class integration for its Agents and Conversations API. Their Python SDK (<code>mistralai</code>) includes built-in MCP client support, and Mistral recently hosted an <a href="https://hackathon.mistral.ai">MCP Hackathon</a> to encourage the community to build creative MCP servers — from code assistants to data pipeline connectors.</p>
+<p>Here’s how to connect your MCP server to a Mistral agent:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> asyncio</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pathlib <span class="im">import</span> Path</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mistralai.client <span class="im">import</span> Mistral</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mistralai.extra.run.context <span class="im">import</span> RunContext</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mcp <span class="im">import</span> StdioServerParameters</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mistralai.extra.mcp.stdio <span class="im">import</span> MCPClientSTDIO</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>MODEL <span class="op">=</span> <span class="st">"mistral-medium-latest"</span></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>cwd <span class="op">=</span> Path(<span class="va">__file__</span>).parent</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> main() <span class="op">-&gt;</span> <span class="va">None</span>:</span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>    client <span class="op">=</span> Mistral(api_key<span class="op">=</span>os.environ[<span class="st">"MISTRAL_API_KEY"</span>])</span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Point to your MCP server</span></span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>    server_params <span class="op">=</span> StdioServerParameters(</span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>        command<span class="op">=</span><span class="st">"uv"</span>,</span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>        args<span class="op">=</span>[<span class="st">"--directory"</span>, <span class="bu">str</span>(cwd), <span class="st">"run"</span>, <span class="st">"server.py"</span>],</span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>        env<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Create an agent</span></span>
+<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a>    agent <span class="op">=</span> client.beta.agents.create(</span>
+<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a>        model<span class="op">=</span>MODEL,</span>
+<span id="cb14-27"><a href="#cb14-27" aria-hidden="true" tabindex="-1"></a>        name<span class="op">=</span><span class="st">"project-assistant"</span>,</span>
+<span id="cb14-28"><a href="#cb14-28" aria-hidden="true" tabindex="-1"></a>        instructions<span class="op">=</span><span class="st">"You help developers understand and work with the project."</span>,</span>
+<span id="cb14-29"><a href="#cb14-29" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb14-30"><a href="#cb14-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-31"><a href="#cb14-31" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Set up the run context with MCP</span></span>
+<span id="cb14-32"><a href="#cb14-32" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="cf">with</span> RunContext(agent_id<span class="op">=</span>agent.<span class="bu">id</span>) <span class="im">as</span> run_ctx:</span>
+<span id="cb14-33"><a href="#cb14-33" aria-hidden="true" tabindex="-1"></a>        mcp_client <span class="op">=</span> MCPClientSTDIO(stdio_params<span class="op">=</span>server_params)</span>
+<span id="cb14-34"><a href="#cb14-34" aria-hidden="true" tabindex="-1"></a>        <span class="cf">await</span> run_ctx.register_mcp_client(mcp_client<span class="op">=</span>mcp_client)</span>
+<span id="cb14-35"><a href="#cb14-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-36"><a href="#cb14-36" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Run the agent</span></span>
+<span id="cb14-37"><a href="#cb14-37" aria-hidden="true" tabindex="-1"></a>        result <span class="op">=</span> <span class="cf">await</span> client.beta.conversations.run_async(</span>
+<span id="cb14-38"><a href="#cb14-38" aria-hidden="true" tabindex="-1"></a>            run_ctx<span class="op">=</span>run_ctx,</span>
+<span id="cb14-39"><a href="#cb14-39" aria-hidden="true" tabindex="-1"></a>            inputs<span class="op">=</span><span class="st">"Search for all API endpoint definitions in the project."</span>,</span>
+<span id="cb14-40"><a href="#cb14-40" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb14-41"><a href="#cb14-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-42"><a href="#cb14-42" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> entry <span class="kw">in</span> result.output_entries:</span>
+<span id="cb14-43"><a href="#cb14-43" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(entry)</span>
+<span id="cb14-44"><a href="#cb14-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-45"><a href="#cb14-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-46"><a href="#cb14-46" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="va">__name__</span> <span class="op">==</span> <span class="st">"__main__"</span>:</span>
+<span id="cb14-47"><a href="#cb14-47" aria-hidden="true" tabindex="-1"></a>    asyncio.run(main())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Mistral’s agent framework automatically discovers tools exposed by the MCP server and makes them available to the model. The agent can combine MCP tools with Mistral’s built-in connectors (web search, code interpreter) in a single conversation — or you can use <strong>handoffs</strong> to route between multiple specialized agents, each connected to different MCP servers.</p>
+</section>
+<section id="deploying-to-production" class="level2">
+<h2 class="anchored" data-anchor-id="deploying-to-production">Deploying to Production</h2>
+<section id="containerizing-with-docker" class="level3">
+<h3 class="anchored" data-anchor-id="containerizing-with-docker">Containerizing with Docker</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode dockerfile code-with-copy"><code class="sourceCode dockerfile"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> python:3.12-slim</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="kw">WORKDIR</span> /app</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Install uv</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">pip</span> install uv</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Copy project files</span></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a><span class="kw">COPY</span> pyproject.toml uv.lock ./</span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a><span class="kw">COPY</span> server.py ./</span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Install dependencies</span></span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a><span class="kw">RUN</span> <span class="ex">uv</span> sync <span class="at">--frozen</span></span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Expose port for Streamable HTTP transport</span></span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a><span class="kw">EXPOSE</span> 8080</span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a><span class="co"># Run the server</span></span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a><span class="kw">CMD</span> [<span class="st">"uv"</span>, <span class="st">"run"</span>, <span class="st">"server.py"</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Update your server to use Streamable HTTP for remote access:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="va">__name__</span> <span class="op">==</span> <span class="st">"__main__"</span>:</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    transport <span class="op">=</span> os.environ.get(<span class="st">"MCP_TRANSPORT"</span>, <span class="st">"stdio"</span>)</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> transport <span class="op">==</span> <span class="st">"streamable-http"</span>:</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>        mcp.run(</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>            transport<span class="op">=</span><span class="st">"streamable-http"</span>,</span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>            host<span class="op">=</span><span class="st">"0.0.0.0"</span>,</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>            port<span class="op">=</span><span class="bu">int</span>(os.environ.get(<span class="st">"PORT"</span>, <span class="dv">8080</span>)),</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>        mcp.run(transport<span class="op">=</span><span class="st">"stdio"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="security-best-practices" class="level3">
+<h3 class="anchored" data-anchor-id="security-best-practices">Security Best Practices</h3>
+<p>When deploying MCP servers — especially remote ones — follow these security guidelines:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 36%">
+<col style="width: 64%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Concern</th>
+<th style="text-align: left;">Recommendation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Path traversal</strong></td>
+<td style="text-align: left;">Validate all file paths against an allowed root directory</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>SQL injection</strong></td>
+<td style="text-align: left;">Use parameterized queries; restrict to read-only operations</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>DNS rebinding</strong></td>
+<td style="text-align: left;">Validate the <code>Origin</code> header on all HTTP connections</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Network binding</strong></td>
+<td style="text-align: left;">Bind to <code>127.0.0.1</code> for local servers, not <code>0.0.0.0</code></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Authentication</strong></td>
+<td style="text-align: left;">Use OAuth or bearer tokens for remote servers</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Input validation</strong></td>
+<td style="text-align: left;">Validate all tool arguments at the server boundary</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Rate limiting</strong></td>
+<td style="text-align: left;">Implement per-client rate limits for resource-intensive tools</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Logging</strong></td>
+<td style="text-align: left;">Never log sensitive data; use <code>stderr</code> for stdio servers</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="deployment-options" class="level3">
+<h3 class="anchored" data-anchor-id="deployment-options">Deployment Options</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 28%">
+<col style="width: 31%">
+<col style="width: 40%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Platform</th>
+<th style="text-align: left;">Transport</th>
+<th style="text-align: left;">Configuration</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Local (Claude Desktop / VS Code)</strong></td>
+<td style="text-align: left;">stdio</td>
+<td style="text-align: left;">JSON config pointing to <code>uv run server.py</code></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Docker</strong></td>
+<td style="text-align: left;">Streamable HTTP</td>
+<td style="text-align: left;">Container with exposed port</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Cloud Run / Railway</strong></td>
+<td style="text-align: left;">Streamable HTTP</td>
+<td style="text-align: left;">Autoscaling HTTP service</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>AWS Lambda</strong></td>
+<td style="text-align: left;">Streamable HTTP</td>
+<td style="text-align: left;">Serverless function behind API Gateway</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Kubernetes</strong></td>
+<td style="text-align: left;">Streamable HTTP</td>
+<td style="text-align: left;">Deployment with service and ingress</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="comparison-mcp-vs.-direct-function-calling" class="level2">
+<h2 class="anchored" data-anchor-id="comparison-mcp-vs.-direct-function-calling">Comparison: MCP vs.&nbsp;Direct Function Calling</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 22%">
+<col style="width: 63%">
+<col style="width: 13%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Aspect</th>
+<th style="text-align: left;">Direct Function Calling</th>
+<th style="text-align: left;">MCP</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Protocol</strong></td>
+<td style="text-align: left;">Provider-specific (OpenAI, Mistral, etc.)</td>
+<td style="text-align: left;">Open standard (JSON-RPC 2.0)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Discovery</strong></td>
+<td style="text-align: left;">Manual schema definition</td>
+<td style="text-align: left;">Automatic via <code>tools/list</code></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Portability</strong></td>
+<td style="text-align: left;">Locked to one provider</td>
+<td style="text-align: left;">Works across all MCP-compatible hosts</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Execution</strong></td>
+<td style="text-align: left;">Client-side (developer handles calls)</td>
+<td style="text-align: left;">Server-side (server manages tool logic)</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>State</strong></td>
+<td style="text-align: left;">Stateless per request</td>
+<td style="text-align: left;">Stateful sessions with lifecycle</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Real-time updates</strong></td>
+<td style="text-align: left;">Not supported</td>
+<td style="text-align: left;">Notifications for capability changes</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Ecosystem</strong></td>
+<td style="text-align: left;">Provider-specific</td>
+<td style="text-align: left;">Growing open ecosystem of servers</td>
+</tr>
+</tbody>
+</table>
+<p>Function calling and MCP are <strong>complementary</strong>. Function calling defines how the model <em>requests</em> tool invocations; MCP defines how those tools are <em>discovered, connected, and managed</em>. In fact, Mistral’s MCP integration wraps function calling — the model uses its standard tool-calling capability, and the Mistral SDK automatically routes calls to the appropriate MCP server.</p>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ol type="1">
+<li>Model Context Protocol, “Introduction — What is MCP?”, modelcontextprotocol.io, 2025. Available: <a href="https://modelcontextprotocol.io/introduction">https://modelcontextprotocol.io/introduction</a></li>
+<li>Model Context Protocol, “Architecture Overview”, modelcontextprotocol.io, 2025. Available: <a href="https://modelcontextprotocol.io/docs/concepts/architecture">https://modelcontextprotocol.io/docs/concepts/architecture</a></li>
+<li>Model Context Protocol, “Build an MCP Server — Quickstart”, modelcontextprotocol.io, 2025. Available: <a href="https://modelcontextprotocol.io/quickstart/server">https://modelcontextprotocol.io/quickstart/server</a></li>
+<li>Model Context Protocol, “Transports Specification”, modelcontextprotocol.io, 2025. Available: <a href="https://modelcontextprotocol.io/specification/2025-06-18/basic/transports">https://modelcontextprotocol.io/specification/2025-06-18/basic/transports</a></li>
+<li>Mistral AI, “MCP — Agents Tools Documentation”, docs.mistral.ai, 2025. Available: <a href="https://docs.mistral.ai/agents/tools/mcp/">https://docs.mistral.ai/agents/tools/mcp/</a></li>
+<li>Mistral AI, “Function Calling”, docs.mistral.ai, 2025. Available: <a href="https://docs.mistral.ai/capabilities/function_calling/">https://docs.mistral.ai/capabilities/function_calling/</a></li>
+<li>Mistral AI, “MCP Hackathon”, hackathon.mistral.ai, 2025. Available: <a href="https://hackathon.mistral.ai">https://hackathon.mistral.ai</a></li>
+<li>GitHub, “MCP Inspector — Visual Testing Tool”, github.com/modelcontextprotocol/inspector, 2025. Available: <a href="https://github.com/modelcontextprotocol/inspector">https://github.com/modelcontextprotocol/inspector</a></li>
+</ol>
+</section>
+<section id="read-more" class="level2">
+<h2 class="anchored" data-anchor-id="read-more">Read More</h2>
+<ul>
+<li><a href="../../posts/agent/Tool Use and Function Calling for Retrieval Agents.html">Tool Use and Function Calling for Retrieval Agents</a> — Covers function calling patterns that MCP servers expose as tools, and how LLMs select and invoke them.</li>
+<li><a href="../../posts/agent/Building a ReAct Agent from Scratch.html">Building a ReAct Agent from Scratch</a> — Build the Thought-Action-Observation loop that powers agents consuming MCP tools.</li>
+<li><a href="../../posts/agent/Design Patterns for AI Agents.html">Design Patterns for AI Agents</a> — Architectural patterns like Orchestrator-Workers and Tool Use that MCP servers enable at the infrastructure level.</li>
+<li><a href="../../posts/agent/Building Agents with LangGraph.html">Building Agents with LangGraph</a> — LangGraph agents can integrate with MCP servers for tool orchestration in stateful workflows.</li>
+<li><a href="../../posts/agent/Deploying Retrieval Agents in Production.html">Deploying Retrieval Agents in Production</a> — Production deployment patterns for agent systems, including containerization and scaling strategies applicable to MCP servers.</li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/tanquangduong\.github\.io\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> Copyright 2025, Quang T. Duong</p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

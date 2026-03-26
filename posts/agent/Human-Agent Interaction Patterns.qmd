@@ -1,0 +1,874 @@
+---
+title: "Human–Agent Interaction Patterns"
+subtitle: "Human in the Loop, Human on the Loop, Human over the Loop — choosing the right level of autonomy for AI agents in production"
+image: /images/llm/human-agent-interaction-patterns-300px.png
+date: "2025-06-18"
+---
+
+**Keywords:** human-in-the-loop, human-on-the-loop, human-over-the-loop, human-out-of-the-loop, HITL, HOTL, agent autonomy, oversight patterns, approval workflows, LangGraph interrupt, guardrails, AI safety, human oversight, autonomous agents, co-pilot
+
+![](/images/llm/human-agent-interaction-patterns-300px.png){fig-align="center" width=300}
+
+## Introduction
+
+Every AI agent sits somewhere on a spectrum between **fully manual** and **fully autonomous**. At one end, a human approves every single action; at the other, the agent plans, acts, and delivers results without any human involvement. Neither extreme is ideal for most real-world applications — the sweet spot depends on the stakes, the domain, and how much you trust the agent.
+
+The terminology for these patterns originates from **military autonomous systems** research. In a 2012 Human Rights Watch report, Bonnie Docherty defined three classifications — *human-in-the-loop*, *human-on-the-loop*, and *human-out-of-the-loop* — to describe degrees of human control over autonomous weapons. These concepts have since been adopted broadly in AI, robotics, and now LLM-powered agents.
+
+This article maps these patterns to AI agent design, adds two additional patterns that have emerged in practice (*human-over-the-loop* and *human-beside-the-loop*), and provides concrete implementation guidance with **LangGraph**, **LlamaIndex**, and raw Python.
+
+## The Autonomy Spectrum
+
+Human–agent interaction patterns form a spectrum from maximum human control to full agent autonomy:
+
+```{mermaid}
+graph LR
+    A["Human-in-the-Loop<br/>🔒 Maximum Control"] --> B["Human-on-the-Loop<br/>👁️ Active Monitoring"]
+    B --> C["Human-over-the-Loop<br/>📋 Policy Governance"]
+    C --> D["Human-beside-the-Loop<br/>🤝 Collaborative"]
+    D --> E["Human-out-of-the-Loop<br/>🚀 Full Autonomy"]
+
+    style A fill:#e74c3c,color:#fff
+    style B fill:#e67e22,color:#fff
+    style C fill:#f5a623,color:#fff
+    style D fill:#27ae60,color:#fff
+    style E fill:#4a90d9,color:#fff
+```
+
+| Pattern | Human Role | Agent Autonomy | Latency | Scalability |
+|:--------|:-----------|:---------------|:--------|:------------|
+| **Human-in-the-Loop** | Approves every action | Minimal — proposes only | High | Low |
+| **Human-on-the-Loop** | Monitors, can abort/override | Moderate — acts unless stopped | Medium | Medium |
+| **Human-over-the-Loop** | Sets goals & policies, reviews outcomes | High — plans and acts within boundaries | Low | High |
+| **Human-beside-the-Loop** | Collaborates as co-pilot | Shared — alternates initiative | Medium | Medium |
+| **Human-out-of-the-Loop** | None | Full — end-to-end autonomous | Lowest | Highest |
+
+The key insight: **moving right on the spectrum increases throughput and reduces latency, but also increases risk**. Choose the pattern that matches the consequences of agent errors in your domain.
+
+## Pattern 1: Human-in-the-Loop (HITL)
+
+### Definition
+
+The agent **proposes** an action, then **waits** for explicit human approval before executing it. Every tool call, every decision, every output requires a human to press "approve" or "reject."
+
+```{mermaid}
+sequenceDiagram
+    participant User as Human
+    participant Agent as AI Agent
+    participant Tool as Tool / API
+
+    User->>Agent: Query
+    Agent->>User: Proposed Action: search("capital of France")
+    User->>Agent: ✅ Approved
+    Agent->>Tool: search("capital of France")
+    Tool->>Agent: Paris
+    Agent->>User: Proposed Action: search("population of Paris")
+    User->>Agent: ✅ Approved
+    Agent->>Tool: search("population of Paris")
+    Tool->>Agent: 2.1 million
+    Agent->>User: Final Answer: Paris, ~2.1 million
+```
+
+### When to Use
+
+- **High-stakes decisions**: financial transactions, medical recommendations, legal actions
+- **Early deployment**: building trust before granting more autonomy
+- **Sensitive operations**: deleting data, sending emails, modifying production systems
+- **Regulatory requirements**: EU AI Act Article 14 mandates human oversight for high-risk AI systems
+
+### Implementation with LangGraph
+
+LangGraph provides `interrupt()` to pause execution and wait for human input:
+
+```python
+from langgraph.graph import StateGraph, END
+from langgraph.types import interrupt, Command
+from langgraph.checkpoint.memory import MemorySaver
+from typing import TypedDict, Annotated
+from langgraph.graph.message import add_messages
+
+
+class AgentState(TypedDict):
+    messages: Annotated[list, add_messages]
+
+
+def agent_node(state: AgentState) -> dict:
+    """LLM decides what to do next."""
+    response = llm_with_tools.invoke(state["messages"])
+    return {"messages": [response]}
+
+
+def human_approval_node(state: AgentState) -> dict:
+    """Pause for human approval before executing tools."""
+    last_message = state["messages"][-1]
+    tool_calls = last_message.tool_calls
+
+    # Present the proposed action to the human
+    descriptions = []
+    for tc in tool_calls:
+        descriptions.append(f"{tc['name']}({tc['args']})")
+
+    # interrupt() pauses the graph and returns control to the caller
+    decision = interrupt({
+        "proposed_actions": descriptions,
+        "prompt": "Approve these tool calls? (yes/no/edit)",
+    })
+
+    if decision.get("action") == "reject":
+        # Human rejected — ask the agent to try something else
+        return {"messages": [{
+            "role": "user",
+            "content": f"The user rejected the proposed actions. Reason: {decision.get('reason', 'No reason given')}. Try a different approach.",
+        }]}
+
+    # Approved — proceed (tools node will execute)
+    return {"messages": []}
+
+
+def should_continue(state: AgentState) -> str:
+    last_message = state["messages"][-1]
+    if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+        return "human_approval"
+    return END
+
+
+# Build the graph
+graph = StateGraph(AgentState)
+graph.add_node("agent", agent_node)
+graph.add_node("human_approval", human_approval_node)
+graph.add_node("tools", ToolNode(tools))
+
+graph.set_entry_point("agent")
+graph.add_conditional_edges("agent", should_continue, {
+    "human_approval": "human_approval",
+    END: END,
+})
+graph.add_edge("human_approval", "tools")
+graph.add_edge("tools", "agent")
+
+app = graph.compile(checkpointer=MemorySaver())
+```
+
+Usage:
+
+```python
+config = {"configurable": {"thread_id": "session-1"}}
+
+# Start the agent
+result = app.invoke(
+    {"messages": [{"role": "user", "content": "Delete the staging database"}]},
+    config=config,
+)
+# Agent proposes: delete_database("staging") → graph pauses at interrupt()
+
+# Human reviews and approves
+result = app.invoke(
+    Command(resume={"action": "approve"}),
+    config=config,
+)
+```
+
+### Trade-offs
+
+| Advantage | Disadvantage |
+|:----------|:-------------|
+| Maximum safety and control | High latency — human is a bottleneck |
+| Full audit trail of decisions | Doesn't scale to many concurrent tasks |
+| Builds trust incrementally | User fatigue from constant approval prompts |
+| Regulatory compliance | Defeats the purpose of automation for simple tasks |
+
+## Pattern 2: Human-on-the-Loop (HOTL)
+
+### Definition
+
+The agent **acts autonomously** but a human **monitors** in real time and can **abort, pause, or override** at any point. The key difference from HITL: the agent doesn't wait for approval — it acts unless the human intervenes.
+
+```{mermaid}
+sequenceDiagram
+    participant User as Human Monitor
+    participant Agent as AI Agent
+    participant Tool as Tool / API
+
+    User->>Agent: Query + Monitoring starts
+    Agent->>Tool: search("capital of France")
+    Note over User: Observing... ✓
+    Tool->>Agent: Paris
+    Agent->>Tool: search("population of Paris")
+    Note over User: Observing... ✓
+    Tool->>Agent: 2.1 million
+    Agent->>User: Final Answer: Paris, ~2.1 million
+    Note over User: No intervention needed
+```
+
+When the human sees something wrong, they can intervene:
+
+```{mermaid}
+sequenceDiagram
+    participant User as Human Monitor
+    participant Agent as AI Agent
+    participant Tool as Tool / API
+
+    User->>Agent: "Refactor the authentication module"
+    Agent->>Tool: edit_file("auth.py", ...)
+    Note over User: Observing... ✓
+    Tool->>Agent: File edited
+    Agent->>Tool: delete_file("auth_old.py")
+    Note over User: ⚠️ INTERVENE!
+    User->>Agent: ❌ ABORT — don't delete that file
+    Agent->>User: Understood. Keeping auth_old.py. What should I do instead?
+```
+
+### When to Use
+
+- **Moderate-risk operations**: code generation, document drafting, data analysis
+- **Time-sensitive workflows**: where waiting for approval would negate the value
+- **Experienced operators**: humans who understand the domain and can spot problems quickly
+- **Iterative development**: testing agent behavior before moving to less oversight
+
+### Implementation: Streaming with Kill Switch
+
+```python
+import asyncio
+from dataclasses import dataclass
+
+
+@dataclass
+class MonitorState:
+    """Shared state for human monitoring."""
+    should_abort: bool = False
+    abort_reason: str = ""
+    step_log: list = None
+
+    def __post_init__(self):
+        self.step_log = []
+
+    def abort(self, reason: str):
+        self.should_abort = True
+        self.abort_reason = reason
+
+
+async def run_agent_with_monitoring(
+    query: str,
+    tools: dict,
+    monitor: MonitorState,
+    max_steps: int = 10,
+) -> str:
+    """Agent loop that checks for human intervention at each step."""
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": query},
+    ]
+
+    for step in range(max_steps):
+        # Check for human abort before each step
+        if monitor.should_abort:
+            return f"Aborted by human at step {step}: {monitor.abort_reason}"
+
+        response = await call_llm_async(messages, tools)
+        messages.append(response)
+
+        # Log the step for monitoring
+        monitor.step_log.append({
+            "step": step,
+            "type": "llm_response",
+            "content": response.content,
+            "tool_calls": [tc.function.name for tc in (response.tool_calls or [])],
+        })
+
+        if not response.tool_calls:
+            return response.content
+
+        for tool_call in response.tool_calls:
+            # Check abort before each tool execution
+            if monitor.should_abort:
+                return f"Aborted before executing {tool_call.function.name}: {monitor.abort_reason}"
+
+            # Log proposed action
+            monitor.step_log.append({
+                "step": step,
+                "type": "tool_call",
+                "tool": tool_call.function.name,
+                "args": tool_call.function.arguments,
+            })
+
+            # Small delay to give monitor a chance to intervene
+            await asyncio.sleep(0.5)
+
+            if monitor.should_abort:
+                return f"Aborted: {monitor.abort_reason}"
+
+            # Execute the tool
+            result = tools[tool_call.function.name](**json.loads(tool_call.function.arguments))
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": str(result),
+            })
+
+    return "Reached maximum steps."
+
+
+# Usage: run agent and monitor concurrently
+async def main():
+    monitor = MonitorState()
+
+    # Start the agent (non-blocking)
+    agent_task = asyncio.create_task(
+        run_agent_with_monitoring("Analyze the sales data", tools, monitor)
+    )
+
+    # Monitoring loop (could be a web UI, CLI, or API)
+    while not agent_task.done():
+        await asyncio.sleep(1)
+        if monitor.step_log:
+            latest = monitor.step_log[-1]
+            print(f"[Monitor] Step {latest['step']}: {latest['type']} — {latest.get('tool', latest.get('content', '')[:80])}")
+
+            # Human decides to abort based on what they see
+            if latest.get("tool") == "delete_database":
+                monitor.abort("Dangerous operation detected")
+
+    result = await agent_task
+    print(f"\nResult: {result}")
+```
+
+### Trade-offs
+
+| Advantage | Disadvantage |
+|:----------|:-------------|
+| Lower latency than HITL | Human must pay continuous attention |
+| Agent can work at speed | Intervention may come too late for fast actions |
+| Good balance of safety and efficiency | Requires real-time monitoring infrastructure |
+| Natural fit for streaming UIs | Human fatigue increases miss rate over time |
+
+## Pattern 3: Human-over-the-Loop (HOTL²)
+
+### Definition
+
+The human operates at the **governance level** — setting goals, defining policies, configuring guardrails, and reviewing aggregate outcomes — while the agent handles all planning and execution autonomously within those boundaries.
+
+```{mermaid}
+graph TD
+    subgraph GovernanceLayer["Human: Governance Layer"]
+        H1["Set Goals & Policies"]
+        H2["Define Guardrails"]
+        H3["Review Aggregate Outcomes"]
+        H4["Adjust Boundaries"]
+    end
+
+    subgraph ExecutionLayer["Agent: Execution Layer"]
+        A1["Plan"] --> A2["Act"]
+        A2 --> A3["Observe"]
+        A3 --> A4["Evaluate"]
+        A4 -->|"Within bounds"| A1
+        A4 -->|"Task complete"| A5["Report Results"]
+    end
+
+    H1 -->|"Goals"| A1
+    H2 -->|"Constraints"| A2
+    A5 -->|"Results"| H3
+    H3 -->|"Feedback"| H4
+    H4 -->|"Updated policies"| H2
+
+    style GovernanceLayer fill:#f0f4ff,stroke:#4A90D9
+    style ExecutionLayer fill:#fff5f0,stroke:#E67E22
+```
+
+### When to Use
+
+- **Batch processing**: analyzing thousands of documents, processing support tickets
+- **Well-defined domains**: operations with clear success/failure criteria
+- **Trusted agents**: systems that have been validated through HITL/HOTL phases
+- **Scale-critical workloads**: where per-action human review is impossible
+
+### Implementation: Policy-Based Guardrails
+
+```python
+from dataclasses import dataclass, field
+
+
+@dataclass
+class AgentPolicy:
+    """Human-defined policies that constrain agent behavior."""
+    allowed_tools: list[str] = field(default_factory=list)
+    blocked_tools: list[str] = field(default_factory=list)
+    max_cost_per_task: float = 10.0  # dollars
+    max_steps: int = 20
+    require_approval_for: list[str] = field(default_factory=list)
+    output_constraints: dict = field(default_factory=dict)
+
+    def is_tool_allowed(self, tool_name: str) -> bool:
+        if self.blocked_tools and tool_name in self.blocked_tools:
+            return False
+        if self.allowed_tools and tool_name not in self.allowed_tools:
+            return False
+        return True
+
+    def needs_approval(self, tool_name: str) -> bool:
+        return tool_name in self.require_approval_for
+
+
+class PolicyEnforcedAgent:
+    """Agent that operates autonomously within human-defined policies."""
+
+    def __init__(self, tools: dict, policy: AgentPolicy):
+        self.tools = tools
+        self.policy = policy
+        self.total_cost = 0.0
+        self.execution_log = []
+
+    async def run(self, query: str) -> dict:
+        messages = [
+            {"role": "system", "content": self._build_system_prompt()},
+            {"role": "user", "content": query},
+        ]
+
+        for step in range(self.policy.max_steps):
+            response = await call_llm_async(messages, self.tools)
+            self.total_cost += estimate_cost(response)
+            messages.append(response)
+
+            # Policy check: cost budget
+            if self.total_cost > self.policy.max_cost_per_task:
+                self.execution_log.append({"event": "budget_exceeded", "step": step})
+                return {"status": "budget_exceeded", "log": self.execution_log}
+
+            if not response.tool_calls:
+                return {
+                    "status": "completed",
+                    "answer": response.content,
+                    "log": self.execution_log,
+                    "total_cost": self.total_cost,
+                }
+
+            for tool_call in response.tool_calls:
+                tool_name = tool_call.function.name
+
+                # Policy check: tool allowlist/blocklist
+                if not self.policy.is_tool_allowed(tool_name):
+                    self.execution_log.append({
+                        "event": "tool_blocked",
+                        "tool": tool_name,
+                        "step": step,
+                    })
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": f"Error: Tool '{tool_name}' is not allowed by policy.",
+                    })
+                    continue
+
+                # Policy check: escalation for sensitive tools
+                if self.policy.needs_approval(tool_name):
+                    self.execution_log.append({
+                        "event": "escalated",
+                        "tool": tool_name,
+                        "step": step,
+                    })
+                    return {
+                        "status": "needs_approval",
+                        "pending_tool": tool_name,
+                        "pending_args": tool_call.function.arguments,
+                        "log": self.execution_log,
+                    }
+
+                # Execute within policy
+                result = self.tools[tool_name](
+                    **json.loads(tool_call.function.arguments)
+                )
+                self.execution_log.append({
+                    "event": "tool_executed",
+                    "tool": tool_name,
+                    "step": step,
+                })
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": str(result),
+                })
+
+        return {"status": "max_steps_reached", "log": self.execution_log}
+
+    def _build_system_prompt(self) -> str:
+        allowed = ", ".join(self.policy.allowed_tools) if self.policy.allowed_tools else "all"
+        blocked = ", ".join(self.policy.blocked_tools) if self.policy.blocked_tools else "none"
+        return (
+            f"You are an autonomous assistant operating under the following policies:\n"
+            f"- Allowed tools: {allowed}\n"
+            f"- Blocked tools: {blocked}\n"
+            f"- Maximum steps: {self.policy.max_steps}\n"
+            f"- Work within these constraints. If you cannot complete the task within policy, explain why."
+        )
+
+
+# Human configures the policy once
+policy = AgentPolicy(
+    allowed_tools=["search_docs", "read_file", "calculator"],
+    blocked_tools=["delete_file", "send_email"],
+    max_cost_per_task=5.0,
+    max_steps=15,
+    require_approval_for=["write_file"],
+)
+
+# Agent runs autonomously within those bounds
+agent = PolicyEnforcedAgent(tools=all_tools, policy=policy)
+result = await agent.run("Summarize all Q4 reports and calculate total revenue")
+```
+
+The human reviews the `execution_log` and aggregate results periodically, adjusting policies as needed — not individual actions.
+
+### Trade-offs
+
+| Advantage | Disadvantage |
+|:----------|:-------------|
+| High throughput — agent runs at full speed | Loss of per-action visibility |
+| Scales to many parallel tasks | Policy design requires upfront effort |
+| Human effort focused on strategy, not tactics | Guardrails can't anticipate every edge case |
+| Clear separation of concerns | Errors may propagate before review |
+
+## Pattern 4: Human-beside-the-Loop (Co-Pilot)
+
+### Definition
+
+Human and agent work **collaboratively** as peers. Neither has sole control — they **alternate initiative**, each contributing their strengths. The agent handles data retrieval, code generation, and repetitive tasks; the human provides judgment, creativity, and domain expertise.
+
+This is the pattern behind tools like GitHub Copilot, Claude in an IDE, and ChatGPT with canvas — the agent drafts, the human edits, and they iterate together.
+
+```{mermaid}
+sequenceDiagram
+    participant Human
+    participant Agent as AI Co-Pilot
+
+    Human->>Agent: "Draft a marketing email for the new feature"
+    Agent->>Human: Here's a draft [shows text]
+    Human->>Agent: "Good structure, but make tone more casual and add the pricing tier"
+    Agent->>Human: Updated draft [revised text]
+    Human->>Agent: "Perfect, now translate to French"
+    Agent->>Human: French version [translated text]
+    Human->>Human: Final review and send
+```
+
+### When to Use
+
+- **Creative work**: writing, design, brainstorming
+- **Complex reasoning**: where agent + human outperform either alone
+- **Skill amplification**: helping non-experts leverage agent capabilities
+- **Iterative refinement**: tasks that require multiple rounds of feedback
+- **Exploration**: when the goal itself isn't fully defined yet
+
+### Implementation: Turn-Based Collaboration
+
+```python
+class CoPilotSession:
+    """Interactive co-pilot that alternates between agent and human turns."""
+
+    def __init__(self, tools: list, model: str = "gpt-4o-mini"):
+        self.tools = tools
+        self.model = model
+        self.messages = [{
+            "role": "system",
+            "content": (
+                "You are a collaborative co-pilot. Work WITH the user, not FOR them. "
+                "After each response, suggest 2-3 possible next steps the user might want. "
+                "When uncertain, ask clarifying questions rather than guessing. "
+                "Show your work and reasoning so the user can guide you."
+            ),
+        }]
+        self.turn_count = 0
+
+    def human_turn(self, message: str) -> None:
+        """Human provides input, feedback, or direction."""
+        self.messages.append({"role": "user", "content": message})
+        self.turn_count += 1
+
+    async def agent_turn(self) -> str:
+        """Agent responds, possibly calling tools."""
+        response = await call_llm_async(
+            self.messages, self.tools, model=self.model
+        )
+        self.messages.append(response)
+        self.turn_count += 1
+
+        # Handle tool calls if any
+        while response.tool_calls:
+            for tc in response.tool_calls:
+                result = self.tools[tc.function.name](
+                    **json.loads(tc.function.arguments)
+                )
+                self.messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": str(result),
+                })
+            response = await call_llm_async(
+                self.messages, self.tools, model=self.model
+            )
+            self.messages.append(response)
+
+        return response.content
+
+    def get_context_summary(self) -> str:
+        """Summarize the collaboration so far."""
+        return f"Turns: {self.turn_count}, Messages: {len(self.messages)}"
+```
+
+### Trade-offs
+
+| Advantage | Disadvantage |
+|:----------|:-------------|
+| Best quality output — combines human + AI strengths | Requires engaged human participant |
+| Natural, intuitive interaction model | Not suitable for batch/unattended tasks |
+| Both parties learn from each other | Latency depends on human response time |
+| Flexible — can shift to more/less autonomy dynamically | Hard to define clear handoff boundaries |
+
+## Pattern 5: Human-out-of-the-Loop (HOOTL)
+
+### Definition
+
+The agent operates with **full autonomy** from start to finish. No human monitors, approves, or intervenes during execution. The human's only involvement is initiating the task and receiving the final result.
+
+```{mermaid}
+graph LR
+    H["Human"] -->|"Task"| A["Autonomous Agent"]
+    A -->|"Plan"| A
+    A -->|"Act"| T["Tools / APIs"]
+    T -->|"Observe"| A
+    A -->|"Final Result"| H
+
+    style H fill:#4a90d9,color:#fff
+    style A fill:#e74c3c,color:#fff
+    style T fill:#27ae60,color:#fff
+```
+
+### When to Use
+
+- **Low-stakes, well-tested tasks**: automated data pipelines, routine analysis, code formatting
+- **Extremely high-volume**: thousands of tasks per hour
+- **Latency-critical**: where any human delay is unacceptable
+- **Mature agents**: after extensive HITL → HOTL → HOTL² validation
+
+### Critical Safeguards
+
+Full autonomy **demands** compensating controls — because there is no human to catch errors in real time:
+
+```python
+@dataclass
+class AutonomousAgentConfig:
+    """Configuration for fully autonomous agent operation."""
+    # Hard limits
+    max_steps: int = 20
+    max_cost: float = 10.0
+    timeout_seconds: int = 300
+
+    # Guardrails
+    blocked_tools: list[str] = field(default_factory=lambda: [
+        "delete_database", "send_email", "modify_production",
+    ])
+    output_validation: bool = True
+
+    # Rollback
+    enable_dry_run: bool = False
+    checkpoint_every_n_steps: int = 5
+
+    # Observability
+    log_all_steps: bool = True
+    alert_on_error: bool = True
+    alert_on_budget_threshold: float = 0.8  # Alert at 80% of budget
+
+
+class AutonomousAgent:
+    """Fully autonomous agent with mandatory safety controls."""
+
+    def __init__(self, config: AutonomousAgentConfig):
+        self.config = config
+
+    async def run(self, task: str) -> dict:
+        start_time = time.time()
+        cost = 0.0
+        steps = []
+
+        for step in range(self.config.max_steps):
+            # Timeout check
+            elapsed = time.time() - start_time
+            if elapsed > self.config.timeout_seconds:
+                return self._finalize("timeout", steps, cost)
+
+            # Cost check
+            if cost > self.config.max_cost:
+                return self._finalize("budget_exceeded", steps, cost)
+
+            result = await self._execute_step(step)
+            steps.append(result)
+            cost += result.get("cost", 0)
+
+            # Checkpoint for potential rollback
+            if step % self.config.checkpoint_every_n_steps == 0:
+                await self._save_checkpoint(steps)
+
+            if result.get("is_final"):
+                answer = result["content"]
+                # Output validation
+                if self.config.output_validation:
+                    validation = await self._validate_output(answer, task)
+                    if not validation["valid"]:
+                        steps.append({"event": "validation_failed", "reason": validation["reason"]})
+                        continue  # Let agent try again
+
+                return self._finalize("completed", steps, cost, answer=answer)
+
+        return self._finalize("max_steps", steps, cost)
+
+    def _finalize(self, status, steps, cost, answer=None):
+        if self.config.log_all_steps:
+            log_to_observability_platform(steps)
+        if status != "completed" and self.config.alert_on_error:
+            send_alert(f"Agent finished with status: {status}")
+        return {"status": status, "steps": len(steps), "cost": cost, "answer": answer}
+```
+
+### Trade-offs
+
+| Advantage | Disadvantage |
+|:----------|:-------------|
+| Maximum throughput and lowest latency | No safety net — errors go undetected |
+| Scales to any volume | Requires extensive pre-deployment validation |
+| Lowest human labor cost | Compounding errors can cause significant damage |
+| Ideal for routine, proven workflows | Regulatory and ethical concerns in high-stakes domains |
+
+## Choosing the Right Pattern
+
+### Decision Framework
+
+```{mermaid}
+graph TD
+    Start["What are the consequences<br/>of an agent error?"] --> Q1{"Catastrophic?<br/>(irreversible, safety-critical)"}
+    Q1 -->|Yes| HITL["Human-in-the-Loop"]
+    Q1 -->|No| Q2{"Significant?<br/>(costly, hard to fix)"}
+    Q2 -->|Yes| Q3{"Real-time<br/>monitoring feasible?"}
+    Q3 -->|Yes| HOTL["Human-on-the-Loop"]
+    Q3 -->|No| HOTL2["Human-over-the-Loop"]
+    Q2 -->|No| Q4{"Creative or<br/>exploratory task?"}
+    Q4 -->|Yes| COOP["Human-beside-the-Loop"]
+    Q4 -->|No| Q5{"Agent well-tested<br/>for this task?"}
+    Q5 -->|Yes| HOOTL["Human-out-of-the-Loop"]
+    Q5 -->|No| HOTL2
+
+    style HITL fill:#e74c3c,color:#fff
+    style HOTL fill:#e67e22,color:#fff
+    style HOTL2 fill:#f5a623,color:#fff
+    style COOP fill:#27ae60,color:#fff
+    style HOOTL fill:#4a90d9,color:#fff
+```
+
+### Pattern Comparison by Domain
+
+| Domain | Recommended Pattern | Rationale |
+|:-------|:-------------------|:----------|
+| **Medical diagnosis** | Human-in-the-Loop | Errors can harm patients; regulatory requirements |
+| **Financial trading** | Human-on-the-Loop | Speed matters; human monitors for anomalies |
+| **Customer support** | Human-over-the-Loop | Policies define allowed responses; escalation rules |
+| **Code writing** | Human-beside-the-Loop | Developer and AI collaborate iteratively |
+| **Data pipeline ETL** | Human-out-of-the-Loop | Routine, well-tested, high-volume |
+| **Content moderation** | Human-on-the-Loop | AI flags, human reviews edge cases |
+| **Email drafting** | Human-beside-the-Loop | Human guides tone and content |
+| **Log analysis** | Human-out-of-the-Loop | Routine pattern matching at scale |
+| **Legal document review** | Human-in-the-Loop | High consequences; requires expert judgment |
+| **Research synthesis** | Human-over-the-Loop | Policies define scope; human reviews synthesis |
+
+## Progressive Autonomy: Graduating Through Patterns
+
+A best practice is to **start with more human control and progressively relax it** as you build confidence in the agent:
+
+```{mermaid}
+graph TD
+    Phase1["Phase 1: HITL<br/>Approve every action<br/>Build training data"] --> Phase2["Phase 2: HOTL<br/>Monitor with kill switch<br/>Measure error rate"]
+    Phase2 --> Phase3["Phase 3: Human-over-the-Loop<br/>Set policies, review batches<br/>Spot-check results"]
+    Phase3 --> Phase4["Phase 4: HOOTL<br/>Full autonomy with guardrails<br/>Alert on anomalies"]
+
+    Phase1 -.->|"Error rate < 5%"| Phase2
+    Phase2 -.->|"Error rate < 1%"| Phase3
+    Phase3 -.->|"Error rate < 0.1%"| Phase4
+
+    style Phase1 fill:#e74c3c,color:#fff
+    style Phase2 fill:#e67e22,color:#fff
+    style Phase3 fill:#f5a623,color:#fff
+    style Phase4 fill:#4a90d9,color:#fff
+```
+
+This "graduation" approach:
+
+1. **Generates labeled data** — every HITL approval/rejection becomes training signal
+2. **Builds quantified trust** — error rates at each phase justify moving to the next
+3. **Creates rollback paths** — if error rate increases, revert to more oversight
+4. **Satisfies auditors** — clear evidence trail showing the agent was validated progressively
+
+```python
+class AdaptiveOversight:
+    """Automatically adjusts oversight level based on agent performance."""
+
+    def __init__(self, initial_mode: str = "hitl"):
+        self.mode = initial_mode
+        self.recent_results = []  # (success: bool, severity: str)
+        self.window_size = 100
+
+    def record_outcome(self, success: bool, severity: str = "low"):
+        self.recent_results.append((success, severity))
+        if len(self.recent_results) > self.window_size:
+            self.recent_results.pop(0)
+        self._maybe_adjust()
+
+    def _maybe_adjust(self):
+        if len(self.recent_results) < self.window_size:
+            return  # Not enough data
+
+        error_rate = sum(1 for s, _ in self.recent_results if not s) / len(self.recent_results)
+        severe_errors = sum(1 for s, sev in self.recent_results if not s and sev == "high")
+
+        if severe_errors > 0:
+            self.mode = "hitl"  # Any severe error → back to HITL
+        elif error_rate > 0.05:
+            self.mode = "hotl"
+        elif error_rate > 0.01:
+            self.mode = "over_the_loop"
+        else:
+            self.mode = "autonomous"
+
+    @property
+    def needs_approval(self) -> bool:
+        return self.mode == "hitl"
+
+    @property
+    def needs_monitoring(self) -> bool:
+        return self.mode in ("hitl", "hotl")
+```
+
+## Common Pitfalls
+
+| Pitfall | Pattern Affected | Fix |
+|:--------|:----------------|:----|
+| **Approval fatigue** | HITL | Batch low-risk approvals; auto-approve known-safe actions |
+| **Attention drift** | HOTL | Rotate monitors; add automated anomaly alerts |
+| **Insufficient policies** | Over-the-Loop | Start restrictive, relax only with data |
+| **Over-reliance on agent** | HOOTL | Regular spot-checks; automated output validation |
+| **Unclear handoff boundaries** | Co-Pilot | Define explicit trigger phrases for agent vs. human turns |
+| **Jumping to full autonomy** | All | Always start with HITL/HOTL; graduate with evidence |
+| **No rollback plan** | HOTL, HOOTL | Implement checkpoints and undo mechanisms |
+
+## References
+
+1. Docherty, B., "Losing Humanity: The Case Against Killer Robots", Human Rights Watch, 2012. Available: [https://www.hrw.org/report/2012/11/19/losing-humanity/case-against-killer-robots](https://www.hrw.org/report/2012/11/19/losing-humanity/case-against-killer-robots)
+2. Anthropic, "Building Effective Agents", anthropic.com, Dec. 2024. Available: [https://www.anthropic.com/engineering/building-effective-agents](https://www.anthropic.com/engineering/building-effective-agents)
+3. Stanford HAI, G. Wang, "Humans in the Loop: The Design of Interactive AI Systems", hai.stanford.edu, Oct. 2019. Available: [https://hai.stanford.edu/news/humans-loop-design-interactive-ai-systems](https://hai.stanford.edu/news/humans-loop-design-interactive-ai-systems)
+4. IBM, "What is Human-in-the-Loop?", ibm.com/think, 2025. Available: [https://www.ibm.com/think/topics/human-in-the-loop](https://www.ibm.com/think/topics/human-in-the-loop)
+5. European Parliament, "EU AI Act — Article 14: Human Oversight", 2024. Available: [https://artificialintelligenceact.eu/article/14/](https://artificialintelligenceact.eu/article/14/)
+6. LangChain, "LangGraph Human-in-the-Loop Concepts", langchain-ai.github.io/langgraph, 2025. Available: [https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/](https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/)
+7. NIST, "AI Risk Management Framework (AI RMF 1.0)", nist.gov, 2023. Available: [https://www.nist.gov/itl/ai-risk-management-framework](https://www.nist.gov/itl/ai-risk-management-framework)
+
+## Read More
+
+- [Building a ReAct Agent from Scratch](/posts/agent/Building%20a%20ReAct%20Agent%20from%20Scratch.html) — The Thought-Action-Observation loop that makes each agent step inspectable for human oversight.
+- [Building Agents with LangGraph](/posts/agent/Building%20Agents%20with%20LangGraph.html) — LangGraph's `interrupt()` and checkpointers provide the infrastructure for HITL and HOTL patterns.
+- [Guardrails and Safety for Autonomous Retrieval Agents](/posts/agent/Guardrails%20and%20Safety%20for%20Autonomous%20Retrieval%20Agents.html) — Guardrails are the policy enforcement mechanism for Human-over-the-Loop agents.
+- [Design Patterns for AI Agents](/posts/agent/Design%20Patterns%20for%20AI%20Agents.html) — Architectural patterns like Evaluator-Optimizer and Orchestrator-Workers that combine with these oversight patterns.
+- [Evaluating and Debugging AI Agents](/posts/agent/Evaluating%20and%20Debugging%20AI%20Agents.html) — Measuring agent error rates is essential for deciding when to graduate to more autonomy.
+- [Deploying Retrieval Agents in Production](/posts/agent/Deploying%20Retrieval%20Agents%20in%20Production.html) — Production deployment patterns including monitoring dashboards used in Human-on-the-Loop setups.
