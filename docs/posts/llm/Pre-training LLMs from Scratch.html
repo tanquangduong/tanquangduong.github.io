@@ -8,7 +8,7 @@
 
 <meta name="dcterms.date" content="2024-09-15">
 
-<title>Pre-training LLMs from Scratch – Quang Duong</title>
+<title>Pre-training LLMs from Scratch – Vectoring AI</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -79,7 +79,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dbc92dda8186f57fa2e333fbb71d6a9d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-b981e3f33a8ad6ba97cc0b6118e04959.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-23f3439e4bd86aeeff5ff0174c43dd13.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/all.css" rel="stylesheet">
 <link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/latex-fontsize.css" rel="stylesheet">
 <script id="quarto-search-options" type="application/json">{
@@ -115,13 +115,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 <link rel="stylesheet" href="../../styles.css">
-<meta property="og:title" content="Pre-training LLMs from Scratch – Quang Duong">
+<meta property="og:title" content="Pre-training LLMs from Scratch – Vectoring AI">
 <meta property="og:description" content="End-to-end guide: from web scraping and data collection to preprocessing, tokenization, and pretraining a small language model with PyTorch and Unsloth">
 <meta property="og:image" content="https://vectoringai.com//images/llm/training-llm-from-scratch-300px.png">
-<meta property="og:site_name" content="Quang Duong">
+<meta property="og:site_name" content="Vectoring AI">
 <meta property="og:image:height" content="200">
 <meta property="og:image:width" content="300">
-<meta name="twitter:title" content="Pre-training LLMs from Scratch – Quang Duong">
+<meta name="twitter:title" content="Pre-training LLMs from Scratch – Vectoring AI">
 <meta name="twitter:description" content="End-to-end guide: from web scraping and data collection to preprocessing, tokenization, and pretraining a small language model with PyTorch and Unsloth">
 <meta name="twitter:image" content="https://vectoringai.com//images/llm/training-llm-from-scratch-300px.png">
 <meta name="twitter:image-height" content="200">
@@ -139,7 +139,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
         <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">
-      Quang Duong
+      Vectoring AI
       </li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
@@ -155,7 +155,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
     <div class="pt-lg-2 mt-2 text-left sidebar-header">
     <div class="sidebar-title mb-0 py-0">
-      <a href="../../">Quang Duong</a> 
+      <a href="../../">Vectoring AI</a> 
         <div class="sidebar-tools-main">
     <a href="https://www.linkedin.com/in/tanquangduong/" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-linkedin"></i></a>
     <a href="https://github.com/tanquangduong" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
@@ -256,7 +256,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p><strong>Keywords:</strong> pretraining, data collection, web scraping, data preprocessing, tokenization, BPE, Common Crawl, FineWeb, datatrove, trafilatura, PyTorch, Unsloth, small language model, continued pretraining, LoRA, deduplication, filtering</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="../../images/llm/training-llm-from-scratch-300px.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="300"></p>
+<p><img src="../..\images/llm/training-llm-from-scratch-300px.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="300"></p>
 </figure>
 </div>
 <section id="introduction" class="level2">
@@ -264,7 +264,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Training a language model is more than just calling <code>.train()</code> — the bulk of the work lies in <strong>data collection, cleaning, and formatting</strong>. Real-world LLM training pipelines spend 80%+ of effort on data, because data quality directly determines model quality.</p>
 <p>This article walks through the <strong>complete pipeline</strong> for training a small language model: from raw web data to a working model. We cover web scraping with <code>trafilatura</code>, data preprocessing and deduplication with <code>datatrove</code>, tokenizer training, and finally pretraining and continued pretraining using <strong>PyTorch</strong> and <strong>Unsloth</strong>. All examples target small models (0.5B–3B parameters) that can run on consumer hardware.</p>
 <blockquote class="blockquote">
-<p>For fine-tuning an existing model, see <a href="../../posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html">Fine-tuning an LLM with Unsloth and Serving with Ollama</a>. For post-training alignment, see <a href="../../posts/llm/Post-Training LLMs for Human Alignment.html">Post-Training LLMs for Human Alignment</a>. For reasoning training, see <a href="../../posts/llm/Training LLMs for Reasoning.html">Training LLMs for Reasoning</a>.</p>
+<p>For fine-tuning an existing model, see <a href="../..\posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html">Fine-tuning an LLM with Unsloth and Serving with Ollama</a>. For post-training alignment, see <a href="../..\posts/llm/Post-Training LLMs for Human Alignment.html">Post-Training LLMs for Human Alignment</a>. For reasoning training, see <a href="../..\posts/llm/Training LLMs for Reasoning.html">Training LLMs for Reasoning</a>.</p>
 </blockquote>
 </section>
 <section id="the-end-to-end-training-pipeline" class="level2">
@@ -1317,7 +1317,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>    quantization_method<span class="op">=</span><span class="st">"q4_k_m"</span>,</span>
 <span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <blockquote class="blockquote">
-<p>For serving with Ollama or llama.cpp, see <a href="../../posts/llm/Run LLM locally with Ollama.html">Run LLM locally with Ollama</a> and <a href="../../posts/llm/Deploying and Serving LLM with Llama.cpp.html">Deploying and Serving LLM with Llama.cpp</a>.</p>
+<p>For serving with Ollama or llama.cpp, see <a href="../..\posts/llm/Run LLM locally with Ollama.html">Run LLM locally with Ollama</a> and <a href="../..\posts/llm/Deploying and Serving LLM with Llama.cpp.html">Deploying and Serving LLM with Llama.cpp</a>.</p>
 </blockquote>
 </section>
 </section>
@@ -1515,16 +1515,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>For <strong>single consumer GPU</strong> (16–24 GB):</p>
 <ol type="1">
 <li>Use <strong>continued pretraining</strong> with Unsloth + LoRA on your domain corpus</li>
-<li>Follow with <strong>SFT</strong> on instruction data using <a href="../../posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html">Unsloth</a></li>
-<li>Export to GGUF and serve with <a href="../../posts/llm/Run LLM locally with Ollama.html">Ollama</a> or <a href="../../posts/llm/Deploying and Serving LLM with Llama.cpp.html">Llama.cpp</a></li>
+<li>Follow with <strong>SFT</strong> on instruction data using <a href="../..\posts/llm/Fine-tuning LLM with Unsloth and serving it with Ollama.html">Unsloth</a></li>
+<li>Export to GGUF and serve with <a href="../..\posts/llm/Run LLM locally with Ollama.html">Ollama</a> or <a href="../..\posts/llm/Deploying and Serving LLM with Llama.cpp.html">Llama.cpp</a></li>
 </ol>
 <p>For <strong>small cluster</strong> (8 GPUs):</p>
 <ol type="1">
 <li><strong>Curate data</strong> using datatrove (scrape → filter → dedup → tokenize)</li>
 <li><strong>Pretrain from scratch</strong> or continued pretraining with PyTorch + nanotron</li>
-<li><strong>Post-train</strong> with <a href="../../posts/llm/Post-Training LLMs for Human Alignment.html">alignment techniques</a> (DPO/GRPO)</li>
-<li>Add <a href="../../posts/llm/Training LLMs for Reasoning.html">reasoning capabilities</a> if needed</li>
-<li>Deploy with <a href="../../posts/llm/Deploying and Serving LLM with vLLM.html">vLLM</a> for production</li>
+<li><strong>Post-train</strong> with <a href="../..\posts/llm/Post-Training LLMs for Human Alignment.html">alignment techniques</a> (DPO/GRPO)</li>
+<li>Add <a href="../..\posts/llm/Training LLMs for Reasoning.html">reasoning capabilities</a> if needed</li>
+<li>Deploy with <a href="../..\posts/llm/Deploying and Serving LLM with vLLM.html">vLLM</a> for production</li>
 </ol>
 </section>
 </section>
@@ -1542,7 +1542,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ol>
 <p>The tools are all open source and well-documented. The real challenge is data curation, not model training.</p>
 <blockquote class="blockquote">
-<p>For the next steps after pretraining, see <a href="../../posts/llm/Post-Training LLMs for Human Alignment.html">Post-Training LLMs for Human Alignment</a> and <a href="../../posts/llm/Training LLMs for Reasoning.html">Training LLMs for Reasoning</a>.</p>
+<p>For the next steps after pretraining, see <a href="../..\posts/llm/Post-Training LLMs for Human Alignment.html">Post-Training LLMs for Human Alignment</a> and <a href="../..\posts/llm/Training LLMs for Reasoning.html">Training LLMs for Reasoning</a>.</p>
 </blockquote>
 </section>
 <section id="references" class="level2">
@@ -1983,7 +1983,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       &nbsp;
     </div>   
     <div class="nav-footer-center">
-<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> Copyright 2025, Quang T. Duong</p>
+<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> Copyright 2025, Vectoring AI. All rights reserved.</p>
 </div>
     <div class="nav-footer-right">
       &nbsp;

@@ -8,7 +8,7 @@
 
 <meta name="dcterms.date" content="2025-07-30">
 
-<title>Evaluating and Debugging AI Agents – Quang Duong</title>
+<title>Evaluating and Debugging AI Agents – Vectoring AI</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -79,7 +79,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dbc92dda8186f57fa2e333fbb71d6a9d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-b981e3f33a8ad6ba97cc0b6118e04959.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-23f3439e4bd86aeeff5ff0174c43dd13.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/all.css" rel="stylesheet">
 <link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/latex-fontsize.css" rel="stylesheet">
 <script id="quarto-search-options" type="application/json">{
@@ -158,13 +158,13 @@ window.Quarto = {
 </script>
 
 <link rel="stylesheet" href="../../styles.css">
-<meta property="og:title" content="Evaluating and Debugging AI Agents – Quang Duong">
+<meta property="og:title" content="Evaluating and Debugging AI Agents – Vectoring AI">
 <meta property="og:description" content="Trajectory-level scoring, tool-call accuracy, LangSmith traces, agent benchmarks, and failure root-cause analysis">
 <meta property="og:image" content="https://vectoringai.com//images/agent/evaluating-debugging-ai-agents-300px.png">
-<meta property="og:site_name" content="Quang Duong">
+<meta property="og:site_name" content="Vectoring AI">
 <meta property="og:image:height" content="200">
 <meta property="og:image:width" content="300">
-<meta name="twitter:title" content="Evaluating and Debugging AI Agents – Quang Duong">
+<meta name="twitter:title" content="Evaluating and Debugging AI Agents – Vectoring AI">
 <meta name="twitter:description" content="Trajectory-level scoring, tool-call accuracy, LangSmith traces, agent benchmarks, and failure root-cause analysis">
 <meta name="twitter:image" content="https://vectoringai.com//images/agent/evaluating-debugging-ai-agents-300px.png">
 <meta name="twitter:image-height" content="200">
@@ -182,7 +182,7 @@ window.Quarto = {
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
         <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">
-      Quang Duong
+      Vectoring AI
       </li></ol></nav>
         <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
@@ -198,7 +198,7 @@ window.Quarto = {
   <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
     <div class="pt-lg-2 mt-2 text-left sidebar-header">
     <div class="sidebar-title mb-0 py-0">
-      <a href="../../">Quang Duong</a> 
+      <a href="../../">Vectoring AI</a> 
         <div class="sidebar-tools-main">
     <a href="https://www.linkedin.com/in/tanquangduong/" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-linkedin"></i></a>
     <a href="https://github.com/tanquangduong" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
@@ -299,12 +299,12 @@ window.Quarto = {
 <p><strong>Keywords:</strong> agent evaluation, trajectory scoring, tool-call accuracy, LangSmith, agent benchmarks, AgentBench, GAIA, tau-bench, SWE-bench, LLM-as-judge, failure analysis, agent debugging, agent observability, agent tracing, pass@k, step-level evaluation</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="../../images/agent/evaluating-debugging-ai-agents-300px.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="300"></p>
+<p><img src="../..\images/agent/evaluating-debugging-ai-agents-300px.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="300"></p>
 </figure>
 </div>
 <section id="introduction" class="level2">
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
-<p>You can build a <a href="../../posts/agent/Building a ReAct Agent from Scratch.html">ReAct agent</a> in an afternoon. Getting it to work reliably on Monday, Wednesday, and Friday — with different queries, different retrieved documents, and different model versions — is a different problem entirely.</p>
+<p>You can build a <a href="../..\posts/agent/Building a ReAct Agent from Scratch.html">ReAct agent</a> in an afternoon. Getting it to work reliably on Monday, Wednesday, and Friday — with different queries, different retrieved documents, and different model versions — is a different problem entirely.</p>
 <p>Evaluating AI agents is fundamentally harder than evaluating LLMs. A chat model takes a prompt and returns text; you compare the text to a reference. An agent takes a goal and produces a <strong>trajectory</strong> — a sequence of thoughts, tool calls, observations, and decisions — before arriving at a final answer. Two trajectories can reach the same correct answer through entirely different paths, or reach a wrong answer despite every individual step looking reasonable.</p>
 <p>The GAIA benchmark showed that human respondents solved 92% of questions while GPT-4 with plugins solved only 15%. AgentBench found a “significant disparity” between commercial and open-source models across 8 interactive environments. τ-bench revealed that even GPT-4o succeeds on fewer than 50% of tool-agent-user interaction tasks — and drops below 25% when consistency across multiple trials is measured.</p>
 <p>This article covers the full evaluation and debugging stack for retrieval agents: <strong>what to measure</strong> (final-answer correctness, trajectory quality, tool-call accuracy), <strong>how to measure it</strong> (LLM-as-judge, programmatic scorers, benchmarks), <strong>how to trace failures</strong> (LangSmith, structured logging), and <strong>how to systematically debug</strong> when things go wrong.</p>
@@ -1209,7 +1209,7 @@ pass@8:  5.8%</code></pre>
 <td style="text-align: left;"><strong>Infinite loop</strong></td>
 <td style="text-align: left;">Agent retries the same failing search 5 times</td>
 <td style="text-align: left;">No loop detection</td>
-<td style="text-align: left;">Add <a href="../../posts/agent/Building a ReAct Agent from Scratch.html">stopping conditions</a> and deduplication</td>
+<td style="text-align: left;">Add <a href="../..\posts/agent/Building a ReAct Agent from Scratch.html">stopping conditions</a> and deduplication</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;"><strong>Context overflow</strong></td>
@@ -1496,13 +1496,13 @@ pass@8:  5.8%</code></pre>
 </tr>
 <tr class="odd">
 <td style="text-align: left;"><strong>Infinite loop</strong></td>
-<td style="text-align: left;">Add <a href="../../posts/agent/Guardrails and Safety for Autonomous Retrieval Agents.html">stopping conditions and budget limits</a></td>
+<td style="text-align: left;">Add <a href="../..\posts/agent/Guardrails and Safety for Autonomous Retrieval Agents.html">stopping conditions and budget limits</a></td>
 <td style="text-align: left;">Agent loop</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;"><strong>Context overflow</strong></td>
 <td style="text-align: left;">Limit retrieved chunks, summarize history</td>
-<td style="text-align: left;">Retrieval config / <a href="../../posts/agent/Memory Systems for Long-Running Retrieval Agents.html">memory system</a></td>
+<td style="text-align: left;">Retrieval config / <a href="../..\posts/agent/Memory Systems for Long-Running Retrieval Agents.html">memory system</a></td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;"><strong>Inconsistent behavior</strong></td>
@@ -1569,16 +1569,16 @@ pass@8:  5.8%</code></pre>
 <section id="read-more" class="level2">
 <h2 class="anchored" data-anchor-id="read-more">Read More</h2>
 <ul>
-<li>Understand the <a href="../../posts/agent/Building a ReAct Agent from Scratch.html">Thought-Action-Observation loop</a> that generates the trajectories you evaluate — including stopping conditions and error recovery.</li>
-<li>Evaluate how well agents <a href="../../posts/agent/Tool Use and Function Calling for Retrieval Agents.html">select and call tools</a> — function calling schemas, MCP, and dynamic tool selection.</li>
-<li>Trace agent execution through <a href="../../posts/agent/Building Agents with LangGraph.html">LangGraph state machines</a> — nodes, edges, checkpointers, and streaming for step-by-step debugging.</li>
-<li>Debug coordination failures in <a href="../../posts/agent/Multi-Agent RAG Orchestration Patterns.html">multi-agent RAG orchestration</a> — supervisor vs.&nbsp;hierarchical topologies and routing accuracy.</li>
-<li>Evaluate <a href="../../posts/agent/Memory Systems for Long-Running Retrieval Agents.html">memory systems</a> for context loss and retrieval accuracy across long-running sessions.</li>
-<li>Measure the quality of <a href="../../posts/agent/Planning and Query Decomposition for Complex Retrieval.html">query decomposition plans</a> — plan correctness and sub-question coverage.</li>
-<li>Benchmark <a href="../../posts/agent/Deep Research Agents from RAG to Autonomous Investigation.html">deep research agents</a> on source coverage, triangulation accuracy, and report quality.</li>
-<li>Test <a href="../../posts/agent/Guardrails and Safety for Autonomous Retrieval Agents.html">guardrails and safety layers</a> — verify that budget limits, authorization gates, and injection defenses trigger correctly.</li>
-<li>Monitor agent behavior in production with <a href="../../posts/llm/Observability for Multi-Turn LLM Conversations.html">Observability for Multi-Turn LLM Conversations</a>.</li>
-<li>Evaluate the RAG pipeline underlying your agents with <a href="../../posts/rag/Evaluating RAG Systems.html">Evaluating RAG Systems</a>.</li>
+<li>Understand the <a href="../..\posts/agent/Building a ReAct Agent from Scratch.html">Thought-Action-Observation loop</a> that generates the trajectories you evaluate — including stopping conditions and error recovery.</li>
+<li>Evaluate how well agents <a href="../..\posts/agent/Tool Use and Function Calling for Retrieval Agents.html">select and call tools</a> — function calling schemas, MCP, and dynamic tool selection.</li>
+<li>Trace agent execution through <a href="../..\posts/agent/Building Agents with LangGraph.html">LangGraph state machines</a> — nodes, edges, checkpointers, and streaming for step-by-step debugging.</li>
+<li>Debug coordination failures in <a href="../..\posts/agent/Multi-Agent RAG Orchestration Patterns.html">multi-agent RAG orchestration</a> — supervisor vs.&nbsp;hierarchical topologies and routing accuracy.</li>
+<li>Evaluate <a href="../..\posts/agent/Memory Systems for Long-Running Retrieval Agents.html">memory systems</a> for context loss and retrieval accuracy across long-running sessions.</li>
+<li>Measure the quality of <a href="../..\posts/agent/Planning and Query Decomposition for Complex Retrieval.html">query decomposition plans</a> — plan correctness and sub-question coverage.</li>
+<li>Benchmark <a href="../..\posts/agent/Deep Research Agents from RAG to Autonomous Investigation.html">deep research agents</a> on source coverage, triangulation accuracy, and report quality.</li>
+<li>Test <a href="../..\posts/agent/Guardrails and Safety for Autonomous Retrieval Agents.html">guardrails and safety layers</a> — verify that budget limits, authorization gates, and injection defenses trigger correctly.</li>
+<li>Monitor agent behavior in production with <a href="../..\posts/llm/Observability for Multi-Turn LLM Conversations.html">Observability for Multi-Turn LLM Conversations</a>.</li>
+<li>Evaluate the RAG pipeline underlying your agents with <a href="../..\posts/rag/Evaluating RAG Systems.html">Evaluating RAG Systems</a>.</li>
 </ul>
 
 
@@ -1997,7 +1997,7 @@ pass@8:  5.8%</code></pre>
       &nbsp;
     </div>   
     <div class="nav-footer-center">
-<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> Copyright 2025, Quang T. Duong</p>
+<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> Copyright 2025, Vectoring AI. All rights reserved.</p>
 </div>
     <div class="nav-footer-right">
       &nbsp;
