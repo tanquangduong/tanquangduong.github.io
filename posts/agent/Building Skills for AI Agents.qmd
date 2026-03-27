@@ -1,0 +1,989 @@
+---
+title: "Building Skills for AI Agents"
+subtitle: "Designing modular, reusable agent capabilities — from tool engineering and prompt crafting to skill bundles and the Agent Skills standard"
+image: /images/agent/building-skills-ai-agents-300px.png
+date: "2025-07-02"
+---
+
+**Keywords:** agent skills, skill architecture, tool engineering, agent-computer interface, ACI, SKILL.md, reusable agent capabilities, prompt engineering tools, modular agent design, OpenAI skills, Claude Code skills, agent skills standard, function calling, tool use, agent capabilities, skill bundles
+
+![](/images/agent/building-skills-ai-agents-300px.png){fig-align="center" width=300}
+
+## Introduction
+
+An agent is only as capable as its **skills** — the set of tools, instructions, and workflows it can reliably execute. You can have the most sophisticated reasoning loop, the most elegant multi-agent topology, and the best LLM available — but if your agent can't reliably call the right tool with the right arguments, it fails.
+
+The AI industry is converging on a shared insight: **the most impactful work in building agents isn't choosing the model or the framework — it's engineering the skills**. Anthropic's engineering team [reported](https://www.anthropic.com/engineering/building-effective-agents) that while building their SWE-bench agent, they "actually spent more time optimizing our tools than the overall prompt." OpenAI now provides a formal [Skills API](https://developers.openai.com/api/docs/guides/tools-skills) — versioned bundles of instructions and files that agents can mount and execute. And the emerging [Agent Skills standard](https://agentskills.io/home) is creating an open, interoperable format for packaging and sharing agent capabilities.
+
+This article covers the full lifecycle of building agent skills — from the design principles behind effective tool interfaces, through implementation patterns in Python with LangGraph and LlamaIndex, to packaging skills as reusable bundles that teams can share. We draw on published guidance from Anthropic and OpenAI, and connect to the broader agent architecture patterns covered in this series.
+
+## What Is an Agent Skill?
+
+### From Tools to Skills
+
+In the early days of LLM agents, a "tool" was a Python function with a docstring. The agent would call `search_wikipedia(query)` or `calculator(expression)`, observe the result, and continue. This works for simple workflows, but production agents need something richer.
+
+A **skill** is a higher-level unit of agent capability that bundles together:
+
+| Component | Description | Example |
+|:----------|:-----------|:--------|
+| **Instructions** | Markdown guidance on when and how to use the skill | "Use this skill for CSV analysis. Always validate headers first." |
+| **Tools** | One or more callable functions or API endpoints | `read_csv()`, `compute_statistics()`, `generate_chart()` |
+| **Supporting files** | Templates, schemas, reference data | Column name mappings, output templates |
+| **Constraints** | Allowed/disallowed actions, safety boundaries | "Never delete rows. Read-only access." |
+| **Metadata** | Name, description, version, trigger conditions | `name: csv-insights`, `version: 2` |
+
+```{mermaid}
+graph TD
+    A["Agent Skill"] --> B["Instructions<br/><small>SKILL.md with frontmatter</small>"]
+    A --> C["Tools<br/><small>Functions, APIs, scripts</small>"]
+    A --> D["Supporting Files<br/><small>Templates, schemas</small>"]
+    A --> E["Constraints<br/><small>Allowed tools, safety rules</small>"]
+    A --> F["Metadata<br/><small>Name, version, triggers</small>"]
+
+    style A fill:#9b59b6,color:#fff,stroke:#333
+    style B fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#27ae60,color:#fff,stroke:#333
+    style D fill:#e67e22,color:#fff,stroke:#333
+    style E fill:#e74c3c,color:#fff,stroke:#333
+    style F fill:#f5a623,color:#fff,stroke:#333
+```
+
+The key insight: **a skill is not just a tool — it's a tool plus the knowledge of when and how to use it**. A raw `execute_sql(query)` function is a tool. A skill wraps it with instructions like "Use this for analytics queries against the metrics database. Always use parameterized queries. Return results as markdown tables. Limit to 1000 rows."
+
+### How AI Labs Define Skills
+
+**Anthropic** introduced skills in [Claude Code](https://anthropic.skilljar.com/introduction-to-agent-skills) as "reusable markdown instructions that Claude automatically applies to the right tasks at the right time." A skill is a `SKILL.md` file with YAML frontmatter (name, description, trigger conditions) and markdown instructions. Skills can include multiple files, restrict tool access with `allowed-tools`, and be shared via repositories or enterprise settings. Anthropic's Skilljar course teaches building, configuring, and distributing skills — from single-file skills to multi-file bundles with progressive disclosure to keep context windows efficient.
+
+**OpenAI** formalized skills in their [Agents platform](https://developers.openai.com/api/docs/guides/tools-skills) as "versioned bundles of files plus a `SKILL.md` manifest." Skills are uploaded via API, mounted in shell environments, and the model decides when to invoke them based on the skill's name and description. OpenAI supports hosted skills (uploaded to their platform), inline skills (base64-encoded zip bundles), and local skills (file paths on your machine). They also maintain curated first-party skills like `openai-spreadsheets`.
+
+Both approaches converge on the same architecture:
+
+1. A **manifest file** (`SKILL.md`) with metadata and instructions
+2. **Supporting files** (scripts, templates, data)
+3. **Automatic matching** — the agent reads the skill's description and decides when to use it
+4. **Versioning** — skills can be updated without breaking existing workflows
+
+## The Agent-Computer Interface (ACI)
+
+### Why Tool Design Matters More Than Prompts
+
+Anthropic's core principle for building effective agents is to "carefully craft your agent-computer interface (ACI) through thorough tool documentation and testing." Just as human-computer interfaces (HCI) require extensive design effort, the interface between agents and their tools deserves equal attention.
+
+This is not intuitive. Most developers spend 90% of their time on the system prompt and 10% on tool definitions. **Flip this ratio.** Anthropic explicitly states:
+
+> "While building our agent for SWE-bench, we actually spent more time optimizing our tools than the overall prompt."
+
+### Principles of ACI Design
+
+```{mermaid}
+graph TD
+    A["ACI Design Principles"] --> B["Clear naming<br/><small>Obvious from the name</small>"]
+    A --> C["Rich descriptions<br/><small>Include examples, edge cases</small>"]
+    A --> D["Minimal parameters<br/><small>Fewer = less confusion</small>"]
+    A --> E["Poka-yoke<br/><small>Hard to use incorrectly</small>"]
+    A --> F["Natural formats<br/><small>Match what LLMs expect</small>"]
+    A --> G["Actionable errors<br/><small>Tell the agent what to do</small>"]
+
+    style A fill:#9b59b6,color:#fff,stroke:#333
+    style B fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#4a90d9,color:#fff,stroke:#333
+    style D fill:#4a90d9,color:#fff,stroke:#333
+    style E fill:#4a90d9,color:#fff,stroke:#333
+    style F fill:#4a90d9,color:#fff,stroke:#333
+    style G fill:#4a90d9,color:#fff,stroke:#333
+```
+
+**1. Clear, descriptive naming**
+
+Bad: `process_data(input)` — ambiguous, could mean anything.
+
+Good: `search_knowledge_base(query: str)` — the purpose is obvious from the name.
+
+**2. Rich descriptions with examples and edge cases**
+
+A tool description is like a docstring for a junior developer who has never seen your codebase:
+
+```python
+@tool
+def search_knowledge_base(query: str) -> str:
+    """Search the internal documentation for relevant passages.
+
+    Use this tool when the user asks about product features, API endpoints,
+    configuration options, or internal processes.
+
+    Do NOT use this for:
+    - General knowledge questions (use web_search instead)
+    - Database metrics or analytics (use query_database instead)
+
+    Args:
+        query: A natural language search query. Be specific.
+               Good: "rate limiting configuration for REST API"
+               Bad: "rate limit" (too vague)
+
+    Returns:
+        Top 5 matching passages with source document references.
+        Returns "No results found" if nothing matches.
+    """
+```
+
+**3. Minimal, well-typed parameters**
+
+More parameters = more chances for the agent to get confused. Combine related inputs, use sensible defaults, and eliminate optional parameters that are rarely needed.
+
+```python
+# Bad: too many parameters, confusing
+@tool
+def search(query: str, index: str, top_k: int, threshold: float,
+           rerank: bool, filter_date: str, exclude_ids: list) -> str:
+    ...
+
+# Good: minimal, focused
+@tool
+def search_docs(query: str) -> str:
+    """Search documentation. Returns top 5 results ranked by relevance."""
+    ...
+```
+
+**4. Poka-yoke (error-proofing) your tools**
+
+Design tools so they're hard to use incorrectly. Anthropic found that their SWE-bench agent made mistakes with relative file paths, so they changed the tool to require absolute paths — and the agent used it flawlessly.
+
+```python
+# Bad: relative paths cause errors when the agent changes directories
+@tool
+def read_file(path: str) -> str:
+    """Read a file."""
+    ...
+
+# Good: always absolute, with validation
+@tool
+def read_file(absolute_path: str) -> str:
+    """Read a file. Path MUST be absolute (starting with /).
+    Example: /home/user/project/src/main.py"""
+    if not absolute_path.startswith("/"):
+        return f"Error: path must be absolute. Got: {absolute_path}"
+    ...
+```
+
+**5. Natural output formats**
+
+LLMs process text. Return results in formats the LLM naturally understands — markdown, plain text, or simple JSON. Avoid complex nested structures unless necessary.
+
+```python
+# Bad: deeply nested JSON that's hard for the LLM to parse
+return json.dumps({"data": {"results": [{"id": 1, "fields": {...}}]}})
+
+# Good: clean markdown that reads naturally
+return """Found 3 results:
+1. **Rate Limiting** (docs/api/rate-limits.md): API endpoints are limited to 60 requests/minute...
+2. **Authentication** (docs/api/auth.md): Use Bearer tokens for API access...
+3. **Pagination** (docs/api/pagination.md): Use cursor-based pagination for large result sets..."""
+```
+
+**6. Actionable error messages**
+
+When a tool fails, tell the agent what to do differently — don't just return a stack trace.
+
+```python
+# Bad: raw exception
+return "Error: KeyError: 'user_id'"
+
+# Good: actionable guidance
+return ("Error: 'user_id' is required but was not found in the input. "
+        "Make sure to include a user_id parameter. "
+        "Example: query_user(user_id='usr_123')")
+```
+
+## Building Skills from Scratch
+
+### Skill Architecture: The SKILL.md Pattern
+
+The emerging [Agent Skills standard](https://agentskills.io/home) defines a portable format for skill bundles. At its core, every skill is a directory with a `SKILL.md` file:
+
+```
+csv-insights/
+├── SKILL.md           # Manifest + instructions
+├── analyze.py         # Analysis script
+├── templates/
+│   └── report.md      # Output template
+└── schemas/
+    └── columns.json   # Expected column definitions
+```
+
+The `SKILL.md` file uses YAML frontmatter for metadata and markdown for instructions:
+
+```markdown
+---
+name: csv-insights
+description: >
+  Analyze CSV files and produce summary reports with statistics,
+  distributions, and anomaly detection. Use when the user provides
+  a CSV file or asks for data analysis.
+version: 1
+---
+
+## Instructions
+
+When analyzing a CSV file:
+
+1. **Validate** — Read the CSV and check for expected columns
+2. **Profile** — Compute column types, missing values, and basic statistics
+3. **Analyze** — Run the analysis script for distributions and anomalies
+4. **Report** — Format results using the report template
+
+## Rules
+
+- Always show sample data (first 5 rows) before analysis
+- Round numbers to 2 decimal places
+- Flag any column with >10% missing values
+- Never modify the original file
+```
+
+### Building a Retrieval Skill
+
+Let's build a complete retrieval skill that an agent can use to search a knowledge base with query rewriting and relevance grading:
+
+```python
+from langchain_core.tools import tool
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_core.documents import Document
+import numpy as np
+
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+
+
+# --- Core retrieval tools ---
+
+@tool
+def search_knowledge_base(query: str) -> str:
+    """Search the documentation knowledge base for relevant information.
+
+    Use this for questions about product features, API usage, configuration,
+    or internal processes. Returns up to 5 relevant passages with sources.
+
+    Args:
+        query: Specific natural language query.
+               Good: "how to configure rate limiting for REST API"
+               Bad: "rate limit" (too vague — rewrite before searching)
+    """
+    # In production: actual vector store search
+    results = [
+        {"content": "Rate limiting is configured via the API gateway...",
+         "source": "docs/api/rate-limits.md", "score": 0.92},
+        {"content": "Default rate limit is 60 requests per minute...",
+         "source": "docs/api/defaults.md", "score": 0.87},
+    ]
+    if not results:
+        return "No results found. Try rephrasing your query or using different keywords."
+
+    formatted = []
+    for i, r in enumerate(results, 1):
+        formatted.append(
+            f"{i}. **{r['source']}** (relevance: {r['score']:.0%})\n"
+            f"   {r['content'][:200]}"
+        )
+    return "\n\n".join(formatted)
+
+
+@tool
+def rewrite_query(original_query: str, context: str = "") -> str:
+    """Rewrite a search query for better retrieval results.
+
+    Use this BEFORE searching if:
+    - The original query is vague or too broad
+    - A previous search returned no relevant results
+    - You need to search from a different angle
+
+    Args:
+        original_query: The query that needs improvement.
+        context: Optional context about what information is needed and why.
+    """
+    response = llm.invoke([{
+        "role": "user",
+        "content": f"Rewrite this search query to be more specific and retrieval-friendly.\n"
+                   f"Original: {original_query}\n"
+                   f"Context: {context}\n"
+                   f"Return ONLY the rewritten query, nothing else."
+    }])
+    return response.content.strip()
+
+
+@tool
+def grade_relevance(query: str, document: str) -> str:
+    """Check if a retrieved document is relevant to the query.
+
+    Use this to verify search results before including them in your answer.
+    Returns 'relevant' or 'not_relevant' with an explanation.
+
+    Args:
+        query: The original user question.
+        document: The retrieved document text to evaluate.
+    """
+    response = llm.invoke([{
+        "role": "system",
+        "content": "You are a relevance grader. Given a query and a document, "
+                   "determine if the document contains information relevant to "
+                   "answering the query. Reply with EXACTLY 'relevant' or "
+                   "'not_relevant' followed by a brief explanation."
+    }, {
+        "role": "user",
+        "content": f"Query: {query}\n\nDocument: {document}"
+    }])
+    return response.content.strip()
+
+
+# --- Skill bundle ---
+RETRIEVAL_SKILL = {
+    "name": "knowledge-base-retrieval",
+    "description": "Search, rewrite, and grade results from the documentation knowledge base.",
+    "tools": [search_knowledge_base, rewrite_query, grade_relevance],
+}
+```
+
+### Building a Data Analysis Skill
+
+```python
+import math
+from langchain_core.tools import tool
+
+
+@tool
+def query_metrics_database(description: str) -> str:
+    """Query the metrics database using natural language.
+
+    Describe what data you need in plain English. The tool translates
+    your description into a database query and returns results.
+
+    Use this for questions about:
+    - User counts, growth rates, retention
+    - Feature usage and adoption metrics
+    - Performance stats (latency, error rates)
+
+    Args:
+        description: Natural language description of the data needed.
+                     Good: "monthly active users for the last 6 months"
+                     Bad: "SELECT * FROM users" (don't write SQL)
+    """
+    # In production: text-to-SQL or pre-built query templates
+    return ("Query results for: {}\n"
+            "| Month | Active Users | Growth |\n"
+            "|:------|:-------------|:-------|\n"
+            "| Jan   | 12,450       | +15%   |\n"
+            "| Feb   | 14,320       | +12%   |\n"
+            "| Mar   | 15,890       | +11%   |").format(description)
+
+
+@tool
+def calculate(expression: str) -> str:
+    """Evaluate a mathematical expression and return the result.
+
+    Use for computing growth rates, percentages, averages, and other
+    numerical calculations based on data from the metrics database.
+
+    Supports: +, -, *, /, ** (power), sqrt(), abs(), round()
+
+    Args:
+        expression: A mathematical expression.
+                    Example: "round((15890 - 12450) / 12450 * 100, 1)"
+    """
+    allowed_names = {
+        "sqrt": math.sqrt, "abs": abs, "round": round,
+        "min": min, "max": max, "sum": sum,
+    }
+    try:
+        result = eval(expression, {"__builtins__": {}}, allowed_names)
+        return str(result)
+    except Exception as e:
+        return f"Error evaluating '{expression}': {e}. Check syntax and try again."
+
+
+@tool
+def format_report(title: str, sections: str) -> str:
+    """Format analysis results into a structured markdown report.
+
+    Use this as the LAST step after gathering and analyzing data.
+
+    Args:
+        title: Report title.
+        sections: Content in markdown format with headers and data.
+    """
+    return f"# {title}\n\n{sections}\n\n---\n*Generated from metrics database*"
+
+
+ANALYSIS_SKILL = {
+    "name": "data-analysis",
+    "description": "Query metrics databases, perform calculations, and generate analysis reports.",
+    "tools": [query_metrics_database, calculate, format_report],
+}
+```
+
+## Composing Skills into Agents
+
+### Single-Agent, Multi-Skill
+
+The simplest composition: one agent with multiple skills. Each skill's tools are registered with the agent, and the agent's prompt lists when to use each skill.
+
+```python
+from langgraph.prebuilt import create_react_agent
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+# Combine tools from multiple skills
+all_tools = RETRIEVAL_SKILL["tools"] + ANALYSIS_SKILL["tools"]
+
+agent = create_react_agent(
+    model=llm,
+    tools=all_tools,
+    prompt="""You are a product analyst assistant with two skill sets:
+
+1. **Knowledge Base Retrieval**: Use search_knowledge_base, rewrite_query,
+   and grade_relevance for documentation questions.
+
+2. **Data Analysis**: Use query_metrics_database, calculate, and
+   format_report for metrics and analytics questions.
+
+When answering:
+- Use retrieval skills for "what" and "how" questions about the product
+- Use analysis skills for "how many" and "what's the trend" questions
+- For questions that need BOTH, gather information first, then analyze
+- Always verify retrieved information with grade_relevance before using it
+- Present final answers using format_report for consistency""",
+)
+
+# Run it
+result = agent.invoke({
+    "messages": [{
+        "role": "user",
+        "content": "What's our user growth rate and does it match "
+                   "the targets mentioned in our documentation?"
+    }]
+})
+```
+
+### Multi-Agent, Skill-Per-Agent
+
+For complex workflows, assign one skill per agent and orchestrate with a supervisor. This follows the principle from [Multi-Agent RAG Orchestration Patterns](/posts/agent/Multi-Agent%20RAG%20Orchestration%20Patterns.html) — each agent has 2–4 focused tools, making tool selection near-perfect.
+
+```python
+from typing import TypedDict, Annotated
+from langgraph.graph import StateGraph, END, START
+from langgraph.graph.message import add_messages
+from langgraph.prebuilt import create_react_agent
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage
+
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+
+# Create skill-specific agents
+retrieval_agent = create_react_agent(
+    model=llm,
+    tools=RETRIEVAL_SKILL["tools"],
+    prompt="You are a retrieval specialist. Search the knowledge base, "
+           "rewrite queries for better results, and verify relevance. "
+           "Always cite your sources.",
+)
+
+analysis_agent = create_react_agent(
+    model=llm,
+    tools=ANALYSIS_SKILL["tools"],
+    prompt="You are a data analyst. Query the metrics database, "
+           "perform calculations, and format results as reports. "
+           "Always show your calculations.",
+)
+
+
+# Supervisor that routes to skill-agents
+class SkillState(TypedDict):
+    messages: Annotated[list, add_messages]
+    next_skill: str
+    skill_outputs: dict
+
+
+def router(state: SkillState) -> dict:
+    """Route the query to the appropriate skill-agent."""
+    outputs = state.get("skill_outputs", {})
+    context = "\n".join(f"[{k}]: {v}" for k, v in outputs.items()) if outputs else "None"
+
+    response = llm.invoke([
+        {"role": "system", "content": (
+            "You are a router. Based on the question and any results so far, "
+            "choose the next skill to use.\n"
+            "Available skills:\n"
+            f"- retrieval: {RETRIEVAL_SKILL['description']}\n"
+            f"- analysis: {ANALYSIS_SKILL['description']}\n"
+            "- FINISH: enough information to answer\n\n"
+            f"Results so far:\n{context}\n\n"
+            "Reply with exactly: retrieval, analysis, or FINISH"
+        )},
+        *state["messages"],
+    ])
+    return {"next_skill": response.content.strip().lower()}
+
+
+def run_skill(skill_name: str, agent):
+    """Create a node that runs a skill-specific agent."""
+    def node(state: SkillState) -> dict:
+        user_msg = next(
+            (m.content for m in state["messages"] if isinstance(m, HumanMessage)), ""
+        )
+        context = state.get("skill_outputs", {})
+        context_str = "\n".join(f"[{k}]: {v}" for k, v in context.items())
+        query = f"{user_msg}\n\nContext:\n{context_str}" if context_str else user_msg
+
+        result = agent.invoke({"messages": [{"role": "user", "content": query}]})
+        updated = {**state.get("skill_outputs", {}), skill_name: result["messages"][-1].content}
+        return {"skill_outputs": updated}
+    return node
+
+
+def route_decision(state: SkillState) -> str:
+    skill = state.get("next_skill", "FINISH")
+    return skill if skill in ("retrieval", "analysis") else "synthesize"
+
+
+def synthesize(state: SkillState) -> dict:
+    outputs = state.get("skill_outputs", {})
+    context = "\n\n".join(f"**{k}**:\n{v}" for k, v in outputs.items())
+    response = llm.invoke([
+        {"role": "system", "content": "Synthesize skill outputs into a clear answer."},
+        {"role": "user", "content": f"Question: {state['messages'][0].content}\n\n{context}"},
+    ])
+    return {"messages": [{"role": "assistant", "content": response.content}]}
+
+
+# Build the graph
+graph = StateGraph(SkillState)
+graph.add_node("router", router)
+graph.add_node("retrieval", run_skill("retrieval", retrieval_agent))
+graph.add_node("analysis", run_skill("analysis", analysis_agent))
+graph.add_node("synthesize", synthesize)
+
+graph.add_edge(START, "router")
+graph.add_conditional_edges("router", route_decision, {
+    "retrieval": "retrieval",
+    "analysis": "analysis",
+    "synthesize": "synthesize",
+})
+graph.add_edge("retrieval", "router")
+graph.add_edge("analysis", "router")
+graph.add_edge("synthesize", END)
+
+skill_agent = graph.compile()
+```
+
+### LlamaIndex: Skills as QueryEngine Tools
+
+In LlamaIndex, skills map naturally to `QueryEngineTool` instances — each backed by a different index or data source:
+
+```python
+from llama_index.llms.openai import OpenAI
+from llama_index.core.agent.workflow import ReActAgent
+from llama_index.core.tools import FunctionTool, QueryEngineTool
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
+from llama_index.core.workflow import Context
+
+
+# Build skill-specific indices
+docs = SimpleDirectoryReader("./docs/product").load_data()
+product_index = VectorStoreIndex.from_documents(docs)
+
+api_docs = SimpleDirectoryReader("./docs/api").load_data()
+api_index = VectorStoreIndex.from_documents(api_docs)
+
+# Wrap as skill tools with rich descriptions
+product_skill = QueryEngineTool.from_defaults(
+    query_engine=product_index.as_query_engine(similarity_top_k=5),
+    name="product_knowledge",
+    description=(
+        "Search product documentation for feature descriptions, user guides, "
+        "and configuration instructions. Use for 'what' and 'how' questions "
+        "about the product. Returns relevant passages with source references."
+    ),
+)
+
+api_skill = QueryEngineTool.from_defaults(
+    query_engine=api_index.as_query_engine(similarity_top_k=5),
+    name="api_reference",
+    description=(
+        "Search API documentation for endpoint specifications, request/response "
+        "formats, authentication, rate limits, and error codes. Use for "
+        "developer-facing technical questions."
+    ),
+)
+
+calc_skill = FunctionTool.from_defaults(
+    fn=lambda expression: str(eval(expression, {"__builtins__": {}},
+                                   {"sqrt": __import__('math').sqrt, "abs": abs})),
+    name="calculator",
+    description="Evaluate mathematical expressions for calculations based on data.",
+)
+
+# Create the agent with all skills
+agent = ReActAgent(
+    tools=[product_skill, api_skill, calc_skill],
+    llm=OpenAI(model="gpt-4o-mini", temperature=0),
+)
+
+ctx = Context(agent)
+response = await agent.run(
+    "What's the API rate limit and how many requests can I make per hour?",
+    ctx=ctx,
+)
+```
+
+The agent will reason about which skill to invoke — using `api_reference` for the rate limit question, then `calculator` to compute hourly capacity.
+
+## Packaging Skills for Teams
+
+### The SKILL.md Standard
+
+Both Anthropic and OpenAI have converged on a `SKILL.md`-based format. Here's how to create a distributable skill:
+
+```
+code-review/
+├── SKILL.md
+├── checklist.md
+└── templates/
+    └── review-comment.md
+```
+
+**SKILL.md:**
+```markdown
+---
+name: code-review
+description: >
+  Review code changes for bugs, security issues, and style violations.
+  Use when reviewing pull requests or code diffs.
+version: 2
+---
+
+## When to Use
+
+Apply this skill when:
+- Reviewing a pull request or code diff
+- Asked to check code quality or find bugs
+- Performing security review of code changes
+
+## Process
+
+1. Read the diff or changed files
+2. Check against the review checklist (see checklist.md)
+3. For each issue found, generate a review comment using the template
+4. Categorize issues: critical, warning, suggestion
+5. Summarize findings with counts by category
+
+## Rules
+
+- Always check for: SQL injection, XSS, hardcoded secrets, missing auth
+- Flag any TODO or FIXME comments in new code
+- Verify error handling exists for all external calls
+- Check that tests exist for new public functions
+```
+
+### Distributing Skills
+
+**Git repositories** — Commit skills to a shared repo. Teams clone or reference them:
+
+```
+.skills/
+├── code-review/
+│   └── SKILL.md
+├── csv-insights/
+│   ├── SKILL.md
+│   └── analyze.py
+└── api-testing/
+    ├── SKILL.md
+    └── test-templates/
+```
+
+**OpenAI Skills API** — Upload skills programmatically:
+
+```bash
+# Upload a skill
+curl -X POST 'https://api.openai.com/v1/skills' \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -F 'files=@./code-review.zip;type=application/zip'
+
+# Mount in a shell environment
+curl -L 'https://api.openai.com/v1/responses' \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "tools": [{
+      "type": "shell",
+      "environment": {
+        "type": "container_auto",
+        "skills": [
+          {"type": "skill_reference", "skill_id": "skill_abc123"}
+        ]
+      }
+    }],
+    "input": "Review the code changes in this PR."
+  }'
+```
+
+**Anthropic Claude Code** — Place skills in the `.claude/skills/` directory:
+
+```
+.claude/
+└── skills/
+    ├── code-review/
+    │   └── SKILL.md
+    └── testing/
+        └── SKILL.md
+```
+
+Claude Code automatically discovers skills and applies them when the task matches the skill's description.
+
+## Skill Design Patterns
+
+### Pattern 1: Progressive Disclosure
+
+Don't front-load all instructions. Start with a brief description, and include detailed instructions in separate files that the agent reads only when needed.
+
+```markdown
+---
+name: database-migration
+description: Plan and execute database schema migrations safely.
+---
+
+## Quick Start
+Use this skill for any database schema change. Start by reading
+the full migration checklist in `checklist.md`.
+
+## Files
+- `checklist.md` — Step-by-step migration process
+- `rollback-template.sql` — Template for rollback scripts
+- `validation-queries.sql` — Post-migration validation queries
+```
+
+This keeps the context window small until the agent actually needs the detailed instructions.
+
+### Pattern 2: Skill Composition
+
+Build complex skills by composing simpler ones. A "research report" skill might invoke retrieval, analysis, and formatting skills:
+
+```python
+@tool
+def generate_research_report(topic: str) -> str:
+    """Generate a comprehensive research report on a topic.
+
+    This skill orchestrates three sub-skills:
+    1. Knowledge base retrieval — gather relevant documents
+    2. Data analysis — pull metrics and compute trends
+    3. Report formatting — structure findings into a polished report
+
+    Args:
+        topic: The research topic to investigate.
+    """
+    # Step 1: Retrieve
+    docs = search_knowledge_base(topic)
+
+    # Step 2: Analyze
+    metrics = query_metrics_database(f"metrics related to {topic}")
+
+    # Step 3: Format
+    report = format_report(
+        title=f"Research Report: {topic}",
+        sections=f"## Findings\n{docs}\n\n## Metrics\n{metrics}"
+    )
+    return report
+```
+
+### Pattern 3: Guardrailed Skills
+
+Wrap skills with input and output validation using the patterns from [Guardrails and Safety for Autonomous Retrieval Agents](/posts/agent/Guardrails%20and%20Safety%20for%20Autonomous%20Retrieval%20Agents.html):
+
+```python
+@tool
+def safe_database_query(description: str) -> str:
+    """Query the database with safety guardrails.
+
+    This tool validates that queries are read-only before execution.
+    Write operations (INSERT, UPDATE, DELETE) are blocked.
+
+    Args:
+        description: Natural language description of the data needed.
+    """
+    # Input guardrail: check for write operations
+    write_keywords = ["insert", "update", "delete", "drop", "alter", "truncate"]
+    if any(kw in description.lower() for kw in write_keywords):
+        return ("Error: Write operations are not allowed through this tool. "
+                "Use the admin dashboard for data modifications.")
+
+    result = query_metrics_database(description)
+
+    # Output guardrail: check for PII
+    pii_patterns = ["@", "SSN", "social security", "credit card"]
+    if any(pattern.lower() in result.lower() for pattern in pii_patterns):
+        return "Error: Query results contain potentially sensitive data. Results filtered."
+
+    return result
+```
+
+### Pattern 4: Self-Improving Skills
+
+Add feedback loops where the agent evaluates its own skill usage and adjusts. This builds on the reflection pattern from [Design Patterns for AI Agents](/posts/agent/Design%20Patterns%20for%20AI%20Agents.html):
+
+```python
+@tool
+def evaluate_skill_result(
+    skill_name: str, query: str, result: str
+) -> str:
+    """Evaluate whether a skill produced a useful result.
+
+    Use this after calling any skill to verify the output quality.
+    If the result is poor, the evaluation will suggest improvements.
+
+    Args:
+        skill_name: Which skill produced this result.
+        query: The original query sent to the skill.
+        result: The skill's output to evaluate.
+    """
+    response = llm.invoke([{
+        "role": "system",
+        "content": (
+            "Evaluate this skill result. Rate as: 'good', 'partial', or 'poor'.\n"
+            "If partial or poor, explain what's missing and suggest a better query.\n"
+            "Format: RATING: <rating>\\nFEEDBACK: <feedback>"
+        )
+    }, {
+        "role": "user",
+        "content": f"Skill: {skill_name}\nQuery: {query}\nResult: {result}"
+    }])
+    return response.content
+```
+
+## Testing and Evaluating Skills
+
+### Unit Testing Skills
+
+Test each tool independently before composing them into agents:
+
+```python
+import pytest
+
+
+def test_search_returns_results():
+    """Verify search returns formatted results for valid queries."""
+    result = search_knowledge_base.invoke({"query": "rate limiting"})
+    assert "No results found" not in result
+    assert "relevance:" in result
+
+
+def test_search_handles_empty_results():
+    """Verify graceful handling of no results."""
+    result = search_knowledge_base.invoke({"query": "xyzzy_nonexistent_topic"})
+    assert "No results found" in result or "rephrasing" in result
+
+
+def test_calculator_handles_errors():
+    """Verify calculator returns helpful errors."""
+    result = calculate.invoke({"expression": "1/0"})
+    assert "Error" in result
+    assert "try again" in result.lower() or "syntax" in result.lower()
+
+
+def test_query_rewrite_improves_specificity():
+    """Verify query rewriting produces more specific queries."""
+    original = "rate limit"
+    rewritten = rewrite_query.invoke({
+        "original_query": original,
+        "context": "User wants to know about API rate limiting configuration"
+    })
+    assert len(rewritten) > len(original)
+```
+
+### Integration Testing with Agent Traces
+
+Test skills in the context of a full agent run, checking that the agent chooses the right skills:
+
+```python
+def test_agent_uses_retrieval_skill_for_docs_question():
+    """Agent should use knowledge base for documentation questions."""
+    result = skill_agent.invoke({
+        "messages": [{"role": "user", "content": "How do I configure rate limiting?"}],
+        "next_skill": "",
+        "skill_outputs": {},
+    })
+
+    # Check that retrieval skill was used
+    assert "retrieval" in result.get("skill_outputs", {})
+    assert "rate limit" in result["messages"][-1].content.lower()
+
+
+def test_agent_uses_analysis_skill_for_metrics_question():
+    """Agent should use analysis skill for metrics questions."""
+    result = skill_agent.invoke({
+        "messages": [{"role": "user", "content": "How many active users do we have?"}],
+        "next_skill": "",
+        "skill_outputs": {},
+    })
+
+    assert "analysis" in result.get("skill_outputs", {})
+```
+
+### Evaluation Criteria
+
+| Criterion | What to Measure | Target |
+|:----------|:---------------|:-------|
+| **Tool selection accuracy** | Does the agent pick the right skill? | >95% on test cases |
+| **Argument correctness** | Are tool inputs properly formatted? | >98% valid inputs |
+| **Result utilization** | Does the agent use the tool output in its answer? | >90% of results cited |
+| **Error recovery** | Does the agent retry with a different approach on failure? | >80% recovery |
+| **Step efficiency** | How many tool calls to answer? | ≤3 for simple, ≤6 for complex |
+| **Cost per query** | Total tokens consumed | Project-dependent |
+
+## Common Pitfalls and Fixes
+
+| Pitfall | Symptom | Fix |
+|:--------|:--------|:----|
+| **Vague tool descriptions** | Agent picks wrong tool or ignores it | Add specific trigger conditions, examples, and anti-examples |
+| **Too many tools** | Tool selection accuracy drops below 80% | Split into multi-agent with 2–4 tools per agent |
+| **Missing error guidance** | Agent loops after tool errors | Return actionable error messages with correction hints |
+| **Brittle parameters** | Agent passes wrong types or formats | Use fewer parameters, add validation, poka-yoke the interface |
+| **No output structure** | Agent struggles to parse tool results | Return clean markdown; avoid deeply nested JSON |
+| **Skill conflicts** | Two skills seem applicable, agent oscillates | Add explicit "do NOT use for" sections in descriptions |
+| **Context window bloat** | Too many skill instructions loaded at once | Use progressive disclosure — brief descriptions up front, details in files |
+| **No versioning** | Skill updates break existing workflows | Use the SKILL.md version field; test before deploying |
+
+## Conclusion
+
+Building skills for agents is the highest-leverage work in agent engineering. The reasoning loop, the orchestration topology, and the model choice all matter — but they're multiplied by the quality of the skills your agent can execute.
+
+**Key takeaways:**
+
+- **A skill = tool + instructions + context.** A raw function is a tool. A skill wraps it with descriptions, examples, constraints, and metadata so the agent knows when and how to use it.
+- **Invest more in ACI than prompts.** Anthropic's principle holds: tool definitions and descriptions deserve as much engineering attention as your system prompt. Clear naming, rich docstrings, minimal parameters, and actionable errors make the difference.
+- **Poka-yoke everything.** Design tools so they're hard to use incorrectly — require absolute paths, validate inputs, return structured errors with correction hints.
+- **Use the SKILL.md standard.** Both Anthropic and OpenAI have converged on manifest files with YAML frontmatter. Package skills as versioned directories for portability and team sharing.
+- **Progressive disclosure.** Keep context windows small. Put brief descriptions in the skill manifest and detailed instructions in separate files the agent reads on demand.
+- **Test skills independently**, then in agent context. Unit test each tool, then trace full agent runs to verify skill selection and result utilization.
+- **Start simple.** One agent with well-designed tools beats a multi-agent system with poorly designed tools every time. Add orchestration complexity only when tool selection accuracy drops.
+
+
+## References
+
+- Anthropic, [Building Effective Agents](https://www.anthropic.com/engineering/building-effective-agents) — practical patterns from production agent deployments, including ACI design principles.
+- Anthropic, [Introduction to Agent Skills](https://anthropic.skilljar.com/introduction-to-agent-skills) — Anthropic Academy course on building, configuring, and sharing skills in Claude Code.
+- OpenAI, [Skills API Documentation](https://developers.openai.com/api/docs/guides/tools-skills) — OpenAI's skills platform for uploading, versioning, and mounting agent skills.
+- Agent Skills Standard, [agentskills.io](https://agentskills.io/home) — open specification for portable, interoperable skill bundles.
+- Ng, Andrew, [Agentic Design Patterns](https://www.deeplearning.ai/the-batch/how-agents-can-improve-llm-performance/) — four foundational patterns: Reflection, Tool Use, Planning, Multi-Agent Collaboration.
+- Weng, Lilian, [LLM Powered Autonomous Agents](https://lilianweng.github.io/posts/2023-06-23-agent/) — comprehensive survey of Planning, Memory, and Tool Use components.
+- Liu et al., [Architectural Patterns for Foundation Model-Based Agents](https://arxiv.org/abs/2405.10467) — catalogue of 18 agent patterns with trade-off analysis.
+
+
+## Read More
+
+- Understand the foundational loop that skills execute within: [Building a ReAct Agent from Scratch](/posts/agent/Building%20a%20ReAct%20Agent%20from%20Scratch.html) covers the Thought-Action-Observation cycle that drives tool use.
+- Learn the broader architectural patterns that skills plug into: [Design Patterns for AI Agents](/posts/agent/Design%20Patterns%20for%20AI%20Agents.html) covers reflection, planning, and multi-agent collaboration.
+- See how tool calling works at the protocol level: [Tool Use and Function Calling for Retrieval Agents](/posts/agent/Tool%20Use%20and%20Function%20Calling%20for%20Retrieval%20Agents.html) covers schemas, parallel calls, and error handling.
+- Assign each skill to a dedicated agent: [Multi-Agent RAG Orchestration Patterns](/posts/agent/Multi-Agent%20RAG%20Orchestration%20Patterns.html) shows supervisor, swarm, and hierarchical topologies.
+- Add safety boundaries to your skills: [Guardrails and Safety for Autonomous Retrieval Agents](/posts/agent/Guardrails%20and%20Safety%20for%20Autonomous%20Retrieval%20Agents.html) covers input/output validation and human-in-the-loop.
+- Expose skills over a standard protocol: [Build and Deploy MCP Server from Scratch](/posts/agent/Build%20and%20Deploy%20MCP%20Server%20from%20Scratch.html) shows how to serve tools via the Model Context Protocol.
+- Measure whether skills work in practice: [Evaluating and Debugging AI Agents](/posts/agent/Evaluating%20and%20Debugging%20AI%20Agents.html) covers trace inspection, tool selection accuracy, and cost analysis.

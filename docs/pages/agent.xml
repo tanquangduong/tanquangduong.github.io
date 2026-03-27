@@ -4148,7 +4148,7 @@ font-style: inherit;">await</span> worker.run()</span></code></pre></div></div>
  ]]></description>
   <guid>https://tanquangduong.github.io/posts/agent/Deploying Retrieval Agents in Production.html</guid>
   <pubDate>Wed, 06 Aug 2025 00:00:00 GMT</pubDate>
-  <media:content url="https://tanquangduong.github.io/images/agent/deploying-retrieval-agents-production-300px.png" medium="image" type="image/png"/>
+  <media:content url="https://tanquangduong.github.io/images/agent/deploying-retrieval-agents-production-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
   <title>Evaluating and Debugging AI Agents</title>
@@ -7865,7 +7865,7 @@ font-style: inherit;">"</span>)</span></code></pre></div></div>
  ]]></description>
   <guid>https://tanquangduong.github.io/posts/agent/Evaluating and Debugging AI Agents.html</guid>
   <pubDate>Wed, 30 Jul 2025 00:00:00 GMT</pubDate>
-  <media:content url="https://tanquangduong.github.io/images/agent/evaluating-debugging-ai-agents-300px.png" medium="image" type="image/png"/>
+  <media:content url="https://tanquangduong.github.io/images/agent/evaluating-debugging-ai-agents-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
   <title>Guardrails and Safety for Autonomous Retrieval Agents</title>
@@ -11269,7 +11269,7 @@ font-style: inherit;">str</span>(log_entry))</span></code></pre></div></div>
  ]]></description>
   <guid>https://tanquangduong.github.io/posts/agent/Guardrails and Safety for Autonomous Retrieval Agents.html</guid>
   <pubDate>Wed, 23 Jul 2025 00:00:00 GMT</pubDate>
-  <media:content url="https://tanquangduong.github.io/images/agent/guardrails-safety-autonomous-retrieval-agents-300px.png" medium="image" type="image/png"/>
+  <media:content url="https://tanquangduong.github.io/images/agent/guardrails-safety-autonomous-retrieval-agents-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
   <title>Deep Research Agents: from RAG to Autonomous Investigation</title>
@@ -14893,7 +14893,7 @@ font-style: inherit;">0</span>].message.content)</span></code></pre></div></div>
  ]]></description>
   <guid>https://tanquangduong.github.io/posts/agent/Deep Research Agents from RAG to Autonomous Investigation.html</guid>
   <pubDate>Wed, 16 Jul 2025 00:00:00 GMT</pubDate>
-  <media:content url="https://tanquangduong.github.io/images/agent/deep-research-agents-autonomous-investigation-300px.png" medium="image" type="image/png"/>
+  <media:content url="https://tanquangduong.github.io/images/agent/deep-research-agents-autonomous-investigation-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
   <title>Planning and Query Decomposition for Complex Retrieval</title>
@@ -20085,7 +20085,3150 @@ font-style: inherit;">compile</span>()</span></code></pre></div></div>
  ]]></description>
   <guid>https://tanquangduong.github.io/posts/agent/Planning and Query Decomposition for Complex Retrieval.html</guid>
   <pubDate>Wed, 09 Jul 2025 00:00:00 GMT</pubDate>
-  <media:content url="https://tanquangduong.github.io/images/agent/planning-query-decomposition-retrieval-300px.png" medium="image" type="image/png"/>
+  <media:content url="https://tanquangduong.github.io/images/agent/planning-query-decomposition-retrieval-300px.png" medium="image" type="image/png" height="96" width="144"/>
+</item>
+<item>
+  <title>Building Skills for AI Agents</title>
+  <link>https://tanquangduong.github.io/posts/agent/Building Skills for AI Agents.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<p><strong>Keywords:</strong> agent skills, skill architecture, tool engineering, agent-computer interface, ACI, SKILL.md, reusable agent capabilities, prompt engineering tools, modular agent design, OpenAI skills, Claude Code skills, agent skills standard, function calling, tool use, agent capabilities, skill bundles</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://tanquangduong.github.io/images/agent/building-skills-ai-agents-300px.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="300"></p>
+</figure>
+</div>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>An agent is only as capable as its <strong>skills</strong> — the set of tools, instructions, and workflows it can reliably execute. You can have the most sophisticated reasoning loop, the most elegant multi-agent topology, and the best LLM available — but if your agent can’t reliably call the right tool with the right arguments, it fails.</p>
+<p>The AI industry is converging on a shared insight: <strong>the most impactful work in building agents isn’t choosing the model or the framework — it’s engineering the skills</strong>. Anthropic’s engineering team <a href="https://www.anthropic.com/engineering/building-effective-agents">reported</a> that while building their SWE-bench agent, they “actually spent more time optimizing our tools than the overall prompt.” OpenAI now provides a formal <a href="https://developers.openai.com/api/docs/guides/tools-skills">Skills API</a> — versioned bundles of instructions and files that agents can mount and execute. And the emerging <a href="https://agentskills.io/home">Agent Skills standard</a> is creating an open, interoperable format for packaging and sharing agent capabilities.</p>
+<p>This article covers the full lifecycle of building agent skills — from the design principles behind effective tool interfaces, through implementation patterns in Python with LangGraph and LlamaIndex, to packaging skills as reusable bundles that teams can share. We draw on published guidance from Anthropic and OpenAI, and connect to the broader agent architecture patterns covered in this series.</p>
+</section>
+<section id="what-is-an-agent-skill" class="level2">
+<h2 class="anchored" data-anchor-id="what-is-an-agent-skill">What Is an Agent Skill?</h2>
+<section id="from-tools-to-skills" class="level3">
+<h3 class="anchored" data-anchor-id="from-tools-to-skills">From Tools to Skills</h3>
+<p>In the early days of LLM agents, a “tool” was a Python function with a docstring. The agent would call <code>search_wikipedia(query)</code> or <code>calculator(expression)</code>, observe the result, and continue. This works for simple workflows, but production agents need something richer.</p>
+<p>A <strong>skill</strong> is a higher-level unit of agent capability that bundles together:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 34%">
+<col style="width: 37%">
+<col style="width: 28%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Component</th>
+<th style="text-align: left;">Description</th>
+<th style="text-align: left;">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Instructions</strong></td>
+<td style="text-align: left;">Markdown guidance on when and how to use the skill</td>
+<td style="text-align: left;">“Use this skill for CSV analysis. Always validate headers first.”</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Tools</strong></td>
+<td style="text-align: left;">One or more callable functions or API endpoints</td>
+<td style="text-align: left;"><code>read_csv()</code>, <code>compute_statistics()</code>, <code>generate_chart()</code></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Supporting files</strong></td>
+<td style="text-align: left;">Templates, schemas, reference data</td>
+<td style="text-align: left;">Column name mappings, output templates</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Constraints</strong></td>
+<td style="text-align: left;">Allowed/disallowed actions, safety boundaries</td>
+<td style="text-align: left;">“Never delete rows. Read-only access.”</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Metadata</strong></td>
+<td style="text-align: left;">Name, description, version, trigger conditions</td>
+<td style="text-align: left;"><code>name: csv-insights</code>, <code>version: 2</code></td>
+</tr>
+</tbody>
+</table>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["Agent Skill"] --&gt; B["Instructions&lt;br/&gt;&lt;small&gt;SKILL.md with frontmatter&lt;/small&gt;"]
+    A --&gt; C["Tools&lt;br/&gt;&lt;small&gt;Functions, APIs, scripts&lt;/small&gt;"]
+    A --&gt; D["Supporting Files&lt;br/&gt;&lt;small&gt;Templates, schemas&lt;/small&gt;"]
+    A --&gt; E["Constraints&lt;br/&gt;&lt;small&gt;Allowed tools, safety rules&lt;/small&gt;"]
+    A --&gt; F["Metadata&lt;br/&gt;&lt;small&gt;Name, version, triggers&lt;/small&gt;"]
+
+    style A fill:#9b59b6,color:#fff,stroke:#333
+    style B fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#27ae60,color:#fff,stroke:#333
+    style D fill:#e67e22,color:#fff,stroke:#333
+    style E fill:#e74c3c,color:#fff,stroke:#333
+    style F fill:#f5a623,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>The key insight: <strong>a skill is not just a tool — it’s a tool plus the knowledge of when and how to use it</strong>. A raw <code>execute_sql(query)</code> function is a tool. A skill wraps it with instructions like “Use this for analytics queries against the metrics database. Always use parameterized queries. Return results as markdown tables. Limit to 1000 rows.”</p>
+</section>
+<section id="how-ai-labs-define-skills" class="level3">
+<h3 class="anchored" data-anchor-id="how-ai-labs-define-skills">How AI Labs Define Skills</h3>
+<p><strong>Anthropic</strong> introduced skills in <a href="https://anthropic.skilljar.com/introduction-to-agent-skills">Claude Code</a> as “reusable markdown instructions that Claude automatically applies to the right tasks at the right time.” A skill is a <code>SKILL.md</code> file with YAML frontmatter (name, description, trigger conditions) and markdown instructions. Skills can include multiple files, restrict tool access with <code>allowed-tools</code>, and be shared via repositories or enterprise settings. Anthropic’s Skilljar course teaches building, configuring, and distributing skills — from single-file skills to multi-file bundles with progressive disclosure to keep context windows efficient.</p>
+<p><strong>OpenAI</strong> formalized skills in their <a href="https://developers.openai.com/api/docs/guides/tools-skills">Agents platform</a> as “versioned bundles of files plus a <code>SKILL.md</code> manifest.” Skills are uploaded via API, mounted in shell environments, and the model decides when to invoke them based on the skill’s name and description. OpenAI supports hosted skills (uploaded to their platform), inline skills (base64-encoded zip bundles), and local skills (file paths on your machine). They also maintain curated first-party skills like <code>openai-spreadsheets</code>.</p>
+<p>Both approaches converge on the same architecture:</p>
+<ol type="1">
+<li>A <strong>manifest file</strong> (<code>SKILL.md</code>) with metadata and instructions</li>
+<li><strong>Supporting files</strong> (scripts, templates, data)</li>
+<li><strong>Automatic matching</strong> — the agent reads the skill’s description and decides when to use it</li>
+<li><strong>Versioning</strong> — skills can be updated without breaking existing workflows</li>
+</ol>
+</section>
+</section>
+<section id="the-agent-computer-interface-aci" class="level2">
+<h2 class="anchored" data-anchor-id="the-agent-computer-interface-aci">The Agent-Computer Interface (ACI)</h2>
+<section id="why-tool-design-matters-more-than-prompts" class="level3">
+<h3 class="anchored" data-anchor-id="why-tool-design-matters-more-than-prompts">Why Tool Design Matters More Than Prompts</h3>
+<p>Anthropic’s core principle for building effective agents is to “carefully craft your agent-computer interface (ACI) through thorough tool documentation and testing.” Just as human-computer interfaces (HCI) require extensive design effort, the interface between agents and their tools deserves equal attention.</p>
+<p>This is not intuitive. Most developers spend 90% of their time on the system prompt and 10% on tool definitions. <strong>Flip this ratio.</strong> Anthropic explicitly states:</p>
+<blockquote class="blockquote">
+<p>“While building our agent for SWE-bench, we actually spent more time optimizing our tools than the overall prompt.”</p>
+</blockquote>
+</section>
+<section id="principles-of-aci-design" class="level3">
+<h3 class="anchored" data-anchor-id="principles-of-aci-design">Principles of ACI Design</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["ACI Design Principles"] --&gt; B["Clear naming&lt;br/&gt;&lt;small&gt;Obvious from the name&lt;/small&gt;"]
+    A --&gt; C["Rich descriptions&lt;br/&gt;&lt;small&gt;Include examples, edge cases&lt;/small&gt;"]
+    A --&gt; D["Minimal parameters&lt;br/&gt;&lt;small&gt;Fewer = less confusion&lt;/small&gt;"]
+    A --&gt; E["Poka-yoke&lt;br/&gt;&lt;small&gt;Hard to use incorrectly&lt;/small&gt;"]
+    A --&gt; F["Natural formats&lt;br/&gt;&lt;small&gt;Match what LLMs expect&lt;/small&gt;"]
+    A --&gt; G["Actionable errors&lt;br/&gt;&lt;small&gt;Tell the agent what to do&lt;/small&gt;"]
+
+    style A fill:#9b59b6,color:#fff,stroke:#333
+    style B fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#4a90d9,color:#fff,stroke:#333
+    style D fill:#4a90d9,color:#fff,stroke:#333
+    style E fill:#4a90d9,color:#fff,stroke:#333
+    style F fill:#4a90d9,color:#fff,stroke:#333
+    style G fill:#4a90d9,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p><strong>1. Clear, descriptive naming</strong></p>
+<p>Bad: <code>process_data(input)</code> — ambiguous, could mean anything.</p>
+<p>Good: <code>search_knowledge_base(query: str)</code> — the purpose is obvious from the name.</p>
+<p><strong>2. Rich descriptions with examples and edge cases</strong></p>
+<p>A tool description is like a docstring for a junior developer who has never seen your codebase:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb1-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> search_knowledge_base(query: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb1-3">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Search the internal documentation for relevant passages.</span></span>
+<span id="cb1-4"></span>
+<span id="cb1-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Use this tool when the user asks about product features, API endpoints,</span></span>
+<span id="cb1-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    configuration options, or internal processes.</span></span>
+<span id="cb1-7"></span>
+<span id="cb1-8"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Do NOT use this for:</span></span>
+<span id="cb1-9"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    - General knowledge questions (use web_search instead)</span></span>
+<span id="cb1-10"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    - Database metrics or analytics (use query_database instead)</span></span>
+<span id="cb1-11"></span>
+<span id="cb1-12"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Args:</span></span>
+<span id="cb1-13"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        query: A natural language search query. Be specific.</span></span>
+<span id="cb1-14"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">               Good: "rate limiting configuration for REST API"</span></span>
+<span id="cb1-15"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">               Bad: "rate limit" (too vague)</span></span>
+<span id="cb1-16"></span>
+<span id="cb1-17"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Returns:</span></span>
+<span id="cb1-18"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        Top 5 matching passages with source document references.</span></span>
+<span id="cb1-19"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        Returns "No results found" if nothing matches.</span></span>
+<span id="cb1-20"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    """</span></span></code></pre></div></div>
+<p><strong>3. Minimal, well-typed parameters</strong></p>
+<p>More parameters = more chances for the agent to get confused. Combine related inputs, use sensible defaults, and eliminate optional parameters that are rarely needed.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Bad: too many parameters, confusing</span></span>
+<span id="cb2-2"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb2-3"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> search(query: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, index: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, top_k: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>, threshold: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">float</span>,</span>
+<span id="cb2-4">           rerank: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">bool</span>, filter_date: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, exclude_ids: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb2-5">    ...</span>
+<span id="cb2-6"></span>
+<span id="cb2-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Good: minimal, focused</span></span>
+<span id="cb2-8"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb2-9"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> search_docs(query: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb2-10">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Search documentation. Returns top 5 results ranked by relevance."""</span></span>
+<span id="cb2-11">    ...</span></code></pre></div></div>
+<p><strong>4. Poka-yoke (error-proofing) your tools</strong></p>
+<p>Design tools so they’re hard to use incorrectly. Anthropic found that their SWE-bench agent made mistakes with relative file paths, so they changed the tool to require absolute paths — and the agent used it flawlessly.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Bad: relative paths cause errors when the agent changes directories</span></span>
+<span id="cb3-2"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb3-3"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> read_file(path: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb3-4">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Read a file."""</span></span>
+<span id="cb3-5">    ...</span>
+<span id="cb3-6"></span>
+<span id="cb3-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Good: always absolute, with validation</span></span>
+<span id="cb3-8"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb3-9"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> read_file(absolute_path: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb3-10">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Read a file. Path MUST be absolute (starting with /).</span></span>
+<span id="cb3-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Example: /home/user/project/src/main.py"""</span></span>
+<span id="cb3-12">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> absolute_path.startswith(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/"</span>):</span>
+<span id="cb3-13">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Error: path must be absolute. Got: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>absolute_path<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb3-14">    ...</span></code></pre></div></div>
+<p><strong>5. Natural output formats</strong></p>
+<p>LLMs process text. Return results in formats the LLM naturally understands — markdown, plain text, or simple JSON. Avoid complex nested structures unless necessary.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Bad: deeply nested JSON that's hard for the LLM to parse</span></span>
+<span id="cb4-2"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> json.dumps({<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"data"</span>: {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"results"</span>: [{<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"id"</span>: <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"fields"</span>: {...}}]}})</span>
+<span id="cb4-3"></span>
+<span id="cb4-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Good: clean markdown that reads naturally</span></span>
+<span id="cb4-5"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"""Found 3 results:</span></span>
+<span id="cb4-6"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">1. **Rate Limiting** (docs/api/rate-limits.md): API endpoints are limited to 60 requests/minute...</span></span>
+<span id="cb4-7"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">2. **Authentication** (docs/api/auth.md): Use Bearer tokens for API access...</span></span>
+<span id="cb4-8"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">3. **Pagination** (docs/api/pagination.md): Use cursor-based pagination for large result sets..."""</span></span></code></pre></div></div>
+<p><strong>6. Actionable error messages</strong></p>
+<p>When a tool fails, tell the agent what to do differently — don’t just return a stack trace.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Bad: raw exception</span></span>
+<span id="cb5-2"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Error: KeyError: 'user_id'"</span></span>
+<span id="cb5-3"></span>
+<span id="cb5-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Good: actionable guidance</span></span>
+<span id="cb5-5"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Error: 'user_id' is required but was not found in the input. "</span></span>
+<span id="cb5-6">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Make sure to include a user_id parameter. "</span></span>
+<span id="cb5-7">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Example: query_user(user_id='usr_123')"</span>)</span></code></pre></div></div>
+</section>
+</section>
+<section id="building-skills-from-scratch" class="level2">
+<h2 class="anchored" data-anchor-id="building-skills-from-scratch">Building Skills from Scratch</h2>
+<section id="skill-architecture-the-skill.md-pattern" class="level3">
+<h3 class="anchored" data-anchor-id="skill-architecture-the-skill.md-pattern">Skill Architecture: The SKILL.md Pattern</h3>
+<p>The emerging <a href="https://agentskills.io/home">Agent Skills standard</a> defines a portable format for skill bundles. At its core, every skill is a directory with a <code>SKILL.md</code> file:</p>
+<pre><code>csv-insights/
+├── SKILL.md           # Manifest + instructions
+├── analyze.py         # Analysis script
+├── templates/
+│   └── report.md      # Output template
+└── schemas/
+    └── columns.json   # Expected column definitions</code></pre>
+<p>The <code>SKILL.md</code> file uses YAML frontmatter for metadata and markdown for instructions:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb7-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">---</span></span>
+<span id="cb7-2"><span class="an" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">name:</span><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"> csv-insights</span></span>
+<span id="cb7-3"><span class="an" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">description:</span><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"> &gt;</span></span>
+<span id="cb7-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">  Analyze CSV files and produce summary reports with statistics,</span></span>
+<span id="cb7-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">  distributions, and anomaly detection. Use when the user provides</span></span>
+<span id="cb7-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">  a CSV file or asks for data analysis.</span></span>
+<span id="cb7-7"><span class="an" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">version:</span><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"> 1</span></span>
+<span id="cb7-8"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">---</span></span>
+<span id="cb7-9"></span>
+<span id="cb7-10"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">## Instructions</span></span>
+<span id="cb7-11"></span>
+<span id="cb7-12">When analyzing a CSV file:</span>
+<span id="cb7-13"></span>
+<span id="cb7-14"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">1. </span>**Validate** — Read the CSV and check for expected columns</span>
+<span id="cb7-15"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">2. </span>**Profile** — Compute column types, missing values, and basic statistics</span>
+<span id="cb7-16"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">3. </span>**Analyze** — Run the analysis script for distributions and anomalies</span>
+<span id="cb7-17"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">4. </span>**Report** — Format results using the report template</span>
+<span id="cb7-18"></span>
+<span id="cb7-19"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">## Rules</span></span>
+<span id="cb7-20"></span>
+<span id="cb7-21"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">- </span>Always show sample data (first 5 rows) before analysis</span>
+<span id="cb7-22"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">- </span>Round numbers to 2 decimal places</span>
+<span id="cb7-23"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">- </span>Flag any column with &gt;10% missing values</span>
+<span id="cb7-24"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">- </span>Never modify the original file</span></code></pre></div></div>
+</section>
+<section id="building-a-retrieval-skill" class="level3">
+<h3 class="anchored" data-anchor-id="building-a-retrieval-skill">Building a Retrieval Skill</h3>
+<p>Let’s build a complete retrieval skill that an agent can use to search a knowledge base with query rewriting and relevance grading:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langchain_core.tools <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> tool</span>
+<span id="cb8-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langchain_openai <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> ChatOpenAI, OpenAIEmbeddings</span>
+<span id="cb8-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langchain_core.documents <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Document</span>
+<span id="cb8-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> numpy <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> np</span>
+<span id="cb8-5"></span>
+<span id="cb8-6">llm <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> ChatOpenAI(model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"gpt-4o-mini"</span>, temperature<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>)</span>
+<span id="cb8-7">embeddings <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> OpenAIEmbeddings(model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"text-embedding-3-small"</span>)</span>
+<span id="cb8-8"></span>
+<span id="cb8-9"></span>
+<span id="cb8-10"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- Core retrieval tools ---</span></span>
+<span id="cb8-11"></span>
+<span id="cb8-12"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb8-13"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> search_knowledge_base(query: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb8-14">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Search the documentation knowledge base for relevant information.</span></span>
+<span id="cb8-15"></span>
+<span id="cb8-16"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Use this for questions about product features, API usage, configuration,</span></span>
+<span id="cb8-17"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    or internal processes. Returns up to 5 relevant passages with sources.</span></span>
+<span id="cb8-18"></span>
+<span id="cb8-19"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Args:</span></span>
+<span id="cb8-20"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        query: Specific natural language query.</span></span>
+<span id="cb8-21"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">               Good: "how to configure rate limiting for REST API"</span></span>
+<span id="cb8-22"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">               Bad: "rate limit" (too vague — rewrite before searching)</span></span>
+<span id="cb8-23"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    """</span></span>
+<span id="cb8-24">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># In production: actual vector store search</span></span>
+<span id="cb8-25">    results <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [</span>
+<span id="cb8-26">        {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Rate limiting is configured via the API gateway..."</span>,</span>
+<span id="cb8-27">         <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"source"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"docs/api/rate-limits.md"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"score"</span>: <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.92</span>},</span>
+<span id="cb8-28">        {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Default rate limit is 60 requests per minute..."</span>,</span>
+<span id="cb8-29">         <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"source"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"docs/api/defaults.md"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"score"</span>: <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.87</span>},</span>
+<span id="cb8-30">    ]</span>
+<span id="cb8-31">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> results:</span>
+<span id="cb8-32">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"No results found. Try rephrasing your query or using different keywords."</span></span>
+<span id="cb8-33"></span>
+<span id="cb8-34">    formatted <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb8-35">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i, r <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">enumerate</span>(results, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>):</span>
+<span id="cb8-36">        formatted.append(</span>
+<span id="cb8-37">            <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>i<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">. **</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>r[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'source'</span>]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">** (relevance: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>r[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'score'</span>]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.0%}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">)</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb8-38">            <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"   </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>r[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'content'</span>][:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span>]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb8-39">        )</span>
+<span id="cb8-40">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>.join(formatted)</span>
+<span id="cb8-41"></span>
+<span id="cb8-42"></span>
+<span id="cb8-43"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb8-44"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> rewrite_query(original_query: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, context: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">""</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb8-45">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Rewrite a search query for better retrieval results.</span></span>
+<span id="cb8-46"></span>
+<span id="cb8-47"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Use this BEFORE searching if:</span></span>
+<span id="cb8-48"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    - The original query is vague or too broad</span></span>
+<span id="cb8-49"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    - A previous search returned no relevant results</span></span>
+<span id="cb8-50"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    - You need to search from a different angle</span></span>
+<span id="cb8-51"></span>
+<span id="cb8-52"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Args:</span></span>
+<span id="cb8-53"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        original_query: The query that needs improvement.</span></span>
+<span id="cb8-54"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        context: Optional context about what information is needed and why.</span></span>
+<span id="cb8-55"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    """</span></span>
+<span id="cb8-56">    response <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> llm.invoke([{</span>
+<span id="cb8-57">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"user"</span>,</span>
+<span id="cb8-58">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Rewrite this search query to be more specific and retrieval-friendly.</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb8-59">                   <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Original: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>original_query<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb8-60">                   <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Context: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>context<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb8-61">                   <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Return ONLY the rewritten query, nothing else."</span></span>
+<span id="cb8-62">    }])</span>
+<span id="cb8-63">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> response.content.strip()</span>
+<span id="cb8-64"></span>
+<span id="cb8-65"></span>
+<span id="cb8-66"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb8-67"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> grade_relevance(query: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, document: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb8-68">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Check if a retrieved document is relevant to the query.</span></span>
+<span id="cb8-69"></span>
+<span id="cb8-70"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Use this to verify search results before including them in your answer.</span></span>
+<span id="cb8-71"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Returns 'relevant' or 'not_relevant' with an explanation.</span></span>
+<span id="cb8-72"></span>
+<span id="cb8-73"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Args:</span></span>
+<span id="cb8-74"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        query: The original user question.</span></span>
+<span id="cb8-75"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        document: The retrieved document text to evaluate.</span></span>
+<span id="cb8-76"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    """</span></span>
+<span id="cb8-77">    response <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> llm.invoke([{</span>
+<span id="cb8-78">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"system"</span>,</span>
+<span id="cb8-79">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"You are a relevance grader. Given a query and a document, "</span></span>
+<span id="cb8-80">                   <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"determine if the document contains information relevant to "</span></span>
+<span id="cb8-81">                   <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"answering the query. Reply with EXACTLY 'relevant' or "</span></span>
+<span id="cb8-82">                   <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"'not_relevant' followed by a brief explanation."</span></span>
+<span id="cb8-83">    }, {</span>
+<span id="cb8-84">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"user"</span>,</span>
+<span id="cb8-85">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Query: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>query<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">Document: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>document<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb8-86">    }])</span>
+<span id="cb8-87">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> response.content.strip()</span>
+<span id="cb8-88"></span>
+<span id="cb8-89"></span>
+<span id="cb8-90"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- Skill bundle ---</span></span>
+<span id="cb8-91">RETRIEVAL_SKILL <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {</span>
+<span id="cb8-92">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"name"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"knowledge-base-retrieval"</span>,</span>
+<span id="cb8-93">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"description"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Search, rewrite, and grade results from the documentation knowledge base."</span>,</span>
+<span id="cb8-94">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"tools"</span>: [search_knowledge_base, rewrite_query, grade_relevance],</span>
+<span id="cb8-95">}</span></code></pre></div></div>
+</section>
+<section id="building-a-data-analysis-skill" class="level3">
+<h3 class="anchored" data-anchor-id="building-a-data-analysis-skill">Building a Data Analysis Skill</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> math</span>
+<span id="cb9-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langchain_core.tools <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> tool</span>
+<span id="cb9-3"></span>
+<span id="cb9-4"></span>
+<span id="cb9-5"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb9-6"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> query_metrics_database(description: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb9-7">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Query the metrics database using natural language.</span></span>
+<span id="cb9-8"></span>
+<span id="cb9-9"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Describe what data you need in plain English. The tool translates</span></span>
+<span id="cb9-10"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    your description into a database query and returns results.</span></span>
+<span id="cb9-11"></span>
+<span id="cb9-12"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Use this for questions about:</span></span>
+<span id="cb9-13"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    - User counts, growth rates, retention</span></span>
+<span id="cb9-14"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    - Feature usage and adoption metrics</span></span>
+<span id="cb9-15"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    - Performance stats (latency, error rates)</span></span>
+<span id="cb9-16"></span>
+<span id="cb9-17"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Args:</span></span>
+<span id="cb9-18"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        description: Natural language description of the data needed.</span></span>
+<span id="cb9-19"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">                     Good: "monthly active users for the last 6 months"</span></span>
+<span id="cb9-20"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">                     Bad: "SELECT * FROM users" (don't write SQL)</span></span>
+<span id="cb9-21"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    """</span></span>
+<span id="cb9-22">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># In production: text-to-SQL or pre-built query templates</span></span>
+<span id="cb9-23">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Query results for: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb9-24">            <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"| Month | Active Users | Growth |</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb9-25">            <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"|:------|:-------------|:-------|</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb9-26">            <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"| Jan   | 12,450       | +15%   |</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb9-27">            <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"| Feb   | 14,320       | +12%   |</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb9-28">            <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"| Mar   | 15,890       | +11%   |"</span>).<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">format</span>(description)</span>
+<span id="cb9-29"></span>
+<span id="cb9-30"></span>
+<span id="cb9-31"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb9-32"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> calculate(expression: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb9-33">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Evaluate a mathematical expression and return the result.</span></span>
+<span id="cb9-34"></span>
+<span id="cb9-35"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Use for computing growth rates, percentages, averages, and other</span></span>
+<span id="cb9-36"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    numerical calculations based on data from the metrics database.</span></span>
+<span id="cb9-37"></span>
+<span id="cb9-38"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Supports: +, -, *, /, ** (power), sqrt(), abs(), round()</span></span>
+<span id="cb9-39"></span>
+<span id="cb9-40"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Args:</span></span>
+<span id="cb9-41"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        expression: A mathematical expression.</span></span>
+<span id="cb9-42"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">                    Example: "round((15890 - 12450) / 12450 * 100, 1)"</span></span>
+<span id="cb9-43"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    """</span></span>
+<span id="cb9-44">    allowed_names <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {</span>
+<span id="cb9-45">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"sqrt"</span>: math.sqrt, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"abs"</span>: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">abs</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"round"</span>: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">round</span>,</span>
+<span id="cb9-46">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"min"</span>: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">min</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"max"</span>: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">max</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"sum"</span>: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">sum</span>,</span>
+<span id="cb9-47">    }</span>
+<span id="cb9-48">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">try</span>:</span>
+<span id="cb9-49">        result <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">eval</span>(expression, {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"__builtins__"</span>: {}}, allowed_names)</span>
+<span id="cb9-50">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>(result)</span>
+<span id="cb9-51">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">except</span> <span class="pp" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">Exception</span> <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> e:</span>
+<span id="cb9-52">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Error evaluating '</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>expression<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">': </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>e<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">. Check syntax and try again."</span></span>
+<span id="cb9-53"></span>
+<span id="cb9-54"></span>
+<span id="cb9-55"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb9-56"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> format_report(title: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, sections: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb9-57">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Format analysis results into a structured markdown report.</span></span>
+<span id="cb9-58"></span>
+<span id="cb9-59"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Use this as the LAST step after gathering and analyzing data.</span></span>
+<span id="cb9-60"></span>
+<span id="cb9-61"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Args:</span></span>
+<span id="cb9-62"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        title: Report title.</span></span>
+<span id="cb9-63"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        sections: Content in markdown format with headers and data.</span></span>
+<span id="cb9-64"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    """</span></span>
+<span id="cb9-65">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"# </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>title<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n\n</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>sections<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">---</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">*Generated from metrics database*"</span></span>
+<span id="cb9-66"></span>
+<span id="cb9-67"></span>
+<span id="cb9-68">ANALYSIS_SKILL <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {</span>
+<span id="cb9-69">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"name"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"data-analysis"</span>,</span>
+<span id="cb9-70">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"description"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Query metrics databases, perform calculations, and generate analysis reports."</span>,</span>
+<span id="cb9-71">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"tools"</span>: [query_metrics_database, calculate, format_report],</span>
+<span id="cb9-72">}</span></code></pre></div></div>
+</section>
+</section>
+<section id="composing-skills-into-agents" class="level2">
+<h2 class="anchored" data-anchor-id="composing-skills-into-agents">Composing Skills into Agents</h2>
+<section id="single-agent-multi-skill" class="level3">
+<h3 class="anchored" data-anchor-id="single-agent-multi-skill">Single-Agent, Multi-Skill</h3>
+<p>The simplest composition: one agent with multiple skills. Each skill’s tools are registered with the agent, and the agent’s prompt lists when to use each skill.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langgraph.prebuilt <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> create_react_agent</span>
+<span id="cb10-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langchain_openai <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> ChatOpenAI</span>
+<span id="cb10-3"></span>
+<span id="cb10-4">llm <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> ChatOpenAI(model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"gpt-4o-mini"</span>, temperature<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>)</span>
+<span id="cb10-5"></span>
+<span id="cb10-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Combine tools from multiple skills</span></span>
+<span id="cb10-7">all_tools <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> RETRIEVAL_SKILL[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"tools"</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> ANALYSIS_SKILL[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"tools"</span>]</span>
+<span id="cb10-8"></span>
+<span id="cb10-9">agent <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> create_react_agent(</span>
+<span id="cb10-10">    model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>llm,</span>
+<span id="cb10-11">    tools<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>all_tools,</span>
+<span id="cb10-12">    prompt<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"""You are a product analyst assistant with two skill sets:</span></span>
+<span id="cb10-13"></span>
+<span id="cb10-14"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">1. **Knowledge Base Retrieval**: Use search_knowledge_base, rewrite_query,</span></span>
+<span id="cb10-15"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">   and grade_relevance for documentation questions.</span></span>
+<span id="cb10-16"></span>
+<span id="cb10-17"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">2. **Data Analysis**: Use query_metrics_database, calculate, and</span></span>
+<span id="cb10-18"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">   format_report for metrics and analytics questions.</span></span>
+<span id="cb10-19"></span>
+<span id="cb10-20"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">When answering:</span></span>
+<span id="cb10-21"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">- Use retrieval skills for "what" and "how" questions about the product</span></span>
+<span id="cb10-22"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">- Use analysis skills for "how many" and "what's the trend" questions</span></span>
+<span id="cb10-23"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">- For questions that need BOTH, gather information first, then analyze</span></span>
+<span id="cb10-24"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">- Always verify retrieved information with grade_relevance before using it</span></span>
+<span id="cb10-25"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">- Present final answers using format_report for consistency"""</span>,</span>
+<span id="cb10-26">)</span>
+<span id="cb10-27"></span>
+<span id="cb10-28"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Run it</span></span>
+<span id="cb10-29">result <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> agent.invoke({</span>
+<span id="cb10-30">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"messages"</span>: [{</span>
+<span id="cb10-31">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"user"</span>,</span>
+<span id="cb10-32">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"What's our user growth rate and does it match "</span></span>
+<span id="cb10-33">                   <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"the targets mentioned in our documentation?"</span></span>
+<span id="cb10-34">    }]</span>
+<span id="cb10-35">})</span></code></pre></div></div>
+</section>
+<section id="multi-agent-skill-per-agent" class="level3">
+<h3 class="anchored" data-anchor-id="multi-agent-skill-per-agent">Multi-Agent, Skill-Per-Agent</h3>
+<p>For complex workflows, assign one skill per agent and orchestrate with a supervisor. This follows the principle from <a href="../../posts/agent/Multi-Agent RAG Orchestration Patterns.html">Multi-Agent RAG Orchestration Patterns</a> — each agent has 2–4 focused tools, making tool selection near-perfect.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> typing <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> TypedDict, Annotated</span>
+<span id="cb11-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langgraph.graph <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> StateGraph, END, START</span>
+<span id="cb11-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langgraph.graph.message <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> add_messages</span>
+<span id="cb11-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langgraph.prebuilt <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> create_react_agent</span>
+<span id="cb11-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langchain_openai <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> ChatOpenAI</span>
+<span id="cb11-6"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langchain_core.messages <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> HumanMessage</span>
+<span id="cb11-7"></span>
+<span id="cb11-8">llm <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> ChatOpenAI(model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"gpt-4o-mini"</span>, temperature<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>)</span>
+<span id="cb11-9"></span>
+<span id="cb11-10"></span>
+<span id="cb11-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Create skill-specific agents</span></span>
+<span id="cb11-12">retrieval_agent <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> create_react_agent(</span>
+<span id="cb11-13">    model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>llm,</span>
+<span id="cb11-14">    tools<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>RETRIEVAL_SKILL[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"tools"</span>],</span>
+<span id="cb11-15">    prompt<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"You are a retrieval specialist. Search the knowledge base, "</span></span>
+<span id="cb11-16">           <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rewrite queries for better results, and verify relevance. "</span></span>
+<span id="cb11-17">           <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Always cite your sources."</span>,</span>
+<span id="cb11-18">)</span>
+<span id="cb11-19"></span>
+<span id="cb11-20">analysis_agent <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> create_react_agent(</span>
+<span id="cb11-21">    model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>llm,</span>
+<span id="cb11-22">    tools<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>ANALYSIS_SKILL[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"tools"</span>],</span>
+<span id="cb11-23">    prompt<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"You are a data analyst. Query the metrics database, "</span></span>
+<span id="cb11-24">           <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"perform calculations, and format results as reports. "</span></span>
+<span id="cb11-25">           <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Always show your calculations."</span>,</span>
+<span id="cb11-26">)</span>
+<span id="cb11-27"></span>
+<span id="cb11-28"></span>
+<span id="cb11-29"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Supervisor that routes to skill-agents</span></span>
+<span id="cb11-30"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">class</span> SkillState(TypedDict):</span>
+<span id="cb11-31">    messages: Annotated[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>, add_messages]</span>
+<span id="cb11-32">    next_skill: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span></span>
+<span id="cb11-33">    skill_outputs: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span></span>
+<span id="cb11-34"></span>
+<span id="cb11-35"></span>
+<span id="cb11-36"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> router(state: SkillState) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>:</span>
+<span id="cb11-37">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Route the query to the appropriate skill-agent."""</span></span>
+<span id="cb11-38">    outputs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> state.get(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"skill_outputs"</span>, {})</span>
+<span id="cb11-39">    context <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>.join(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"[</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>k<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">]: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>v<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> k, v <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> outputs.items()) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> outputs <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">else</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"None"</span></span>
+<span id="cb11-40"></span>
+<span id="cb11-41">    response <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> llm.invoke([</span>
+<span id="cb11-42">        {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"system"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: (</span>
+<span id="cb11-43">            <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"You are a router. Based on the question and any results so far, "</span></span>
+<span id="cb11-44">            <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"choose the next skill to use.</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb11-45">            <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Available skills:</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb11-46">            <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"- retrieval: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>RETRIEVAL_SKILL[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'description'</span>]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb11-47">            <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"- analysis: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>ANALYSIS_SKILL[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'description'</span>]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb11-48">            <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"- FINISH: enough information to answer</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb11-49">            <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Results so far:</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>context<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb11-50">            <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Reply with exactly: retrieval, analysis, or FINISH"</span></span>
+<span id="cb11-51">        )},</span>
+<span id="cb11-52">        <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>state[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"messages"</span>],</span>
+<span id="cb11-53">    ])</span>
+<span id="cb11-54">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"next_skill"</span>: response.content.strip().lower()}</span>
+<span id="cb11-55"></span>
+<span id="cb11-56"></span>
+<span id="cb11-57"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> run_skill(skill_name: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, agent):</span>
+<span id="cb11-58">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Create a node that runs a skill-specific agent."""</span></span>
+<span id="cb11-59">    <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> node(state: SkillState) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>:</span>
+<span id="cb11-60">        user_msg <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">next</span>(</span>
+<span id="cb11-61">            (m.content <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> m <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> state[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"messages"</span>] <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">isinstance</span>(m, HumanMessage)), <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">""</span></span>
+<span id="cb11-62">        )</span>
+<span id="cb11-63">        context <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> state.get(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"skill_outputs"</span>, {})</span>
+<span id="cb11-64">        context_str <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>.join(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"[</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>k<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">]: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>v<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> k, v <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> context.items())</span>
+<span id="cb11-65">        query <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>user_msg<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">Context:</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>context_str<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> context_str <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">else</span> user_msg</span>
+<span id="cb11-66"></span>
+<span id="cb11-67">        result <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> agent.invoke({<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"messages"</span>: [{<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"user"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: query}]})</span>
+<span id="cb11-68">        updated <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span>state.get(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"skill_outputs"</span>, {}), skill_name: result[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"messages"</span>][<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>].content}</span>
+<span id="cb11-69">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"skill_outputs"</span>: updated}</span>
+<span id="cb11-70">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> node</span>
+<span id="cb11-71"></span>
+<span id="cb11-72"></span>
+<span id="cb11-73"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> route_decision(state: SkillState) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb11-74">    skill <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> state.get(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"next_skill"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"FINISH"</span>)</span>
+<span id="cb11-75">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> skill <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> skill <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"retrieval"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"analysis"</span>) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">else</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"synthesize"</span></span>
+<span id="cb11-76"></span>
+<span id="cb11-77"></span>
+<span id="cb11-78"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> synthesize(state: SkillState) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>:</span>
+<span id="cb11-79">    outputs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> state.get(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"skill_outputs"</span>, {})</span>
+<span id="cb11-80">    context <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>.join(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"**</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>k<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">**:</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>v<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> k, v <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> outputs.items())</span>
+<span id="cb11-81">    response <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> llm.invoke([</span>
+<span id="cb11-82">        {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"system"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Synthesize skill outputs into a clear answer."</span>},</span>
+<span id="cb11-83">        {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"user"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Question: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>state[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'messages'</span>][<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>content<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n\n</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>context<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>},</span>
+<span id="cb11-84">    ])</span>
+<span id="cb11-85">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"messages"</span>: [{<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"assistant"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: response.content}]}</span>
+<span id="cb11-86"></span>
+<span id="cb11-87"></span>
+<span id="cb11-88"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Build the graph</span></span>
+<span id="cb11-89">graph <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> StateGraph(SkillState)</span>
+<span id="cb11-90">graph.add_node(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"router"</span>, router)</span>
+<span id="cb11-91">graph.add_node(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"retrieval"</span>, run_skill(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"retrieval"</span>, retrieval_agent))</span>
+<span id="cb11-92">graph.add_node(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"analysis"</span>, run_skill(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"analysis"</span>, analysis_agent))</span>
+<span id="cb11-93">graph.add_node(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"synthesize"</span>, synthesize)</span>
+<span id="cb11-94"></span>
+<span id="cb11-95">graph.add_edge(START, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"router"</span>)</span>
+<span id="cb11-96">graph.add_conditional_edges(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"router"</span>, route_decision, {</span>
+<span id="cb11-97">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"retrieval"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"retrieval"</span>,</span>
+<span id="cb11-98">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"analysis"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"analysis"</span>,</span>
+<span id="cb11-99">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"synthesize"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"synthesize"</span>,</span>
+<span id="cb11-100">})</span>
+<span id="cb11-101">graph.add_edge(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"retrieval"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"router"</span>)</span>
+<span id="cb11-102">graph.add_edge(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"analysis"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"router"</span>)</span>
+<span id="cb11-103">graph.add_edge(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"synthesize"</span>, END)</span>
+<span id="cb11-104"></span>
+<span id="cb11-105">skill_agent <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> graph.<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">compile</span>()</span></code></pre></div></div>
+</section>
+<section id="llamaindex-skills-as-queryengine-tools" class="level3">
+<h3 class="anchored" data-anchor-id="llamaindex-skills-as-queryengine-tools">LlamaIndex: Skills as QueryEngine Tools</h3>
+<p>In LlamaIndex, skills map naturally to <code>QueryEngineTool</code> instances — each backed by a different index or data source:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> llama_index.llms.openai <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> OpenAI</span>
+<span id="cb12-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> llama_index.core.agent.workflow <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> ReActAgent</span>
+<span id="cb12-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> llama_index.core.tools <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> FunctionTool, QueryEngineTool</span>
+<span id="cb12-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> llama_index.core <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> VectorStoreIndex, SimpleDirectoryReader</span>
+<span id="cb12-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> llama_index.core.workflow <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Context</span>
+<span id="cb12-6"></span>
+<span id="cb12-7"></span>
+<span id="cb12-8"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Build skill-specific indices</span></span>
+<span id="cb12-9">docs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> SimpleDirectoryReader(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"./docs/product"</span>).load_data()</span>
+<span id="cb12-10">product_index <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> VectorStoreIndex.from_documents(docs)</span>
+<span id="cb12-11"></span>
+<span id="cb12-12">api_docs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> SimpleDirectoryReader(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"./docs/api"</span>).load_data()</span>
+<span id="cb12-13">api_index <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> VectorStoreIndex.from_documents(api_docs)</span>
+<span id="cb12-14"></span>
+<span id="cb12-15"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Wrap as skill tools with rich descriptions</span></span>
+<span id="cb12-16">product_skill <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> QueryEngineTool.from_defaults(</span>
+<span id="cb12-17">    query_engine<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>product_index.as_query_engine(similarity_top_k<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>),</span>
+<span id="cb12-18">    name<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"product_knowledge"</span>,</span>
+<span id="cb12-19">    description<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(</span>
+<span id="cb12-20">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Search product documentation for feature descriptions, user guides, "</span></span>
+<span id="cb12-21">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"and configuration instructions. Use for 'what' and 'how' questions "</span></span>
+<span id="cb12-22">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"about the product. Returns relevant passages with source references."</span></span>
+<span id="cb12-23">    ),</span>
+<span id="cb12-24">)</span>
+<span id="cb12-25"></span>
+<span id="cb12-26">api_skill <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> QueryEngineTool.from_defaults(</span>
+<span id="cb12-27">    query_engine<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>api_index.as_query_engine(similarity_top_k<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>),</span>
+<span id="cb12-28">    name<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"api_reference"</span>,</span>
+<span id="cb12-29">    description<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(</span>
+<span id="cb12-30">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Search API documentation for endpoint specifications, request/response "</span></span>
+<span id="cb12-31">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"formats, authentication, rate limits, and error codes. Use for "</span></span>
+<span id="cb12-32">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"developer-facing technical questions."</span></span>
+<span id="cb12-33">    ),</span>
+<span id="cb12-34">)</span>
+<span id="cb12-35"></span>
+<span id="cb12-36">calc_skill <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> FunctionTool.from_defaults(</span>
+<span id="cb12-37">    fn<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">lambda</span> expression: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">eval</span>(expression, {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"__builtins__"</span>: {}},</span>
+<span id="cb12-38">                                   {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"sqrt"</span>: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">__import__</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'math'</span>).sqrt, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"abs"</span>: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">abs</span>})),</span>
+<span id="cb12-39">    name<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"calculator"</span>,</span>
+<span id="cb12-40">    description<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Evaluate mathematical expressions for calculations based on data."</span>,</span>
+<span id="cb12-41">)</span>
+<span id="cb12-42"></span>
+<span id="cb12-43"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Create the agent with all skills</span></span>
+<span id="cb12-44">agent <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> ReActAgent(</span>
+<span id="cb12-45">    tools<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[product_skill, api_skill, calc_skill],</span>
+<span id="cb12-46">    llm<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>OpenAI(model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"gpt-4o-mini"</span>, temperature<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>),</span>
+<span id="cb12-47">)</span>
+<span id="cb12-48"></span>
+<span id="cb12-49">ctx <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Context(agent)</span>
+<span id="cb12-50">response <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> agent.run(</span>
+<span id="cb12-51">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"What's the API rate limit and how many requests can I make per hour?"</span>,</span>
+<span id="cb12-52">    ctx<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>ctx,</span>
+<span id="cb12-53">)</span></code></pre></div></div>
+<p>The agent will reason about which skill to invoke — using <code>api_reference</code> for the rate limit question, then <code>calculator</code> to compute hourly capacity.</p>
+</section>
+</section>
+<section id="packaging-skills-for-teams" class="level2">
+<h2 class="anchored" data-anchor-id="packaging-skills-for-teams">Packaging Skills for Teams</h2>
+<section id="the-skill.md-standard" class="level3">
+<h3 class="anchored" data-anchor-id="the-skill.md-standard">The SKILL.md Standard</h3>
+<p>Both Anthropic and OpenAI have converged on a <code>SKILL.md</code>-based format. Here’s how to create a distributable skill:</p>
+<pre><code>code-review/
+├── SKILL.md
+├── checklist.md
+└── templates/
+    └── review-comment.md</code></pre>
+<p><strong>SKILL.md:</strong></p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14" style="background: #f1f3f5;"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb14-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">---</span></span>
+<span id="cb14-2"><span class="an" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">name:</span><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"> code-review</span></span>
+<span id="cb14-3"><span class="an" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">description:</span><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"> &gt;</span></span>
+<span id="cb14-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">  Review code changes for bugs, security issues, and style violations.</span></span>
+<span id="cb14-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">  Use when reviewing pull requests or code diffs.</span></span>
+<span id="cb14-6"><span class="an" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">version:</span><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"> 2</span></span>
+<span id="cb14-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">---</span></span>
+<span id="cb14-8"></span>
+<span id="cb14-9"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">## When to Use</span></span>
+<span id="cb14-10"></span>
+<span id="cb14-11">Apply this skill when:</span>
+<span id="cb14-12"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">- </span>Reviewing a pull request or code diff</span>
+<span id="cb14-13"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">- </span>Asked to check code quality or find bugs</span>
+<span id="cb14-14"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">- </span>Performing security review of code changes</span>
+<span id="cb14-15"></span>
+<span id="cb14-16"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">## Process</span></span>
+<span id="cb14-17"></span>
+<span id="cb14-18"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">1. </span>Read the diff or changed files</span>
+<span id="cb14-19"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">2. </span>Check against the review checklist (see checklist.md)</span>
+<span id="cb14-20"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">3. </span>For each issue found, generate a review comment using the template</span>
+<span id="cb14-21"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">4. </span>Categorize issues: critical, warning, suggestion</span>
+<span id="cb14-22"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">5. </span>Summarize findings with counts by category</span>
+<span id="cb14-23"></span>
+<span id="cb14-24"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">## Rules</span></span>
+<span id="cb14-25"></span>
+<span id="cb14-26"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">- </span>Always check for: SQL injection, XSS, hardcoded secrets, missing auth</span>
+<span id="cb14-27"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">- </span>Flag any TODO or FIXME comments in new code</span>
+<span id="cb14-28"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">- </span>Verify error handling exists for all external calls</span>
+<span id="cb14-29"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">- </span>Check that tests exist for new public functions</span></code></pre></div></div>
+</section>
+<section id="distributing-skills" class="level3">
+<h3 class="anchored" data-anchor-id="distributing-skills">Distributing Skills</h3>
+<p><strong>Git repositories</strong> — Commit skills to a shared repo. Teams clone or reference them:</p>
+<pre><code>.skills/
+├── code-review/
+│   └── SKILL.md
+├── csv-insights/
+│   ├── SKILL.md
+│   └── analyze.py
+└── api-testing/
+    ├── SKILL.md
+    └── test-templates/</code></pre>
+<p><strong>OpenAI Skills API</strong> — Upload skills programmatically:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Upload a skill</span></span>
+<span id="cb16-2"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">curl</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-X</span> POST <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'https://api.openai.com/v1/skills'</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb16-3">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-H</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Authorization: Bearer </span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$OPENAI_API_KEY</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb16-4">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-F</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'files=@./code-review.zip;type=application/zip'</span></span>
+<span id="cb16-5"></span>
+<span id="cb16-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Mount in a shell environment</span></span>
+<span id="cb16-7"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">curl</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-L</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'https://api.openai.com/v1/responses'</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb16-8">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-H</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Content-Type: application/json"</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb16-9">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-H</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Authorization: Bearer </span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$OPENAI_API_KEY</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb16-10">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-d</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'{</span></span>
+<span id="cb16-11"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">    "model": "gpt-4o-mini",</span></span>
+<span id="cb16-12"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">    "tools": [{</span></span>
+<span id="cb16-13"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">      "type": "shell",</span></span>
+<span id="cb16-14"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">      "environment": {</span></span>
+<span id="cb16-15"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">        "type": "container_auto",</span></span>
+<span id="cb16-16"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">        "skills": [</span></span>
+<span id="cb16-17"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">          {"type": "skill_reference", "skill_id": "skill_abc123"}</span></span>
+<span id="cb16-18"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">        ]</span></span>
+<span id="cb16-19"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">      }</span></span>
+<span id="cb16-20"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">    }],</span></span>
+<span id="cb16-21"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">    "input": "Review the code changes in this PR."</span></span>
+<span id="cb16-22"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">  }'</span></span></code></pre></div></div>
+<p><strong>Anthropic Claude Code</strong> — Place skills in the <code>.claude/skills/</code> directory:</p>
+<pre><code>.claude/
+└── skills/
+    ├── code-review/
+    │   └── SKILL.md
+    └── testing/
+        └── SKILL.md</code></pre>
+<p>Claude Code automatically discovers skills and applies them when the task matches the skill’s description.</p>
+</section>
+</section>
+<section id="skill-design-patterns" class="level2">
+<h2 class="anchored" data-anchor-id="skill-design-patterns">Skill Design Patterns</h2>
+<section id="pattern-1-progressive-disclosure" class="level3">
+<h3 class="anchored" data-anchor-id="pattern-1-progressive-disclosure">Pattern 1: Progressive Disclosure</h3>
+<p>Don’t front-load all instructions. Start with a brief description, and include detailed instructions in separate files that the agent reads only when needed.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18" style="background: #f1f3f5;"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb18-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">---</span></span>
+<span id="cb18-2"><span class="an" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">name:</span><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"> database-migration</span></span>
+<span id="cb18-3"><span class="an" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">description:</span><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"> Plan and execute database schema migrations safely.</span></span>
+<span id="cb18-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">---</span></span>
+<span id="cb18-5"></span>
+<span id="cb18-6"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">## Quick Start</span></span>
+<span id="cb18-7">Use this skill for any database schema change. Start by reading</span>
+<span id="cb18-8">the full migration checklist in <span class="in" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">`checklist.md`</span>.</span>
+<span id="cb18-9"></span>
+<span id="cb18-10"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">## Files</span></span>
+<span id="cb18-11"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">- </span><span class="in" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">`checklist.md`</span> — Step-by-step migration process</span>
+<span id="cb18-12"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">- </span><span class="in" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">`rollback-template.sql`</span> — Template for rollback scripts</span>
+<span id="cb18-13"><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">- </span><span class="in" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">`validation-queries.sql`</span> — Post-migration validation queries</span></code></pre></div></div>
+<p>This keeps the context window small until the agent actually needs the detailed instructions.</p>
+</section>
+<section id="pattern-2-skill-composition" class="level3">
+<h3 class="anchored" data-anchor-id="pattern-2-skill-composition">Pattern 2: Skill Composition</h3>
+<p>Build complex skills by composing simpler ones. A “research report” skill might invoke retrieval, analysis, and formatting skills:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb19" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb19-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> generate_research_report(topic: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb19-3">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Generate a comprehensive research report on a topic.</span></span>
+<span id="cb19-4"></span>
+<span id="cb19-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    This skill orchestrates three sub-skills:</span></span>
+<span id="cb19-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    1. Knowledge base retrieval — gather relevant documents</span></span>
+<span id="cb19-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    2. Data analysis — pull metrics and compute trends</span></span>
+<span id="cb19-8"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    3. Report formatting — structure findings into a polished report</span></span>
+<span id="cb19-9"></span>
+<span id="cb19-10"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Args:</span></span>
+<span id="cb19-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        topic: The research topic to investigate.</span></span>
+<span id="cb19-12"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    """</span></span>
+<span id="cb19-13">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Step 1: Retrieve</span></span>
+<span id="cb19-14">    docs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> search_knowledge_base(topic)</span>
+<span id="cb19-15"></span>
+<span id="cb19-16">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Step 2: Analyze</span></span>
+<span id="cb19-17">    metrics <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> query_metrics_database(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"metrics related to </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>topic<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb19-18"></span>
+<span id="cb19-19">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Step 3: Format</span></span>
+<span id="cb19-20">    report <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> format_report(</span>
+<span id="cb19-21">        title<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Research Report: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>topic<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>,</span>
+<span id="cb19-22">        sections<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"## Findings</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>docs<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">## Metrics</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>metrics<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb19-23">    )</span>
+<span id="cb19-24">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> report</span></code></pre></div></div>
+</section>
+<section id="pattern-3-guardrailed-skills" class="level3">
+<h3 class="anchored" data-anchor-id="pattern-3-guardrailed-skills">Pattern 3: Guardrailed Skills</h3>
+<p>Wrap skills with input and output validation using the patterns from <a href="../../posts/agent/Guardrails and Safety for Autonomous Retrieval Agents.html">Guardrails and Safety for Autonomous Retrieval Agents</a>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb20-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> safe_database_query(description: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb20-3">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Query the database with safety guardrails.</span></span>
+<span id="cb20-4"></span>
+<span id="cb20-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    This tool validates that queries are read-only before execution.</span></span>
+<span id="cb20-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Write operations (INSERT, UPDATE, DELETE) are blocked.</span></span>
+<span id="cb20-7"></span>
+<span id="cb20-8"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Args:</span></span>
+<span id="cb20-9"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        description: Natural language description of the data needed.</span></span>
+<span id="cb20-10"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    """</span></span>
+<span id="cb20-11">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Input guardrail: check for write operations</span></span>
+<span id="cb20-12">    write_keywords <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"insert"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"update"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"delete"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"drop"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"alter"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"truncate"</span>]</span>
+<span id="cb20-13">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">any</span>(kw <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> description.lower() <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> kw <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> write_keywords):</span>
+<span id="cb20-14">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Error: Write operations are not allowed through this tool. "</span></span>
+<span id="cb20-15">                <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Use the admin dashboard for data modifications."</span>)</span>
+<span id="cb20-16"></span>
+<span id="cb20-17">    result <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> query_metrics_database(description)</span>
+<span id="cb20-18"></span>
+<span id="cb20-19">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Output guardrail: check for PII</span></span>
+<span id="cb20-20">    pii_patterns <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"@"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"SSN"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"social security"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"credit card"</span>]</span>
+<span id="cb20-21">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">any</span>(pattern.lower() <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> result.lower() <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> pattern <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> pii_patterns):</span>
+<span id="cb20-22">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Error: Query results contain potentially sensitive data. Results filtered."</span></span>
+<span id="cb20-23"></span>
+<span id="cb20-24">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> result</span></code></pre></div></div>
+</section>
+<section id="pattern-4-self-improving-skills" class="level3">
+<h3 class="anchored" data-anchor-id="pattern-4-self-improving-skills">Pattern 4: Self-Improving Skills</h3>
+<p>Add feedback loops where the agent evaluates its own skill usage and adjusts. This builds on the reflection pattern from <a href="../../posts/agent/Design Patterns for AI Agents.html">Design Patterns for AI Agents</a>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb21-2"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> evaluate_skill_result(</span>
+<span id="cb21-3">    skill_name: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, query: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, result: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span></span>
+<span id="cb21-4">) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb21-5">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Evaluate whether a skill produced a useful result.</span></span>
+<span id="cb21-6"></span>
+<span id="cb21-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Use this after calling any skill to verify the output quality.</span></span>
+<span id="cb21-8"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    If the result is poor, the evaluation will suggest improvements.</span></span>
+<span id="cb21-9"></span>
+<span id="cb21-10"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Args:</span></span>
+<span id="cb21-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        skill_name: Which skill produced this result.</span></span>
+<span id="cb21-12"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        query: The original query sent to the skill.</span></span>
+<span id="cb21-13"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">        result: The skill's output to evaluate.</span></span>
+<span id="cb21-14"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    """</span></span>
+<span id="cb21-15">    response <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> llm.invoke([{</span>
+<span id="cb21-16">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"system"</span>,</span>
+<span id="cb21-17">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: (</span>
+<span id="cb21-18">            <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Evaluate this skill result. Rate as: 'good', 'partial', or 'poor'.</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb21-19">            <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"If partial or poor, explain what's missing and suggest a better query.</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb21-20">            <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Format: RATING: &lt;rating&gt;</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\\</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">nFEEDBACK: &lt;feedback&gt;"</span></span>
+<span id="cb21-21">        )</span>
+<span id="cb21-22">    }, {</span>
+<span id="cb21-23">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"user"</span>,</span>
+<span id="cb21-24">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Skill: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>skill_name<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">Query: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>query<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">Result: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>result<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb21-25">    }])</span>
+<span id="cb21-26">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> response.content</span></code></pre></div></div>
+</section>
+</section>
+<section id="testing-and-evaluating-skills" class="level2">
+<h2 class="anchored" data-anchor-id="testing-and-evaluating-skills">Testing and Evaluating Skills</h2>
+<section id="unit-testing-skills" class="level3">
+<h3 class="anchored" data-anchor-id="unit-testing-skills">Unit Testing Skills</h3>
+<p>Test each tool independently before composing them into agents:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb22" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> pytest</span>
+<span id="cb22-2"></span>
+<span id="cb22-3"></span>
+<span id="cb22-4"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> test_search_returns_results():</span>
+<span id="cb22-5">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Verify search returns formatted results for valid queries."""</span></span>
+<span id="cb22-6">    result <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> search_knowledge_base.invoke({<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"query"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rate limiting"</span>})</span>
+<span id="cb22-7">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">assert</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"No results found"</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> result</span>
+<span id="cb22-8">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">assert</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"relevance:"</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> result</span>
+<span id="cb22-9"></span>
+<span id="cb22-10"></span>
+<span id="cb22-11"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> test_search_handles_empty_results():</span>
+<span id="cb22-12">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Verify graceful handling of no results."""</span></span>
+<span id="cb22-13">    result <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> search_knowledge_base.invoke({<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"query"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"xyzzy_nonexistent_topic"</span>})</span>
+<span id="cb22-14">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">assert</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"No results found"</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> result <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">or</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rephrasing"</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> result</span>
+<span id="cb22-15"></span>
+<span id="cb22-16"></span>
+<span id="cb22-17"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> test_calculator_handles_errors():</span>
+<span id="cb22-18">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Verify calculator returns helpful errors."""</span></span>
+<span id="cb22-19">    result <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> calculate.invoke({<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"expression"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"1/0"</span>})</span>
+<span id="cb22-20">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">assert</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Error"</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> result</span>
+<span id="cb22-21">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">assert</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"try again"</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> result.lower() <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">or</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"syntax"</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> result.lower()</span>
+<span id="cb22-22"></span>
+<span id="cb22-23"></span>
+<span id="cb22-24"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> test_query_rewrite_improves_specificity():</span>
+<span id="cb22-25">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Verify query rewriting produces more specific queries."""</span></span>
+<span id="cb22-26">    original <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rate limit"</span></span>
+<span id="cb22-27">    rewritten <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> rewrite_query.invoke({</span>
+<span id="cb22-28">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"original_query"</span>: original,</span>
+<span id="cb22-29">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"context"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"User wants to know about API rate limiting configuration"</span></span>
+<span id="cb22-30">    })</span>
+<span id="cb22-31">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">assert</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(rewritten) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(original)</span></code></pre></div></div>
+</section>
+<section id="integration-testing-with-agent-traces" class="level3">
+<h3 class="anchored" data-anchor-id="integration-testing-with-agent-traces">Integration Testing with Agent Traces</h3>
+<p>Test skills in the context of a full agent run, checking that the agent chooses the right skills:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb23" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> test_agent_uses_retrieval_skill_for_docs_question():</span>
+<span id="cb23-2">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Agent should use knowledge base for documentation questions."""</span></span>
+<span id="cb23-3">    result <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> skill_agent.invoke({</span>
+<span id="cb23-4">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"messages"</span>: [{<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"user"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"How do I configure rate limiting?"</span>}],</span>
+<span id="cb23-5">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"next_skill"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">""</span>,</span>
+<span id="cb23-6">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"skill_outputs"</span>: {},</span>
+<span id="cb23-7">    })</span>
+<span id="cb23-8"></span>
+<span id="cb23-9">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Check that retrieval skill was used</span></span>
+<span id="cb23-10">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">assert</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"retrieval"</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> result.get(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"skill_outputs"</span>, {})</span>
+<span id="cb23-11">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">assert</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"rate limit"</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> result[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"messages"</span>][<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>].content.lower()</span>
+<span id="cb23-12"></span>
+<span id="cb23-13"></span>
+<span id="cb23-14"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> test_agent_uses_analysis_skill_for_metrics_question():</span>
+<span id="cb23-15">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Agent should use analysis skill for metrics questions."""</span></span>
+<span id="cb23-16">    result <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> skill_agent.invoke({</span>
+<span id="cb23-17">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"messages"</span>: [{<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"user"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"How many active users do we have?"</span>}],</span>
+<span id="cb23-18">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"next_skill"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">""</span>,</span>
+<span id="cb23-19">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"skill_outputs"</span>: {},</span>
+<span id="cb23-20">    })</span>
+<span id="cb23-21"></span>
+<span id="cb23-22">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">assert</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"analysis"</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> result.get(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"skill_outputs"</span>, {})</span></code></pre></div></div>
+</section>
+<section id="evaluation-criteria" class="level3">
+<h3 class="anchored" data-anchor-id="evaluation-criteria">Evaluation Criteria</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 31%">
+<col style="width: 45%">
+<col style="width: 22%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Criterion</th>
+<th style="text-align: left;">What to Measure</th>
+<th style="text-align: left;">Target</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Tool selection accuracy</strong></td>
+<td style="text-align: left;">Does the agent pick the right skill?</td>
+<td style="text-align: left;">&gt;95% on test cases</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Argument correctness</strong></td>
+<td style="text-align: left;">Are tool inputs properly formatted?</td>
+<td style="text-align: left;">&gt;98% valid inputs</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Result utilization</strong></td>
+<td style="text-align: left;">Does the agent use the tool output in its answer?</td>
+<td style="text-align: left;">&gt;90% of results cited</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Error recovery</strong></td>
+<td style="text-align: left;">Does the agent retry with a different approach on failure?</td>
+<td style="text-align: left;">&gt;80% recovery</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Step efficiency</strong></td>
+<td style="text-align: left;">How many tool calls to answer?</td>
+<td style="text-align: left;">≤3 for simple, ≤6 for complex</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Cost per query</strong></td>
+<td style="text-align: left;">Total tokens consumed</td>
+<td style="text-align: left;">Project-dependent</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="common-pitfalls-and-fixes" class="level2">
+<h2 class="anchored" data-anchor-id="common-pitfalls-and-fixes">Common Pitfalls and Fixes</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 39%">
+<col style="width: 39%">
+<col style="width: 21%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Pitfall</th>
+<th style="text-align: left;">Symptom</th>
+<th style="text-align: left;">Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Vague tool descriptions</strong></td>
+<td style="text-align: left;">Agent picks wrong tool or ignores it</td>
+<td style="text-align: left;">Add specific trigger conditions, examples, and anti-examples</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Too many tools</strong></td>
+<td style="text-align: left;">Tool selection accuracy drops below 80%</td>
+<td style="text-align: left;">Split into multi-agent with 2–4 tools per agent</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Missing error guidance</strong></td>
+<td style="text-align: left;">Agent loops after tool errors</td>
+<td style="text-align: left;">Return actionable error messages with correction hints</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Brittle parameters</strong></td>
+<td style="text-align: left;">Agent passes wrong types or formats</td>
+<td style="text-align: left;">Use fewer parameters, add validation, poka-yoke the interface</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>No output structure</strong></td>
+<td style="text-align: left;">Agent struggles to parse tool results</td>
+<td style="text-align: left;">Return clean markdown; avoid deeply nested JSON</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Skill conflicts</strong></td>
+<td style="text-align: left;">Two skills seem applicable, agent oscillates</td>
+<td style="text-align: left;">Add explicit “do NOT use for” sections in descriptions</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Context window bloat</strong></td>
+<td style="text-align: left;">Too many skill instructions loaded at once</td>
+<td style="text-align: left;">Use progressive disclosure — brief descriptions up front, details in files</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>No versioning</strong></td>
+<td style="text-align: left;">Skill updates break existing workflows</td>
+<td style="text-align: left;">Use the SKILL.md version field; test before deploying</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="conclusion" class="level2">
+<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
+<p>Building skills for agents is the highest-leverage work in agent engineering. The reasoning loop, the orchestration topology, and the model choice all matter — but they’re multiplied by the quality of the skills your agent can execute.</p>
+<p><strong>Key takeaways:</strong></p>
+<ul>
+<li><strong>A skill = tool + instructions + context.</strong> A raw function is a tool. A skill wraps it with descriptions, examples, constraints, and metadata so the agent knows when and how to use it.</li>
+<li><strong>Invest more in ACI than prompts.</strong> Anthropic’s principle holds: tool definitions and descriptions deserve as much engineering attention as your system prompt. Clear naming, rich docstrings, minimal parameters, and actionable errors make the difference.</li>
+<li><strong>Poka-yoke everything.</strong> Design tools so they’re hard to use incorrectly — require absolute paths, validate inputs, return structured errors with correction hints.</li>
+<li><strong>Use the SKILL.md standard.</strong> Both Anthropic and OpenAI have converged on manifest files with YAML frontmatter. Package skills as versioned directories for portability and team sharing.</li>
+<li><strong>Progressive disclosure.</strong> Keep context windows small. Put brief descriptions in the skill manifest and detailed instructions in separate files the agent reads on demand.</li>
+<li><strong>Test skills independently</strong>, then in agent context. Unit test each tool, then trace full agent runs to verify skill selection and result utilization.</li>
+<li><strong>Start simple.</strong> One agent with well-designed tools beats a multi-agent system with poorly designed tools every time. Add orchestration complexity only when tool selection accuracy drops.</li>
+</ul>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li>Anthropic, <a href="https://www.anthropic.com/engineering/building-effective-agents">Building Effective Agents</a> — practical patterns from production agent deployments, including ACI design principles.</li>
+<li>Anthropic, <a href="https://anthropic.skilljar.com/introduction-to-agent-skills">Introduction to Agent Skills</a> — Anthropic Academy course on building, configuring, and sharing skills in Claude Code.</li>
+<li>OpenAI, <a href="https://developers.openai.com/api/docs/guides/tools-skills">Skills API Documentation</a> — OpenAI’s skills platform for uploading, versioning, and mounting agent skills.</li>
+<li>Agent Skills Standard, <a href="https://agentskills.io/home">agentskills.io</a> — open specification for portable, interoperable skill bundles.</li>
+<li>Ng, Andrew, <a href="https://www.deeplearning.ai/the-batch/how-agents-can-improve-llm-performance/">Agentic Design Patterns</a> — four foundational patterns: Reflection, Tool Use, Planning, Multi-Agent Collaboration.</li>
+<li>Weng, Lilian, <a href="https://lilianweng.github.io/posts/2023-06-23-agent/">LLM Powered Autonomous Agents</a> — comprehensive survey of Planning, Memory, and Tool Use components.</li>
+<li>Liu et al., <a href="https://arxiv.org/abs/2405.10467">Architectural Patterns for Foundation Model-Based Agents</a> — catalogue of 18 agent patterns with trade-off analysis.</li>
+</ul>
+</section>
+<section id="read-more" class="level2">
+<h2 class="anchored" data-anchor-id="read-more">Read More</h2>
+<ul>
+<li>Understand the foundational loop that skills execute within: <a href="../../posts/agent/Building a ReAct Agent from Scratch.html">Building a ReAct Agent from Scratch</a> covers the Thought-Action-Observation cycle that drives tool use.</li>
+<li>Learn the broader architectural patterns that skills plug into: <a href="../../posts/agent/Design Patterns for AI Agents.html">Design Patterns for AI Agents</a> covers reflection, planning, and multi-agent collaboration.</li>
+<li>See how tool calling works at the protocol level: <a href="../../posts/agent/Tool Use and Function Calling for Retrieval Agents.html">Tool Use and Function Calling for Retrieval Agents</a> covers schemas, parallel calls, and error handling.</li>
+<li>Assign each skill to a dedicated agent: <a href="../../posts/agent/Multi-Agent RAG Orchestration Patterns.html">Multi-Agent RAG Orchestration Patterns</a> shows supervisor, swarm, and hierarchical topologies.</li>
+<li>Add safety boundaries to your skills: <a href="../../posts/agent/Guardrails and Safety for Autonomous Retrieval Agents.html">Guardrails and Safety for Autonomous Retrieval Agents</a> covers input/output validation and human-in-the-loop.</li>
+<li>Expose skills over a standard protocol: <a href="../../posts/agent/Build and Deploy MCP Server from Scratch.html">Build and Deploy MCP Server from Scratch</a> shows how to serve tools via the Model Context Protocol.</li>
+<li>Measure whether skills work in practice: <a href="../../posts/agent/Evaluating and Debugging AI Agents.html">Evaluating and Debugging AI Agents</a> covers trace inspection, tool selection accuracy, and cost analysis.</li>
+</ul>
+
+
+</section>
+
+ ]]></description>
+  <guid>https://tanquangduong.github.io/posts/agent/Building Skills for AI Agents.html</guid>
+  <pubDate>Wed, 02 Jul 2025 00:00:00 GMT</pubDate>
+  <media:content url="https://tanquangduong.github.io/images/agent/building-skills-ai-agents-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
   <title>Memory Systems for Long-Running Retrieval Agents</title>
@@ -24655,7 +27798,7 @@ font-style: inherit;">=</span>store)</span></code></pre></div></div>
  ]]></description>
   <guid>https://tanquangduong.github.io/posts/agent/Memory Systems for Long-Running Retrieval Agents.html</guid>
   <pubDate>Wed, 02 Jul 2025 00:00:00 GMT</pubDate>
-  <media:content url="https://tanquangduong.github.io/images/agent/memory-systems-retrieval-agents-300px.png" medium="image" type="image/png"/>
+  <media:content url="https://tanquangduong.github.io/images/agent/memory-systems-retrieval-agents-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
   <title>Multi-Agent RAG Orchestration Patterns</title>
@@ -28777,7 +31920,7 @@ font-style: inherit;">"user growth"</span>})</span></code></pre></div></div>
  ]]></description>
   <guid>https://tanquangduong.github.io/posts/agent/Multi-Agent RAG Orchestration Patterns.html</guid>
   <pubDate>Wed, 25 Jun 2025 00:00:00 GMT</pubDate>
-  <media:content url="https://tanquangduong.github.io/images/agent/multi-agent-rag-orchestration-300px.png" medium="image" type="image/png"/>
+  <media:content url="https://tanquangduong.github.io/images/agent/multi-agent-rag-orchestration-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
   <title>Building Agents with LangGraph</title>
@@ -32248,7 +35391,7 @@ font-style: inherit;">"agent_graph.png"</span>)</span></code></pre></div></div>
  ]]></description>
   <guid>https://tanquangduong.github.io/posts/agent/Building Agents with LangGraph.html</guid>
   <pubDate>Wed, 18 Jun 2025 00:00:00 GMT</pubDate>
-  <media:content url="https://tanquangduong.github.io/images/agent/building-agents-langgraph-300px.png" medium="image" type="image/png"/>
+  <media:content url="https://tanquangduong.github.io/images/agent/building-agents-langgraph-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
   <title>Human–Agent Interaction Patterns</title>
@@ -35341,7 +38484,7 @@ font-style: inherit;">"hotl"</span>)</span></code></pre></div></div>
  ]]></description>
   <guid>https://tanquangduong.github.io/posts/agent/Human-Agent Interaction Patterns.html</guid>
   <pubDate>Wed, 18 Jun 2025 00:00:00 GMT</pubDate>
-  <media:content url="https://tanquangduong.github.io/images/agent/human-agent-interaction-patterns-300px.png" medium="image" type="image/png"/>
+  <media:content url="https://tanquangduong.github.io/images/agent/human-agent-interaction-patterns-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
   <title>Build and Deploy MCP Server from Scratch</title>
@@ -37915,7 +41058,7 @@ font-style: inherit;">"stdio"</span>)</span></code></pre></div></div>
  ]]></description>
   <guid>https://tanquangduong.github.io/posts/agent/Build and Deploy MCP Server from Scratch.html</guid>
   <pubDate>Sun, 15 Jun 2025 00:00:00 GMT</pubDate>
-  <media:content url="https://tanquangduong.github.io/images/agent/build-deploy-mcp-server-300px.png" medium="image" type="image/png"/>
+  <media:content url="https://tanquangduong.github.io/images/agent/build-deploy-mcp-server-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
   <title>Tool Use and Function Calling for Retrieval Agents</title>
@@ -42413,7 +45556,7 @@ font-style: inherit;">=</span>llm,</span>
  ]]></description>
   <guid>https://tanquangduong.github.io/posts/agent/Tool Use and Function Calling for Retrieval Agents.html</guid>
   <pubDate>Wed, 11 Jun 2025 00:00:00 GMT</pubDate>
-  <media:content url="https://tanquangduong.github.io/images/agent/tool-use-function-calling-retrieval-agents-300px.png" medium="image" type="image/png"/>
+  <media:content url="https://tanquangduong.github.io/images/agent/tool-use-function-calling-retrieval-agents-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
   <title>Design Patterns for AI Agents</title>
@@ -45834,7 +48977,7 @@ font-style: inherit;">"Verify all claims. Suggest specific improvements."</span>
  ]]></description>
   <guid>https://tanquangduong.github.io/posts/agent/Design Patterns for AI Agents.html</guid>
   <pubDate>Tue, 10 Jun 2025 00:00:00 GMT</pubDate>
-  <media:content url="https://tanquangduong.github.io/images/agent/design-patterns-ai-agents-300px.png" medium="image" type="image/png"/>
+  <media:content url="https://tanquangduong.github.io/images/agent/design-patterns-ai-agents-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
   <title>Building a ReAct Agent from Scratch</title>
@@ -49683,7 +52826,7 @@ font-style: inherit;">"gpt-4o-mini"</span>),</span>
  ]]></description>
   <guid>https://tanquangduong.github.io/posts/agent/Building a ReAct Agent from Scratch.html</guid>
   <pubDate>Wed, 04 Jun 2025 00:00:00 GMT</pubDate>
-  <media:content url="https://tanquangduong.github.io/images/agent/react-agent-from-scratch-300px.png" medium="image" type="image/png"/>
+  <media:content url="https://tanquangduong.github.io/images/agent/react-agent-from-scratch-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 </channel>
 </rss>
