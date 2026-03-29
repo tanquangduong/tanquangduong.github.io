@@ -1,0 +1,291 @@
+---
+title: "τ²-Bench"
+subtitle: "A dual-control benchmark that tests whether AI agents can guide users through real-world customer service tasks across airline, retail, and telecom domains"
+image: /images/benchmark/tau2-bench-300px.png
+date: "2025-09-17"
+---
+
+**Keywords:** τ²-bench, tau-bench, AI agent benchmark, dual-control, conversational agents, customer service, tool-agent-user interaction, pass^k, Sierra, telecom troubleshooting, Dec-POMDP, agent reliability, LLM evaluation
+
+![](/images/benchmark/tau2-bench-300px.png){fig-align="center" width=300}
+
+## Introduction
+
+Most AI benchmarks test what a model knows or what it can do alone. But real-world customer service demands something harder: **guiding another human** through a task while managing your own tools in a shared, dynamic environment. Can an AI agent walk you through rebooting your router while simultaneously checking backend network settings — and stay on track when you misunderstand an instruction?
+
+**τ²-bench** (tau-squared-bench) is a benchmark for evaluating conversational AI agents in **dual-control environments** — scenarios where both the agent and the user must take actions to resolve a task. Built by **Sierra**, it extends the original τ-bench by introducing a telecom troubleshooting domain modeled as a **Decentralized Partially Observable Markov Decision Process (Dec-POMDP)**, where the agent and user share control over the environment.
+
+> "Existing benchmarks for conversational AI agents simulate single-control environments, where only the AI agent can use tools to interact with the world, while the user remains a passive information provider. This differs from real-world scenarios like technical support, where users need to actively participate in modifying the state of the (shared) world." — Barres et al., arXiv:2506.07982
+
+```{mermaid}
+graph LR
+    A["Traditional Agent Benchmarks<br/>(Single-control)<br/>Agent acts alone"] --> B["User is passive<br/>information provider"]
+    B --> C["τ²-Bench<br/>(Dual-control)<br/>Agent + User both act"]
+    C --> D["Tests coordination,<br/>communication & guidance"]
+
+    style A fill:#e74c3c,stroke:#333,color:#fff
+    style B fill:#f39c12,stroke:#333,color:#fff
+    style C fill:#27ae60,stroke:#333,color:#fff
+    style D fill:#3498db,stroke:#333,color:#fff
+```
+
+
+## What Is τ²-Bench?
+
+**τ²-Bench** is a simulation framework for evaluating customer service agents across multiple real-world domains. It challenges AI agents not just to reason and act, but to **coordinate, guide, and assist a user** in achieving a shared objective. The benchmark supports both **solo mode** (agent has full control) and **interactive mode** (agent guides the user through their responsibilities while managing its own tools), revealing dramatic performance gaps between the two.
+
+The benchmark builds on the original τ-bench (which introduced airline and retail domains) with four key contributions:
+
+1. **Telecom dual-control domain** — modeled as a Dec-POMDP where both agent and user use tools in a shared, dynamic environment
+2. **Compositional task generator** — programmatically creates diverse, verifiable tasks from atomic components
+3. **Reliable user simulator** — tightly coupled with the environment, constrained by tools and observable states
+4. **Fine-grained error analysis** — separates errors from reasoning vs. communication/coordination
+
+### Key Characteristics
+
+| Feature | Details |
+|---------|---------|
+| **Domains** | Airline, Retail, Telecom (+ Banking Knowledge in τ³) |
+| **Control modes** | Solo (agent-only) and Interactive (dual-control) |
+| **Formalization** | Dec-POMDP (Decentralized Partially Observable MDP) |
+| **Task generation** | Compositional — built from atomic, verifiable actions |
+| **Evaluation** | Database state comparison against annotated goal states |
+| **Reliability metric** | pass^k — success rate over k independent trials |
+| **User simulator** | LLM-based, constrained by environment tools & states |
+| **License** | MIT |
+
+### The Dual-Control Challenge
+
+In τ²-bench, the environment is **co-owned** by the agent and the user. The agent may toggle backend features or query network settings, while the user is responsible for verifying on-device status, rebooting hardware, or changing configurations:
+
+```{mermaid}
+graph TD
+    T["Customer Service Task"] --> A["Agent Actions<br/>Query account, toggle features,<br/>check backend settings"]
+    T --> U["User Actions<br/>Reboot device, change settings,<br/>verify on-device status"]
+    A --> E["Shared Environment<br/>(Dec-POMDP)"]
+    U --> E
+    E --> V["Verification<br/>Database state vs. goal state"]
+
+    style T fill:#8e44ad,color:#fff,stroke:#333
+    style A fill:#3498db,color:#fff,stroke:#333
+    style U fill:#e67e22,color:#fff,stroke:#333
+    style E fill:#27ae60,color:#fff,stroke:#333
+    style V fill:#e74c3c,color:#fff,stroke:#333
+```
+
+| Mode | Description | Challenge |
+|------|-------------|-----------|
+| **Solo** | Agent has full control, performs all actions | Tests reasoning and tool use |
+| **Interactive** | Agent guides user through their responsibilities | Tests coordination, communication, and guidance |
+
+
+## Who Built It?
+
+τ²-Bench was developed by **Sierra**, a company building conversational AI agents for enterprises. The research team includes:
+
+- **Victor Barres**, **Honghua Dong**, **Soham Ray** — Sierra
+- **Xujie Si** — University of Toronto
+- **Karthik Narasimhan** — Princeton University / Sierra
+
+The original τ-bench (2024) was created by **Shunyu Yao**, **Noah Shinn**, **Pedram Razavi**, and **Karthik Narasimhan**.
+
+The benchmark has since evolved to **τ³-bench**, adding a **banking knowledge domain** (with RAG-based retrieval), **voice full-duplex evaluation** (real-time audio APIs), and 75+ task quality fixes based on the SABER analysis.
+
+| Resource | Link |
+|----------|------|
+| **Website & Leaderboard** | [taubench.com](https://taubench.com/) |
+| **arXiv Paper (τ²-bench)** | [arxiv.org/abs/2506.07982](https://arxiv.org/abs/2506.07982) |
+| **arXiv Paper (τ-bench)** | [arxiv.org/abs/2406.12045](https://arxiv.org/abs/2406.12045) |
+| **GitHub** | [github.com/sierra-research/tau2-bench](https://github.com/sierra-research/tau2-bench) |
+| **Sierra Blog** | [sierra.ai/blog/benchmarking-agents-in-collaborative-real-world-scenarios](https://sierra.ai/blog/benchmarking-agents-in-collaborative-real-world-scenarios) |
+
+
+## What Skills Does It Test?
+
+τ²-Bench evaluates a broad spectrum of capabilities essential for real-world conversational agents:
+
+```{mermaid}
+graph TD
+    TB["τ²-Bench<br/>Dual-Control Benchmark"] --> P["Policy Compliance<br/>Follow domain-specific<br/>rules & guidelines"]
+    TB --> TC["Tool Coordination<br/>Use APIs correctly<br/>across multiple turns"]
+    TB --> UG["User Guidance<br/>Instruct users clearly<br/>& adapt to feedback"]
+    TB --> R["Reliability<br/>Consistent success<br/>across repeated trials"]
+    TB --> D["Domain Expertise<br/>Airline · Retail<br/>Telecom · Banking"]
+
+    style TB fill:#e74c3c,color:#fff,stroke:#333
+    style P fill:#3498db,color:#fff,stroke:#333
+    style TC fill:#27ae60,color:#fff,stroke:#333
+    style UG fill:#f39c12,color:#fff,stroke:#333
+    style R fill:#8e44ad,color:#fff,stroke:#333
+    style D fill:#e67e22,color:#fff,stroke:#333
+```
+
+| Capability | What τ²-Bench Tests |
+|-----------|---------------------|
+| **Policy compliance** | Following domain-specific rules (refund policies, troubleshooting procedures, account rules) |
+| **Tool use** | Correct API calls with proper parameters across multi-turn conversations |
+| **User coordination** | Guiding a user through device-side actions while managing backend tools |
+| **Communication** | Issuing precise, understandable instructions and adapting when things go wrong |
+| **Reliability** | Consistent task completion across multiple independent trials (pass^k) |
+| **Compositional reasoning** | Handling tasks composed of multiple atomic sub-tasks with dependencies |
+| **Error recovery** | Adapting strategy when user feedback indicates an unexpected state |
+
+
+## Current Leaderboard
+
+The leaderboard below shows model performance on τ-bench across four domains. Results use **pass^k**: the probability of passing all k independent trials, measuring agent **reliability** — not just one-shot accuracy.
+
+> **Source:** [taubench.com](https://taubench.com/) — τ-bench Leaderboard by Sierra (consulted March 29, 2026). Submission data from GitHub repository. User simulator: GPT-5.2. 4 trials per task.
+
+### pass^1 Results (%) — Text Mode
+
+| Model | Airline | Retail | Telecom | Banking Knowledge |
+|:------|:-------:|:------:|:-------:|:-----------------:|
+| **Qwen3.5-397B-A17B** | 81.50 | **84.43** | **97.81** | 9.79 |
+| **Claude Opus 4.5** | **84.00** | 79.61 | 92.32 | 24.74 |
+| GPT-5.2 | 83.00 | 81.58 | 89.69 | 25.52 |
+| Gemini 3 Flash | 82.50 | 76.75 | 91.23 | 20.62 |
+| GLM-5 | 82.50 | 73.68 | 86.84 | 9.79 |
+| Gemini 3 Pro | 80.50 | 75.88 | 91.01 | 15.72 |
+| Claude Sonnet 4.5 | 72.00 | 72.37 | 84.87 | 22.42 |
+| GPT-5.4 | — | — | — | **31.19** |
+| Distyl ButtonAgent | — | — | — | **31.19** |
+
+### Reliability: pass^4 Results (%)
+
+| Model | Airline | Retail | Telecom | Banking Knowledge |
+|:------|:-------:|:------:|:-------:|:-----------------:|
+| **Qwen3.5-397B-A17B** | 68.00 | **59.65** | **92.11** | 5.15 |
+| **Claude Opus 4.5** | **70.00** | 51.75 | 78.07 | 9.28 |
+| GPT-5.2 | 72.00 | 51.75 | 71.93 | 9.28 |
+| Gemini 3 Flash | 68.00 | 51.75 | 70.18 | 4.12 |
+| GLM-5 | 70.00 | 43.86 | 62.28 | 3.09 |
+| Gemini 3 Pro | 66.00 | 47.37 | 74.56 | 4.12 |
+| Claude Sonnet 4.5 | 48.00 | 39.47 | 64.04 | 10.31 |
+| GPT-5.4 | — | — | — | **16.49** |
+
+**Key takeaways:**
+
+- **Qwen3.5-397B-A17B** dominates Telecom (97.81% pass^1, 92.11% pass^4) and Retail (84.43% pass^1), showing exceptional reliability in the dual-control domain
+- **Claude Opus 4.5** leads Airline (84.00% pass^1) and shows strong telecom performance (92.32% pass^1)
+- **Banking Knowledge** is by far the hardest domain — even the best models (GPT-5.4, Distyl ButtonAgent) reach only ~31% pass^1, with pass^4 dropping to ~16%
+- **Reliability drops sharply** from pass^1 to pass^4 across all models and domains, exposing inconsistent agent behavior — the core insight of the pass^k metric
+- Even top models show a **significant gap between solo and interactive modes**, with up to 25-point drops when agents must guide users
+
+For the latest leaderboard, visit [taubench.com](https://taubench.com/).
+
+
+## Where to Explore the Benchmark
+
+### Dashboards and Leaderboard
+
+| Resource | Description | Link |
+|----------|-------------|------|
+| **τ-bench Leaderboard** | Interactive leaderboard with text and voice results | [taubench.com](https://taubench.com/) |
+| **Sierra Blog** | Detailed blog post explaining τ²-bench design and findings | [sierra.ai/blog/benchmarking-agents-in-collaborative-real-world-scenarios](https://sierra.ai/blog/benchmarking-agents-in-collaborative-real-world-scenarios) |
+
+### Dataset and Code
+
+| Resource | Description | Link |
+|----------|-------------|------|
+| **GitHub Repository** | Full benchmark code, domains, task data, and agent examples | [github.com/sierra-research/tau2-bench](https://github.com/sierra-research/tau2-bench) |
+| **arXiv Paper (τ²-bench)** | Dual-control benchmark with telecom domain | [arxiv.org/abs/2506.07982](https://arxiv.org/abs/2506.07982) |
+| **arXiv Paper (τ-bench)** | Original benchmark with airline and retail domains | [arxiv.org/abs/2406.12045](https://arxiv.org/abs/2406.12045) |
+| **Leaderboard Submission Guide** | How to submit your own results | [GitHub docs](https://github.com/sierra-research/tau2-bench/blob/main/docs/leaderboard-submission.md) |
+
+### Run the Benchmark
+
+```bash
+git clone https://github.com/sierra-research/tau2-bench
+cd tau2-bench
+uv sync
+tau2 run --domain airline --agent-llm gpt-4.1 --user-llm gpt-4.1 \
+  --num-trials 1 --num-tasks 5
+```
+
+
+## Understanding the Metrics
+
+### pass^k (Reliability Metric)
+
+The signature metric of τ-bench. While most benchmarks report one-shot accuracy, **pass^k** measures whether an agent can solve the same task **consistently across k independent trials**. This is critical for production deployment — a customer service agent that succeeds 80% of the time but fails unpredictably 20% of the time is not reliable enough.
+
+$$\text{pass}^k = \mathbb{E}\left[\prod_{i=1}^{k} \mathbf{1}[\text{trial}_i = \text{success}]\right]$$
+
+| Metric | What It Measures |
+|--------|-----------------|
+| **pass^1** | One-shot success rate (standard accuracy) |
+| **pass^2** | Probability of succeeding on 2 consecutive trials |
+| **pass^4** | Probability of succeeding on all 4 trials — the reliability floor |
+
+**Key insight:** The gap between pass^1 and pass^4 reveals **agent inconsistency**. For example, GPT-5.2 scores 81.58% pass^1 on Retail but drops to 51.75% pass^4, meaning it fails nearly half the time when reliability matters.
+
+### Database State Verification
+
+Tasks are evaluated by comparing the **database state** at the end of a conversation with the **annotated goal state**. This avoids subjective grading — every completed task leaves a measurable footprint: a changed setting, an updated account, a resolved ticket.
+
+
+## Why τ²-Bench Matters
+
+```{mermaid}
+graph LR
+    A["Single-control benchmarks<br/>Agent acts alone"] --> B["Don't test real-world<br/>collaboration"]
+    B --> C["τ²-Bench fills<br/>the gap"]
+    C --> D["Tests coordination<br/>& user guidance"]
+
+    A2["One-shot accuracy<br/>looks impressive"] --> B2["Agents are actually<br/>inconsistent"]
+    B2 --> C
+    C --> D2["pass^k reveals<br/>reliability gaps"]
+
+    style A fill:#e74c3c,color:#fff,stroke:#333
+    style A2 fill:#e74c3c,color:#fff,stroke:#333
+    style C fill:#27ae60,color:#fff,stroke:#333
+    style D fill:#3498db,color:#fff,stroke:#333
+    style D2 fill:#3498db,color:#fff,stroke:#333
+```
+
+1. **First dual-control benchmark** — evaluates agents in shared environments where both agent and user must act, reflecting real-world customer service
+2. **pass^k reveals the reliability crisis** — one-shot accuracy masks severe inconsistency; pass^4 scores drop 20–30 points below pass^1
+3. **Exposes the coordination gap** — up to 25-point performance drops from solo to interactive mode, even for frontier models
+4. **Compositional task generation** — programmatic task construction ensures coverage, controlled complexity, and automatic verification
+5. **Production-relevant domains** — airline, retail, telecom, and banking reflect actual enterprise customer service scenarios
+
+
+## Video: τ²-Bench Explained
+
+{{< video https://www.youtube.com/watch?v=D_slDI2HCPY >}}
+
+If you find this content valuable, consider **subscribing** to the [Vectoring AI YouTube channel](https://www.youtube.com/playlist?list=PLEovTOgu9-np-5__vIhTWyiJChZjqvDYa) and **sharing** this article with your network. Every subscription and share helps us bring you more AI engineering content!
+
+
+## Conclusion
+
+τ²-Bench exposes a critical gap in current AI agent capabilities:
+
+- **Dual-control environments** reveal that agents struggle to guide users effectively — performance drops up to **25 points** from solo to interactive mode
+- The **pass^k reliability metric** shows that even top models are inconsistent: an 84% pass^1 can mask a 70% pass^4, meaning agents fail on ~30% of tasks when reliability is required
+- **Four production-relevant domains** (airline, retail, telecom, banking) provide a realistic testbed for enterprise customer service agents
+- **Banking knowledge retrieval** remains extremely challenging — the best models reach only ~31% pass^1, highlighting the difficulty of combining RAG with conversational agent tasks
+- The benchmark has rapidly influenced both academic research and industrial evaluation pipelines, and continues to evolve (τ³-bench adds voice and knowledge retrieval)
+
+As AI agents move from demos to production, τ²-Bench provides the rigorous, reliability-focused evaluation framework that the field needs. It's not enough for an agent to sometimes get it right — it must get it right **every time**.
+
+
+## References
+
+- Barres, V., Dong, H., Ray, S., Si, X., & Narasimhan, K. "τ²-Bench: Evaluating Conversational Agents in a Dual-Control Environment." *arXiv preprint* arXiv:2506.07982 (2025). [arxiv.org/abs/2506.07982](https://arxiv.org/abs/2506.07982)
+- Yao, S., Shinn, N., Razavi, P., & Narasimhan, K. "τ-bench: A Benchmark for Tool-Agent-User Interaction in Real-World Domains." *arXiv preprint* arXiv:2406.12045 (2024). [arxiv.org/abs/2406.12045](https://arxiv.org/abs/2406.12045)
+- Sierra. "τ²-bench: Benchmarking Agents in Collaborative Real-World Scenarios." [sierra.ai/blog/benchmarking-agents-in-collaborative-real-world-scenarios](https://sierra.ai/blog/benchmarking-agents-in-collaborative-real-world-scenarios)
+- τ-bench Leaderboard. [taubench.com](https://taubench.com/) (consulted March 29, 2026)
+- GitHub Repository. [github.com/sierra-research/tau2-bench](https://github.com/sierra-research/tau2-bench)
+
+
+## Read More
+
+- Explore another agent benchmark — see [Terminal Bench](/posts/benchmark/Terminal%20Bench.html)
+- Long-horizon agent evaluation — see [Vending-Bench](/posts/benchmark/Vending-Bench.html)
+- Track model costs when running evaluations — see [FinOps Best Practices for LLM Applications](/posts/llm/FinOps%20Best%20Practices%20for%20LLM%20Applications.html)
+- Deploy models for running your own evaluations — see [Deploying and Serving LLM with vLLM](/posts/llm/Deploying%20and%20Serving%20LLM%20with%20vLLM.html)
+- Scale your evaluation infrastructure — see [Scaling LLM Serving for Enterprise Production](/posts/llm/Scaling%20LLM%20Serving%20for%20Enterprise%20Production.html)
+- [τ-bench Leaderboard](https://taubench.com/)
+- [τ²-bench GitHub Repository](https://github.com/sierra-research/tau2-bench)

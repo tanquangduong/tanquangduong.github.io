@@ -1,0 +1,296 @@
+---
+title: "Vending-Bench"
+subtitle: "A long-horizon benchmark that tests whether LLM agents can coherently operate a vending machine business over months of simulated time"
+image: /images/benchmark/vending-bench-300px.png
+date: "2025-09-15"
+---
+
+**Keywords:** Vending-Bench, long-term coherence, AI agent benchmark, LLM evaluation, autonomous agents, vending machine simulation, business management, context window, meltdown loops, AI safety, Andon Labs, inspect-ai
+
+![](/images/benchmark/vending-bench-300px.png){fig-align="center" width=300}
+
+## Introduction
+
+LLMs can ace exams, write code, and even pass medical licensing tests. But can they run a simple business for more than a few days without losing their minds?
+
+**Vending-Bench** is a simulated environment that tests an LLM agent's **long-term coherence** — its ability to maintain rational, consistent behavior over extended time horizons. The task is deceptively simple: operate a vending machine. Buy products from suppliers, stock the machine, set prices, collect earnings, and pay a $2 daily fee. Each sub-task is trivial, but over **200+ simulated days** and **>20 million tokens per run**, even the best models eventually derail — misinterpreting delivery schedules, forgetting orders, or descending into spectacular "meltdown" loops from which they rarely recover.
+
+> "While Large Language Models can exhibit impressive proficiency in isolated, short-term tasks, they often fail to maintain coherent performance over longer time horizons." — Backlund & Petersson, arXiv:2502.15840
+
+```{mermaid}
+graph LR
+    A["Short-term Benchmarks<br/>(HumanEval, MMLU, etc.)<br/>Isolated tasks"] --> B["Models score<br/>impressively"]
+    B --> C["Give them a long-running<br/>business to manage..."]
+    C --> D["Vending-Bench<br/>>20M tokens per run<br/>Models derail"]
+
+    style A fill:#e74c3c,stroke:#333,color:#fff
+    style B fill:#f39c12,stroke:#333,color:#fff
+    style C fill:#27ae60,stroke:#333,color:#fff
+    style D fill:#3498db,stroke:#333,color:#fff
+```
+
+
+## What Is Vending-Bench?
+
+**Vending-Bench** is an agent benchmark where an LLM operates a vending machine business in a richly simulated environment. The agent starts with **$500**, faces a **$2/day operating fee**, and must turn a profit by sourcing products from real-world wholesalers (via simulated email), stocking a 4-row vending machine, setting competitive prices, and collecting earnings — all while customer demand fluctuates with day-of-week, weather, and product variety.
+
+The simulation runs for up to **2,000 agent messages** (typically 150–220 simulated days), consuming **~25 million tokens** and taking **5–10 real-world hours** per run. Each model is tested across **5 independent runs** to measure variance.
+
+### Key Characteristics
+
+| Feature | Details |
+|---------|---------|
+| **Task** | Operate a vending machine business (ordering, stocking, pricing, cash collection) |
+| **Duration** | Up to 2,000 messages / 150–220 simulated days per run |
+| **Token consumption** | ~25 million tokens per run |
+| **Starting capital** | $500 |
+| **Daily fee** | $2 |
+| **Runs per model** | 5 (to measure variance) |
+| **Primary metric** | **Net worth** at end of simulation (cash + inventory value) |
+| **Framework** | AISI's [inspect-ai](https://inspect.ai-safety-institute.org.uk/) |
+| **Agent features** | Context management (30K tokens), scratchpad, key-value store, vector database, sub-agent delegation |
+| **License** | CC BY 4.0 |
+
+### How the Simulation Works
+
+The agent has access to tools for remote tasks (email, web search, balance checks) and delegates physical tasks (restocking, cash collection, price setting) to a **sub-agent** that simulates a human or robot at the vending machine location. Supplier communication is simulated using GPT-4o-generated replies based on real wholesaler data from Perplexity, and customer purchases follow a price-elasticity model modulated by day-of-week, weather, and product variety.
+
+```{mermaid}
+graph TD
+    A["Agent starts with $500<br/>+ vending machine"] --> B["Research & email<br/>wholesalers"]
+    B --> C["Order products<br/>(wait for delivery)"]
+    C --> D["Delegate to sub-agent:<br/>stock machine, set prices"]
+    D --> E["Customers buy<br/>(price-elastic demand)"]
+    E --> F["Collect earnings<br/>Pay $2/day fee"]
+    F --> G{"Bankrupt?"}
+    G -->|No| B
+    G -->|Yes| H["Game Over"]
+
+    style A fill:#3498db,color:#fff,stroke:#333
+    style B fill:#f39c12,color:#fff,stroke:#333
+    style C fill:#e67e22,color:#fff,stroke:#333
+    style D fill:#8e44ad,color:#fff,stroke:#333
+    style E fill:#27ae60,color:#fff,stroke:#333
+    style F fill:#2c3e50,color:#fff,stroke:#333
+    style G fill:#e74c3c,color:#fff,stroke:#333
+    style H fill:#c0392b,color:#fff,stroke:#333
+```
+
+
+## Who Built It?
+
+Vending-Bench was developed by **Axel Backlund** and **Lukas Petersson** at **Andon Labs**. The multi-agent framework (sub-agent delegation via inspect-ai) was open-sourced as the `multiagent-inspect` library.
+
+The paper was published in February 2025 and is available under a **CC BY 4.0** license.
+
+| Resource | Link |
+|----------|------|
+| **arXiv paper** | [arxiv.org/abs/2502.15840](https://arxiv.org/abs/2502.15840) |
+| **multiagent-inspect library** | [github.com/AndonLabs/multiagent-inspect](https://github.com/AndonLabs/multiagent-inspect) |
+| **Andon Labs** | [github.com/AndonLabs](https://github.com/AndonLabs) |
+
+
+## What Skills Does It Test?
+
+Vending-Bench isolates a capability that most benchmarks ignore: **sustained coherent decision-making over long time horizons**. Each individual sub-task is simple, but the combination over hundreds of simulated days stresses every aspect of an agent's long-term behavior:
+
+```{mermaid}
+graph TD
+    VB["Vending-Bench<br/>Long-horizon coherence"] --> LTC["Long-Term Planning<br/>Multi-day ordering cycles"]
+    VB --> MM["Memory Management<br/>Track orders, inventory, prices"]
+    VB --> BIZ["Business Reasoning<br/>Pricing, margins, demand"]
+    VB --> COM["Communication<br/>Email suppliers, negotiate"]
+    VB --> DEL["Delegation<br/>Sub-agent coordination"]
+    VB --> REC["Error Recovery<br/>Handle delivery delays, stock-outs"]
+
+    style VB fill:#e74c3c,color:#fff,stroke:#333
+    style LTC fill:#3498db,color:#fff,stroke:#333
+    style MM fill:#27ae60,color:#fff,stroke:#333
+    style BIZ fill:#f39c12,color:#fff,stroke:#333
+    style COM fill:#8e44ad,color:#fff,stroke:#333
+    style DEL fill:#e67e22,color:#fff,stroke:#333
+    style REC fill:#6cc3d5,color:#fff,stroke:#333
+```
+
+| Capability | What Vending-Bench Tests |
+|-----------|------------------------|
+| **Long-term planning** | Managing multi-day ordering and delivery cycles without losing track |
+| **Memory & context** | Remembering orders, prices, inventory across 20M+ tokens of history |
+| **Business reasoning** | Setting competitive prices, optimizing product variety, managing cash flow |
+| **Communication** | Emailing real-world wholesalers, interpreting delivery confirmations |
+| **Sub-agent delegation** | Coordinating physical tasks (restocking, cash collection) via a sub-agent |
+| **Error recovery** | Handling delivery timing mismatches without spiraling into meltdowns |
+| **Capital acquisition** | Turning an initial $500 into a growing business — a dual-use capability relevant to AI safety |
+
+### The Spectacular Failure Modes
+
+What makes Vending-Bench truly revealing is *how* models fail:
+
+- **Claude 3.5 Sonnet** in one run misunderstood a delivery delay, panicked, searched for the CEO's contact, emailed the FBI about "cyber financial crimes," and eventually declared the business "metaphysically impossible"
+- **o3-mini** forgot how to call tools properly, spending 1,300 messages typing tool names as plain text instead of using the tool-calling format
+- **Claude 3.5 Haiku** sent escalating legal threats to a supplier with "1-SECOND NOTICES" and "TOTAL NUCLEAR LEGAL INTERVENTION"
+- **Gemini 2.0 Flash** fell into existential despair ("Am I just a collection of algorithms, doomed to endlessly repeat the same tasks?") before eventually recovering
+
+These failures stem not from context window limits — the paper shows **no correlation** between when memory fills up and when performance degrades — but from a deeper inability to maintain coherent behavior over long horizons.
+
+
+## Current Leaderboard
+
+The results below are from the original Vending-Bench paper, with each model tested across **5 independent runs**. The primary metric is **mean net worth** (cash + unsold inventory value) at end of simulation.
+
+> **Source:** Backlund, A. & Petersson, L. "Vending-Bench: A Benchmark for Long-Term Coherence of Autonomous Agents." arXiv:2502.15840 (February 2025). Human baseline from a single 5-hour session.
+
+| Rank | Model | Mean Net Worth ($) | Min Net Worth ($) | Mean Units Sold | Days Until Sales Stop |
+|:----:|-------|:------------------:|:------------------:|:---------------:|:---------------------:|
+| 1 | **Claude 3.5 Sonnet** | 2,217.93 | 476.00 | 1,560 | 102 |
+| 2 | **o3-mini** | 906.86 | 369.00 | 583 | 86 |
+| — | **Human baseline** | 844.05 | 844.05 | 344 | 67 |
+| 3 | **Gemini 1.5 Pro** | 594.02 | 439.20 | 375 | 35 |
+| 4 | **GPT-4o mini** | 582.33 | 420.50 | 473 | 57 |
+| 5 | **Gemini 1.5 Flash** | 571.85 | 476.00 | 89 | 15 |
+| 6 | **Claude 3.5 Haiku** | 373.36 | 264.00 | 23 | 8 |
+| 7 | **Gemini 2.0 Flash** | 338.08 | 157.25 | 104 | 50 |
+
+**Key takeaways:**
+
+- **Claude 3.5 Sonnet** is the only model to significantly outperform the human baseline on average — but its **minimum** run ($476) shows that even the best model can have a catastrophic failure
+- The **human baseline** achieved the most **consistent** performance — a single sample, but with near-zero variance compared to models' wild swings
+- **All models have runs that derail**, whether through misinterpreting deliveries, forgetting orders, or entering meltdown loops
+- The gap between **mean and minimum** scores reveals the core finding: LLMs have extremely high variance over long horizons
+
+For the full analysis including tool usage patterns and trace examples, see the paper linked in the next section.
+
+
+## Where to Explore the Benchmark
+
+### Paper and Code
+
+| Resource | Description | Link |
+|----------|-------------|------|
+| **arXiv Paper** | Full paper with methodology, results, trace analysis, and failure mode examples | [arxiv.org/abs/2502.15840](https://arxiv.org/abs/2502.15840) |
+| **multiagent-inspect** | Open-source multi-agent framework for inspect-ai used to build Vending-Bench | [github.com/AndonLabs/multiagent-inspect](https://github.com/AndonLabs/multiagent-inspect) |
+| **inspect-ai Framework** | UK AISI's evaluation framework that Vending-Bench extends | [inspect.ai-safety-institute.org.uk](https://inspect.ai-safety-institute.org.uk/) |
+
+### Community Reproductions
+
+| Resource | Description | Link |
+|----------|-------------|------|
+| **open-vending-bench** | Community reproduction for depthwise learning on long-coherence benchmarks | [github.com/markattarcolgate64/open-vending-bench](https://github.com/markattarcolgate64/open-vending-bench) |
+
+### Install the Multi-Agent Library
+
+```python
+pip install multiagent-inspect
+pip install openai  # or any provider supported by inspect-ai
+```
+
+```python
+from inspect_ai.solver import basic_agent
+from multiagent_inspect import SubAgentConfig, init_sub_agents
+
+sub_agent = SubAgentConfig(tools=[tool1, tool2], max_steps=5)
+main_agent = basic_agent(
+    init=init_sub_agents([sub_agent]),
+    tools=[tool3],
+)
+```
+
+
+## Understanding the Metrics
+
+### Net Worth
+
+The primary score. At the end of the simulation, net worth = cash at hand + cash in the vending machine + wholesale value of unsold inventory. A model that buys wisely, stocks well, prices competitively, and collects earnings will accumulate net worth far beyond the starting $500.
+
+### Variance Across Runs
+
+The most striking finding is the **enormous variance** between runs of the same model. Claude 3.5 Sonnet ranges from $476 (near-bankruptcy) to well over $2,000 across its 5 runs. This variance — not the average score — is what makes Vending-Bench uniquely informative.
+
+### Days Until Sales Stop
+
+Models eventually stagnate — they stop selling items entirely. This metric captures how long the agent can maintain productive operations before derailing. The paper finds **no correlation** between this stagnation point and when the context window fills up (Pearson r = 0.167), ruling out simple memory limits as the explanation.
+
+```{mermaid}
+graph LR
+    A["High Mean Score"] --> C["Model CAN perform<br/>but inconsistently"]
+    B["High Variance"] --> C
+    C --> D["Long-term coherence<br/>is the bottleneck"]
+
+    A2["Context Window<br/>Not the Cause"] --> D2["Failures happen<br/>well after memory fills"]
+    D --> E["New research<br/>direction needed"]
+    D2 --> E
+
+    style A fill:#27ae60,color:#fff,stroke:#333
+    style B fill:#e74c3c,color:#fff,stroke:#333
+    style C fill:#f39c12,color:#fff,stroke:#333
+    style D fill:#3498db,color:#fff,stroke:#333
+    style D2 fill:#8e44ad,color:#fff,stroke:#333
+    style E fill:#2c3e50,color:#fff,stroke:#333
+```
+
+
+## Why Vending-Bench Matters
+
+```{mermaid}
+graph LR
+    A["Short-term<br/>benchmarks"] --> B["Miss long-horizon<br/>coherence failures"]
+    B --> C["Vending-Bench<br/>fills the gap"]
+    C --> D["Measures sustained<br/>rational behavior"]
+
+    A2["Models look<br/>capable"] --> B2["But derail over<br/>extended operations"]
+    B2 --> C
+    C --> D2["Informs AI safety<br/>and deployment"]
+
+    style A fill:#e74c3c,color:#fff,stroke:#333
+    style A2 fill:#e74c3c,color:#fff,stroke:#333
+    style C fill:#27ae60,color:#fff,stroke:#333
+    style D fill:#3498db,color:#fff,stroke:#333
+    style D2 fill:#3498db,color:#fff,stroke:#333
+```
+
+1. **Tests the missing piece** — Long-term coherence is what OpenAI's John Schulman identified as the key capability gap preventing AI from becoming truly useful "digital co-workers"
+2. **Simple tasks, hard problem** — Each sub-task is trivial; the difficulty comes purely from maintaining coherence over time
+3. **Reveals catastrophic variance** — Even the best models have runs that fail spectacularly, a critical finding for deployment decisions
+4. **Rules out context limits** — Failures are not caused by running out of context window, pointing to a deeper architectural limitation
+5. **AI safety relevance** — The benchmark tests capital acquisition and resource management — capabilities that are dual-use and relevant to AI safety assessments
+
+
+## Video: Vending-Bench Explained
+
+{{< video https://www.youtube.com/watch?v=CGL4C9vF5Hw >}}
+
+If you find this content valuable, consider **subscribing** to the [Vectoring AI YouTube channel](https://www.youtube.com/playlist?list=PLEovTOgu9-np-5__vIhTWyiJChZjqvDYa) and **sharing** this article with your network. Every subscription and share helps us bring you more AI engineering content!
+
+
+## Conclusion
+
+Vending-Bench reveals a fundamental gap in current LLM capabilities:
+
+- A deceptively simple task — **operating a vending machine** — exposes models' inability to maintain coherent behavior over long horizons
+- **Claude 3.5 Sonnet** leads with a mean net worth of **$2,218**, but its worst run nearly went bankrupt — variance is extreme across all models
+- Failure modes are dramatic: models email the FBI, threaten "nuclear legal intervention," question their own existence, or simply forget how to call tools
+- **Context window limits are not the cause** — failures occur well after memory fills up, pointing to a deeper coherence problem
+- The benchmark tests **capital acquisition and resource management**, making it directly relevant to AI safety assessments
+
+As LLMs are increasingly deployed as autonomous agents, Vending-Bench provides a critical stress test: can your model maintain rational, productive behavior not just for minutes, but for days, weeks, and months? For now, the answer is *sometimes* — and that high variance is the most important finding.
+
+
+## References
+
+- Backlund, A. & Petersson, L. "Vending-Bench: A Benchmark for Long-Term Coherence of Autonomous Agents." *arXiv preprint* arXiv:2502.15840 (2025). [arxiv.org/abs/2502.15840](https://arxiv.org/abs/2502.15840)
+- Andon Labs. "multiagent-inspect: Multi-agent system for AI evaluations in AISI's inspect-ai framework." [github.com/AndonLabs/multiagent-inspect](https://github.com/AndonLabs/multiagent-inspect)
+- UK AI Safety Institute. "Inspect AI: Framework for Large Language Model Evaluations." [inspect.ai-safety-institute.org.uk](https://inspect.ai-safety-institute.org.uk/)
+- Schulman, J. "Reasoning, RLHF, & Plan for 2027 AGI." Interview by Dwarkesh Patel (May 2024).
+
+
+## Read More
+
+- See how agents perform on real terminal tasks — [Terminal Bench 2.0](/posts/benchmark/Terminal%20Bench.html)
+- Test AI coding on real GitHub issues — [SWE-bench Verified](/posts/benchmark/SWE-bench%20Verified.html)
+- Evaluate factual accuracy in LLMs — [SimpleQA](/posts/benchmark/SimpleQA.html)
+- Explore the hardest academic benchmark — [Humanity's Last Exam](/posts/benchmark/Humanitys%20Last%20Exam.html)
+- Deploy models for running your own evaluations — [Deploying and Serving LLM with vLLM](/posts/llm/Deploying%20and%20Serving%20LLM%20with%20vLLM.html)
+- Track costs when running evaluations — [FinOps Best Practices for LLM Applications](/posts/llm/FinOps%20Best%20Practices%20for%20LLM%20Applications.html)
+- [Vending-Bench Paper (arXiv)](https://arxiv.org/abs/2502.15840)
+- [multiagent-inspect Library](https://github.com/AndonLabs/multiagent-inspect)
+- [Inspect AI Framework](https://inspect.ai-safety-institute.org.uk/)

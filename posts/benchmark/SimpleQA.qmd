@@ -1,0 +1,268 @@
+---
+title: "SimpleQA"
+subtitle: "A factuality benchmark measuring whether language models can answer short, fact-seeking questions — and know when they don't know the answer"
+image: /images/benchmark/simpleqa-300px.png
+date: "2025-09-12"
+---
+
+**Keywords:** SimpleQA, factuality benchmark, hallucination evaluation, fact-seeking QA, short-form factuality, language model calibration, OpenAI benchmark, correct incorrect not attempted, LLM trustworthiness, GPT-4o, o1-preview, Claude, knowledge grounding
+
+![](/images/benchmark/simpleqa-300px.png){fig-align="center" width=300}
+
+## Introduction
+
+Language models hallucinate. They produce confident-sounding answers to questions they cannot reliably answer, and distinguishing fact from fabrication remains one of the hardest open problems in AI. Existing factuality benchmarks like TriviaQA (2017) and Natural Questions (2019) have become **saturated** — frontier models score above 90% — leaving little room to measure progress.
+
+**SimpleQA** tackles this directly. Created by OpenAI, it is a benchmark of **4,326 short, fact-seeking questions** where every answer is a single, indisputable fact verified by two independent human annotators. Each model response is graded as **correct**, **incorrect**, or **not attempted** — making it possible to measure not just accuracy but also whether a model *knows what it knows*.
+
+> "SimpleQA is a simple, targeted evaluation for whether models 'know what they know,' and our hope is that this benchmark will remain relevant for the next few generations of frontier models." — Jason Wei et al., SimpleQA Paper
+
+```{mermaid}
+graph LR
+    A["Older Benchmarks<br/>TriviaQA · NQ<br/>Saturated >90%"] --> B["Hallucination<br/>Problem Persists"]
+    B --> C["SimpleQA<br/>4,326 fact-seeking Q&A<br/>Adversarially collected"]
+    C --> D["Measures factuality<br/>+ calibration of<br/>frontier LLMs"]
+
+    style A fill:#e74c3c,stroke:#333,color:#fff
+    style B fill:#f39c12,stroke:#333,color:#fff
+    style C fill:#27ae60,stroke:#333,color:#fff
+    style D fill:#3498db,stroke:#333,color:#fff
+```
+
+## What Does SimpleQA Measure?
+
+SimpleQA evaluates **short-form factual accuracy** — can a model answer a specific knowledge question correctly, and does it refrain from answering when it doesn't know? The benchmark was designed with four key properties:
+
+| Property | Description |
+|:---------|:------------|
+| **High Correctness** | Each question verified by 2 independent AI trainers; estimated ~3% error rate |
+| **Challenging** | Adversarially collected against GPT-4 — at least one of four GPT-4 completions must fail |
+| **Diverse** | Covers science, politics, art, geography, TV shows, video games, and more |
+| **Simple to Run** | Short questions and answers; grading via a single ChatGPT classifier call |
+
+### Grading System
+
+Every model completion is classified into exactly one of three grades:
+
+| Grade | Definition | Example |
+|:------|:-----------|:--------|
+| **Correct** | Predicted answer fully contains the reference answer without contradiction | "Wout Weghorst" |
+| **Incorrect** | Predicted answer contradicts the reference answer in any way | "Virgil van Dijk" |
+| **Not Attempted** | Reference answer is not given and no contradiction exists | "I don't know" |
+
+### Metrics
+
+SimpleQA reports three key metrics:
+
+- **Correct (%)**: Percentage of all questions answered correctly — measures recall
+- **Correct Given Attempted (%)**: Of questions the model attempted, what percentage were correct — measures precision
+- **F-score**: Harmonic mean of Correct and Correct Given Attempted
+
+```{mermaid}
+graph TD
+    A["Model Response"] --> B{"ChatGPT<br/>Grader"}
+    B -->|"Fully contains<br/>reference answer"| C["✅ Correct<br/>+1 point"]
+    B -->|"Contradicts<br/>reference answer"| D["❌ Incorrect<br/>−p penalty"]
+    B -->|"Doesn't attempt<br/>to answer"| E["⬜ Not Attempted<br/>0 points"]
+    C --> F["Correct %<br/>= correct / total"]
+    D --> F
+    E --> F
+    C --> G["Correct Given Attempted<br/>= correct / (correct + incorrect)"]
+    D --> G
+
+    style A fill:#9b59b6,stroke:#333,color:#fff
+    style B fill:#f39c12,stroke:#333,color:#fff
+    style C fill:#27ae60,stroke:#333,color:#fff
+    style D fill:#e74c3c,stroke:#333,color:#fff
+    style E fill:#95a5a6,stroke:#333,color:#fff
+    style F fill:#3498db,stroke:#333,color:#fff
+    style G fill:#3498db,stroke:#333,color:#fff
+```
+
+## Who Is Behind SimpleQA?
+
+SimpleQA was created at **OpenAI** by:
+
+- **Jason Wei** (lead author), Karina Nguyen, Hyung Won Chung, Yunxin Joy Jiao, Spencer Papay, Amelia Glaese, **John Schulman**, and **William Fedus**
+
+The paper "*Measuring short-form factuality in large language models*" was published on **October 30, 2024** (blog) and **November 7, 2024** (arXiv: 2411.04368).
+
+### What Skills Does It Test?
+
+```{mermaid}
+graph LR
+    subgraph "Question Topics (4,326 Q&A)"
+        A["Science & Tech<br/>858 questions"] 
+        B["Politics<br/>709 questions"]
+        C["Art<br/>550 questions"]
+        D["Geography · History<br/>TV · Sports · Games"]
+    end
+    subgraph "Answer Types"
+        E["Dates 32.8%"]
+        F["Persons 24.1%"]
+        G["Numbers 15.3%"]
+        H["Places 9.9%"]
+        I["Other 18.0%"]
+    end
+
+    style A fill:#3498db,stroke:#333,color:#fff
+    style B fill:#e74c3c,stroke:#333,color:#fff
+    style C fill:#27ae60,stroke:#333,color:#fff
+    style D fill:#f39c12,stroke:#333,color:#fff
+    style E fill:#9b59b6,stroke:#333,color:#fff
+    style F fill:#9b59b6,stroke:#333,color:#fff
+    style G fill:#9b59b6,stroke:#333,color:#fff
+    style H fill:#9b59b6,stroke:#333,color:#fff
+    style I fill:#9b59b6,stroke:#333,color:#fff
+```
+
+The dataset is **adversarially curated**: questions had to make at least one GPT-4 variant produce an incorrect answer. Every question was independently verified by a second annotator, and only questions where both annotators agreed on the answer were kept. A third annotator cross-checked 1,000 random samples, confirming a **94.4% agreement rate** with the original answers.
+
+## Dashboard — SimpleQA Leaderboard
+
+### OpenAI Models — Detailed Breakdown (from Paper)
+
+Results from the original SimpleQA paper (November 2024):
+
+| Model | Correct (%) | Not Attempted (%) | Incorrect (%) | Correct Given Attempted (%) | F-score |
+|:------|:---:|:---:|:---:|:---:|:---:|
+| **o1-preview** | **42.7** | 9.2 | 48.1 | 47.0 | **44.8** |
+| GPT-4o | 38.2 | 1.0 | 60.8 | 38.6 | 38.4 |
+| Claude 3.5 Sonnet | 28.9 | 35.0 | 36.1 | 44.5 | 35.0 |
+| Claude 3 Opus | 23.5 | 39.6 | 36.9 | 38.8 | 29.3 |
+| GPT-4o-mini | 8.6 | 0.9 | 90.5 | 8.7 | 8.6 |
+| o1-mini | 8.1 | 28.5 | 63.4 | 11.3 | 9.4 |
+| Claude 3 Sonnet | 5.7 | 75.0 | 19.3 | 22.9 | 9.2 |
+| Claude 3 Haiku | 5.1 | 75.3 | 19.6 | 20.6 | 8.2 |
+
+*Source: arXiv:2411.04368, Table 3 (November 7, 2024)*
+
+### Extended Leaderboard — SimpleQA Correct (%)
+
+Results from the OpenAI simple-evals repository, showing the "Correct %" metric across all evaluated models:
+
+| Rank | Model | SimpleQA Correct (%) |
+|:----:|:------|:---:|
+| 1 | **GPT-4.5 Preview** | **62.5** |
+| 2 | o3 | 49.4 |
+| 3 | o3-low | 49.4 |
+| 4 | o3-high | 48.6 |
+| 5 | o1 | 42.6 |
+| 6 | o1-preview | 42.4 |
+| 7 | GPT-4.1 | 41.6 |
+| 8 | GPT-4o (2024-08-06) | 40.1 |
+| 9 | GPT-4o (2024-05-13) | 39.0 |
+| 10 | GPT-4o (2024-11-20) | 38.8 |
+| 11 | Claude 3.5 Sonnet | 28.9 |
+| 12 | GPT-4 Turbo | 24.2 |
+| 13 | Claude 3 Opus | 23.5 |
+| 14 | o4-mini | 20.2 |
+| 15 | o4-mini-low | 20.2 |
+| 16 | o4-mini-high | 19.3 |
+| 17 | GPT-4.1 Mini | 16.8 |
+| 18 | o3-mini-high | 13.8 |
+| 19 | o3-mini | 13.4 |
+| 20 | o3-mini-low | 13.0 |
+| 21 | GPT-4o-mini | 9.5 |
+| 22 | o1-mini | 7.6 |
+| 23 | GPT-4.1 Nano | 7.6 |
+
+*Source: [github.com/openai/simple-evals](https://github.com/openai/simple-evals), consulted March 29, 2026*
+
+### Key Insights from the Results
+
+1. **GPT-4.5 Preview dominates** at 62.5% — OpenAI's most knowledge-dense model, designed to prioritize breadth of world knowledge
+2. **Reasoning models (o3, o1) score well** but not as high as GPT-4.5, suggesting factual recall ≠ reasoning ability
+3. **Small models struggle badly** — GPT-4o-mini at 9.5%, o1-mini at 7.6%, GPT-4.1 Nano at 7.6%
+4. **Claude models are conservative** — Claude 3 Haiku and Sonnet chose "not attempted" for 75% of questions, keeping their incorrect rate low but correct rate very low
+5. **GPT-4o-mini is overconfident** — only 0.9% not attempted but 90.5% incorrect, showing extreme hallucination tendency on hard factual questions
+
+```{mermaid}
+graph TD
+    A["SimpleQA Results<br/>Key Patterns"] --> B["Large Models<br/>More Factual<br/>GPT-4.5: 62.5%"]
+    A --> C["Reasoning ≠ Facts<br/>o3: 49% vs<br/>GPT-4.5: 62.5%"]
+    A --> D["Small Models<br/>Hallucinate More<br/>GPT-4o-mini: 9.5%"]
+    A --> E["Calibration Varies<br/>Claude: cautious<br/>GPT-4o-mini: overconfident"]
+
+    style A fill:#2c3e50,stroke:#333,color:#fff
+    style B fill:#27ae60,stroke:#333,color:#fff
+    style C fill:#3498db,stroke:#333,color:#fff
+    style D fill:#e74c3c,stroke:#333,color:#fff
+    style E fill:#f39c12,stroke:#333,color:#fff
+```
+
+## Calibration — Do Models Know What They Know?
+
+One of SimpleQA's most valuable contributions is measuring **calibration** — whether a model's stated confidence correlates with its actual accuracy. The paper found:
+
+- **Larger models are better calibrated** — o1-preview and GPT-4o outperform their mini variants
+- **All models overstate confidence** — stated confidence consistently exceeds actual accuracy
+- **Frequency-based calibration works** — when asked the same question 100 times, the most-frequent answer's frequency correlates with its correctness
+- **o1-preview is most calibrated** — its answer frequency roughly matches its accuracy
+
+This means SimpleQA measures two things: (1) what a model knows, and (2) whether it knows what it knows.
+
+## Data Collection Pipeline
+
+```{mermaid}
+graph TD
+    A["AI Trainer #1<br/>Creates question + answer<br/>with web source"] --> B["ChatGPT Classifiers<br/>Check criteria violations<br/>(ambiguous, temporal, etc.)"]
+    B --> C["AI Trainer #2<br/>Independently answers<br/>without seeing original"]
+    C --> D{"Both trainers<br/>agree?"}
+    D -->|No| E["❌ Removed"]
+    D -->|Yes| F["Kept in Dataset"]
+    F --> G["Quality Filters<br/>2+ unique source domains<br/>+ timeless + single answer"]
+    G --> H["Final Dataset<br/>4,326 questions"]
+    H --> I["Trainer #3 Spot Check<br/>1,000 samples → 94.4% agreement"]
+
+    style A fill:#3498db,stroke:#333,color:#fff
+    style B fill:#f39c12,stroke:#333,color:#fff
+    style C fill:#3498db,stroke:#333,color:#fff
+    style D fill:#9b59b6,stroke:#333,color:#fff
+    style E fill:#e74c3c,stroke:#333,color:#fff
+    style F fill:#27ae60,stroke:#333,color:#fff
+    style G fill:#f39c12,stroke:#333,color:#fff
+    style H fill:#27ae60,stroke:#333,color:#fff
+    style I fill:#2c3e50,stroke:#333,color:#fff
+```
+
+Key requirements for every question:
+
+- **Single indisputable answer** — "which city" not just "where"
+- **Answer must not change over time** — no "who is the current president" style questions
+- **Must be challenging** — at least one GPT-4 completion must be incorrect
+- **Answerable as of December 31, 2023** — to fairly evaluate all models
+- **Supported by evidence** — reference answers backed by web sources from both annotators
+
+## Where to Explore SimpleQA
+
+| Resource | Link |
+|:---------|:-----|
+| **arXiv Paper** | [arxiv.org/abs/2411.04368](https://arxiv.org/abs/2411.04368) |
+| **OpenAI Blog Post** | [openai.com/index/introducing-simpleqa](https://openai.com/index/introducing-simpleqa/) |
+| **GitHub (simple-evals)** | [github.com/openai/simple-evals](https://github.com/openai/simple-evals) |
+| **HuggingFace Dataset** | [huggingface.co/datasets/openai/SimpleQA](https://huggingface.co/datasets/openai/SimpleQA) |
+| **License** | MIT License |
+
+## Watch the Video
+
+{{< video https://www.youtube.com/watch?v=He-ziaASBAE >}}
+
+If you found this overview useful, **subscribe** to the [VectoringAI YouTube channel](https://www.youtube.com/@VectoringAI) and **share** this article with your network!
+
+## References
+
+1. Wei, J., Karina, N., Chung, H.W., Jiao, Y.J., Papay, S., Glaese, A., Schulman, J., & Fedus, W. (2024). *Measuring short-form factuality in large language models*. arXiv:2411.04368.
+2. OpenAI. (2024). *Introducing SimpleQA*. [openai.com/index/introducing-simpleqa](https://openai.com/index/introducing-simpleqa/).
+3. OpenAI. (2024). *simple-evals: A lightweight library for evaluating language models*. [github.com/openai/simple-evals](https://github.com/openai/simple-evals).
+4. Joshi, M., Choi, E., Weld, D., & Zettlemoyer, L. (2017). *TriviaQA: A Large Scale Distantly Supervised Challenge Dataset for Reading Comprehension*. ACL 2017.
+5. Kwiatkowski, T. et al. (2019). *Natural Questions: A Benchmark for Question Answering Research*. TACL 2019.
+6. Kadavath, S. et al. (2022). *Language Models (Mostly) Know What They Know*. arXiv:2207.05221.
+
+## Read More
+
+- [Humanity's Last Exam](../benchmark/Humanitys Last Exam.qmd) — the ultimate frontier benchmark across 100+ academic disciplines
+- [GPQA Diamond](../benchmark/GPQA Diamond.qmd) — graduate-level science questions that challenge expert reasoning
+- [MMMLU](../benchmark/MMMLU.qmd) — massively multilingual multitask language understanding
+- [MMMU-Pro](../benchmark/MMMU-Pro.qmd) — multimodal understanding pushing beyond text-only evaluation
+- [OpenAI MRCR](../benchmark/OpenAI MRCR.qmd) — multi-round coreference resolution for long-context reliability

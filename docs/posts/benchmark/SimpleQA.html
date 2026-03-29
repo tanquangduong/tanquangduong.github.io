@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.36">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2025-09-12">
+
+<title>SimpleQA – Vectoring AI</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../..//images/favicon.ico" rel="icon">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dbc92dda8186f57fa2e333fbb71d6a9d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-23f3439e4bd86aeeff5ff0174c43dd13.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/all.css" rel="stylesheet">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/latex-fontsize.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="../../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="../../styles.css">
+<meta property="og:title" content="SimpleQA – Vectoring AI">
+<meta property="og:description" content="A factuality benchmark measuring whether language models can answer short, fact-seeking questions — and know when they don’t know the answer">
+<meta property="og:image" content="https://vectoringai.com//images/benchmark/simpleqa-300px.png">
+<meta property="og:site_name" content="Vectoring AI">
+<meta property="og:image:height" content="200">
+<meta property="og:image:width" content="300">
+<meta name="twitter:title" content="SimpleQA – Vectoring AI">
+<meta name="twitter:description" content="A factuality benchmark measuring whether language models can answer short, fact-seeking questions — and know when they don’t know the answer">
+<meta name="twitter:image" content="https://vectoringai.com//images/benchmark/simpleqa-300px.png">
+<meta name="twitter:image-height" content="200">
+<meta name="twitter:image-width" content="300">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+
+<body class="nav-sidebar docked quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">
+      Vectoring AI
+      </li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../../">Vectoring AI</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://github.com/VectoringAI" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">AI Engineering</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">LLM</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/agent.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Agent</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/rag.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">RAG</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/benchmark.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Benchmark</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title"><strong>Sections</strong></h2>
+   
+  <ul class="collapse">
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#what-does-simpleqa-measure" id="toc-what-does-simpleqa-measure" class="nav-link" data-scroll-target="#what-does-simpleqa-measure">What Does SimpleQA Measure?</a></li>
+  <li><a href="#who-is-behind-simpleqa" id="toc-who-is-behind-simpleqa" class="nav-link" data-scroll-target="#who-is-behind-simpleqa">Who Is Behind SimpleQA?</a></li>
+  <li><a href="#dashboard-simpleqa-leaderboard" id="toc-dashboard-simpleqa-leaderboard" class="nav-link" data-scroll-target="#dashboard-simpleqa-leaderboard">Dashboard — SimpleQA Leaderboard</a></li>
+  <li><a href="#calibration-do-models-know-what-they-know" id="toc-calibration-do-models-know-what-they-know" class="nav-link" data-scroll-target="#calibration-do-models-know-what-they-know">Calibration — Do Models Know What They Know?</a></li>
+  <li><a href="#data-collection-pipeline" id="toc-data-collection-pipeline" class="nav-link" data-scroll-target="#data-collection-pipeline">Data Collection Pipeline</a></li>
+  <li><a href="#where-to-explore-simpleqa" id="toc-where-to-explore-simpleqa" class="nav-link" data-scroll-target="#where-to-explore-simpleqa">Where to Explore SimpleQA</a></li>
+  <li><a href="#watch-the-video" id="toc-watch-the-video" class="nav-link" data-scroll-target="#watch-the-video">Watch the Video</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  <li><a href="#read-more" id="toc-read-more" class="nav-link" data-scroll-target="#read-more">Read More</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">SimpleQA</h1>
+<p class="subtitle lead">A factuality benchmark measuring whether language models can answer short, fact-seeking questions — and know when they don’t know the answer</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">September 12, 2025</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p><strong>Keywords:</strong> SimpleQA, factuality benchmark, hallucination evaluation, fact-seeking QA, short-form factuality, language model calibration, OpenAI benchmark, correct incorrect not attempted, LLM trustworthiness, GPT-4o, o1-preview, Claude, knowledge grounding</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../..\images/benchmark/simpleqa-300px.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="300"></p>
+</figure>
+</div>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>Language models hallucinate. They produce confident-sounding answers to questions they cannot reliably answer, and distinguishing fact from fabrication remains one of the hardest open problems in AI. Existing factuality benchmarks like TriviaQA (2017) and Natural Questions (2019) have become <strong>saturated</strong> — frontier models score above 90% — leaving little room to measure progress.</p>
+<p><strong>SimpleQA</strong> tackles this directly. Created by OpenAI, it is a benchmark of <strong>4,326 short, fact-seeking questions</strong> where every answer is a single, indisputable fact verified by two independent human annotators. Each model response is graded as <strong>correct</strong>, <strong>incorrect</strong>, or <strong>not attempted</strong> — making it possible to measure not just accuracy but also whether a model <em>knows what it knows</em>.</p>
+<blockquote class="blockquote">
+<p>“SimpleQA is a simple, targeted evaluation for whether models ‘know what they know,’ and our hope is that this benchmark will remain relevant for the next few generations of frontier models.” — Jason Wei et al., SimpleQA Paper</p>
+</blockquote>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    A["Older Benchmarks&lt;br/&gt;TriviaQA · NQ&lt;br/&gt;Saturated &gt;90%"] --&gt; B["Hallucination&lt;br/&gt;Problem Persists"]
+    B --&gt; C["SimpleQA&lt;br/&gt;4,326 fact-seeking Q&amp;A&lt;br/&gt;Adversarially collected"]
+    C --&gt; D["Measures factuality&lt;br/&gt;+ calibration of&lt;br/&gt;frontier LLMs"]
+
+    style A fill:#e74c3c,stroke:#333,color:#fff
+    style B fill:#f39c12,stroke:#333,color:#fff
+    style C fill:#27ae60,stroke:#333,color:#fff
+    style D fill:#3498db,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="what-does-simpleqa-measure" class="level2">
+<h2 class="anchored" data-anchor-id="what-does-simpleqa-measure">What Does SimpleQA Measure?</h2>
+<p>SimpleQA evaluates <strong>short-form factual accuracy</strong> — can a model answer a specific knowledge question correctly, and does it refrain from answering when it doesn’t know? The benchmark was designed with four key properties:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 43%">
+<col style="width: 56%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Property</th>
+<th style="text-align: left;">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>High Correctness</strong></td>
+<td style="text-align: left;">Each question verified by 2 independent AI trainers; estimated ~3% error rate</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Challenging</strong></td>
+<td style="text-align: left;">Adversarially collected against GPT-4 — at least one of four GPT-4 completions must fail</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Diverse</strong></td>
+<td style="text-align: left;">Covers science, politics, art, geography, TV shows, video games, and more</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Simple to Run</strong></td>
+<td style="text-align: left;">Short questions and answers; grading via a single ChatGPT classifier call</td>
+</tr>
+</tbody>
+</table>
+<section id="grading-system" class="level3">
+<h3 class="anchored" data-anchor-id="grading-system">Grading System</h3>
+<p>Every model completion is classified into exactly one of three grades:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 42%">
+<col style="width: 32%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Grade</th>
+<th style="text-align: left;">Definition</th>
+<th style="text-align: left;">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Correct</strong></td>
+<td style="text-align: left;">Predicted answer fully contains the reference answer without contradiction</td>
+<td style="text-align: left;">“Wout Weghorst”</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Incorrect</strong></td>
+<td style="text-align: left;">Predicted answer contradicts the reference answer in any way</td>
+<td style="text-align: left;">“Virgil van Dijk”</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Not Attempted</strong></td>
+<td style="text-align: left;">Reference answer is not given and no contradiction exists</td>
+<td style="text-align: left;">“I don’t know”</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="metrics" class="level3">
+<h3 class="anchored" data-anchor-id="metrics">Metrics</h3>
+<p>SimpleQA reports three key metrics:</p>
+<ul>
+<li><strong>Correct (%)</strong>: Percentage of all questions answered correctly — measures recall</li>
+<li><strong>Correct Given Attempted (%)</strong>: Of questions the model attempted, what percentage were correct — measures precision</li>
+<li><strong>F-score</strong>: Harmonic mean of Correct and Correct Given Attempted</li>
+</ul>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["Model Response"] --&gt; B{"ChatGPT&lt;br/&gt;Grader"}
+    B --&gt;|"Fully contains&lt;br/&gt;reference answer"| C["✅ Correct&lt;br/&gt;+1 point"]
+    B --&gt;|"Contradicts&lt;br/&gt;reference answer"| D["❌ Incorrect&lt;br/&gt;−p penalty"]
+    B --&gt;|"Doesn't attempt&lt;br/&gt;to answer"| E["⬜ Not Attempted&lt;br/&gt;0 points"]
+    C --&gt; F["Correct %&lt;br/&gt;= correct / total"]
+    D --&gt; F
+    E --&gt; F
+    C --&gt; G["Correct Given Attempted&lt;br/&gt;= correct / (correct + incorrect)"]
+    D --&gt; G
+
+    style A fill:#9b59b6,stroke:#333,color:#fff
+    style B fill:#f39c12,stroke:#333,color:#fff
+    style C fill:#27ae60,stroke:#333,color:#fff
+    style D fill:#e74c3c,stroke:#333,color:#fff
+    style E fill:#95a5a6,stroke:#333,color:#fff
+    style F fill:#3498db,stroke:#333,color:#fff
+    style G fill:#3498db,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="who-is-behind-simpleqa" class="level2">
+<h2 class="anchored" data-anchor-id="who-is-behind-simpleqa">Who Is Behind SimpleQA?</h2>
+<p>SimpleQA was created at <strong>OpenAI</strong> by:</p>
+<ul>
+<li><strong>Jason Wei</strong> (lead author), Karina Nguyen, Hyung Won Chung, Yunxin Joy Jiao, Spencer Papay, Amelia Glaese, <strong>John Schulman</strong>, and <strong>William Fedus</strong></li>
+</ul>
+<p>The paper “<em>Measuring short-form factuality in large language models</em>” was published on <strong>October 30, 2024</strong> (blog) and <strong>November 7, 2024</strong> (arXiv: 2411.04368).</p>
+<section id="what-skills-does-it-test" class="level3">
+<h3 class="anchored" data-anchor-id="what-skills-does-it-test">What Skills Does It Test?</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph "Question Topics (4,326 Q&amp;A)"
+        A["Science &amp; Tech&lt;br/&gt;858 questions"] 
+        B["Politics&lt;br/&gt;709 questions"]
+        C["Art&lt;br/&gt;550 questions"]
+        D["Geography · History&lt;br/&gt;TV · Sports · Games"]
+    end
+    subgraph "Answer Types"
+        E["Dates 32.8%"]
+        F["Persons 24.1%"]
+        G["Numbers 15.3%"]
+        H["Places 9.9%"]
+        I["Other 18.0%"]
+    end
+
+    style A fill:#3498db,stroke:#333,color:#fff
+    style B fill:#e74c3c,stroke:#333,color:#fff
+    style C fill:#27ae60,stroke:#333,color:#fff
+    style D fill:#f39c12,stroke:#333,color:#fff
+    style E fill:#9b59b6,stroke:#333,color:#fff
+    style F fill:#9b59b6,stroke:#333,color:#fff
+    style G fill:#9b59b6,stroke:#333,color:#fff
+    style H fill:#9b59b6,stroke:#333,color:#fff
+    style I fill:#9b59b6,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>The dataset is <strong>adversarially curated</strong>: questions had to make at least one GPT-4 variant produce an incorrect answer. Every question was independently verified by a second annotator, and only questions where both annotators agreed on the answer were kept. A third annotator cross-checked 1,000 random samples, confirming a <strong>94.4% agreement rate</strong> with the original answers.</p>
+</section>
+</section>
+<section id="dashboard-simpleqa-leaderboard" class="level2">
+<h2 class="anchored" data-anchor-id="dashboard-simpleqa-leaderboard">Dashboard — SimpleQA Leaderboard</h2>
+<section id="openai-models-detailed-breakdown-from-paper" class="level3">
+<h3 class="anchored" data-anchor-id="openai-models-detailed-breakdown-from-paper">OpenAI Models — Detailed Breakdown (from Paper)</h3>
+<p>Results from the original SimpleQA paper (November 2024):</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 21%">
+<col style="width: 15%">
+<col style="width: 15%">
+<col style="width: 15%">
+<col style="width: 15%">
+<col style="width: 15%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Model</th>
+<th style="text-align: center;">Correct (%)</th>
+<th style="text-align: center;">Not Attempted (%)</th>
+<th style="text-align: center;">Incorrect (%)</th>
+<th style="text-align: center;">Correct Given Attempted (%)</th>
+<th style="text-align: center;">F-score</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>o1-preview</strong></td>
+<td style="text-align: center;"><strong>42.7</strong></td>
+<td style="text-align: center;">9.2</td>
+<td style="text-align: center;">48.1</td>
+<td style="text-align: center;">47.0</td>
+<td style="text-align: center;"><strong>44.8</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">GPT-4o</td>
+<td style="text-align: center;">38.2</td>
+<td style="text-align: center;">1.0</td>
+<td style="text-align: center;">60.8</td>
+<td style="text-align: center;">38.6</td>
+<td style="text-align: center;">38.4</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Claude 3.5 Sonnet</td>
+<td style="text-align: center;">28.9</td>
+<td style="text-align: center;">35.0</td>
+<td style="text-align: center;">36.1</td>
+<td style="text-align: center;">44.5</td>
+<td style="text-align: center;">35.0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Claude 3 Opus</td>
+<td style="text-align: center;">23.5</td>
+<td style="text-align: center;">39.6</td>
+<td style="text-align: center;">36.9</td>
+<td style="text-align: center;">38.8</td>
+<td style="text-align: center;">29.3</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">GPT-4o-mini</td>
+<td style="text-align: center;">8.6</td>
+<td style="text-align: center;">0.9</td>
+<td style="text-align: center;">90.5</td>
+<td style="text-align: center;">8.7</td>
+<td style="text-align: center;">8.6</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">o1-mini</td>
+<td style="text-align: center;">8.1</td>
+<td style="text-align: center;">28.5</td>
+<td style="text-align: center;">63.4</td>
+<td style="text-align: center;">11.3</td>
+<td style="text-align: center;">9.4</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Claude 3 Sonnet</td>
+<td style="text-align: center;">5.7</td>
+<td style="text-align: center;">75.0</td>
+<td style="text-align: center;">19.3</td>
+<td style="text-align: center;">22.9</td>
+<td style="text-align: center;">9.2</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Claude 3 Haiku</td>
+<td style="text-align: center;">5.1</td>
+<td style="text-align: center;">75.3</td>
+<td style="text-align: center;">19.6</td>
+<td style="text-align: center;">20.6</td>
+<td style="text-align: center;">8.2</td>
+</tr>
+</tbody>
+</table>
+<p><em>Source: arXiv:2411.04368, Table 3 (November 7, 2024)</em></p>
+</section>
+<section id="extended-leaderboard-simpleqa-correct" class="level3">
+<h3 class="anchored" data-anchor-id="extended-leaderboard-simpleqa-correct">Extended Leaderboard — SimpleQA Correct (%)</h3>
+<p>Results from the OpenAI simple-evals repository, showing the “Correct %” metric across all evaluated models:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th style="text-align: center;">Rank</th>
+<th style="text-align: left;">Model</th>
+<th style="text-align: center;">SimpleQA Correct (%)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">1</td>
+<td style="text-align: left;"><strong>GPT-4.5 Preview</strong></td>
+<td style="text-align: center;"><strong>62.5</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">2</td>
+<td style="text-align: left;">o3</td>
+<td style="text-align: center;">49.4</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">3</td>
+<td style="text-align: left;">o3-low</td>
+<td style="text-align: center;">49.4</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">4</td>
+<td style="text-align: left;">o3-high</td>
+<td style="text-align: center;">48.6</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">5</td>
+<td style="text-align: left;">o1</td>
+<td style="text-align: center;">42.6</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">6</td>
+<td style="text-align: left;">o1-preview</td>
+<td style="text-align: center;">42.4</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">7</td>
+<td style="text-align: left;">GPT-4.1</td>
+<td style="text-align: center;">41.6</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">8</td>
+<td style="text-align: left;">GPT-4o (2024-08-06)</td>
+<td style="text-align: center;">40.1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">9</td>
+<td style="text-align: left;">GPT-4o (2024-05-13)</td>
+<td style="text-align: center;">39.0</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">10</td>
+<td style="text-align: left;">GPT-4o (2024-11-20)</td>
+<td style="text-align: center;">38.8</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">11</td>
+<td style="text-align: left;">Claude 3.5 Sonnet</td>
+<td style="text-align: center;">28.9</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">12</td>
+<td style="text-align: left;">GPT-4 Turbo</td>
+<td style="text-align: center;">24.2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">13</td>
+<td style="text-align: left;">Claude 3 Opus</td>
+<td style="text-align: center;">23.5</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">14</td>
+<td style="text-align: left;">o4-mini</td>
+<td style="text-align: center;">20.2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">15</td>
+<td style="text-align: left;">o4-mini-low</td>
+<td style="text-align: center;">20.2</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">16</td>
+<td style="text-align: left;">o4-mini-high</td>
+<td style="text-align: center;">19.3</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">17</td>
+<td style="text-align: left;">GPT-4.1 Mini</td>
+<td style="text-align: center;">16.8</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">18</td>
+<td style="text-align: left;">o3-mini-high</td>
+<td style="text-align: center;">13.8</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">19</td>
+<td style="text-align: left;">o3-mini</td>
+<td style="text-align: center;">13.4</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">20</td>
+<td style="text-align: left;">o3-mini-low</td>
+<td style="text-align: center;">13.0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">21</td>
+<td style="text-align: left;">GPT-4o-mini</td>
+<td style="text-align: center;">9.5</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">22</td>
+<td style="text-align: left;">o1-mini</td>
+<td style="text-align: center;">7.6</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">23</td>
+<td style="text-align: left;">GPT-4.1 Nano</td>
+<td style="text-align: center;">7.6</td>
+</tr>
+</tbody>
+</table>
+<p><em>Source: <a href="https://github.com/openai/simple-evals">github.com/openai/simple-evals</a>, consulted March 29, 2026</em></p>
+</section>
+<section id="key-insights-from-the-results" class="level3">
+<h3 class="anchored" data-anchor-id="key-insights-from-the-results">Key Insights from the Results</h3>
+<ol type="1">
+<li><strong>GPT-4.5 Preview dominates</strong> at 62.5% — OpenAI’s most knowledge-dense model, designed to prioritize breadth of world knowledge</li>
+<li><strong>Reasoning models (o3, o1) score well</strong> but not as high as GPT-4.5, suggesting factual recall ≠ reasoning ability</li>
+<li><strong>Small models struggle badly</strong> — GPT-4o-mini at 9.5%, o1-mini at 7.6%, GPT-4.1 Nano at 7.6%</li>
+<li><strong>Claude models are conservative</strong> — Claude 3 Haiku and Sonnet chose “not attempted” for 75% of questions, keeping their incorrect rate low but correct rate very low</li>
+<li><strong>GPT-4o-mini is overconfident</strong> — only 0.9% not attempted but 90.5% incorrect, showing extreme hallucination tendency on hard factual questions</li>
+</ol>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["SimpleQA Results&lt;br/&gt;Key Patterns"] --&gt; B["Large Models&lt;br/&gt;More Factual&lt;br/&gt;GPT-4.5: 62.5%"]
+    A --&gt; C["Reasoning ≠ Facts&lt;br/&gt;o3: 49% vs&lt;br/&gt;GPT-4.5: 62.5%"]
+    A --&gt; D["Small Models&lt;br/&gt;Hallucinate More&lt;br/&gt;GPT-4o-mini: 9.5%"]
+    A --&gt; E["Calibration Varies&lt;br/&gt;Claude: cautious&lt;br/&gt;GPT-4o-mini: overconfident"]
+
+    style A fill:#2c3e50,stroke:#333,color:#fff
+    style B fill:#27ae60,stroke:#333,color:#fff
+    style C fill:#3498db,stroke:#333,color:#fff
+    style D fill:#e74c3c,stroke:#333,color:#fff
+    style E fill:#f39c12,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="calibration-do-models-know-what-they-know" class="level2">
+<h2 class="anchored" data-anchor-id="calibration-do-models-know-what-they-know">Calibration — Do Models Know What They Know?</h2>
+<p>One of SimpleQA’s most valuable contributions is measuring <strong>calibration</strong> — whether a model’s stated confidence correlates with its actual accuracy. The paper found:</p>
+<ul>
+<li><strong>Larger models are better calibrated</strong> — o1-preview and GPT-4o outperform their mini variants</li>
+<li><strong>All models overstate confidence</strong> — stated confidence consistently exceeds actual accuracy</li>
+<li><strong>Frequency-based calibration works</strong> — when asked the same question 100 times, the most-frequent answer’s frequency correlates with its correctness</li>
+<li><strong>o1-preview is most calibrated</strong> — its answer frequency roughly matches its accuracy</li>
+</ul>
+<p>This means SimpleQA measures two things: (1) what a model knows, and (2) whether it knows what it knows.</p>
+</section>
+<section id="data-collection-pipeline" class="level2">
+<h2 class="anchored" data-anchor-id="data-collection-pipeline">Data Collection Pipeline</h2>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["AI Trainer #1&lt;br/&gt;Creates question + answer&lt;br/&gt;with web source"] --&gt; B["ChatGPT Classifiers&lt;br/&gt;Check criteria violations&lt;br/&gt;(ambiguous, temporal, etc.)"]
+    B --&gt; C["AI Trainer #2&lt;br/&gt;Independently answers&lt;br/&gt;without seeing original"]
+    C --&gt; D{"Both trainers&lt;br/&gt;agree?"}
+    D --&gt;|No| E["❌ Removed"]
+    D --&gt;|Yes| F["Kept in Dataset"]
+    F --&gt; G["Quality Filters&lt;br/&gt;2+ unique source domains&lt;br/&gt;+ timeless + single answer"]
+    G --&gt; H["Final Dataset&lt;br/&gt;4,326 questions"]
+    H --&gt; I["Trainer #3 Spot Check&lt;br/&gt;1,000 samples → 94.4% agreement"]
+
+    style A fill:#3498db,stroke:#333,color:#fff
+    style B fill:#f39c12,stroke:#333,color:#fff
+    style C fill:#3498db,stroke:#333,color:#fff
+    style D fill:#9b59b6,stroke:#333,color:#fff
+    style E fill:#e74c3c,stroke:#333,color:#fff
+    style F fill:#27ae60,stroke:#333,color:#fff
+    style G fill:#f39c12,stroke:#333,color:#fff
+    style H fill:#27ae60,stroke:#333,color:#fff
+    style I fill:#2c3e50,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>Key requirements for every question:</p>
+<ul>
+<li><strong>Single indisputable answer</strong> — “which city” not just “where”</li>
+<li><strong>Answer must not change over time</strong> — no “who is the current president” style questions</li>
+<li><strong>Must be challenging</strong> — at least one GPT-4 completion must be incorrect</li>
+<li><strong>Answerable as of December 31, 2023</strong> — to fairly evaluate all models</li>
+<li><strong>Supported by evidence</strong> — reference answers backed by web sources from both annotators</li>
+</ul>
+</section>
+<section id="where-to-explore-simpleqa" class="level2">
+<h2 class="anchored" data-anchor-id="where-to-explore-simpleqa">Where to Explore SimpleQA</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Resource</th>
+<th style="text-align: left;">Link</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>arXiv Paper</strong></td>
+<td style="text-align: left;"><a href="https://arxiv.org/abs/2411.04368">arxiv.org/abs/2411.04368</a></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>OpenAI Blog Post</strong></td>
+<td style="text-align: left;"><a href="https://openai.com/index/introducing-simpleqa/">openai.com/index/introducing-simpleqa</a></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>GitHub (simple-evals)</strong></td>
+<td style="text-align: left;"><a href="https://github.com/openai/simple-evals">github.com/openai/simple-evals</a></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>HuggingFace Dataset</strong></td>
+<td style="text-align: left;"><a href="https://huggingface.co/datasets/openai/SimpleQA">huggingface.co/datasets/openai/SimpleQA</a></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>License</strong></td>
+<td style="text-align: left;">MIT License</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="watch-the-video" class="level2">
+<h2 class="anchored" data-anchor-id="watch-the-video">Watch the Video</h2>
+<div class="quarto-video ratio ratio-16x9"><iframe data-external="1" src="https://www.youtube.com/embed/He-ziaASBAE" title="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen=""></iframe></div>
+<p>If you found this overview useful, <strong>subscribe</strong> to the <a href="https://www.youtube.com/@VectoringAI">VectoringAI YouTube channel</a> and <strong>share</strong> this article with your network!</p>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ol type="1">
+<li>Wei, J., Karina, N., Chung, H.W., Jiao, Y.J., Papay, S., Glaese, A., Schulman, J., &amp; Fedus, W. (2024). <em>Measuring short-form factuality in large language models</em>. arXiv:2411.04368.</li>
+<li>OpenAI. (2024). <em>Introducing SimpleQA</em>. <a href="https://openai.com/index/introducing-simpleqa/">openai.com/index/introducing-simpleqa</a>.</li>
+<li>OpenAI. (2024). <em>simple-evals: A lightweight library for evaluating language models</em>. <a href="https://github.com/openai/simple-evals">github.com/openai/simple-evals</a>.</li>
+<li>Joshi, M., Choi, E., Weld, D., &amp; Zettlemoyer, L. (2017). <em>TriviaQA: A Large Scale Distantly Supervised Challenge Dataset for Reading Comprehension</em>. ACL 2017.</li>
+<li>Kwiatkowski, T. et al.&nbsp;(2019). <em>Natural Questions: A Benchmark for Question Answering Research</em>. TACL 2019.</li>
+<li>Kadavath, S. et al.&nbsp;(2022). <em>Language Models (Mostly) Know What They Know</em>. arXiv:2207.05221.</li>
+</ol>
+</section>
+<section id="read-more" class="level2">
+<h2 class="anchored" data-anchor-id="read-more">Read More</h2>
+<ul>
+<li><a href="../../posts/benchmark/Humanitys Last Exam.html">Humanity’s Last Exam</a> — the ultimate frontier benchmark across 100+ academic disciplines</li>
+<li><a href="../../posts/benchmark/GPQA Diamond.html">GPQA Diamond</a> — graduate-level science questions that challenge expert reasoning</li>
+<li><a href="../../posts/benchmark/MMMLU.html">MMMLU</a> — massively multilingual multitask language understanding</li>
+<li><a href="../../posts/benchmark/MMMU-Pro.html">MMMU-Pro</a> — multimodal understanding pushing beyond text-only evaluation</li>
+<li><a href="../../posts/benchmark/OpenAI MRCR.html">OpenAI MRCR</a> — multi-round coreference resolution for long-context reliability</li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/vectoringai\.com\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> 2025-2026 Vectoring AI. All rights reserved.</p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
