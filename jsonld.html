@@ -1,0 +1,41 @@
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var ogTitle = document.querySelector('meta[property="og:title"]');
+  var ogDesc = document.querySelector('meta[property="og:description"]');
+  var ogImage = document.querySelector('meta[property="og:image"]');
+  var dcDate = document.querySelector('meta[name="dcterms.date"]');
+
+  if (!ogTitle) return;
+
+  var isArticle = !!dcDate;
+  var jsonld = {
+    "@context": "https://schema.org",
+    "@type": isArticle ? "Article" : "WebPage",
+    "headline": ogTitle.content.replace(/ – Vectoring AI$/, ''),
+    "description": ogDesc ? ogDesc.content : "",
+    "url": window.location.href,
+    "author": {
+      "@type": "Organization",
+      "name": "Vectoring AI",
+      "url": "https://vectoringai.com/pages/about.html"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Vectoring AI",
+      "url": "https://vectoringai.com",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://vectoringai.com/images/favicon_io/android-chrome-512x512.png"
+      }
+    }
+  };
+
+  if (ogImage) jsonld.image = ogImage.content;
+  if (dcDate) jsonld.datePublished = dcDate.content;
+
+  var el = document.createElement('script');
+  el.type = 'application/ld+json';
+  el.textContent = JSON.stringify(jsonld);
+  document.head.appendChild(el);
+});
+</script>
