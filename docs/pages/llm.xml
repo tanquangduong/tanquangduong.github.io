@@ -20,7 +20,1272 @@
 
 
 
-div id=“notebook-link” data-url=“https://colab.research.google.com/github/VectoringAI/ai-engineering/blob/main/llm/decoding_methods_for_text_generation_with_llms.ipynb” style=“display:none”&gt;
+<div id="notebook-link" data-url="https://colab.research.google.com/github/VectoringAI/ai-engineering/blob/main/llm/decoding_methods_for_text_generation_with_llms.ipynb" style="display:none">
+
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://vectoringai.com/images/llm/decoding-llm-300px.png" class="img-fluid figure-img" width="300"></p>
+<figcaption>Comparison of LLM decoding methods: greedy, beam search, top-k, top-p sampling</figcaption>
+</figure>
+</div>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>When a pretrained language model generates text, it produces a probability distribution over the entire vocabulary at each step. <strong>The decoding method determines how the next token is selected from that distribution.</strong> This choice has a dramatic effect on output quality — the same model can produce boring repetitive text or creative human-like prose, depending entirely on the decoding strategy.</p>
+<p>This article provides a practical, hands-on comparison of six common decoding methods using <strong>GPT-2</strong> (124M parameters) — a small model that runs comfortably on CPU. All code examples use the Hugging Face <code>transformers</code> library and can be reproduced on any machine.</p>
+<blockquote class="blockquote">
+<p>If you are new to running LLMs locally, check out <a href="../../posts/llm/Run-LLM-locally-with-Ollama.html">Run LLM Locally with Ollama</a> for a beginner-friendly setup guide. For deploying models at scale, see <a href="../../posts/llm/Deploying-and-Serving-LLM-with-vLLM.html">Deploying and Serving LLM with vLLM</a> and <a href="../../posts/llm/Deploying-and-Serving-LLM-with-Llama.cpp.html">Deploying and Serving LLM with Llama.cpp</a>.</p>
+</blockquote>
+</section>
+<section id="how-auto-regressive-generation-works" class="level2">
+<h2 class="anchored" data-anchor-id="how-auto-regressive-generation-works">How Auto-Regressive Generation Works</h2>
+<p>All decoder-only LLMs (GPT-2, Llama, Mistral, Phi, etc.) generate text <strong>one token at a time</strong>. The probability of a word sequence is decomposed as:</p>
+<p><img src="https://latex.codecogs.com/png.latex?P(w_%7B1:T%7D%20%7C%20W_0)%20=%20%5Cprod_%7Bt=1%7D%5E%7BT%7D%20P(w_t%20%7C%20w_%7B1:t-1%7D,%20W_0)"></p>
+<p>where <img src="https://latex.codecogs.com/png.latex?W_0"> is the initial prompt (context) and <img src="https://latex.codecogs.com/png.latex?T"> is the generated sequence length. Generation stops when the model emits an <strong>end-of-sequence (EOS)</strong> token or a maximum length is reached.</p>
+<p>The key question is: <strong>how do we pick <img src="https://latex.codecogs.com/png.latex?w_t"> from <img src="https://latex.codecogs.com/png.latex?P(w_t%20%7C%20w_%7B1:t-1%7D)"> at each step?</strong> That is exactly what a decoding method defines.</p>
+</section>
+<section id="setup" class="level2">
+<h2 class="anchored" data-anchor-id="setup">Setup</h2>
+<p>Install the required library and load the model:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1">pip install transformers torch</span></code></pre></div></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> transformers <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> AutoModelForCausalLM, AutoTokenizer, set_seed</span>
+<span id="cb2-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> torch</span>
+<span id="cb2-3"></span>
+<span id="cb2-4">device <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"cuda"</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> torch.cuda.is_available() <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">else</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"cpu"</span></span>
+<span id="cb2-5">tokenizer <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> AutoTokenizer.from_pretrained(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"gpt2"</span>)</span>
+<span id="cb2-6">model <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> AutoModelForCausalLM.from_pretrained(</span>
+<span id="cb2-7">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"gpt2"</span>, pad_token_id<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>tokenizer.eos_token_id</span>
+<span id="cb2-8">).to(device)</span>
+<span id="cb2-9"></span>
+<span id="cb2-10">prompt <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Artificial intelligence is"</span></span>
+<span id="cb2-11">inputs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> tokenizer(prompt, return_tensors<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"pt"</span>).to(device)</span></code></pre></div></div>
+<p>We use <strong>GPT-2</strong> (124M parameters) throughout — small enough to run on CPU, yet large enough to demonstrate clear differences between decoding strategies.</p>
+</section>
+<section id="greedy-search" class="level2">
+<h2 class="anchored" data-anchor-id="greedy-search">1. Greedy Search</h2>
+<p>Greedy search is the simplest strategy. At each step, it selects the token with the <strong>highest probability</strong>:</p>
+<p><img src="https://latex.codecogs.com/png.latex?w_t%20=%20%5Carg%5Cmax_w%20P(w%20%7C%20w_%7B1:t-1%7D)"></p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["The"] --&gt; B["&lt;b&gt;nice&lt;/b&gt; (0.5)"]
+    A --&gt; C["dog (0.4)"]
+    A --&gt; D["car (0.1)"]
+    B --&gt; E["&lt;b&gt;woman&lt;/b&gt; (0.4)"]
+    B --&gt; F["day (0.3)"]
+    B --&gt; G["house (0.3)"]
+
+    style B fill:#56cc9d,stroke:#333,color:#fff
+    style E fill:#56cc9d,stroke:#333,color:#fff
+    style C fill:#f8f9fa,stroke:#ccc
+    style D fill:#f8f9fa,stroke:#ccc
+    style F fill:#f8f9fa,stroke:#ccc
+    style G fill:#f8f9fa,stroke:#ccc
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p><em>Greedy search always follows the green path — picking the single highest-probability token at each step. Result: “The nice woman” (0.5 x 0.4 = 0.20). It misses “The dog has” (0.4 x 0.9 = 0.36).</em></p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1">output <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> model.generate(<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span>inputs, max_new_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">60</span>)</span>
+<span id="cb3-2"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(tokenizer.decode(output[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], skip_special_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>))</span></code></pre></div></div>
+<p><strong>Pros:</strong></p>
+<ul>
+<li>Fast and deterministic.</li>
+<li>Good for short, factual outputs.</li>
+</ul>
+<p><strong>Cons:</strong></p>
+<ul>
+<li>Quickly falls into <strong>repetitive loops</strong> — the model keeps generating the same phrases.</li>
+<li>Misses high-probability sequences hidden behind lower-probability initial tokens.</li>
+</ul>
+<p>Greedy search is the default in <code>transformers</code> when no other parameters are specified.</p>
+</section>
+<section id="beam-search" class="level2">
+<h2 class="anchored" data-anchor-id="beam-search">2. Beam Search</h2>
+<p>Beam search keeps track of the top <img src="https://latex.codecogs.com/png.latex?n"> most likely partial sequences (called <strong>beams</strong>) at each step, then selects the sequence with the highest overall probability. It reduces the risk of missing good sequences that greedy search would overlook.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["The"] --&gt; B["nice (0.5)"]
+    A --&gt; C["dog (0.4)"]
+    B --&gt; E["woman (0.4)&lt;br/&gt;path: 0.20"]
+    B --&gt; F["day (0.3)&lt;br/&gt;path: 0.15"]
+    C --&gt; G["&lt;b&gt;has (0.9)&lt;/b&gt;&lt;br/&gt;&lt;b&gt;path: 0.36&lt;/b&gt;"]
+    C --&gt; H["runs (0.05)&lt;br/&gt;path: 0.02"]
+
+    style B fill:#6cc3d5,stroke:#333,color:#fff
+    style C fill:#6cc3d5,stroke:#333,color:#fff
+    style G fill:#56cc9d,stroke:#333,color:#fff
+    style E fill:#f8f9fa,stroke:#ccc
+    style F fill:#f8f9fa,stroke:#ccc
+    style H fill:#f8f9fa,stroke:#ccc
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p><em>With num_beams=2, both “nice” and “dog” are kept (blue). At the next step, all continuations are scored and the best overall path — “The dog has” (0.36) — wins (green).</em></p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1">output <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> model.generate(</span>
+<span id="cb4-2">    <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span>inputs,</span>
+<span id="cb4-3">    max_new_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">60</span>,</span>
+<span id="cb4-4">    num_beams<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>,</span>
+<span id="cb4-5">    no_repeat_ngram_size<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>,</span>
+<span id="cb4-6">    early_stopping<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb4-7">)</span>
+<span id="cb4-8"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(tokenizer.decode(output[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], skip_special_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>))</span></code></pre></div></div>
+<p><strong>Key parameters:</strong></p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 45%">
+<col style="width: 54%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>num_beams</code></td>
+<td>Number of beams to track (higher = more exploration, slower)</td>
+</tr>
+<tr class="even">
+<td><code>no_repeat_ngram_size</code></td>
+<td>Prevents any n-gram from appearing twice</td>
+</tr>
+<tr class="odd">
+<td><code>early_stopping</code></td>
+<td>Stops when all beams reach the EOS token</td>
+</tr>
+<tr class="even">
+<td><code>num_return_sequences</code></td>
+<td>Return multiple candidate sequences</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Pros:</strong></p>
+<ul>
+<li>Finds higher-probability sequences than greedy search.</li>
+<li>Effective for tasks with predictable output length (translation, summarization).</li>
+</ul>
+<p><strong>Cons:</strong></p>
+<ul>
+<li>Still suffers from repetition without n-gram penalties.</li>
+<li>Produces text that is <strong>too predictable</strong> and lacks diversity for open-ended generation.</li>
+<li>Slower than greedy search due to tracking multiple beams.</li>
+</ul>
+</section>
+<section id="pure-sampling" class="level2">
+<h2 class="anchored" data-anchor-id="pure-sampling">3. Pure Sampling</h2>
+<p>Sampling randomly picks the next token according to its probability distribution:</p>
+<p><img src="https://latex.codecogs.com/png.latex?w_t%20%5Csim%20P(w%20%7C%20w_%7B1:t-1%7D)"></p>
+<p>This introduces randomness, breaking the repetition patterns of deterministic methods.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["Vocabulary distribution"] --&gt; B["nice — 50%"]
+    A --&gt; C["dog — 30%"]
+    A --&gt; D["car — 10%"]
+    A --&gt; E["the — 5%"]
+    A --&gt; F["banana — 3%"]
+    A --&gt; G["... — 2%"]
+    D -.-&gt;|"🎲 randomly selected"| H["Next token: car"]
+
+    style D fill:#ffce67,stroke:#333
+    style H fill:#ffce67,stroke:#333
+    style B fill:#f8f9fa,stroke:#ccc
+    style C fill:#f8f9fa,stroke:#ccc
+    style E fill:#f8f9fa,stroke:#ccc
+    style F fill:#f8f9fa,stroke:#ccc
+    style G fill:#f8f9fa,stroke:#ccc
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p><em>Every token in the vocabulary has a chance proportional to its probability. Even low-probability tokens like “car” (10%) can be selected, which adds diversity but also risk of incoherence.</em></p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1">set_seed(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">42</span>)</span>
+<span id="cb5-2">output <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> model.generate(</span>
+<span id="cb5-3">    <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span>inputs,</span>
+<span id="cb5-4">    max_new_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">60</span>,</span>
+<span id="cb5-5">    do_sample<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb5-6">    top_k<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># disable top-k to use full vocabulary</span></span>
+<span id="cb5-7">)</span>
+<span id="cb5-8"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(tokenizer.decode(output[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], skip_special_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>))</span></code></pre></div></div>
+<p><strong>Pros:</strong></p>
+<ul>
+<li>Eliminates repetition.</li>
+<li>Produces diverse, creative outputs.</li>
+</ul>
+<p><strong>Cons:</strong></p>
+<ul>
+<li>Can produce <strong>incoherent or nonsensical</strong> text because low-probability (weird) tokens still have a chance of being selected.</li>
+</ul>
+<p>Pure sampling is rarely used in practice — the variants below (temperature, top-k, top-p) are used to make it more controlled.</p>
+</section>
+<section id="temperature-scaling" class="level2">
+<h2 class="anchored" data-anchor-id="temperature-scaling">4. Temperature Scaling</h2>
+<p>Temperature <img src="https://latex.codecogs.com/png.latex?%5Ctau"> reshapes the probability distribution before sampling. It is applied to the logits before the softmax:</p>
+<p><img src="https://latex.codecogs.com/png.latex?P(w_i)%20=%20%5Cfrac%7B%5Cexp(z_i%20/%20%5Ctau)%7D%7B%5Csum_j%20%5Cexp(z_j%20/%20%5Ctau)%7D"></p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph low["Low temp (τ=0.3) — Sharp"]
+        direction TB
+        a1["nice — 80%"]
+        a2["dog — 15%"]
+        a3["car — 5%"]
+    end
+    subgraph mid["Normal (τ=1.0) — Original"]
+        direction TB
+        b1["nice — 50%"]
+        b2["dog — 30%"]
+        b3["car — 20%"]
+    end
+    subgraph high["High temp (τ=2.0) — Flat"]
+        direction TB
+        c1["nice — 35%"]
+        c2["dog — 33%"]
+        c3["car — 32%"]
+    end
+
+    style low fill:#56cc9d,stroke:#333,color:#fff
+    style mid fill:#6cc3d5,stroke:#333,color:#fff
+    style high fill:#ff7851,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p><em>Low temperature concentrates probability on the top token (more deterministic). High temperature flattens the distribution toward uniform (more random). At τ→0, it becomes greedy search.</em></p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 61%">
+<col style="width: 38%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Temperature</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><img src="https://latex.codecogs.com/png.latex?%5Ctau%20%3C%201"></td>
+<td>Sharpens the distribution — high-probability tokens become even more likely. Output is more focused and deterministic.</td>
+</tr>
+<tr class="even">
+<td><img src="https://latex.codecogs.com/png.latex?%5Ctau%20=%201"></td>
+<td>No change — original distribution.</td>
+</tr>
+<tr class="odd">
+<td><img src="https://latex.codecogs.com/png.latex?%5Ctau%20%3E%201"></td>
+<td>Flattens the distribution — low-probability tokens get a bigger share. Output is more random and creative.</td>
+</tr>
+<tr class="even">
+<td><img src="https://latex.codecogs.com/png.latex?%5Ctau%20%5Cto%200"></td>
+<td>Equivalent to greedy search.</td>
+</tr>
+</tbody>
+</table>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1">set_seed(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">42</span>)</span>
+<span id="cb6-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Low temperature → more focused</span></span>
+<span id="cb6-3">output <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> model.generate(</span>
+<span id="cb6-4">    <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span>inputs,</span>
+<span id="cb6-5">    max_new_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">60</span>,</span>
+<span id="cb6-6">    do_sample<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb6-7">    temperature<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.3</span>,</span>
+<span id="cb6-8">    top_k<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span></span>
+<span id="cb6-9">)</span>
+<span id="cb6-10"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Low temp:"</span>, tokenizer.decode(output[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], skip_special_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>))</span>
+<span id="cb6-11"></span>
+<span id="cb6-12">set_seed(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">42</span>)</span>
+<span id="cb6-13"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># High temperature → more creative</span></span>
+<span id="cb6-14">output <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> model.generate(</span>
+<span id="cb6-15">    <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span>inputs,</span>
+<span id="cb6-16">    max_new_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">60</span>,</span>
+<span id="cb6-17">    do_sample<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb6-18">    temperature<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.5</span>,</span>
+<span id="cb6-19">    top_k<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span></span>
+<span id="cb6-20">)</span>
+<span id="cb6-21"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"High temp:"</span>, tokenizer.decode(output[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], skip_special_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>))</span></code></pre></div></div>
+<p>Temperature is typically used <strong>in combination</strong> with top-k or top-p, not alone. Common values range from <strong>0.3</strong> (factual) to <strong>1.0</strong> (creative).</p>
+</section>
+<section id="top-k-sampling" class="level2">
+<h2 class="anchored" data-anchor-id="top-k-sampling">5. Top-K Sampling</h2>
+<p>Top-K sampling (Fan et al., 2018) filters the vocabulary to only the <strong>K most likely tokens</strong>, then redistributes the probability mass among them.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    A["Full vocabulary&lt;br/&gt;(50,257 tokens)"] --&gt; B["Sort by&lt;br/&gt;probability"]
+    B --&gt; C["Keep top K=5&lt;br/&gt;tokens only"]
+    C --&gt; D["Renormalize&lt;br/&gt;probabilities"]
+    D --&gt; E["🎲 Sample from&lt;br/&gt;filtered set"]
+
+    style A fill:#f8f9fa,stroke:#333
+    style B fill:#6cc3d5,stroke:#333,color:#fff
+    style C fill:#ffce67,stroke:#333
+    style D fill:#56cc9d,stroke:#333,color:#fff
+    style E fill:#78c2ad,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph kept["Kept — Top K=5"]
+        T1["nice — 0.30"]
+        T2["dog — 0.25"]
+        T3["big — 0.20"]
+        T4["old — 0.15"]
+        T5["red — 0.10"]
+    end
+    subgraph removed["Removed"]
+        T6["the — 0.04"]
+        T7["a — 0.02"]
+        T8["banana — 0.001"]
+        T9["... 50K+ tokens"]
+    end
+
+    style kept fill:#56cc9d,stroke:#333,color:#fff
+    style removed fill:#f8f9fa,stroke:#ccc
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p><em>Top-K keeps a fixed number of candidates regardless of how the probability is distributed. The removed tail tokens can never be selected.</em></p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1">set_seed(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">42</span>)</span>
+<span id="cb7-2">output <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> model.generate(</span>
+<span id="cb7-3">    <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span>inputs,</span>
+<span id="cb7-4">    max_new_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">60</span>,</span>
+<span id="cb7-5">    do_sample<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb7-6">    top_k<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span></span>
+<span id="cb7-7">)</span>
+<span id="cb7-8"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(tokenizer.decode(output[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], skip_special_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>))</span></code></pre></div></div>
+<p><strong>How it works:</strong></p>
+<ol type="1">
+<li>Compute the probability distribution over the full vocabulary.</li>
+<li>Keep only the top <img src="https://latex.codecogs.com/png.latex?K"> tokens.</li>
+<li>Renormalize probabilities among these <img src="https://latex.codecogs.com/png.latex?K"> tokens.</li>
+<li>Sample from the filtered distribution.</li>
+</ol>
+<p><strong>Pros:</strong></p>
+<ul>
+<li>Eliminates nonsensical low-probability tokens.</li>
+<li>GPT-2 used top-k=40 and became famous for generating coherent stories.</li>
+</ul>
+<p><strong>Cons:</strong></p>
+<ul>
+<li>Fixed <img src="https://latex.codecogs.com/png.latex?K"> does not adapt to the shape of the distribution. When the model is very confident (sharp distribution), <img src="https://latex.codecogs.com/png.latex?K=50"> may include garbage tokens. When the model is uncertain (flat distribution), <img src="https://latex.codecogs.com/png.latex?K=50"> may exclude reasonable candidates.</li>
+</ul>
+</section>
+<section id="top-p-nucleus-sampling" class="level2">
+<h2 class="anchored" data-anchor-id="top-p-nucleus-sampling">6. Top-p (Nucleus) Sampling</h2>
+<p>Top-p sampling (Holtzman et al., 2019) dynamically selects the <strong>smallest set of tokens</strong> whose cumulative probability exceeds a threshold <img src="https://latex.codecogs.com/png.latex?p">.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph confident["Confident distribution — only 3 tokens needed"]
+        direction LR
+        C1["nice — 0.60"] --&gt; C2["dog — 0.25"] --&gt; C3["big — 0.10"]
+    end
+    subgraph uncertain["Uncertain distribution — 7 tokens needed"]
+        direction LR
+        U1["nice — 0.18"] --&gt; U2["dog — 0.16"] --&gt; U3["big — 0.14"] --&gt; U4["old — 0.13"] --&gt; U5["red — 0.12"] --&gt; U6["the — 0.11"] --&gt; U7["a — 0.10"]
+    end
+
+    P["p = 0.92"] --&gt; confident
+    P --&gt; uncertain
+
+    style confident fill:#56cc9d,stroke:#333,color:#fff
+    style uncertain fill:#6cc3d5,stroke:#333,color:#fff
+    style P fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p><em>Top-p adapts the candidate set size dynamically. When the model is confident (sharp distribution), few tokens suffice. When uncertain (flat distribution), more tokens are included. This is the key advantage over fixed Top-K.</em></p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1">set_seed(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">42</span>)</span>
+<span id="cb8-2">output <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> model.generate(</span>
+<span id="cb8-3">    <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span>inputs,</span>
+<span id="cb8-4">    max_new_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">60</span>,</span>
+<span id="cb8-5">    do_sample<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb8-6">    top_p<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.92</span>,</span>
+<span id="cb8-7">    top_k<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># disable top-k to let top-p work alone</span></span>
+<span id="cb8-8">)</span>
+<span id="cb8-9"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(tokenizer.decode(output[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], skip_special_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>))</span></code></pre></div></div>
+<p><strong>How it works:</strong></p>
+<ol type="1">
+<li>Sort tokens by probability (descending).</li>
+<li>Cumulate probabilities until the sum exceeds <img src="https://latex.codecogs.com/png.latex?p">.</li>
+<li>Discard all tokens beyond that cutoff.</li>
+<li>Renormalize and sample.</li>
+</ol>
+<p><strong>Pros:</strong></p>
+<ul>
+<li><strong>Adapts dynamically</strong> — uses fewer tokens when the model is confident, more tokens when it is uncertain.</li>
+<li>Generally produces more fluent and coherent text than top-k for open-ended generation.</li>
+</ul>
+<p><strong>Cons:</strong></p>
+<ul>
+<li>Still non-deterministic — results vary across runs.</li>
+</ul>
+<p><strong>Combining top-k and top-p</strong> is a common practice: top-k first removes the long tail, then top-p refines the selection dynamically.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1">set_seed(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">42</span>)</span>
+<span id="cb9-2">output <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> model.generate(</span>
+<span id="cb9-3">    <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span>inputs,</span>
+<span id="cb9-4">    max_new_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">60</span>,</span>
+<span id="cb9-5">    do_sample<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb9-6">    top_k<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span>,</span>
+<span id="cb9-7">    top_p<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.95</span>,</span>
+<span id="cb9-8">    temperature<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.8</span></span>
+<span id="cb9-9">)</span>
+<span id="cb9-10"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(tokenizer.decode(output[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], skip_special_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>))</span></code></pre></div></div>
+</section>
+<section id="contrastive-search" class="level2">
+<h2 class="anchored" data-anchor-id="contrastive-search">7. Contrastive Search</h2>
+<p>Contrastive search (Su et al., NeurIPS 2022) is a newer deterministic method designed to produce human-level text without the repetition of greedy/beam search and without the incoherence of sampling.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["Top-K candidates&lt;br/&gt;(k=4)"] --&gt; B["Candidate: nice"]
+    A --&gt; C["Candidate: dog"]
+    A --&gt; D["Candidate: big"]
+    A --&gt; E["Candidate: old"]
+
+    B --&gt; F["Model confidence: 0.50"]
+    B --&gt; G["Degeneration penalty: 0.85&lt;br/&gt;(similar to context)"]
+    F --&gt; H["Score = (1-α)·0.50 − α·0.85"]
+
+    C --&gt; I["Model confidence: 0.30"]
+    C --&gt; J["Degeneration penalty: 0.20&lt;br/&gt;(different from context)"]
+    I --&gt; K["Score = (1-α)·0.30 − α·0.20 ✅"]
+
+    style K fill:#56cc9d,stroke:#333,color:#fff
+    style H fill:#f8f9fa,stroke:#ccc
+    style B fill:#ff7851,stroke:#333,color:#fff
+    style C fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p><em>“nice” has higher probability but is too similar to previous context (high penalty). “dog” is less probable but brings new information (low penalty), so it wins. This prevents degenerate repetition while staying coherent.</em></p>
+<p>At each step, it selects the token that maximizes:</p>
+<p><img src="https://latex.codecogs.com/png.latex?(1%20-%20%5Calpha)%20%5Ctimes%20%5Cunderbrace%7BP(v%20%7C%20x_%7B%3Ct%7D)%7D_%7B%5Ctext%7Bmodel%20confidence%7D%7D%20-%20%5Calpha%20%5Ctimes%20%5Cunderbrace%7B%5Cmax_%7Bj%20%3C%20t%7D%20%5Ccos(h_v,%20h_%7Bx_j%7D)%7D_%7B%5Ctext%7Bdegeneration%20penalty%7D%7D"></p>
+<p>where:</p>
+<ul>
+<li><strong>Model confidence</strong>: the probability assigned by the language model (keeps the text coherent).</li>
+<li><strong>Degeneration penalty</strong>: the maximum cosine similarity between the candidate token’s representation and all previous token representations (prevents repetition).</li>
+<li><img src="https://latex.codecogs.com/png.latex?%5Calpha"> controls the trade-off. When <img src="https://latex.codecogs.com/png.latex?%5Calpha%20=%200">, it reduces to greedy search.</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1">output <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> model.generate(</span>
+<span id="cb10-2">    <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span>inputs,</span>
+<span id="cb10-3">    max_new_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">60</span>,</span>
+<span id="cb10-4">    penalty_alpha<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.6</span>,</span>
+<span id="cb10-5">    top_k<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span></span>
+<span id="cb10-6">)</span>
+<span id="cb10-7"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(tokenizer.decode(output[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], skip_special_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>))</span></code></pre></div></div>
+<p><strong>Key parameters:</strong></p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 45%">
+<col style="width: 54%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>penalty_alpha</code></td>
+<td>The <img src="https://latex.codecogs.com/png.latex?%5Calpha"> hyperparameter (typically 0.5–0.6)</td>
+</tr>
+<tr class="even">
+<td><code>top_k</code></td>
+<td>Number of candidate tokens considered at each step (typically 4–10)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Pros:</strong></p>
+<ul>
+<li><strong>Deterministic</strong> — same input always produces the same output.</li>
+<li>Generates remarkably fluent and coherent text, often approaching human quality.</li>
+<li>Avoids repetition without needing n-gram penalties.</li>
+</ul>
+<p><strong>Cons:</strong></p>
+<ul>
+<li>Slower than greedy search (requires computing token representations at each step).</li>
+<li>Less creative/diverse than sampling-based methods.</li>
+</ul>
+</section>
+<section id="comparison-summary" class="level2">
+<h2 class="anchored" data-anchor-id="comparison-summary">Comparison Summary</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Method</th>
+<th style="text-align: center;">Deterministic</th>
+<th style="text-align: center;">Repetition</th>
+<th style="text-align: center;">Coherence</th>
+<th style="text-align: center;">Diversity</th>
+<th style="text-align: center;">Speed</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Greedy Search</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">High</td>
+<td style="text-align: center;">Medium</td>
+<td style="text-align: center;">Low</td>
+<td style="text-align: center;">Fast</td>
+</tr>
+<tr class="even">
+<td>Beam Search</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Medium*</td>
+<td style="text-align: center;">Medium-High</td>
+<td style="text-align: center;">Low</td>
+<td style="text-align: center;">Medium</td>
+</tr>
+<tr class="odd">
+<td>Pure Sampling</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">Low</td>
+<td style="text-align: center;">Low</td>
+<td style="text-align: center;">High</td>
+<td style="text-align: center;">Fast</td>
+</tr>
+<tr class="even">
+<td>Top-K Sampling</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">Low</td>
+<td style="text-align: center;">Medium-High</td>
+<td style="text-align: center;">Medium-High</td>
+<td style="text-align: center;">Fast</td>
+</tr>
+<tr class="odd">
+<td>Top-p Sampling</td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;">Low</td>
+<td style="text-align: center;">High</td>
+<td style="text-align: center;">Medium-High</td>
+<td style="text-align: center;">Fast</td>
+</tr>
+<tr class="even">
+<td>Contrastive Search</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Low</td>
+<td style="text-align: center;">Very High</td>
+<td style="text-align: center;">Medium</td>
+<td style="text-align: center;">Slow</td>
+</tr>
+</tbody>
+</table>
+<p>*with n-gram penalty enabled</p>
+</section>
+<section id="when-to-use-what" class="level2">
+<h2 class="anchored" data-anchor-id="when-to-use-what">When to Use What</h2>
+<ul>
+<li><strong>Factual / deterministic tasks</strong> (translation, summarization, code generation): Use <strong>beam search</strong> with n-gram penalty, or <strong>contrastive search</strong>.</li>
+<li><strong>Creative / open-ended generation</strong> (storytelling, dialogue, brainstorming): Use <strong>top-p + top-k + temperature</strong> sampling.</li>
+<li><strong>Maximum quality on open-ended text</strong>: Try <strong>contrastive search</strong> — it often produces the most human-like output from off-the-shelf models.</li>
+<li><strong>Quick prototyping / debugging</strong>: <strong>Greedy search</strong> is fast and reproducible; useful for sanity-checking that the model works.</li>
+</ul>
+</section>
+<section id="full-working-example" class="level2">
+<h2 class="anchored" data-anchor-id="full-working-example">Full Working Example</h2>
+<p>Below is a complete script that generates text using all six methods for side-by-side comparison:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> transformers <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> AutoModelForCausalLM, AutoTokenizer, set_seed</span>
+<span id="cb11-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> torch</span>
+<span id="cb11-3"></span>
+<span id="cb11-4">device <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"cuda"</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> torch.cuda.is_available() <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">else</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"cpu"</span></span>
+<span id="cb11-5">tokenizer <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> AutoTokenizer.from_pretrained(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"gpt2"</span>)</span>
+<span id="cb11-6">model <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> AutoModelForCausalLM.from_pretrained(</span>
+<span id="cb11-7">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"gpt2"</span>, pad_token_id<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>tokenizer.eos_token_id</span>
+<span id="cb11-8">).to(device)</span>
+<span id="cb11-9"></span>
+<span id="cb11-10">prompt <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"The future of artificial intelligence is"</span></span>
+<span id="cb11-11">inputs <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> tokenizer(prompt, return_tensors<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"pt"</span>).to(device)</span>
+<span id="cb11-12">max_tokens <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">80</span></span>
+<span id="cb11-13"></span>
+<span id="cb11-14"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"="</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">70</span>)</span>
+<span id="cb11-15"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"PROMPT:"</span>, prompt)</span>
+<span id="cb11-16"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"="</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">70</span>)</span>
+<span id="cb11-17"></span>
+<span id="cb11-18"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 1. Greedy Search</span></span>
+<span id="cb11-19">output <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> model.generate(<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span>inputs, max_new_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>max_tokens)</span>
+<span id="cb11-20"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">[Greedy Search]"</span>)</span>
+<span id="cb11-21"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(tokenizer.decode(output[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], skip_special_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>))</span>
+<span id="cb11-22"></span>
+<span id="cb11-23"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 2. Beam Search</span></span>
+<span id="cb11-24">output <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> model.generate(</span>
+<span id="cb11-25">    <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span>inputs, max_new_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>max_tokens,</span>
+<span id="cb11-26">    num_beams<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5</span>, no_repeat_ngram_size<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>, early_stopping<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span></span>
+<span id="cb11-27">)</span>
+<span id="cb11-28"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">[Beam Search (5 beams, no repeat 2-gram)]"</span>)</span>
+<span id="cb11-29"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(tokenizer.decode(output[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], skip_special_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>))</span>
+<span id="cb11-30"></span>
+<span id="cb11-31"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 3. Pure Sampling</span></span>
+<span id="cb11-32">set_seed(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">42</span>)</span>
+<span id="cb11-33">output <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> model.generate(</span>
+<span id="cb11-34">    <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span>inputs, max_new_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>max_tokens,</span>
+<span id="cb11-35">    do_sample<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, top_k<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span></span>
+<span id="cb11-36">)</span>
+<span id="cb11-37"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">[Pure Sampling]"</span>)</span>
+<span id="cb11-38"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(tokenizer.decode(output[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], skip_special_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>))</span>
+<span id="cb11-39"></span>
+<span id="cb11-40"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 4. Top-K Sampling</span></span>
+<span id="cb11-41">set_seed(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">42</span>)</span>
+<span id="cb11-42">output <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> model.generate(</span>
+<span id="cb11-43">    <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span>inputs, max_new_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>max_tokens,</span>
+<span id="cb11-44">    do_sample<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, top_k<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span></span>
+<span id="cb11-45">)</span>
+<span id="cb11-46"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">[Top-K Sampling (k=50)]"</span>)</span>
+<span id="cb11-47"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(tokenizer.decode(output[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], skip_special_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>))</span>
+<span id="cb11-48"></span>
+<span id="cb11-49"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 5. Top-p Sampling</span></span>
+<span id="cb11-50">set_seed(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">42</span>)</span>
+<span id="cb11-51">output <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> model.generate(</span>
+<span id="cb11-52">    <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span>inputs, max_new_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>max_tokens,</span>
+<span id="cb11-53">    do_sample<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, top_p<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.92</span>, top_k<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span></span>
+<span id="cb11-54">)</span>
+<span id="cb11-55"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">[Top-p Sampling (p=0.92)]"</span>)</span>
+<span id="cb11-56"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(tokenizer.decode(output[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], skip_special_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>))</span>
+<span id="cb11-57"></span>
+<span id="cb11-58"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 6. Contrastive Search</span></span>
+<span id="cb11-59">output <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> model.generate(</span>
+<span id="cb11-60">    <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span>inputs, max_new_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>max_tokens,</span>
+<span id="cb11-61">    penalty_alpha<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.6</span>, top_k<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span></span>
+<span id="cb11-62">)</span>
+<span id="cb11-63"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">[Contrastive Search (alpha=0.6, k=4)]"</span>)</span>
+<span id="cb11-64"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(tokenizer.decode(output[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>], skip_special_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>))</span></code></pre></div></div>
+</section>
+<section id="conclusion" class="level2">
+<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
+<p>The decoding method is just as important as the model itself for text generation quality. Greedy and beam search are simple and deterministic but prone to repetition. Sampling methods (top-k, top-p) introduce randomness for creative diversity but can sacrifice coherence. Contrastive search offers a compelling middle ground — deterministic, fluent, and repetition-free.</p>
+<p>For small models like GPT-2, the choice of decoding method has an outsized impact because the model has less capacity to self-correct. Experimenting with different strategies and their hyperparameters is essential to get the best output for your specific use case.</p>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li>Patrick von Platen, <a href="https://huggingface.co/blog/how-to-generate">How to generate text: using different decoding methods for language generation with Transformers</a>, Hugging Face Blog, 2020 (updated 2023).</li>
+<li>Yixuan Su and Tian Lan, <a href="https://huggingface.co/blog/introducing-csearch">Generating Human-level Text with Contrastive Search in Transformers</a>, Hugging Face Blog, 2022.</li>
+<li>Fan et al., <a href="https://arxiv.org/abs/1805.04833">Hierarchical Neural Story Generation</a>, ACL 2018 — introduced Top-K sampling.</li>
+<li>Holtzman et al., <a href="https://arxiv.org/abs/1904.09751">The Curious Case of Neural Text Degeneration</a>, ICLR 2020 — introduced Top-p (nucleus) sampling.</li>
+<li>Su et al., <a href="https://arxiv.org/abs/2202.06417">A Contrastive Framework for Neural Text Generation</a>, NeurIPS 2022 — introduced contrastive search.</li>
+<li>Hugging Face, <a href="https://huggingface.co/docs/transformers/generation_strategies">Generation Strategies Documentation</a>.</li>
+</ul>
+</section>
+<section id="read-more" class="level2">
+<h2 class="anchored" data-anchor-id="read-more">Read More</h2>
+<ul>
+<li>Experiment with different small models: <strong>DistilGPT-2</strong> (82M), <strong>Phi-2</strong> (2.7B), or <strong>Qwen2.5-0.5B</strong>.</li>
+<li>Combine decoding methods with <a href="../../posts/llm/Fine-tuning-LLM-with-Unsloth-and-serving-it-with-Ollama.html">fine-tuned models</a> for domain-specific generation.</li>
+<li>Serve your model locally with <a href="../../posts/llm/Run-LLM-locally-with-Ollama.html">Ollama</a> or <a href="../../posts/llm/Deploying-and-Serving-LLM-with-Llama.cpp.html">llama.cpp</a> and control decoding via API parameters.</li>
+<li>Explore advanced techniques: speculative decoding, min-p sampling, and classifier-free guidance.</li>
+</ul>
+<!-- nav-buttons -->
+<p><a href="../../pages/llm.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-brain" aria-label="brain"></i> Explore LLMs</a> <a href="../../index.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-house" aria-label="house"></i> Home</a></p>
+
+
+</section>
+
  ]]></description>
   <guid>https://vectoringai.com/posts/llm/Decoding-Methods-for-Text-Generation-with-LLMs.html</guid>
   <pubDate>Sun, 01 Mar 2026 00:00:00 GMT</pubDate>

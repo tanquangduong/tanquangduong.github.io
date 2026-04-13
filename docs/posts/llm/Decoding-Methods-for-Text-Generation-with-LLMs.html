@@ -665,8 +665,9 @@ window.Quarto = {
 </header>
 
 
-div id=“notebook-link” data-url=“https://colab.research.google.com/github/VectoringAI/ai-engineering/blob/main/llm/decoding_methods_for_text_generation_with_llms.ipynb” style=“display:none”&gt;
-</main></div>
+<div id="notebook-link" data-url="https://colab.research.google.com/github/VectoringAI/ai-engineering/blob/main/llm/decoding_methods_for_text_generation_with_llms.ipynb" style="display:none">
+
+</div>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="../../images/llm/decoding-llm-300px.png" class="img-fluid figure-img" width="300"></p>
@@ -674,7 +675,7 @@ div id=“notebook-link” data-url=“https://colab.research.google.com/github/
 </figure>
 </div>
 <section id="introduction" class="level2">
-<h2 data-anchor-id="introduction">Introduction</h2>
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
 <p>When a pretrained language model generates text, it produces a probability distribution over the entire vocabulary at each step. <strong>The decoding method determines how the next token is selected from that distribution.</strong> This choice has a dramatic effect on output quality — the same model can produce boring repetitive text or creative human-like prose, depending entirely on the decoding strategy.</p>
 <p>This article provides a practical, hands-on comparison of six common decoding methods using <strong>GPT-2</strong> (124M parameters) — a small model that runs comfortably on CPU. All code examples use the Hugging Face <code>transformers</code> library and can be reproduced on any machine.</p>
 <blockquote class="blockquote">
@@ -682,14 +683,14 @@ div id=“notebook-link” data-url=“https://colab.research.google.com/github/
 </blockquote>
 </section>
 <section id="how-auto-regressive-generation-works" class="level2">
-<h2 data-anchor-id="how-auto-regressive-generation-works">How Auto-Regressive Generation Works</h2>
+<h2 class="anchored" data-anchor-id="how-auto-regressive-generation-works">How Auto-Regressive Generation Works</h2>
 <p>All decoder-only LLMs (GPT-2, Llama, Mistral, Phi, etc.) generate text <strong>one token at a time</strong>. The probability of a word sequence is decomposed as:</p>
 <p><span class="math display">P(w_{1:T} | W_0) = \prod_{t=1}^{T} P(w_t | w_{1:t-1}, W_0)</span></p>
 <p>where <span class="math inline">W_0</span> is the initial prompt (context) and <span class="math inline">T</span> is the generated sequence length. Generation stops when the model emits an <strong>end-of-sequence (EOS)</strong> token or a maximum length is reached.</p>
 <p>The key question is: <strong>how do we pick <span class="math inline">w_t</span> from <span class="math inline">P(w_t | w_{1:t-1})</span> at each step?</strong> That is exactly what a decoding method defines.</p>
 </section>
 <section id="setup" class="level2">
-<h2 data-anchor-id="setup">Setup</h2>
+<h2 class="anchored" data-anchor-id="setup">Setup</h2>
 <p>Install the required library and load the model:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>pip install transformers torch</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> transformers <span class="im">import</span> AutoModelForCausalLM, AutoTokenizer, set_seed</span>
@@ -706,7 +707,7 @@ div id=“notebook-link” data-url=“https://colab.research.google.com/github/
 <p>We use <strong>GPT-2</strong> (124M parameters) throughout — small enough to run on CPU, yet large enough to demonstrate clear differences between decoding strategies.</p>
 </section>
 <section id="greedy-search" class="level2">
-<h2 data-anchor-id="greedy-search">1. Greedy Search</h2>
+<h2 class="anchored" data-anchor-id="greedy-search">1. Greedy Search</h2>
 <p>Greedy search is the simplest strategy. At each step, it selects the token with the <strong>highest probability</strong>:</p>
 <p><span class="math display">w_t = \arg\max_w P(w | w_{1:t-1})</span></p>
 <div class="cell" data-layout-align="default">
@@ -750,7 +751,7 @@ div id=“notebook-link” data-url=“https://colab.research.google.com/github/
 <p>Greedy search is the default in <code>transformers</code> when no other parameters are specified.</p>
 </section>
 <section id="beam-search" class="level2">
-<h2 data-anchor-id="beam-search">2. Beam Search</h2>
+<h2 class="anchored" data-anchor-id="beam-search">2. Beam Search</h2>
 <p>Beam search keeps track of the top <span class="math inline">n</span> most likely partial sequences (called <strong>beams</strong>) at each step, then selects the sequence with the highest overall probability. It reduces the risk of missing good sequences that greedy search would overlook.</p>
 <div class="cell" data-layout-align="default">
 <div class="cell-output-display">
@@ -830,7 +831,7 @@ div id=“notebook-link” data-url=“https://colab.research.google.com/github/
 </ul>
 </section>
 <section id="pure-sampling" class="level2">
-<h2 data-anchor-id="pure-sampling">3. Pure Sampling</h2>
+<h2 class="anchored" data-anchor-id="pure-sampling">3. Pure Sampling</h2>
 <p>Sampling randomly picks the next token according to its probability distribution:</p>
 <p><span class="math display">w_t \sim P(w | w_{1:t-1})</span></p>
 <p>This introduces randomness, breaking the repetition patterns of deterministic methods.</p>
@@ -882,7 +883,7 @@ div id=“notebook-link” data-url=“https://colab.research.google.com/github/
 <p>Pure sampling is rarely used in practice — the variants below (temperature, top-k, top-p) are used to make it more controlled.</p>
 </section>
 <section id="temperature-scaling" class="level2">
-<h2 data-anchor-id="temperature-scaling">4. Temperature Scaling</h2>
+<h2 class="anchored" data-anchor-id="temperature-scaling">4. Temperature Scaling</h2>
 <p>Temperature <span class="math inline">\tau</span> reshapes the probability distribution before sampling. It is applied to the logits before the softmax:</p>
 <p><span class="math display">P(w_i) = \frac{\exp(z_i / \tau)}{\sum_j \exp(z_j / \tau)}</span></p>
 <div class="cell" data-layout-align="default">
@@ -974,7 +975,7 @@ div id=“notebook-link” data-url=“https://colab.research.google.com/github/
 <p>Temperature is typically used <strong>in combination</strong> with top-k or top-p, not alone. Common values range from <strong>0.3</strong> (factual) to <strong>1.0</strong> (creative).</p>
 </section>
 <section id="top-k-sampling" class="level2">
-<h2 data-anchor-id="top-k-sampling">5. Top-K Sampling</h2>
+<h2 class="anchored" data-anchor-id="top-k-sampling">5. Top-K Sampling</h2>
 <p>Top-K sampling (Fan et al., 2018) filters the vocabulary to only the <strong>K most likely tokens</strong>, then redistributes the probability mass among them.</p>
 <div class="cell" data-layout-align="default">
 <div class="cell-output-display">
@@ -1053,7 +1054,7 @@ div id=“notebook-link” data-url=“https://colab.research.google.com/github/
 </ul>
 </section>
 <section id="top-p-nucleus-sampling" class="level2">
-<h2 data-anchor-id="top-p-nucleus-sampling">6. Top-p (Nucleus) Sampling</h2>
+<h2 class="anchored" data-anchor-id="top-p-nucleus-sampling">6. Top-p (Nucleus) Sampling</h2>
 <p>Top-p sampling (Holtzman et al., 2019) dynamically selects the <strong>smallest set of tokens</strong> whose cumulative probability exceeds a threshold <span class="math inline">p</span>.</p>
 <div class="cell" data-layout-align="default">
 <div class="cell-output-display">
@@ -1121,7 +1122,7 @@ div id=“notebook-link” data-url=“https://colab.research.google.com/github/
 <span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(tokenizer.decode(output[<span class="dv">0</span>], skip_special_tokens<span class="op">=</span><span class="va">True</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="contrastive-search" class="level2">
-<h2 data-anchor-id="contrastive-search">7. Contrastive Search</h2>
+<h2 class="anchored" data-anchor-id="contrastive-search">7. Contrastive Search</h2>
 <p>Contrastive search (Su et al., NeurIPS 2022) is a newer deterministic method designed to produce human-level text without the repetition of greedy/beam search and without the incoherence of sampling.</p>
 <div class="cell" data-layout-align="default">
 <div class="cell-output-display">
@@ -1204,7 +1205,7 @@ div id=“notebook-link” data-url=“https://colab.research.google.com/github/
 </ul>
 </section>
 <section id="comparison-summary" class="level2">
-<h2 data-anchor-id="comparison-summary">Comparison Summary</h2>
+<h2 class="anchored" data-anchor-id="comparison-summary">Comparison Summary</h2>
 <table class="caption-top table">
 <thead>
 <tr class="header">
@@ -1270,7 +1271,7 @@ div id=“notebook-link” data-url=“https://colab.research.google.com/github/
 <p>*with n-gram penalty enabled</p>
 </section>
 <section id="when-to-use-what" class="level2">
-<h2 data-anchor-id="when-to-use-what">When to Use What</h2>
+<h2 class="anchored" data-anchor-id="when-to-use-what">When to Use What</h2>
 <ul>
 <li><strong>Factual / deterministic tasks</strong> (translation, summarization, code generation): Use <strong>beam search</strong> with n-gram penalty, or <strong>contrastive search</strong>.</li>
 <li><strong>Creative / open-ended generation</strong> (storytelling, dialogue, brainstorming): Use <strong>top-p + top-k + temperature</strong> sampling.</li>
@@ -1279,7 +1280,7 @@ div id=“notebook-link” data-url=“https://colab.research.google.com/github/
 </ul>
 </section>
 <section id="full-working-example" class="level2">
-<h2 data-anchor-id="full-working-example">Full Working Example</h2>
+<h2 class="anchored" data-anchor-id="full-working-example">Full Working Example</h2>
 <p>Below is a complete script that generates text using all six methods for side-by-side comparison:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> transformers <span class="im">import</span> AutoModelForCausalLM, AutoTokenizer, set_seed</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
@@ -1347,12 +1348,12 @@ div id=“notebook-link” data-url=“https://colab.research.google.com/github/
 <span id="cb11-64"><a href="#cb11-64" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(tokenizer.decode(output[<span class="dv">0</span>], skip_special_tokens<span class="op">=</span><span class="va">True</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="conclusion" class="level2">
-<h2 data-anchor-id="conclusion">Conclusion</h2>
+<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
 <p>The decoding method is just as important as the model itself for text generation quality. Greedy and beam search are simple and deterministic but prone to repetition. Sampling methods (top-k, top-p) introduce randomness for creative diversity but can sacrifice coherence. Contrastive search offers a compelling middle ground — deterministic, fluent, and repetition-free.</p>
 <p>For small models like GPT-2, the choice of decoding method has an outsized impact because the model has less capacity to self-correct. Experimenting with different strategies and their hyperparameters is essential to get the best output for your specific use case.</p>
 </section>
 <section id="references" class="level2">
-<h2 data-anchor-id="references">References</h2>
+<h2 class="anchored" data-anchor-id="references">References</h2>
 <ul>
 <li>Patrick von Platen, <a href="https://huggingface.co/blog/how-to-generate">How to generate text: using different decoding methods for language generation with Transformers</a>, Hugging Face Blog, 2020 (updated 2023).</li>
 <li>Yixuan Su and Tian Lan, <a href="https://huggingface.co/blog/introducing-csearch">Generating Human-level Text with Contrastive Search in Transformers</a>, Hugging Face Blog, 2022.</li>
@@ -1363,7 +1364,7 @@ div id=“notebook-link” data-url=“https://colab.research.google.com/github/
 </ul>
 </section>
 <section id="read-more" class="level2">
-<h2 data-anchor-id="read-more">Read More</h2>
+<h2 class="anchored" data-anchor-id="read-more">Read More</h2>
 <ul>
 <li>Experiment with different small models: <strong>DistilGPT-2</strong> (82M), <strong>Phi-2</strong> (2.7B), or <strong>Qwen2.5-0.5B</strong>.</li>
 <li>Combine decoding methods with <a href="../../posts/llm/Fine-tuning-LLM-with-Unsloth-and-serving-it-with-Ollama.html">fine-tuned models</a> for domain-specific generation.</li>
@@ -1376,7 +1377,7 @@ div id=“notebook-link” data-url=“https://colab.research.google.com/github/
 
 </section>
 
- <!-- /main -->
+</main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     const icon = "";
@@ -1782,7 +1783,7 @@ div id=“notebook-link” data-url=“https://colab.research.google.com/github/
     }
   });
   </script>
- <!-- /content -->
+</div> <!-- /content -->
 <footer class="footer">
   <div class="nav-footer">
     <div class="nav-footer-left">
