@@ -1,0 +1,573 @@
+---
+title: "Post-Training LLMs for Human Alignment"
+description: "A practical comparison of SFT, RLHF, DPO, ORPO, KTO, and GRPO for aligning pretrained language models with human preferences"
+colab: <a href="https://colab.research.google.com/github/VectoringAI/ai-engineering/blob/main/llm/post_training_llms_for_human_alignment.ipynb"><img src="/images/colab.png" alt="Open in Colab"></a>
+image: /images/llm/post-training-human-aligment-300px.png
+date: "2026-03-05"
+keywords:
+  - "alignment"
+  - "RLHF"
+  - "DPO"
+  - "ORPO"
+  - "KTO"
+  - "GRPO"
+  - "SFT"
+  - "PPO"
+  - "preference optimization"
+  - "human feedback"
+  - "reward model"
+  - "TRL"
+  - "fine-tuning"
+  - "small models"
+  - "transformers"
+---
+
+<div id="notebook-link" data-url="https://colab.research.google.com/github/VectoringAI/ai-engineering/blob/main/llm/post_training_llms_for_human_alignment.ipynb" style="display:none"></div>
+
+
+![Post-training alignment methods: SFT, RLHF, DPO, ORPO, KTO, GRPO](/images/llm/post-training-human-aligment-300px.png){fig-align="center" width=300}
+
+## Introduction
+
+Pretrained language models learn broad knowledge from massive text corpora, but they don't inherently follow instructions or behave safely. **Post-training alignment** bridges this gap — teaching models to produce helpful, harmless, and honest responses that match human expectations.
+
+The alignment pipeline has evolved rapidly. Early methods like RLHF required training a separate reward model and running complex reinforcement learning. Newer approaches like DPO, ORPO, and GRPO simplify this process significantly, making alignment accessible even on consumer hardware with small models.
+
+This article compares six key alignment methods: **SFT**, **RLHF (PPO)**, **DPO**, **KTO**, **ORPO**, and **GRPO**. All code examples use small models (0.5B–1B parameters) with the [TRL](https://github.com/huggingface/trl) library.
+
+> For fine-tuning fundamentals, see [Fine-tuning an LLM with Unsloth and Serving with Ollama](/posts/llm/Fine-tuning-LLM-with-Unsloth-and-serving-it-with-Ollama.html). For model compression after alignment, see [Quantization Methods for LLMs](/posts/llm/Quantization-Methods-for-LLMs.html). For decoding strategies during inference, see [Decoding Methods for Text Generation with LLMs](/posts/llm/Decoding-Methods-for-Text-Generation-with-LLMs.html).
+
+## The Alignment Pipeline Overview
+
+Before diving into individual methods, here is how post-training fits into the LLM lifecycle:
+
+```{mermaid}
+graph LR
+    A["Pretraining<br/>(next-token prediction<br/>on large corpus)"] --> B["SFT<br/>(instruction<br/>fine-tuning)"]
+    B --> C["Preference Alignment<br/>(RLHF / DPO / ORPO<br/>/ KTO / GRPO)"]
+    C --> D["Deployment<br/>(quantization,<br/>serving)"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#f5a623,color:#fff,stroke:#333
+    style C fill:#e74c3c,color:#fff,stroke:#333
+    style D fill:#27ae60,color:#fff,stroke:#333
+```
+
+Most alignment methods require two stages: first SFT to teach the model to follow instructions, then preference optimization to refine behavior. **ORPO** is unique in merging both stages into one.
+
+## 1. Supervised Fine-Tuning (SFT)
+
+SFT is the foundational first step. The model is trained on (instruction, response) pairs using standard cross-entropy loss, learning to follow instructions and produce structured outputs.
+
+```{mermaid}
+graph TD
+    A["Pretrained Base Model"] --> B["Instruction Dataset<br/>(prompt → response pairs)"]
+    B --> C["Cross-Entropy Loss<br/>on target tokens"]
+    C --> D["SFT Model<br/>(follows instructions)"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#f5a623,color:#fff,stroke:#333
+    style C fill:#e74c3c,color:#fff,stroke:#333
+    style D fill:#27ae60,color:#fff,stroke:#333
+```
+
+### How It Works
+
+- The model receives a prompt (instruction) and is trained to predict the expected response token by token.
+- Loss is computed only on the response tokens, not the prompt tokens.
+- Common datasets: [Alpaca](https://huggingface.co/datasets/tatsu-lab/alpaca), [OpenAssistant](https://huggingface.co/datasets/OpenAssistant/oasst1), [UltraChat](https://huggingface.co/datasets/stingning/ultrachat).
+
+### Code Example with TRL
+
+```python
+from trl import SFTTrainer, SFTConfig
+from datasets import load_dataset
+
+dataset = load_dataset("trl-lib/Capybara", split="train")
+
+training_args = SFTConfig(
+    output_dir="Qwen2.5-0.5B-SFT",
+    num_train_epochs=1,
+    per_device_train_batch_size=4,
+    learning_rate=2e-5,
+    max_seq_length=1024,
+)
+
+trainer = SFTTrainer(
+    model="Qwen/Qwen2.5-0.5B",
+    args=training_args,
+    train_dataset=dataset,
+)
+trainer.train()
+```
+
+### Limitations
+
+SFT teaches the model **what** to say but not how to **discriminate** between good and bad outputs. It increases the probability of both preferred and undesired response patterns. This is why a preference alignment stage is needed.
+
+## 2. RLHF with PPO (Reinforcement Learning from Human Feedback)
+
+RLHF is the classic alignment method, famously used to build InstructGPT and ChatGPT. It involves training a separate reward model on human preference data, then using Proximal Policy Optimization (PPO) to maximize the reward while staying close to the original model.
+
+```{mermaid}
+graph TD
+    subgraph Stage1["Stage 1: Reward Model Training"]
+        direction TB
+        A1["Human Annotators<br/>rank responses"] --> A2["Preference Dataset<br/>(prompt, chosen, rejected)"]
+        A2 --> A3["Train Reward Model<br/>(Bradley-Terry)"]
+    end
+
+    subgraph Stage2["Stage 2: PPO Fine-Tuning"]
+        direction TB
+        B1["SFT Model generates<br/>responses to prompts"] --> B2["Reward Model<br/>scores responses"]
+        B2 --> B3["PPO updates policy<br/>maximize reward - β·KL"]
+    end
+
+    Stage1 --> Stage2
+
+    style A1 fill:#4a90d9,color:#fff,stroke:#333
+    style A2 fill:#f5a623,color:#fff,stroke:#333
+    style A3 fill:#e74c3c,color:#fff,stroke:#333
+    style B1 fill:#4a90d9,color:#fff,stroke:#333
+    style B2 fill:#f5a623,color:#fff,stroke:#333
+    style B3 fill:#27ae60,color:#fff,stroke:#333
+```
+
+### How It Works
+
+1. **Reward Model**: Trained on pairs of (chosen, rejected) responses. It learns to assign higher scores to human-preferred outputs using the Bradley-Terry ranking model.
+2. **PPO Optimization**: The policy (SFT model) generates responses, the reward model scores them, and PPO updates the policy to maximize reward while a KL divergence penalty prevents the model from drifting too far from the reference (SFT) model.
+
+The objective is:
+
+$$\max_\pi \mathbb{E}_{x \sim D, y \sim \pi}[R(x, y)] - \beta \cdot D_{KL}[\pi \| \pi_{\text{ref}}]$$
+
+### Key Components
+
+| Component | Role |
+|-----------|------|
+| Policy model | The LLM being optimized |
+| Reference model | Copy of SFT model (frozen), prevents reward hacking |
+| Reward model | Scores generated outputs |
+| Value model | Estimates expected future rewards for PPO |
+
+### Limitations
+
+- Requires **3–4 models in memory** simultaneously (policy, reference, reward, value)
+- Training is **unstable** — sensitive to hyperparameters
+- Reward model can be **gamed** (reward hacking)
+- Complex engineering pipeline
+
+## 3. DPO (Direct Preference Optimization)
+
+DPO eliminates the need for a separate reward model by directly optimizing the policy on preference data. The key insight: the optimal RL policy can be expressed in closed form given the reward function, so we can reparametrize the reward model loss as a policy loss.
+
+```{mermaid}
+graph TD
+    A["SFT Model<br/>(policy + reference)"] --> B["Preference Dataset<br/>(prompt, chosen, rejected)"]
+    B --> C["DPO Loss<br/>binary cross-entropy<br/>on log-probability ratios"]
+    C --> D["Aligned Model<br/>(no reward model needed)"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#f5a623,color:#fff,stroke:#333
+    style C fill:#e74c3c,color:#fff,stroke:#333
+    style D fill:#27ae60,color:#fff,stroke:#333
+```
+
+### How It Works
+
+DPO defines the loss directly on preference pairs:
+
+$$\mathcal{L}_{\text{DPO}}(\theta) = -\mathbb{E}_{(x, y^+, y^-)} \left[\log \sigma\left(\beta \left(\log \frac{\pi_\theta(y^+ | x)}{\pi_{\text{ref}}(y^+ | x)} - \log \frac{\pi_\theta(y^- | x)}{\pi_{\text{ref}}(y^- | x)}\right)\right)\right]$$
+
+In practice, DPO **increases the relative probability** of the chosen response and **decreases** that of the rejected one, all while staying close to the reference model. The hyperparameter $\beta$ controls the strength of the preference signal (typical values: 0.1–0.5).
+
+### Code Example with TRL
+
+```python
+from trl import DPOTrainer, DPOConfig
+from datasets import load_dataset
+from peft import LoraConfig
+
+dataset = load_dataset("trl-lib/ultrafeedback_binarized", split="train")
+
+training_args = DPOConfig(
+    output_dir="Qwen2.5-0.5B-DPO",
+    num_train_epochs=1,
+    per_device_train_batch_size=4,
+    learning_rate=1e-6,
+    beta=0.1,
+    max_length=1024,
+)
+
+trainer = DPOTrainer(
+    model="Qwen/Qwen2.5-0.5B-Instruct",
+    args=training_args,
+    train_dataset=dataset,
+    peft_config=LoraConfig(r=16, lora_alpha=32),
+)
+trainer.train()
+```
+
+### Advantages over RLHF
+
+- No reward model needed — only **2 models** in memory (policy + reference)
+- **Stable** training with simple classification loss
+- Much **simpler** to implement
+- Comparable or better results on benchmarks
+
+### Dataset Format
+
+DPO expects preference data with three fields:
+
+```python
+# Standard format
+{"prompt": "What is AI?",
+ "chosen": "AI is a branch of computer science...",
+ "rejected": "AI is when computers become sentient..."}
+
+# Conversational format
+{"prompt": [{"role": "user", "content": "What is AI?"}],
+ "chosen": [{"role": "assistant", "content": "AI is a branch of..."}],
+ "rejected": [{"role": "assistant", "content": "AI is when..."}]}
+```
+
+## 4. KTO (Kahneman-Tversky Optimization)
+
+KTO removes the requirement of **paired** preference data. Instead of needing (chosen, rejected) pairs for the same prompt, KTO works with individual examples labeled as simply **"good"** or **"bad"** — like a thumbs up/thumbs down signal.
+
+```{mermaid}
+graph TD
+    A["SFT Model"] --> B["Unpaired Feedback<br/>👍 good examples<br/>👎 bad examples"]
+    B --> C["KTO Loss<br/>(Kahneman-Tversky<br/>value function)"]
+    C --> D["Aligned Model"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#f5a623,color:#fff,stroke:#333
+    style C fill:#e74c3c,color:#fff,stroke:#333
+    style D fill:#27ae60,color:#fff,stroke:#333
+```
+
+### How It Works
+
+KTO is based on **prospect theory** from behavioral economics (Kahneman & Tversky). It models the human tendency to weigh losses more heavily than equivalent gains. The loss function treats "good" and "bad" examples independently:
+
+- For **good** examples: maximize the utility of the model's improvement over the reference
+- For **bad** examples: penalize using a loss-averse weighting (losses hurt more than gains feel good)
+
+### When to Use KTO
+
+| Scenario | Recommended? |
+|----------|:-----------:|
+| You have paired preference data | DPO is generally better |
+| You only have thumbs up/down labels | **KTO is ideal** |
+| Production chatbot with user feedback | **KTO is ideal** |
+| Creating preference data is expensive | **KTO is ideal** |
+
+KTO is particularly practical when collecting **production feedback** — user thumbs up/down ratings are much easier to collect than pairwise comparisons.
+
+## 5. ORPO (Odds Ratio Preference Optimization)
+
+ORPO is unique: it **combines SFT and preference alignment into a single training step**. Instead of first doing SFT then DPO, ORPO adds an odds ratio penalty to the standard NLL (negative log-likelihood) loss, achieving both instruction-following and preference alignment simultaneously.
+
+```{mermaid}
+graph TD
+    A["Pretrained Base Model"] --> B["Preference Dataset<br/>(prompt, chosen, rejected)"]
+    B --> C["ORPO Loss<br/>= NLL + λ·OR Loss"]
+
+    subgraph LossComponents["Loss Components"]
+        direction LR
+        D["NLL Loss<br/>(SFT signal on<br/>chosen response)"]
+        E["Odds Ratio Loss<br/>(penalize rejected,<br/>reward chosen)"]
+    end
+
+    C --> LossComponents
+    LossComponents --> F["Aligned Model<br/>(single stage!)"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#f5a623,color:#fff,stroke:#333
+    style C fill:#e74c3c,color:#fff,stroke:#333
+    style D fill:#4a90d9,color:#fff,stroke:#333
+    style E fill:#f5a623,color:#fff,stroke:#333
+    style F fill:#27ae60,color:#fff,stroke:#333
+```
+
+### How It Works
+
+The ORPO objective is:
+
+$$\mathcal{L}_{\text{ORPO}} = \mathbb{E}_{(x, y^+, y^-)} \left[\mathcal{L}_{\text{SFT}}(x, y^+) + \lambda \cdot \mathcal{L}_{\text{OR}}(x, y^+, y^-)\right]$$
+
+Where $\mathcal{L}_{\text{OR}}$ is the odds ratio loss that contrasts the likelihood of chosen vs. rejected responses. The NLL component handles instruction following (like SFT), while the OR component handles preference alignment.
+
+### Key Advantages
+
+- **No reference model** required — saves 50% memory compared to DPO
+- **Single stage** — no separate SFT step
+- **Computationally efficient** — fewer total training steps
+- Tested from 125M to 7B parameters
+
+### Code Example with TRL
+
+```python
+from trl.experimental.orpo import ORPOTrainer, ORPOConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from datasets import load_dataset
+
+model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2-0.5B-Instruct")
+tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B-Instruct")
+dataset = load_dataset("trl-lib/ultrafeedback_binarized", split="train")
+
+training_args = ORPOConfig(
+    output_dir="Qwen2-0.5B-ORPO",
+    num_train_epochs=1,
+    per_device_train_batch_size=4,
+    learning_rate=8e-6,
+    beta=0.1,  # λ: weight of the OR loss
+    max_length=1024,
+)
+
+trainer = ORPOTrainer(
+    model=model,
+    args=training_args,
+    processing_class=tokenizer,
+    train_dataset=dataset,
+)
+trainer.train()
+```
+
+## 6. GRPO (Group Relative Policy Optimization)
+
+GRPO was introduced by DeepSeek for enhancing mathematical reasoning. Unlike DPO which uses offline preference data, GRPO is an **online RL method** that generates multiple completions per prompt, scores them with a reward function, and uses the **relative ranking within each group** to compute advantages — all without a separate value model.
+
+```{mermaid}
+graph TD
+    A["Policy Model"] --> B["Generate G completions<br/>per prompt"]
+    B --> C["Score with<br/>Reward Function"]
+    C --> D["Compute Group-Relative<br/>Advantages<br/>A = (r - mean) / std"]
+    D --> E["PPO-style Update<br/>with clipped objective"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#f5a623,color:#fff,stroke:#333
+    style C fill:#e74c3c,color:#fff,stroke:#333
+    style D fill:#9b59b6,color:#fff,stroke:#333
+    style E fill:#27ae60,color:#fff,stroke:#333
+```
+
+### How It Works
+
+1. For each prompt, generate **G** completions (e.g., G=8)
+2. Score each completion with a reward function (can be a model or a rule-based function)
+3. Compute **group-relative advantage**: normalize rewards within the group to get relative quality
+4. Update the policy using a clipped surrogate objective (like PPO, but without a value model)
+
+The advantage for completion $i$ is:
+
+$$\hat{A}_i = \frac{r_i - \text{mean}(\mathbf{r})}{\text{std}(\mathbf{r})}$$
+
+### Key Innovation
+
+GRPO replaces the value model used in PPO with group-relative normalization, making it:
+
+- **Memory-efficient**: No value model needed
+- **Self-improving**: Uses model's own generations for training (online RL)
+- **Flexible**: Works with any reward function — including rule-based rewards (no neural reward model required)
+
+### Code Example with TRL
+
+```python
+from trl import GRPOTrainer, GRPOConfig
+from trl.rewards import accuracy_reward
+from datasets import load_dataset
+
+dataset = load_dataset("trl-lib/DeepMath-103K", split="train")
+
+training_args = GRPOConfig(
+    output_dir="Qwen2.5-0.5B-GRPO",
+    num_train_epochs=1,
+    per_device_train_batch_size=4,
+    learning_rate=1e-6,
+    num_generations=8,
+    max_completion_length=256,
+)
+
+trainer = GRPOTrainer(
+    model="Qwen/Qwen2.5-0.5B-Instruct",
+    reward_funcs=accuracy_reward,
+    args=training_args,
+    train_dataset=dataset,
+)
+trainer.train()
+```
+
+### Custom Reward Functions
+
+One of GRPO's strengths is its support for **rule-based reward functions** — no neural reward model needed:
+
+```python
+import re
+
+def format_reward(completions, **kwargs):
+    """Reward for structured <think>...</think><answer>...</answer> format."""
+    pattern = r"^<think>.*?</think><answer>.*?</answer>$"
+    return [1.0 if re.match(pattern, c) else 0.0 for c in completions]
+
+def length_reward(completions, **kwargs):
+    """Reward longer, more detailed responses."""
+    return [min(len(c) / 500, 1.0) for c in completions]
+
+# Combine multiple reward functions
+trainer = GRPOTrainer(
+    model="Qwen/Qwen2.5-0.5B-Instruct",
+    reward_funcs=[format_reward, length_reward],
+    reward_weights=[1.0, 0.5],
+    ...
+)
+```
+
+## Method Comparison
+
+```{mermaid}
+graph TD
+    A{{"Do you have<br/>preference data?"}}
+    A -->|"No, only instructions"| B["SFT"]
+    A -->|"Yes"| C{{"Paired or<br/>unpaired?"}}
+    C -->|"Unpaired<br/>(thumbs up/down)"| D["KTO"]
+    C -->|"Paired<br/>(chosen/rejected)"| E{{"Want single-stage<br/>training?"}}
+    E -->|"Yes"| F["ORPO"]
+    E -->|"No"| G{{"Online or<br/>offline RL?"}}
+    G -->|"Offline<br/>(fixed dataset)"| H["DPO"]
+    G -->|"Online<br/>(model generates)"| I{{"Need rule-based<br/>rewards?"}}
+    I -->|"Yes"| J["GRPO"]
+    I -->|"No, have<br/>reward model"| K["RLHF (PPO)"]
+
+    style A fill:#e74c3c,color:#fff,stroke:#333
+    style B fill:#27ae60,color:#fff,stroke:#333
+    style C fill:#e74c3c,color:#fff,stroke:#333
+    style D fill:#27ae60,color:#fff,stroke:#333
+    style E fill:#e74c3c,color:#fff,stroke:#333
+    style F fill:#27ae60,color:#fff,stroke:#333
+    style G fill:#e74c3c,color:#fff,stroke:#333
+    style H fill:#27ae60,color:#fff,stroke:#333
+    style I fill:#e74c3c,color:#fff,stroke:#333
+    style J fill:#27ae60,color:#fff,stroke:#333
+    style K fill:#27ae60,color:#fff,stroke:#333
+```
+
+### Summary Table
+
+| Method | Type | Models in Memory | Needs Reward Model | Needs Reference Model | Data Requirement | Key Library |
+|--------|------|:----------------:|:------------------:|:---------------------:|------------------|:-----------:|
+| **SFT** | Supervised | 1 | No | No | (instruction, response) | TRL `SFTTrainer` |
+| **RLHF (PPO)** | Online RL | 3–4 | **Yes** | Yes | Preference pairs + reward model | TRL `PPOTrainer` |
+| **DPO** | Offline | 2 | No | Yes | Preference pairs | TRL `DPOTrainer` |
+| **KTO** | Offline | 2 | No | Yes | Unpaired good/bad labels | TRL `DPOTrainer` (loss_type="kto_pair") |
+| **ORPO** | Offline | 1 | No | No | Preference pairs | TRL `ORPOTrainer` |
+| **GRPO** | Online RL | 1–2 | Optional | Optional | Prompts + reward function | TRL `GRPOTrainer` |
+
+### Hyperparameter Sensitivity
+
+The $\beta$ parameter is critical across methods. Empirical studies show:
+
+| Method | Recommended β Range | Notes |
+|--------|:-------------------:|-------|
+| DPO | 0.01 – 0.5 | Lower β often works best; 0.1 is a common default |
+| KTO | 0.01 – 0.3 | Similar trends to DPO |
+| ORPO | 0.1 (λ) | Controls the weight of the odds ratio loss |
+| GRPO | 0.0 – 0.001 | Recent work suggests β=0 (no KL penalty) works well |
+
+## Practical Recommendations
+
+### Resource-Constrained Settings
+
+For training on a single consumer GPU (16–24 GB VRAM) with small models:
+
+1. **Start with SFT** using QLoRA to teach instruction following
+2. **Apply DPO or ORPO** with LoRA adapters for preference alignment
+3. Use **4-bit quantization** (`bitsandbytes`) to fit both policy and reference models
+
+### When to Use Each Method
+
+- **SFT only**: When you have high-quality instruction data and just need a helpful assistant
+- **DPO**: Best general-purpose alignment method — simple, stable, well-tested
+- **ORPO**: When compute is limited and you want a single-stage pipeline
+- **KTO**: When you only have binary feedback (production chatbot settings)
+- **GRPO**: For reasoning tasks (math, code) where you can define verifiable reward functions
+- **RLHF**: When you have the infrastructure and need maximum control over the reward signal
+
+### Training with LoRA/QLoRA
+
+All methods support parameter-efficient fine-tuning:
+
+```python
+from peft import LoraConfig
+
+peft_config = LoraConfig(
+    r=16,
+    lora_alpha=32,
+    lora_dropout=0.05,
+    target_modules=["q_proj", "v_proj", "k_proj", "o_proj"],
+    task_type="CAUSAL_LM",
+)
+
+# Pass to any TRL trainer
+trainer = DPOTrainer(
+    model="Qwen/Qwen2.5-0.5B-Instruct",
+    peft_config=peft_config,
+    ...
+)
+```
+
+## Evolution of Alignment Methods
+
+```{mermaid}
+graph LR
+    A["RLHF + PPO<br/>(2022)<br/>InstructGPT"] --> B["DPO<br/>(2023)<br/>No reward model"]
+    B --> C["KTO<br/>(2024)<br/>Unpaired data"]
+    B --> D["IPO<br/>(2023)<br/>Regularized DPO"]
+    A --> E["ORPO<br/>(2024)<br/>Single-stage"]
+    A --> F["GRPO<br/>(2024)<br/>DeepSeek-Math"]
+    F --> G["DeepSeek-R1<br/>(2025)<br/>Reasoning RL"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#e74c3c,color:#fff,stroke:#333
+    style C fill:#f5a623,color:#fff,stroke:#333
+    style D fill:#9b59b6,color:#fff,stroke:#333
+    style E fill:#27ae60,color:#fff,stroke:#333
+    style F fill:#e67e22,color:#fff,stroke:#333
+    style G fill:#1abc9c,color:#fff,stroke:#333
+```
+
+## Conclusion
+
+Human alignment has rapidly evolved from the complex RLHF pipeline to simpler, more efficient methods. **DPO** remains the most popular general-purpose method due to its stability and simplicity. **ORPO** offers an attractive single-stage alternative. **GRPO** is emerging as the method of choice for reasoning tasks, especially after its success in DeepSeek-R1.
+
+The choice of method depends on your data, compute, and use case. For most practitioners starting out, the recommended path is:
+
+1. **SFT** with LoRA on instruction data
+2. **DPO** with LoRA on preference data
+3. **Quantize** and deploy
+
+> For serving your aligned model, see [Run LLM locally with Ollama](/posts/llm/Run-LLM-locally-with-Ollama.html) or [Deploying and Serving LLM with vLLM](/posts/llm/Deploying-and-Serving-LLM-with-vLLM.html).
+
+## References
+
+- Ouyang et al., *Training language models to follow instructions with human feedback* (InstructGPT), 2022. [arXiv:2203.02155](https://arxiv.org/abs/2203.02155)
+- Rafailov et al., *Direct Preference Optimization: Your Language Model is Secretly a Reward Model*, 2023. [arXiv:2305.18290](https://arxiv.org/abs/2305.18290)
+- Ethayarajh et al., *KTO: Model Alignment as Prospect Theoretic Optimization*, 2024. [GitHub](https://github.com/ContextualAI/HALOs)
+- Azar et al., *A General Theoretical Paradigm to Understand Learning from Human Feedback* (IPO), 2023. [arXiv:2310.12036](https://arxiv.org/abs/2310.12036)
+- Hong et al., *ORPO: Monolithic Preference Optimization without Reference Model*, 2024. [arXiv:2403.07691](https://arxiv.org/abs/2403.07691)
+- Shao et al., *DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models* (GRPO), 2024. [arXiv:2402.03300](https://arxiv.org/abs/2402.03300)
+- DeepSeek-AI, *DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning*, 2025. [arXiv:2501.12948](https://arxiv.org/abs/2501.12948)
+- von Werra et al., *TRL: Transformer Reinforcement Learning*. [GitHub](https://github.com/huggingface/trl)
+
+## Read More
+
+- Explore [TRL documentation](https://huggingface.co/docs/trl) for the latest trainers and features
+- Try the [Hugging Face alignment-handbook](https://github.com/huggingface/alignment-handbook) for production recipes
+- Experiment with GRPO + custom reward functions for domain-specific reasoning tasks
+
+<!-- nav-buttons -->
+
+[{{< fa brain >}} Explore LLMs](../../pages/llm.qmd){.btn .btn-primary .btn-lg}
+[{{< fa house >}} Home](../../index.qmd){.btn .btn-primary .btn-lg}

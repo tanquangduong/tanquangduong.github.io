@@ -1,0 +1,2075 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.36">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Quang Duong">
+<meta name="dcterms.date" content="2026-03-19">
+<meta name="keywords" content="agent skills, skill architecture, tool engineering, agent-computer interface, ACI, SKILL.md, reusable agent capabilities, prompt engineering tools, modular agent design, OpenAI skills, Claude Code skills, agent skills standard, function calling, tool use, agent capabilities, skill bundles">
+<meta name="description" content="Designing modular, reusable agent capabilities — from tool engineering and prompt crafting to skill bundles and the Agent Skills standard">
+
+<title>Building Skills for AI Agents – Vectoring AI</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../..//images/favicon.ico" rel="icon">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dbc92dda8186f57fa2e333fbb71d6a9d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-b981e3f33a8ad6ba97cc0b6118e04959.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/all.css" rel="stylesheet">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/latex-fontsize.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-Q4RQ337R0F"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-Q4RQ337R0F', { 'anonymize_ip': true});
+</script>
+<script async="" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9738638303661485" crossorigin="anonymous"></script>
+<!-- Cookie Consent Banner (GDPR compliant) -->
+<style>
+#cookie-consent-banner {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #1d1d1d !important;
+  color: #ffffff !important;
+  padding: 16px 24px;
+  z-index: 9999;
+  font-size: 14px;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+}
+#cookie-consent-banner p {
+  margin: 0 0 12px 0;
+  line-height: 1.5;
+  color: #ffffff !important;
+}
+#cookie-consent-banner a {
+  color: #78b9ff;
+  text-decoration: underline;
+}
+#cookie-consent-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+#cookie-consent-buttons button {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+#btn-accept-all {
+  background: #3B70FE;
+  color: #fff;
+}
+#btn-accept-essential {
+  background: #555;
+  color: #fff;
+}
+#btn-deny {
+  background: transparent;
+  color: #ccc;
+  border: 1px solid #666 !important;
+}
+</style>
+
+<meta property="og:title" content="Building Skills for AI Agents – Vectoring AI">
+<meta property="og:description" content="Designing modular, reusable agent capabilities — from tool engineering and prompt crafting to skill bundles and the Agent Skills standard">
+<meta property="og:image" content="https://vectoringai.com/images/agent/building-skills-ai-agents-300px.png">
+<meta property="og:site_name" content="Vectoring AI">
+<meta property="og:image:height" content="200">
+<meta property="og:image:width" content="300">
+<meta name="twitter:title" content="Building Skills for AI Agents – Vectoring AI">
+<meta name="twitter:description" content="Designing modular, reusable agent capabilities — from tool engineering and prompt crafting to skill bundles and the Agent Skills standard">
+<meta name="twitter:image" content="https://vectoringai.com/images/agent/building-skills-ai-agents-300px.png">
+<meta name="twitter:image-height" content="200">
+<meta name="twitter:image-width" content="300">
+<meta name="twitter:card" content="summary_large_image">
+</head><body class="nav-sidebar docked quarto-light"><div id="cookie-consent-banner">
+  <p>We use cookies to serve personalized ads (Google AdSense) and analyze traffic.
+    You can accept all cookies, accept only essential cookies, or deny non-essential cookies.
+    <a href="../../pages/privacy.html">Privacy Policy</a>
+  </p>
+  <div id="cookie-consent-buttons">
+    <button id="btn-accept-all">Accept All</button>
+    <button id="btn-accept-essential">Essential Only</button>
+    <button id="btn-deny">Deny</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  var consent = localStorage.getItem("cookie_consent");
+
+  function loadAdSense() {
+    if (document.querySelector('script[src*="adsbygoogle"]')) return;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9738638303661485";
+    s.crossOrigin = "anonymous";
+    document.head.appendChild(s);
+  }
+
+  function showBanner() {
+    document.getElementById("cookie-consent-banner").style.display = "block";
+  }
+
+  function hideBanner() {
+    document.getElementById("cookie-consent-banner").style.display = "none";
+  }
+
+  if (consent === "all") {
+    loadAdSense();
+  } else if (consent === "essential" || consent === "denied") {
+    // Do not load AdSense
+  } else {
+    // No choice made yet — show banner, do not load AdSense
+    window.addEventListener("DOMContentLoaded", showBanner);
+  }
+
+  window.addEventListener("DOMContentLoaded", function() {
+    document.getElementById("btn-accept-all").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "all");
+      hideBanner();
+      loadAdSense();
+    });
+    document.getElementById("btn-accept-essential").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "essential");
+      hideBanner();
+    });
+    document.getElementById("btn-deny").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "denied");
+      hideBanner();
+    });
+  });
+})();
+</script>
+<script>
+// Inject missing Open Graph tags that Facebook requires for proper link sharing
+(function () {
+  if (!document.querySelector('meta[property="og:url"]')) {
+    var m = document.createElement("meta");
+    m.setAttribute("property", "og:url");
+    m.setAttribute("content", window.location.href);
+    document.head.appendChild(m);
+  }
+  if (!document.querySelector('meta[property="og:type"]')) {
+    var t = document.createElement("meta");
+    t.setAttribute("property", "og:type");
+    t.setAttribute("content", "article");
+    document.head.appendChild(t);
+  }
+  // Fix double-slash in og:image (site-url trailing slash + /images/...)
+  var ogImg = document.querySelector('meta[property="og:image"]');
+  if (ogImg) {
+    ogImg.setAttribute("content", ogImg.getAttribute("content").replace(/([^:])\/\//g, "$1/"));
+  }
+  var twImg = document.querySelector('meta[name="twitter:image"]');
+  if (twImg) {
+    twImg.setAttribute("content", twImg.getAttribute("content").replace(/([^:])\/\//g, "$1/"));
+  }
+})();
+</script>
+<style>
+.share-widget {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0.8rem 0 1.2rem 0;
+  padding: 0.5rem 0;
+}
+.share-widget .share-icon {
+  width: 20px;
+  height: 20px;
+  fill: #555;
+}
+.share-widget .share-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #555;
+}
+.share-widget .share-divider {
+  width: 1px;
+  height: 22px;
+  background: #ddd;
+}
+.share-widget a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  transition: transform 0.2s, box-shadow 0.2s;
+  text-decoration: none !important;
+}
+.share-widget a:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.share-widget a svg {
+  width: 20px;
+  height: 20px;
+}
+.notebook-widget {
+  margin: 0 0 1rem 0;
+}
+.notebook-widget a {
+  display: inline-block;
+  transition: transform 0.2s;
+}
+.notebook-widget a:hover {
+  transform: scale(1.05);
+}
+</style>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  if (!window.location.pathname.includes("/posts/")) return;
+
+  var rawTitle = document.title;
+  var rawUrl = window.location.href;
+  var title = encodeURIComponent(rawTitle);
+  var url = encodeURIComponent(rawUrl);
+
+  var widget = document.createElement("div");
+  widget.className = "share-widget";
+  widget.innerHTML =
+    '<svg class="share-icon" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>' +
+    '<span class="share-label">Share</span>' +
+    '<div class="share-divider"></div>' +
+    '<a href="https://twitter.com/intent/tweet?text=' + title + '&url=' + url + '" target="_blank" rel="noopener" title="Share on X"><svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>' +
+    '<a href="https://www.facebook.com/sharer/sharer.php?u=' + url + '" target="_blank" rel="noopener" title="Share on Facebook"><svg viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>' +
+    '<a href="https://www.linkedin.com/shareArticle?mini=true&url=' + url + '&title=' + title + '" target="_blank" rel="noopener" title="Share on LinkedIn"><svg viewBox="0 0 24 24" fill="#0A66C2"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>';
+
+  // Desktop: open a centered popup (standard share UX).
+  // Mobile: let the default target="_blank" navigate so the OS can
+  //         route to the native app (Facebook, LinkedIn, etc.).
+  var isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+  if (!isMobile) {
+    widget.querySelectorAll("a").forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        var w = 600, h = 500;
+        var left = (screen.width - w) / 2;
+        var top = (screen.height - h) / 2;
+        window.open(
+          this.href, "share",
+          "width=" + w + ",height=" + h + ",left=" + left + ",top=" + top + ",noopener,noreferrer"
+        );
+      });
+    });
+  }
+
+  // Insert right after the title-block header, before Keywords
+  var header = document.querySelector("header#title-block-header");
+  if (header && header.nextSibling) {
+    header.parentNode.insertBefore(widget, header.nextSibling);
+  }
+
+  // Add Colab / notebook button if the page has a notebook-link element
+  var nbEl = document.getElementById("notebook-link");
+  if (nbEl && nbEl.dataset.url) {
+    var nbWidget = document.createElement("div");
+    nbWidget.className = "notebook-widget";
+    nbWidget.innerHTML =
+      '<a href="' + nbEl.dataset.url + '" target="_blank" rel="noopener" title="Open notebook in Google Colab">' +
+      '<img src="/images/colab.png" alt="Open in Colab" style="height:28px">' +
+      '</a>';
+    // Insert right after the share widget
+    if (widget.nextSibling) {
+      widget.parentNode.insertBefore(nbWidget, widget.nextSibling);
+    } else if (widget.parentNode) {
+      widget.parentNode.appendChild(nbWidget);
+    }
+  }
+});
+</script>
+<script>
+  var link = document.createElement('link');
+  link.rel = 'canonical';
+  var path = window.location.pathname.replace(/index\.html$/, '');
+  link.href = 'https://vectoringai.com' + path;
+  document.head.appendChild(link);
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var ogTitle = document.querySelector('meta[property="og:title"]');
+  var ogDesc = document.querySelector('meta[property="og:description"]');
+  var ogImage = document.querySelector('meta[property="og:image"]');
+  var dcDate = document.querySelector('meta[name="dcterms.date"]');
+
+  if (!ogTitle) return;
+
+  var isArticle = !!dcDate;
+  var jsonld = {
+    "@context": "https://schema.org",
+    "@type": isArticle ? "Article" : "WebPage",
+    "headline": ogTitle.content.replace(/ – Vectoring AI$/, ''),
+    "description": ogDesc ? ogDesc.content : "",
+    "url": window.location.href,
+    "author": {
+      "@type": "Organization",
+      "name": "Vectoring AI",
+      "url": "https://vectoringai.com/pages/about.html"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Vectoring AI",
+      "url": "https://vectoringai.com",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://vectoringai.com/images/favicon_io/android-chrome-512x512.png"
+      }
+    }
+  };
+
+  if (ogImage) jsonld.image = ogImage.content;
+  if (dcDate) jsonld.datePublished = dcDate.content;
+
+  var el = document.createElement('script');
+  el.type = 'application/ld+json';
+  el.textContent = JSON.stringify(jsonld);
+  document.head.appendChild(el);
+});
+</script>
+<script src="../../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="../../styles.css">
+
+
+
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">
+      Vectoring AI
+      </li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../../">Vectoring AI</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://github.com/VectoringAI" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+    <a href="https://www.youtube.com/@vectoringai" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-youtube"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Home</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">AI Engineering</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/llm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">LLMs</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/agent.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Agents</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/rag.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">RAG</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/benchmark.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Benchmarks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/milestone.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Milestones</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/about.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">About</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title"><strong>Sections</strong></h2>
+   
+  <ul class="collapse">
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#what-is-an-agent-skill" id="toc-what-is-an-agent-skill" class="nav-link" data-scroll-target="#what-is-an-agent-skill">What Is an Agent Skill?</a></li>
+  <li><a href="#the-agent-computer-interface-aci" id="toc-the-agent-computer-interface-aci" class="nav-link" data-scroll-target="#the-agent-computer-interface-aci">The Agent-Computer Interface (ACI)</a></li>
+  <li><a href="#building-skills-from-scratch" id="toc-building-skills-from-scratch" class="nav-link" data-scroll-target="#building-skills-from-scratch">Building Skills from Scratch</a></li>
+  <li><a href="#composing-skills-into-agents" id="toc-composing-skills-into-agents" class="nav-link" data-scroll-target="#composing-skills-into-agents">Composing Skills into Agents</a></li>
+  <li><a href="#packaging-skills-for-teams" id="toc-packaging-skills-for-teams" class="nav-link" data-scroll-target="#packaging-skills-for-teams">Packaging Skills for Teams</a></li>
+  <li><a href="#skill-design-patterns" id="toc-skill-design-patterns" class="nav-link" data-scroll-target="#skill-design-patterns">Skill Design Patterns</a></li>
+  <li><a href="#testing-and-evaluating-skills" id="toc-testing-and-evaluating-skills" class="nav-link" data-scroll-target="#testing-and-evaluating-skills">Testing and Evaluating Skills</a></li>
+  <li><a href="#common-pitfalls-and-fixes" id="toc-common-pitfalls-and-fixes" class="nav-link" data-scroll-target="#common-pitfalls-and-fixes">Common Pitfalls and Fixes</a></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  <li><a href="#read-more" id="toc-read-more" class="nav-link" data-scroll-target="#read-more">Read More</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Building Skills for AI Agents</h1>
+</div>
+
+<div>
+  <div class="description">
+    Designing modular, reusable agent capabilities — from tool engineering and prompt crafting to skill bundles and the Agent Skills standard
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Quang Duong </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">March 19, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+<div>
+  <div class="keywords">
+    <div class="block-title">Keywords</div>
+    <p>agent skills, skill architecture, tool engineering, agent-computer interface, ACI, SKILL.md, reusable agent capabilities, prompt engineering tools, modular agent design, OpenAI skills, Claude Code skills, agent skills standard, function calling, tool use, agent capabilities, skill bundles</p>
+  </div>
+</div>
+
+</header>
+
+
+<div id="notebook-link" data-url="https://colab.research.google.com/github/VectoringAI/ai-engineering/blob/main/agent/building_skills_for_ai_agents.ipynb" style="display:none">
+
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../../images/agent/building-skills-ai-agents-300px.png" class="img-fluid figure-img" width="300"></p>
+<figcaption>Modular skill architecture for reusable AI agent capabilities</figcaption>
+</figure>
+</div>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>An agent is only as capable as its <strong>skills</strong> — the set of tools, instructions, and workflows it can reliably execute. You can have the most sophisticated reasoning loop, the most elegant multi-agent topology, and the best LLM available — but if your agent can’t reliably call the right tool with the right arguments, it fails.</p>
+<p>The AI industry is converging on a shared insight: <strong>the most impactful work in building agents isn’t choosing the model or the framework — it’s engineering the skills</strong>. Anthropic’s engineering team <a href="https://www.anthropic.com/engineering/building-effective-agents">reported</a> that while building their SWE-bench agent, they “actually spent more time optimizing our tools than the overall prompt.” OpenAI now provides a formal <a href="https://developers.openai.com/api/docs/guides/tools-skills">Skills API</a> — versioned bundles of instructions and files that agents can mount and execute. And the emerging <a href="https://agentskills.io/home">Agent Skills standard</a> is creating an open, interoperable format for packaging and sharing agent capabilities.</p>
+<p>This article covers the full lifecycle of building agent skills — from the design principles behind effective tool interfaces, through implementation patterns in Python with LangGraph and LlamaIndex, to packaging skills as reusable bundles that teams can share. We draw on published guidance from Anthropic and OpenAI, and connect to the broader agent architecture patterns covered in this series.</p>
+</section>
+<section id="what-is-an-agent-skill" class="level2">
+<h2 class="anchored" data-anchor-id="what-is-an-agent-skill">What Is an Agent Skill?</h2>
+<section id="from-tools-to-skills" class="level3">
+<h3 class="anchored" data-anchor-id="from-tools-to-skills">From Tools to Skills</h3>
+<p>In the early days of LLM agents, a “tool” was a Python function with a docstring. The agent would call <code>search_wikipedia(query)</code> or <code>calculator(expression)</code>, observe the result, and continue. This works for simple workflows, but production agents need something richer.</p>
+<p>A <strong>skill</strong> is a higher-level unit of agent capability that bundles together:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 34%">
+<col style="width: 37%">
+<col style="width: 28%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Component</th>
+<th style="text-align: left;">Description</th>
+<th style="text-align: left;">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Instructions</strong></td>
+<td style="text-align: left;">Markdown guidance on when and how to use the skill</td>
+<td style="text-align: left;">“Use this skill for CSV analysis. Always validate headers first.”</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Tools</strong></td>
+<td style="text-align: left;">One or more callable functions or API endpoints</td>
+<td style="text-align: left;"><code>read_csv()</code>, <code>compute_statistics()</code>, <code>generate_chart()</code></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Supporting files</strong></td>
+<td style="text-align: left;">Templates, schemas, reference data</td>
+<td style="text-align: left;">Column name mappings, output templates</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Constraints</strong></td>
+<td style="text-align: left;">Allowed/disallowed actions, safety boundaries</td>
+<td style="text-align: left;">“Never delete rows. Read-only access.”</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Metadata</strong></td>
+<td style="text-align: left;">Name, description, version, trigger conditions</td>
+<td style="text-align: left;"><code>name: csv-insights</code>, <code>version: 2</code></td>
+</tr>
+</tbody>
+</table>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["Agent Skill"] --&gt; B["Instructions&lt;br/&gt;&lt;small&gt;SKILL.md with frontmatter&lt;/small&gt;"]
+    A --&gt; C["Tools&lt;br/&gt;&lt;small&gt;Functions, APIs, scripts&lt;/small&gt;"]
+    A --&gt; D["Supporting Files&lt;br/&gt;&lt;small&gt;Templates, schemas&lt;/small&gt;"]
+    A --&gt; E["Constraints&lt;br/&gt;&lt;small&gt;Allowed tools, safety rules&lt;/small&gt;"]
+    A --&gt; F["Metadata&lt;br/&gt;&lt;small&gt;Name, version, triggers&lt;/small&gt;"]
+
+    style A fill:#9b59b6,color:#fff,stroke:#333
+    style B fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#27ae60,color:#fff,stroke:#333
+    style D fill:#e67e22,color:#fff,stroke:#333
+    style E fill:#e74c3c,color:#fff,stroke:#333
+    style F fill:#f5a623,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>The key insight: <strong>a skill is not just a tool — it’s a tool plus the knowledge of when and how to use it</strong>. A raw <code>execute_sql(query)</code> function is a tool. A skill wraps it with instructions like “Use this for analytics queries against the metrics database. Always use parameterized queries. Return results as markdown tables. Limit to 1000 rows.”</p>
+</section>
+<section id="how-ai-labs-define-skills" class="level3">
+<h3 class="anchored" data-anchor-id="how-ai-labs-define-skills">How AI Labs Define Skills</h3>
+<p><strong>Anthropic</strong> introduced skills in <a href="https://anthropic.skilljar.com/introduction-to-agent-skills">Claude Code</a> as “reusable markdown instructions that Claude automatically applies to the right tasks at the right time.” A skill is a <code>SKILL.md</code> file with YAML frontmatter (name, description, trigger conditions) and markdown instructions. Skills can include multiple files, restrict tool access with <code>allowed-tools</code>, and be shared via repositories or enterprise settings. Anthropic’s Skilljar course teaches building, configuring, and distributing skills — from single-file skills to multi-file bundles with progressive disclosure to keep context windows efficient.</p>
+<p><strong>OpenAI</strong> formalized skills in their <a href="https://developers.openai.com/api/docs/guides/tools-skills">Agents platform</a> as “versioned bundles of files plus a <code>SKILL.md</code> manifest.” Skills are uploaded via API, mounted in shell environments, and the model decides when to invoke them based on the skill’s name and description. OpenAI supports hosted skills (uploaded to their platform), inline skills (base64-encoded zip bundles), and local skills (file paths on your machine). They also maintain curated first-party skills like <code>openai-spreadsheets</code>.</p>
+<p>Both approaches converge on the same architecture:</p>
+<ol type="1">
+<li>A <strong>manifest file</strong> (<code>SKILL.md</code>) with metadata and instructions</li>
+<li><strong>Supporting files</strong> (scripts, templates, data)</li>
+<li><strong>Automatic matching</strong> — the agent reads the skill’s description and decides when to use it</li>
+<li><strong>Versioning</strong> — skills can be updated without breaking existing workflows</li>
+</ol>
+</section>
+</section>
+<section id="the-agent-computer-interface-aci" class="level2">
+<h2 class="anchored" data-anchor-id="the-agent-computer-interface-aci">The Agent-Computer Interface (ACI)</h2>
+<section id="why-tool-design-matters-more-than-prompts" class="level3">
+<h3 class="anchored" data-anchor-id="why-tool-design-matters-more-than-prompts">Why Tool Design Matters More Than Prompts</h3>
+<p>Anthropic’s core principle for building effective agents is to “carefully craft your agent-computer interface (ACI) through thorough tool documentation and testing.” Just as human-computer interfaces (HCI) require extensive design effort, the interface between agents and their tools deserves equal attention.</p>
+<p>This is not intuitive. Most developers spend 90% of their time on the system prompt and 10% on tool definitions. <strong>Flip this ratio.</strong> Anthropic explicitly states:</p>
+<blockquote class="blockquote">
+<p>“While building our agent for SWE-bench, we actually spent more time optimizing our tools than the overall prompt.”</p>
+</blockquote>
+</section>
+<section id="principles-of-aci-design" class="level3">
+<h3 class="anchored" data-anchor-id="principles-of-aci-design">Principles of ACI Design</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["ACI Design Principles"] --&gt; B["Clear naming&lt;br/&gt;&lt;small&gt;Obvious from the name&lt;/small&gt;"]
+    A --&gt; C["Rich descriptions&lt;br/&gt;&lt;small&gt;Include examples, edge cases&lt;/small&gt;"]
+    A --&gt; D["Minimal parameters&lt;br/&gt;&lt;small&gt;Fewer = less confusion&lt;/small&gt;"]
+    A --&gt; E["Poka-yoke&lt;br/&gt;&lt;small&gt;Hard to use incorrectly&lt;/small&gt;"]
+    A --&gt; F["Natural formats&lt;br/&gt;&lt;small&gt;Match what LLMs expect&lt;/small&gt;"]
+    A --&gt; G["Actionable errors&lt;br/&gt;&lt;small&gt;Tell the agent what to do&lt;/small&gt;"]
+
+    style A fill:#9b59b6,color:#fff,stroke:#333
+    style B fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#4a90d9,color:#fff,stroke:#333
+    style D fill:#4a90d9,color:#fff,stroke:#333
+    style E fill:#4a90d9,color:#fff,stroke:#333
+    style F fill:#4a90d9,color:#fff,stroke:#333
+    style G fill:#4a90d9,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p><strong>1. Clear, descriptive naming</strong></p>
+<p>Bad: <code>process_data(input)</code> — ambiguous, could mean anything.</p>
+<p>Good: <code>search_knowledge_base(query: str)</code> — the purpose is obvious from the name.</p>
+<p><strong>2. Rich descriptions with examples and edge cases</strong></p>
+<p>A tool description is like a docstring for a junior developer who has never seen your codebase:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> search_knowledge_base(query: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Search the internal documentation for relevant passages.</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co">    Use this tool when the user asks about product features, API endpoints,</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co">    configuration options, or internal processes.</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co">    Do NOT use this for:</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co">    - General knowledge questions (use web_search instead)</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co">    - Database metrics or analytics (use query_database instead)</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="co">        query: A natural language search query. Be specific.</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="co">               Good: "rate limiting configuration for REST API"</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="co">               Bad: "rate limit" (too vague)</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="co">    Returns:</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="co">        Top 5 matching passages with source document references.</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="co">        Returns "No results found" if nothing matches.</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>3. Minimal, well-typed parameters</strong></p>
+<p>More parameters = more chances for the agent to get confused. Combine related inputs, use sensible defaults, and eliminate optional parameters that are rarely needed.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Bad: too many parameters, confusing</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> search(query: <span class="bu">str</span>, index: <span class="bu">str</span>, top_k: <span class="bu">int</span>, threshold: <span class="bu">float</span>,</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>           rerank: <span class="bu">bool</span>, filter_date: <span class="bu">str</span>, exclude_ids: <span class="bu">list</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    ...</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Good: minimal, focused</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> search_docs(query: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Search documentation. Returns top 5 results ranked by relevance."""</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    ...</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>4. Poka-yoke (error-proofing) your tools</strong></p>
+<p>Design tools so they’re hard to use incorrectly. Anthropic found that their SWE-bench agent made mistakes with relative file paths, so they changed the tool to require absolute paths — and the agent used it flawlessly.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Bad: relative paths cause errors when the agent changes directories</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> read_file(path: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Read a file."""</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    ...</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Good: always absolute, with validation</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> read_file(absolute_path: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Read a file. Path MUST be absolute (starting with /).</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="co">    Example: /home/user/project/src/main.py"""</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> absolute_path.startswith(<span class="st">"/"</span>):</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="ss">f"Error: path must be absolute. Got: </span><span class="sc">{</span>absolute_path<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    ...</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>5. Natural output formats</strong></p>
+<p>LLMs process text. Return results in formats the LLM naturally understands — markdown, plain text, or simple JSON. Avoid complex nested structures unless necessary.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Bad: deeply nested JSON that's hard for the LLM to parse</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="cf">return</span> json.dumps({<span class="st">"data"</span>: {<span class="st">"results"</span>: [{<span class="st">"id"</span>: <span class="dv">1</span>, <span class="st">"fields"</span>: {...}}]}})</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Good: clean markdown that reads naturally</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="cf">return</span> <span class="st">"""Found 3 results:</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="st">1. **Rate Limiting** (docs/api/rate-limits.md): API endpoints are limited to 60 requests/minute...</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="st">2. **Authentication** (docs/api/auth.md): Use Bearer tokens for API access...</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="st">3. **Pagination** (docs/api/pagination.md): Use cursor-based pagination for large result sets..."""</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>6. Actionable error messages</strong></p>
+<p>When a tool fails, tell the agent what to do differently — don’t just return a stack trace.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Bad: raw exception</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="cf">return</span> <span class="st">"Error: KeyError: 'user_id'"</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Good: actionable guidance</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="cf">return</span> (<span class="st">"Error: 'user_id' is required but was not found in the input. "</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Make sure to include a user_id parameter. "</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Example: query_user(user_id='usr_123')"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="building-skills-from-scratch" class="level2">
+<h2 class="anchored" data-anchor-id="building-skills-from-scratch">Building Skills from Scratch</h2>
+<section id="skill-architecture-the-skill.md-pattern" class="level3">
+<h3 class="anchored" data-anchor-id="skill-architecture-the-skill.md-pattern">Skill Architecture: The SKILL.md Pattern</h3>
+<p>The emerging <a href="https://agentskills.io/home">Agent Skills standard</a> defines a portable format for skill bundles. At its core, every skill is a directory with a <code>SKILL.md</code> file:</p>
+<pre><code>csv-insights/
+├── SKILL.md           # Manifest + instructions
+├── analyze.py         # Analysis script
+├── templates/
+│   └── report.md      # Output template
+└── schemas/
+    └── columns.json   # Expected column definitions</code></pre>
+<p>The <code>SKILL.md</code> file uses YAML frontmatter for metadata and markdown for instructions:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="an">name:</span><span class="co"> csv-insights</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="an">description:</span><span class="co"> &gt;</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co">  Analyze CSV files and produce summary reports with statistics,</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="co">  distributions, and anomaly detection. Use when the user provides</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="co">  a CSV file or asks for data analysis.</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="an">version:</span><span class="co"> 1</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="fu">## Instructions</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>When analyzing a CSV file:</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Validate** — Read the CSV and check for expected columns</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Profile** — Compute column types, missing values, and basic statistics</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Analyze** — Run the analysis script for distributions and anomalies</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**Report** — Format results using the report template</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a><span class="fu">## Rules</span></span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Always show sample data (first 5 rows) before analysis</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Round numbers to 2 decimal places</span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Flag any column with &gt;10% missing values</span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Never modify the original file</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="building-a-retrieval-skill" class="level3">
+<h3 class="anchored" data-anchor-id="building-a-retrieval-skill">Building a Retrieval Skill</h3>
+<p>Let’s build a complete retrieval skill that an agent can use to search a knowledge base with query rewriting and relevance grading:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_core.tools <span class="im">import</span> tool</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_openai <span class="im">import</span> ChatOpenAI, OpenAIEmbeddings</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_core.documents <span class="im">import</span> Document</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>llm <span class="op">=</span> ChatOpenAI(model<span class="op">=</span><span class="st">"gpt-4o-mini"</span>, temperature<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>embeddings <span class="op">=</span> OpenAIEmbeddings(model<span class="op">=</span><span class="st">"text-embedding-3-small"</span>)</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Core retrieval tools ---</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> search_knowledge_base(query: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Search the documentation knowledge base for relevant information.</span></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a><span class="co">    Use this for questions about product features, API usage, configuration,</span></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a><span class="co">    or internal processes. Returns up to 5 relevant passages with sources.</span></span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a><span class="co">        query: Specific natural language query.</span></span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a><span class="co">               Good: "how to configure rate limiting for REST API"</span></span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a><span class="co">               Bad: "rate limit" (too vague — rewrite before searching)</span></span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>    <span class="co"># In production: actual vector store search</span></span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>    results <span class="op">=</span> [</span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"content"</span>: <span class="st">"Rate limiting is configured via the API gateway..."</span>,</span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>         <span class="st">"source"</span>: <span class="st">"docs/api/rate-limits.md"</span>, <span class="st">"score"</span>: <span class="fl">0.92</span>},</span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"content"</span>: <span class="st">"Default rate limit is 60 requests per minute..."</span>,</span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>         <span class="st">"source"</span>: <span class="st">"docs/api/defaults.md"</span>, <span class="st">"score"</span>: <span class="fl">0.87</span>},</span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a>    ]</span>
+<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> results:</span>
+<span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"No results found. Try rephrasing your query or using different keywords."</span></span>
+<span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a>    formatted <span class="op">=</span> []</span>
+<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i, r <span class="kw">in</span> <span class="bu">enumerate</span>(results, <span class="dv">1</span>):</span>
+<span id="cb8-36"><a href="#cb8-36" aria-hidden="true" tabindex="-1"></a>        formatted.append(</span>
+<span id="cb8-37"><a href="#cb8-37" aria-hidden="true" tabindex="-1"></a>            <span class="ss">f"</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">. **</span><span class="sc">{</span>r[<span class="st">'source'</span>]<span class="sc">}</span><span class="ss">** (relevance: </span><span class="sc">{</span>r[<span class="st">'score'</span>]<span class="sc">:.0%}</span><span class="ss">)</span><span class="ch">\n</span><span class="ss">"</span></span>
+<span id="cb8-38"><a href="#cb8-38" aria-hidden="true" tabindex="-1"></a>            <span class="ss">f"   </span><span class="sc">{</span>r[<span class="st">'content'</span>][:<span class="dv">200</span>]<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb8-39"><a href="#cb8-39" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb8-40"><a href="#cb8-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="st">"</span><span class="ch">\n\n</span><span class="st">"</span>.join(formatted)</span>
+<span id="cb8-41"><a href="#cb8-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-42"><a href="#cb8-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-43"><a href="#cb8-43" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb8-44"><a href="#cb8-44" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> rewrite_query(original_query: <span class="bu">str</span>, context: <span class="bu">str</span> <span class="op">=</span> <span class="st">""</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb8-45"><a href="#cb8-45" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Rewrite a search query for better retrieval results.</span></span>
+<span id="cb8-46"><a href="#cb8-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-47"><a href="#cb8-47" aria-hidden="true" tabindex="-1"></a><span class="co">    Use this BEFORE searching if:</span></span>
+<span id="cb8-48"><a href="#cb8-48" aria-hidden="true" tabindex="-1"></a><span class="co">    - The original query is vague or too broad</span></span>
+<span id="cb8-49"><a href="#cb8-49" aria-hidden="true" tabindex="-1"></a><span class="co">    - A previous search returned no relevant results</span></span>
+<span id="cb8-50"><a href="#cb8-50" aria-hidden="true" tabindex="-1"></a><span class="co">    - You need to search from a different angle</span></span>
+<span id="cb8-51"><a href="#cb8-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-52"><a href="#cb8-52" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb8-53"><a href="#cb8-53" aria-hidden="true" tabindex="-1"></a><span class="co">        original_query: The query that needs improvement.</span></span>
+<span id="cb8-54"><a href="#cb8-54" aria-hidden="true" tabindex="-1"></a><span class="co">        context: Optional context about what information is needed and why.</span></span>
+<span id="cb8-55"><a href="#cb8-55" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb8-56"><a href="#cb8-56" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> llm.invoke([{</span>
+<span id="cb8-57"><a href="#cb8-57" aria-hidden="true" tabindex="-1"></a>        <span class="st">"role"</span>: <span class="st">"user"</span>,</span>
+<span id="cb8-58"><a href="#cb8-58" aria-hidden="true" tabindex="-1"></a>        <span class="st">"content"</span>: <span class="ss">f"Rewrite this search query to be more specific and retrieval-friendly.</span><span class="ch">\n</span><span class="ss">"</span></span>
+<span id="cb8-59"><a href="#cb8-59" aria-hidden="true" tabindex="-1"></a>                   <span class="ss">f"Original: </span><span class="sc">{</span>original_query<span class="sc">}</span><span class="ch">\n</span><span class="ss">"</span></span>
+<span id="cb8-60"><a href="#cb8-60" aria-hidden="true" tabindex="-1"></a>                   <span class="ss">f"Context: </span><span class="sc">{</span>context<span class="sc">}</span><span class="ch">\n</span><span class="ss">"</span></span>
+<span id="cb8-61"><a href="#cb8-61" aria-hidden="true" tabindex="-1"></a>                   <span class="ss">f"Return ONLY the rewritten query, nothing else."</span></span>
+<span id="cb8-62"><a href="#cb8-62" aria-hidden="true" tabindex="-1"></a>    }])</span>
+<span id="cb8-63"><a href="#cb8-63" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> response.content.strip()</span>
+<span id="cb8-64"><a href="#cb8-64" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-65"><a href="#cb8-65" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-66"><a href="#cb8-66" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb8-67"><a href="#cb8-67" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> grade_relevance(query: <span class="bu">str</span>, document: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb8-68"><a href="#cb8-68" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Check if a retrieved document is relevant to the query.</span></span>
+<span id="cb8-69"><a href="#cb8-69" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-70"><a href="#cb8-70" aria-hidden="true" tabindex="-1"></a><span class="co">    Use this to verify search results before including them in your answer.</span></span>
+<span id="cb8-71"><a href="#cb8-71" aria-hidden="true" tabindex="-1"></a><span class="co">    Returns 'relevant' or 'not_relevant' with an explanation.</span></span>
+<span id="cb8-72"><a href="#cb8-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-73"><a href="#cb8-73" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb8-74"><a href="#cb8-74" aria-hidden="true" tabindex="-1"></a><span class="co">        query: The original user question.</span></span>
+<span id="cb8-75"><a href="#cb8-75" aria-hidden="true" tabindex="-1"></a><span class="co">        document: The retrieved document text to evaluate.</span></span>
+<span id="cb8-76"><a href="#cb8-76" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb8-77"><a href="#cb8-77" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> llm.invoke([{</span>
+<span id="cb8-78"><a href="#cb8-78" aria-hidden="true" tabindex="-1"></a>        <span class="st">"role"</span>: <span class="st">"system"</span>,</span>
+<span id="cb8-79"><a href="#cb8-79" aria-hidden="true" tabindex="-1"></a>        <span class="st">"content"</span>: <span class="st">"You are a relevance grader. Given a query and a document, "</span></span>
+<span id="cb8-80"><a href="#cb8-80" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"determine if the document contains information relevant to "</span></span>
+<span id="cb8-81"><a href="#cb8-81" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"answering the query. Reply with EXACTLY 'relevant' or "</span></span>
+<span id="cb8-82"><a href="#cb8-82" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"'not_relevant' followed by a brief explanation."</span></span>
+<span id="cb8-83"><a href="#cb8-83" aria-hidden="true" tabindex="-1"></a>    }, {</span>
+<span id="cb8-84"><a href="#cb8-84" aria-hidden="true" tabindex="-1"></a>        <span class="st">"role"</span>: <span class="st">"user"</span>,</span>
+<span id="cb8-85"><a href="#cb8-85" aria-hidden="true" tabindex="-1"></a>        <span class="st">"content"</span>: <span class="ss">f"Query: </span><span class="sc">{</span>query<span class="sc">}</span><span class="ch">\n\n</span><span class="ss">Document: </span><span class="sc">{</span>document<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb8-86"><a href="#cb8-86" aria-hidden="true" tabindex="-1"></a>    }])</span>
+<span id="cb8-87"><a href="#cb8-87" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> response.content.strip()</span>
+<span id="cb8-88"><a href="#cb8-88" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-89"><a href="#cb8-89" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-90"><a href="#cb8-90" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Skill bundle ---</span></span>
+<span id="cb8-91"><a href="#cb8-91" aria-hidden="true" tabindex="-1"></a>RETRIEVAL_SKILL <span class="op">=</span> {</span>
+<span id="cb8-92"><a href="#cb8-92" aria-hidden="true" tabindex="-1"></a>    <span class="st">"name"</span>: <span class="st">"knowledge-base-retrieval"</span>,</span>
+<span id="cb8-93"><a href="#cb8-93" aria-hidden="true" tabindex="-1"></a>    <span class="st">"description"</span>: <span class="st">"Search, rewrite, and grade results from the documentation knowledge base."</span>,</span>
+<span id="cb8-94"><a href="#cb8-94" aria-hidden="true" tabindex="-1"></a>    <span class="st">"tools"</span>: [search_knowledge_base, rewrite_query, grade_relevance],</span>
+<span id="cb8-95"><a href="#cb8-95" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="building-a-data-analysis-skill" class="level3">
+<h3 class="anchored" data-anchor-id="building-a-data-analysis-skill">Building a Data Analysis Skill</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_core.tools <span class="im">import</span> tool</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> query_metrics_database(description: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Query the metrics database using natural language.</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="co">    Describe what data you need in plain English. The tool translates</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="co">    your description into a database query and returns results.</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a><span class="co">    Use this for questions about:</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a><span class="co">    - User counts, growth rates, retention</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a><span class="co">    - Feature usage and adoption metrics</span></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a><span class="co">    - Performance stats (latency, error rates)</span></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a><span class="co">        description: Natural language description of the data needed.</span></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a><span class="co">                     Good: "monthly active users for the last 6 months"</span></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a><span class="co">                     Bad: "SELECT * FROM users" (don't write SQL)</span></span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>    <span class="co"># In production: text-to-SQL or pre-built query templates</span></span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (<span class="st">"Query results for: </span><span class="sc">{}</span><span class="ch">\n</span><span class="st">"</span></span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>            <span class="st">"| Month | Active Users | Growth |</span><span class="ch">\n</span><span class="st">"</span></span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>            <span class="st">"|:------|:-------------|:-------|</span><span class="ch">\n</span><span class="st">"</span></span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>            <span class="st">"| Jan   | 12,450       | +15%   |</span><span class="ch">\n</span><span class="st">"</span></span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a>            <span class="st">"| Feb   | 14,320       | +12%   |</span><span class="ch">\n</span><span class="st">"</span></span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a>            <span class="st">"| Mar   | 15,890       | +11%   |"</span>).<span class="bu">format</span>(description)</span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> calculate(expression: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Evaluate a mathematical expression and return the result.</span></span>
+<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a><span class="co">    Use for computing growth rates, percentages, averages, and other</span></span>
+<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a><span class="co">    numerical calculations based on data from the metrics database.</span></span>
+<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-38"><a href="#cb9-38" aria-hidden="true" tabindex="-1"></a><span class="co">    Supports: +, -, *, /, ** (power), sqrt(), abs(), round()</span></span>
+<span id="cb9-39"><a href="#cb9-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-40"><a href="#cb9-40" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb9-41"><a href="#cb9-41" aria-hidden="true" tabindex="-1"></a><span class="co">        expression: A mathematical expression.</span></span>
+<span id="cb9-42"><a href="#cb9-42" aria-hidden="true" tabindex="-1"></a><span class="co">                    Example: "round((15890 - 12450) / 12450 * 100, 1)"</span></span>
+<span id="cb9-43"><a href="#cb9-43" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb9-44"><a href="#cb9-44" aria-hidden="true" tabindex="-1"></a>    allowed_names <span class="op">=</span> {</span>
+<span id="cb9-45"><a href="#cb9-45" aria-hidden="true" tabindex="-1"></a>        <span class="st">"sqrt"</span>: math.sqrt, <span class="st">"abs"</span>: <span class="bu">abs</span>, <span class="st">"round"</span>: <span class="bu">round</span>,</span>
+<span id="cb9-46"><a href="#cb9-46" aria-hidden="true" tabindex="-1"></a>        <span class="st">"min"</span>: <span class="bu">min</span>, <span class="st">"max"</span>: <span class="bu">max</span>, <span class="st">"sum"</span>: <span class="bu">sum</span>,</span>
+<span id="cb9-47"><a href="#cb9-47" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb9-48"><a href="#cb9-48" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb9-49"><a href="#cb9-49" aria-hidden="true" tabindex="-1"></a>        result <span class="op">=</span> <span class="bu">eval</span>(expression, {<span class="st">"__builtins__"</span>: {}}, allowed_names)</span>
+<span id="cb9-50"><a href="#cb9-50" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="bu">str</span>(result)</span>
+<span id="cb9-51"><a href="#cb9-51" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
+<span id="cb9-52"><a href="#cb9-52" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="ss">f"Error evaluating '</span><span class="sc">{</span>expression<span class="sc">}</span><span class="ss">': </span><span class="sc">{</span>e<span class="sc">}</span><span class="ss">. Check syntax and try again."</span></span>
+<span id="cb9-53"><a href="#cb9-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-54"><a href="#cb9-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-55"><a href="#cb9-55" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb9-56"><a href="#cb9-56" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> format_report(title: <span class="bu">str</span>, sections: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb9-57"><a href="#cb9-57" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Format analysis results into a structured markdown report.</span></span>
+<span id="cb9-58"><a href="#cb9-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-59"><a href="#cb9-59" aria-hidden="true" tabindex="-1"></a><span class="co">    Use this as the LAST step after gathering and analyzing data.</span></span>
+<span id="cb9-60"><a href="#cb9-60" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-61"><a href="#cb9-61" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb9-62"><a href="#cb9-62" aria-hidden="true" tabindex="-1"></a><span class="co">        title: Report title.</span></span>
+<span id="cb9-63"><a href="#cb9-63" aria-hidden="true" tabindex="-1"></a><span class="co">        sections: Content in markdown format with headers and data.</span></span>
+<span id="cb9-64"><a href="#cb9-64" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb9-65"><a href="#cb9-65" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="ss">f"# </span><span class="sc">{</span>title<span class="sc">}</span><span class="ch">\n\n</span><span class="sc">{</span>sections<span class="sc">}</span><span class="ch">\n\n</span><span class="ss">---</span><span class="ch">\n</span><span class="ss">*Generated from metrics database*"</span></span>
+<span id="cb9-66"><a href="#cb9-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-67"><a href="#cb9-67" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-68"><a href="#cb9-68" aria-hidden="true" tabindex="-1"></a>ANALYSIS_SKILL <span class="op">=</span> {</span>
+<span id="cb9-69"><a href="#cb9-69" aria-hidden="true" tabindex="-1"></a>    <span class="st">"name"</span>: <span class="st">"data-analysis"</span>,</span>
+<span id="cb9-70"><a href="#cb9-70" aria-hidden="true" tabindex="-1"></a>    <span class="st">"description"</span>: <span class="st">"Query metrics databases, perform calculations, and generate analysis reports."</span>,</span>
+<span id="cb9-71"><a href="#cb9-71" aria-hidden="true" tabindex="-1"></a>    <span class="st">"tools"</span>: [query_metrics_database, calculate, format_report],</span>
+<span id="cb9-72"><a href="#cb9-72" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="composing-skills-into-agents" class="level2">
+<h2 class="anchored" data-anchor-id="composing-skills-into-agents">Composing Skills into Agents</h2>
+<section id="single-agent-multi-skill" class="level3">
+<h3 class="anchored" data-anchor-id="single-agent-multi-skill">Single-Agent, Multi-Skill</h3>
+<p>The simplest composition: one agent with multiple skills. Each skill’s tools are registered with the agent, and the agent’s prompt lists when to use each skill.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.prebuilt <span class="im">import</span> create_react_agent</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_openai <span class="im">import</span> ChatOpenAI</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>llm <span class="op">=</span> ChatOpenAI(model<span class="op">=</span><span class="st">"gpt-4o-mini"</span>, temperature<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Combine tools from multiple skills</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>all_tools <span class="op">=</span> RETRIEVAL_SKILL[<span class="st">"tools"</span>] <span class="op">+</span> ANALYSIS_SKILL[<span class="st">"tools"</span>]</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>agent <span class="op">=</span> create_react_agent(</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span>llm,</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>    tools<span class="op">=</span>all_tools,</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>    prompt<span class="op">=</span><span class="st">"""You are a product analyst assistant with two skill sets:</span></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a><span class="st">1. **Knowledge Base Retrieval**: Use search_knowledge_base, rewrite_query,</span></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a><span class="st">   and grade_relevance for documentation questions.</span></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a><span class="st">2. **Data Analysis**: Use query_metrics_database, calculate, and</span></span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a><span class="st">   format_report for metrics and analytics questions.</span></span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a><span class="st">When answering:</span></span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a><span class="st">- Use retrieval skills for "what" and "how" questions about the product</span></span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a><span class="st">- Use analysis skills for "how many" and "what's the trend" questions</span></span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a><span class="st">- For questions that need BOTH, gather information first, then analyze</span></span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a><span class="st">- Always verify retrieved information with grade_relevance before using it</span></span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a><span class="st">- Present final answers using format_report for consistency"""</span>,</span>
+<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a><span class="co"># Run it</span></span>
+<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> agent.invoke({</span>
+<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a>    <span class="st">"messages"</span>: [{</span>
+<span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a>        <span class="st">"role"</span>: <span class="st">"user"</span>,</span>
+<span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a>        <span class="st">"content"</span>: <span class="st">"What's our user growth rate and does it match "</span></span>
+<span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"the targets mentioned in our documentation?"</span></span>
+<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a>    }]</span>
+<span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a>})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="multi-agent-skill-per-agent" class="level3">
+<h3 class="anchored" data-anchor-id="multi-agent-skill-per-agent">Multi-Agent, Skill-Per-Agent</h3>
+<p>For complex workflows, assign one skill per agent and orchestrate with a supervisor. This follows the principle from <a href="../../posts/agent/Multi-Agent-RAG-Orchestration-Patterns.html">Multi-Agent RAG Orchestration Patterns</a> — each agent has 2–4 focused tools, making tool selection near-perfect.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> TypedDict, Annotated</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.graph <span class="im">import</span> StateGraph, END, START</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.graph.message <span class="im">import</span> add_messages</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.prebuilt <span class="im">import</span> create_react_agent</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_openai <span class="im">import</span> ChatOpenAI</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_core.messages <span class="im">import</span> HumanMessage</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>llm <span class="op">=</span> ChatOpenAI(model<span class="op">=</span><span class="st">"gpt-4o-mini"</span>, temperature<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Create skill-specific agents</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>retrieval_agent <span class="op">=</span> create_react_agent(</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span>llm,</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>    tools<span class="op">=</span>RETRIEVAL_SKILL[<span class="st">"tools"</span>],</span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>    prompt<span class="op">=</span><span class="st">"You are a retrieval specialist. Search the knowledge base, "</span></span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>           <span class="st">"rewrite queries for better results, and verify relevance. "</span></span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>           <span class="st">"Always cite your sources."</span>,</span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>analysis_agent <span class="op">=</span> create_react_agent(</span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span>llm,</span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a>    tools<span class="op">=</span>ANALYSIS_SKILL[<span class="st">"tools"</span>],</span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a>    prompt<span class="op">=</span><span class="st">"You are a data analyst. Query the metrics database, "</span></span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a>           <span class="st">"perform calculations, and format results as reports. "</span></span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a>           <span class="st">"Always show your calculations."</span>,</span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a><span class="co"># Supervisor that routes to skill-agents</span></span>
+<span id="cb11-30"><a href="#cb11-30" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> SkillState(TypedDict):</span>
+<span id="cb11-31"><a href="#cb11-31" aria-hidden="true" tabindex="-1"></a>    messages: Annotated[<span class="bu">list</span>, add_messages]</span>
+<span id="cb11-32"><a href="#cb11-32" aria-hidden="true" tabindex="-1"></a>    next_skill: <span class="bu">str</span></span>
+<span id="cb11-33"><a href="#cb11-33" aria-hidden="true" tabindex="-1"></a>    skill_outputs: <span class="bu">dict</span></span>
+<span id="cb11-34"><a href="#cb11-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-35"><a href="#cb11-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-36"><a href="#cb11-36" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> router(state: SkillState) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb11-37"><a href="#cb11-37" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Route the query to the appropriate skill-agent."""</span></span>
+<span id="cb11-38"><a href="#cb11-38" aria-hidden="true" tabindex="-1"></a>    outputs <span class="op">=</span> state.get(<span class="st">"skill_outputs"</span>, {})</span>
+<span id="cb11-39"><a href="#cb11-39" aria-hidden="true" tabindex="-1"></a>    context <span class="op">=</span> <span class="st">"</span><span class="ch">\n</span><span class="st">"</span>.join(<span class="ss">f"[</span><span class="sc">{</span>k<span class="sc">}</span><span class="ss">]: </span><span class="sc">{</span>v<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> k, v <span class="kw">in</span> outputs.items()) <span class="cf">if</span> outputs <span class="cf">else</span> <span class="st">"None"</span></span>
+<span id="cb11-40"><a href="#cb11-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-41"><a href="#cb11-41" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> llm.invoke([</span>
+<span id="cb11-42"><a href="#cb11-42" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"system"</span>, <span class="st">"content"</span>: (</span>
+<span id="cb11-43"><a href="#cb11-43" aria-hidden="true" tabindex="-1"></a>            <span class="st">"You are a router. Based on the question and any results so far, "</span></span>
+<span id="cb11-44"><a href="#cb11-44" aria-hidden="true" tabindex="-1"></a>            <span class="st">"choose the next skill to use.</span><span class="ch">\n</span><span class="st">"</span></span>
+<span id="cb11-45"><a href="#cb11-45" aria-hidden="true" tabindex="-1"></a>            <span class="st">"Available skills:</span><span class="ch">\n</span><span class="st">"</span></span>
+<span id="cb11-46"><a href="#cb11-46" aria-hidden="true" tabindex="-1"></a>            <span class="ss">f"- retrieval: </span><span class="sc">{</span>RETRIEVAL_SKILL[<span class="st">'description'</span>]<span class="sc">}</span><span class="ch">\n</span><span class="ss">"</span></span>
+<span id="cb11-47"><a href="#cb11-47" aria-hidden="true" tabindex="-1"></a>            <span class="ss">f"- analysis: </span><span class="sc">{</span>ANALYSIS_SKILL[<span class="st">'description'</span>]<span class="sc">}</span><span class="ch">\n</span><span class="ss">"</span></span>
+<span id="cb11-48"><a href="#cb11-48" aria-hidden="true" tabindex="-1"></a>            <span class="st">"- FINISH: enough information to answer</span><span class="ch">\n\n</span><span class="st">"</span></span>
+<span id="cb11-49"><a href="#cb11-49" aria-hidden="true" tabindex="-1"></a>            <span class="ss">f"Results so far:</span><span class="ch">\n</span><span class="sc">{</span>context<span class="sc">}</span><span class="ch">\n\n</span><span class="ss">"</span></span>
+<span id="cb11-50"><a href="#cb11-50" aria-hidden="true" tabindex="-1"></a>            <span class="st">"Reply with exactly: retrieval, analysis, or FINISH"</span></span>
+<span id="cb11-51"><a href="#cb11-51" aria-hidden="true" tabindex="-1"></a>        )},</span>
+<span id="cb11-52"><a href="#cb11-52" aria-hidden="true" tabindex="-1"></a>        <span class="op">*</span>state[<span class="st">"messages"</span>],</span>
+<span id="cb11-53"><a href="#cb11-53" aria-hidden="true" tabindex="-1"></a>    ])</span>
+<span id="cb11-54"><a href="#cb11-54" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"next_skill"</span>: response.content.strip().lower()}</span>
+<span id="cb11-55"><a href="#cb11-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-56"><a href="#cb11-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-57"><a href="#cb11-57" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> run_skill(skill_name: <span class="bu">str</span>, agent):</span>
+<span id="cb11-58"><a href="#cb11-58" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Create a node that runs a skill-specific agent."""</span></span>
+<span id="cb11-59"><a href="#cb11-59" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> node(state: SkillState) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb11-60"><a href="#cb11-60" aria-hidden="true" tabindex="-1"></a>        user_msg <span class="op">=</span> <span class="bu">next</span>(</span>
+<span id="cb11-61"><a href="#cb11-61" aria-hidden="true" tabindex="-1"></a>            (m.content <span class="cf">for</span> m <span class="kw">in</span> state[<span class="st">"messages"</span>] <span class="cf">if</span> <span class="bu">isinstance</span>(m, HumanMessage)), <span class="st">""</span></span>
+<span id="cb11-62"><a href="#cb11-62" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb11-63"><a href="#cb11-63" aria-hidden="true" tabindex="-1"></a>        context <span class="op">=</span> state.get(<span class="st">"skill_outputs"</span>, {})</span>
+<span id="cb11-64"><a href="#cb11-64" aria-hidden="true" tabindex="-1"></a>        context_str <span class="op">=</span> <span class="st">"</span><span class="ch">\n</span><span class="st">"</span>.join(<span class="ss">f"[</span><span class="sc">{</span>k<span class="sc">}</span><span class="ss">]: </span><span class="sc">{</span>v<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> k, v <span class="kw">in</span> context.items())</span>
+<span id="cb11-65"><a href="#cb11-65" aria-hidden="true" tabindex="-1"></a>        query <span class="op">=</span> <span class="ss">f"</span><span class="sc">{</span>user_msg<span class="sc">}</span><span class="ch">\n\n</span><span class="ss">Context:</span><span class="ch">\n</span><span class="sc">{</span>context_str<span class="sc">}</span><span class="ss">"</span> <span class="cf">if</span> context_str <span class="cf">else</span> user_msg</span>
+<span id="cb11-66"><a href="#cb11-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-67"><a href="#cb11-67" aria-hidden="true" tabindex="-1"></a>        result <span class="op">=</span> agent.invoke({<span class="st">"messages"</span>: [{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: query}]})</span>
+<span id="cb11-68"><a href="#cb11-68" aria-hidden="true" tabindex="-1"></a>        updated <span class="op">=</span> {<span class="op">**</span>state.get(<span class="st">"skill_outputs"</span>, {}), skill_name: result[<span class="st">"messages"</span>][<span class="op">-</span><span class="dv">1</span>].content}</span>
+<span id="cb11-69"><a href="#cb11-69" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {<span class="st">"skill_outputs"</span>: updated}</span>
+<span id="cb11-70"><a href="#cb11-70" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> node</span>
+<span id="cb11-71"><a href="#cb11-71" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-72"><a href="#cb11-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-73"><a href="#cb11-73" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> route_decision(state: SkillState) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb11-74"><a href="#cb11-74" aria-hidden="true" tabindex="-1"></a>    skill <span class="op">=</span> state.get(<span class="st">"next_skill"</span>, <span class="st">"FINISH"</span>)</span>
+<span id="cb11-75"><a href="#cb11-75" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> skill <span class="cf">if</span> skill <span class="kw">in</span> (<span class="st">"retrieval"</span>, <span class="st">"analysis"</span>) <span class="cf">else</span> <span class="st">"synthesize"</span></span>
+<span id="cb11-76"><a href="#cb11-76" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-77"><a href="#cb11-77" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-78"><a href="#cb11-78" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> synthesize(state: SkillState) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb11-79"><a href="#cb11-79" aria-hidden="true" tabindex="-1"></a>    outputs <span class="op">=</span> state.get(<span class="st">"skill_outputs"</span>, {})</span>
+<span id="cb11-80"><a href="#cb11-80" aria-hidden="true" tabindex="-1"></a>    context <span class="op">=</span> <span class="st">"</span><span class="ch">\n\n</span><span class="st">"</span>.join(<span class="ss">f"**</span><span class="sc">{</span>k<span class="sc">}</span><span class="ss">**:</span><span class="ch">\n</span><span class="sc">{</span>v<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> k, v <span class="kw">in</span> outputs.items())</span>
+<span id="cb11-81"><a href="#cb11-81" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> llm.invoke([</span>
+<span id="cb11-82"><a href="#cb11-82" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"system"</span>, <span class="st">"content"</span>: <span class="st">"Synthesize skill outputs into a clear answer."</span>},</span>
+<span id="cb11-83"><a href="#cb11-83" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="ss">f"Question: </span><span class="sc">{</span>state[<span class="st">'messages'</span>][<span class="dv">0</span>]<span class="sc">.</span>content<span class="sc">}</span><span class="ch">\n\n</span><span class="sc">{</span>context<span class="sc">}</span><span class="ss">"</span>},</span>
+<span id="cb11-84"><a href="#cb11-84" aria-hidden="true" tabindex="-1"></a>    ])</span>
+<span id="cb11-85"><a href="#cb11-85" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"messages"</span>: [{<span class="st">"role"</span>: <span class="st">"assistant"</span>, <span class="st">"content"</span>: response.content}]}</span>
+<span id="cb11-86"><a href="#cb11-86" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-87"><a href="#cb11-87" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-88"><a href="#cb11-88" aria-hidden="true" tabindex="-1"></a><span class="co"># Build the graph</span></span>
+<span id="cb11-89"><a href="#cb11-89" aria-hidden="true" tabindex="-1"></a>graph <span class="op">=</span> StateGraph(SkillState)</span>
+<span id="cb11-90"><a href="#cb11-90" aria-hidden="true" tabindex="-1"></a>graph.add_node(<span class="st">"router"</span>, router)</span>
+<span id="cb11-91"><a href="#cb11-91" aria-hidden="true" tabindex="-1"></a>graph.add_node(<span class="st">"retrieval"</span>, run_skill(<span class="st">"retrieval"</span>, retrieval_agent))</span>
+<span id="cb11-92"><a href="#cb11-92" aria-hidden="true" tabindex="-1"></a>graph.add_node(<span class="st">"analysis"</span>, run_skill(<span class="st">"analysis"</span>, analysis_agent))</span>
+<span id="cb11-93"><a href="#cb11-93" aria-hidden="true" tabindex="-1"></a>graph.add_node(<span class="st">"synthesize"</span>, synthesize)</span>
+<span id="cb11-94"><a href="#cb11-94" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-95"><a href="#cb11-95" aria-hidden="true" tabindex="-1"></a>graph.add_edge(START, <span class="st">"router"</span>)</span>
+<span id="cb11-96"><a href="#cb11-96" aria-hidden="true" tabindex="-1"></a>graph.add_conditional_edges(<span class="st">"router"</span>, route_decision, {</span>
+<span id="cb11-97"><a href="#cb11-97" aria-hidden="true" tabindex="-1"></a>    <span class="st">"retrieval"</span>: <span class="st">"retrieval"</span>,</span>
+<span id="cb11-98"><a href="#cb11-98" aria-hidden="true" tabindex="-1"></a>    <span class="st">"analysis"</span>: <span class="st">"analysis"</span>,</span>
+<span id="cb11-99"><a href="#cb11-99" aria-hidden="true" tabindex="-1"></a>    <span class="st">"synthesize"</span>: <span class="st">"synthesize"</span>,</span>
+<span id="cb11-100"><a href="#cb11-100" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb11-101"><a href="#cb11-101" aria-hidden="true" tabindex="-1"></a>graph.add_edge(<span class="st">"retrieval"</span>, <span class="st">"router"</span>)</span>
+<span id="cb11-102"><a href="#cb11-102" aria-hidden="true" tabindex="-1"></a>graph.add_edge(<span class="st">"analysis"</span>, <span class="st">"router"</span>)</span>
+<span id="cb11-103"><a href="#cb11-103" aria-hidden="true" tabindex="-1"></a>graph.add_edge(<span class="st">"synthesize"</span>, END)</span>
+<span id="cb11-104"><a href="#cb11-104" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-105"><a href="#cb11-105" aria-hidden="true" tabindex="-1"></a>skill_agent <span class="op">=</span> graph.<span class="bu">compile</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="llamaindex-skills-as-queryengine-tools" class="level3">
+<h3 class="anchored" data-anchor-id="llamaindex-skills-as-queryengine-tools">LlamaIndex: Skills as QueryEngine Tools</h3>
+<p>In LlamaIndex, skills map naturally to <code>QueryEngineTool</code> instances — each backed by a different index or data source:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> llama_index.llms.openai <span class="im">import</span> OpenAI</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> llama_index.core.agent.workflow <span class="im">import</span> ReActAgent</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> llama_index.core.tools <span class="im">import</span> FunctionTool, QueryEngineTool</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> llama_index.core <span class="im">import</span> VectorStoreIndex, SimpleDirectoryReader</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> llama_index.core.workflow <span class="im">import</span> Context</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Build skill-specific indices</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>docs <span class="op">=</span> SimpleDirectoryReader(<span class="st">"./docs/product"</span>).load_data()</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>product_index <span class="op">=</span> VectorStoreIndex.from_documents(docs)</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>api_docs <span class="op">=</span> SimpleDirectoryReader(<span class="st">"./docs/api"</span>).load_data()</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>api_index <span class="op">=</span> VectorStoreIndex.from_documents(api_docs)</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Wrap as skill tools with rich descriptions</span></span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>product_skill <span class="op">=</span> QueryEngineTool.from_defaults(</span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>    query_engine<span class="op">=</span>product_index.as_query_engine(similarity_top_k<span class="op">=</span><span class="dv">5</span>),</span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"product_knowledge"</span>,</span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>    description<span class="op">=</span>(</span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Search product documentation for feature descriptions, user guides, "</span></span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a>        <span class="st">"and configuration instructions. Use for 'what' and 'how' questions "</span></span>
+<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a>        <span class="st">"about the product. Returns relevant passages with source references."</span></span>
+<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-26"><a href="#cb12-26" aria-hidden="true" tabindex="-1"></a>api_skill <span class="op">=</span> QueryEngineTool.from_defaults(</span>
+<span id="cb12-27"><a href="#cb12-27" aria-hidden="true" tabindex="-1"></a>    query_engine<span class="op">=</span>api_index.as_query_engine(similarity_top_k<span class="op">=</span><span class="dv">5</span>),</span>
+<span id="cb12-28"><a href="#cb12-28" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"api_reference"</span>,</span>
+<span id="cb12-29"><a href="#cb12-29" aria-hidden="true" tabindex="-1"></a>    description<span class="op">=</span>(</span>
+<span id="cb12-30"><a href="#cb12-30" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Search API documentation for endpoint specifications, request/response "</span></span>
+<span id="cb12-31"><a href="#cb12-31" aria-hidden="true" tabindex="-1"></a>        <span class="st">"formats, authentication, rate limits, and error codes. Use for "</span></span>
+<span id="cb12-32"><a href="#cb12-32" aria-hidden="true" tabindex="-1"></a>        <span class="st">"developer-facing technical questions."</span></span>
+<span id="cb12-33"><a href="#cb12-33" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb12-34"><a href="#cb12-34" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb12-35"><a href="#cb12-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-36"><a href="#cb12-36" aria-hidden="true" tabindex="-1"></a>calc_skill <span class="op">=</span> FunctionTool.from_defaults(</span>
+<span id="cb12-37"><a href="#cb12-37" aria-hidden="true" tabindex="-1"></a>    fn<span class="op">=</span><span class="kw">lambda</span> expression: <span class="bu">str</span>(<span class="bu">eval</span>(expression, {<span class="st">"__builtins__"</span>: {}},</span>
+<span id="cb12-38"><a href="#cb12-38" aria-hidden="true" tabindex="-1"></a>                                   {<span class="st">"sqrt"</span>: <span class="bu">__import__</span>(<span class="st">'math'</span>).sqrt, <span class="st">"abs"</span>: <span class="bu">abs</span>})),</span>
+<span id="cb12-39"><a href="#cb12-39" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"calculator"</span>,</span>
+<span id="cb12-40"><a href="#cb12-40" aria-hidden="true" tabindex="-1"></a>    description<span class="op">=</span><span class="st">"Evaluate mathematical expressions for calculations based on data."</span>,</span>
+<span id="cb12-41"><a href="#cb12-41" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb12-42"><a href="#cb12-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-43"><a href="#cb12-43" aria-hidden="true" tabindex="-1"></a><span class="co"># Create the agent with all skills</span></span>
+<span id="cb12-44"><a href="#cb12-44" aria-hidden="true" tabindex="-1"></a>agent <span class="op">=</span> ReActAgent(</span>
+<span id="cb12-45"><a href="#cb12-45" aria-hidden="true" tabindex="-1"></a>    tools<span class="op">=</span>[product_skill, api_skill, calc_skill],</span>
+<span id="cb12-46"><a href="#cb12-46" aria-hidden="true" tabindex="-1"></a>    llm<span class="op">=</span>OpenAI(model<span class="op">=</span><span class="st">"gpt-4o-mini"</span>, temperature<span class="op">=</span><span class="dv">0</span>),</span>
+<span id="cb12-47"><a href="#cb12-47" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb12-48"><a href="#cb12-48" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-49"><a href="#cb12-49" aria-hidden="true" tabindex="-1"></a>ctx <span class="op">=</span> Context(agent)</span>
+<span id="cb12-50"><a href="#cb12-50" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> <span class="cf">await</span> agent.run(</span>
+<span id="cb12-51"><a href="#cb12-51" aria-hidden="true" tabindex="-1"></a>    <span class="st">"What's the API rate limit and how many requests can I make per hour?"</span>,</span>
+<span id="cb12-52"><a href="#cb12-52" aria-hidden="true" tabindex="-1"></a>    ctx<span class="op">=</span>ctx,</span>
+<span id="cb12-53"><a href="#cb12-53" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The agent will reason about which skill to invoke — using <code>api_reference</code> for the rate limit question, then <code>calculator</code> to compute hourly capacity.</p>
+</section>
+</section>
+<section id="packaging-skills-for-teams" class="level2">
+<h2 class="anchored" data-anchor-id="packaging-skills-for-teams">Packaging Skills for Teams</h2>
+<section id="the-skill.md-standard" class="level3">
+<h3 class="anchored" data-anchor-id="the-skill.md-standard">The SKILL.md Standard</h3>
+<p>Both Anthropic and OpenAI have converged on a <code>SKILL.md</code>-based format. Here’s how to create a distributable skill:</p>
+<pre><code>code-review/
+├── SKILL.md
+├── checklist.md
+└── templates/
+    └── review-comment.md</code></pre>
+<p><strong>SKILL.md:</strong></p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="an">name:</span><span class="co"> code-review</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="an">description:</span><span class="co"> &gt;</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="co">  Review code changes for bugs, security issues, and style violations.</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="co">  Use when reviewing pull requests or code diffs.</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a><span class="an">version:</span><span class="co"> 2</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a><span class="fu">## When to Use</span></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>Apply this skill when:</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Reviewing a pull request or code diff</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Asked to check code quality or find bugs</span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Performing security review of code changes</span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a><span class="fu">## Process</span></span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>Read the diff or changed files</span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>Check against the review checklist (see checklist.md)</span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>For each issue found, generate a review comment using the template</span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>Categorize issues: critical, warning, suggestion</span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>Summarize findings with counts by category</span>
+<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a><span class="fu">## Rules</span></span>
+<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Always check for: SQL injection, XSS, hardcoded secrets, missing auth</span>
+<span id="cb14-27"><a href="#cb14-27" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Flag any TODO or FIXME comments in new code</span>
+<span id="cb14-28"><a href="#cb14-28" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Verify error handling exists for all external calls</span>
+<span id="cb14-29"><a href="#cb14-29" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Check that tests exist for new public functions</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="distributing-skills" class="level3">
+<h3 class="anchored" data-anchor-id="distributing-skills">Distributing Skills</h3>
+<p><strong>Git repositories</strong> — Commit skills to a shared repo. Teams clone or reference them:</p>
+<pre><code>.skills/
+├── code-review/
+│   └── SKILL.md
+├── csv-insights/
+│   ├── SKILL.md
+│   └── analyze.py
+└── api-testing/
+    ├── SKILL.md
+    └── test-templates/</code></pre>
+<p><strong>OpenAI Skills API</strong> — Upload skills programmatically:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Upload a skill</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-X</span> POST <span class="st">'https://api.openai.com/v1/skills'</span> <span class="dt">\</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">-H</span> <span class="st">"Authorization: Bearer </span><span class="va">$OPENAI_API_KEY</span><span class="st">"</span> <span class="dt">\</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">-F</span> <span class="st">'files=@./code-review.zip;type=application/zip'</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Mount in a shell environment</span></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-L</span> <span class="st">'https://api.openai.com/v1/responses'</span> <span class="dt">\</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">-H</span> <span class="st">"Content-Type: application/json"</span> <span class="dt">\</span></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">-H</span> <span class="st">"Authorization: Bearer </span><span class="va">$OPENAI_API_KEY</span><span class="st">"</span> <span class="dt">\</span></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">-d</span> <span class="st">'{</span></span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a><span class="st">    "model": "gpt-4o-mini",</span></span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a><span class="st">    "tools": [{</span></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a><span class="st">      "type": "shell",</span></span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a><span class="st">      "environment": {</span></span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a><span class="st">        "type": "container_auto",</span></span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a><span class="st">        "skills": [</span></span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a><span class="st">          {"type": "skill_reference", "skill_id": "skill_abc123"}</span></span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a><span class="st">        ]</span></span>
+<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a><span class="st">      }</span></span>
+<span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a><span class="st">    }],</span></span>
+<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a><span class="st">    "input": "Review the code changes in this PR."</span></span>
+<span id="cb16-22"><a href="#cb16-22" aria-hidden="true" tabindex="-1"></a><span class="st">  }'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Anthropic Claude Code</strong> — Place skills in the <code>.claude/skills/</code> directory:</p>
+<pre><code>.claude/
+└── skills/
+    ├── code-review/
+    │   └── SKILL.md
+    └── testing/
+        └── SKILL.md</code></pre>
+<p>Claude Code automatically discovers skills and applies them when the task matches the skill’s description.</p>
+</section>
+</section>
+<section id="skill-design-patterns" class="level2">
+<h2 class="anchored" data-anchor-id="skill-design-patterns">Skill Design Patterns</h2>
+<section id="pattern-1-progressive-disclosure" class="level3">
+<h3 class="anchored" data-anchor-id="pattern-1-progressive-disclosure">Pattern 1: Progressive Disclosure</h3>
+<p>Don’t front-load all instructions. Start with a brief description, and include detailed instructions in separate files that the agent reads only when needed.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="an">name:</span><span class="co"> database-migration</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="an">description:</span><span class="co"> Plan and execute database schema migrations safely.</span></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a><span class="fu">## Quick Start</span></span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>Use this skill for any database schema change. Start by reading</span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>the full migration checklist in <span class="in">`checklist.md`</span>.</span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a><span class="fu">## Files</span></span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`checklist.md`</span> — Step-by-step migration process</span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`rollback-template.sql`</span> — Template for rollback scripts</span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span><span class="in">`validation-queries.sql`</span> — Post-migration validation queries</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>This keeps the context window small until the agent actually needs the detailed instructions.</p>
+</section>
+<section id="pattern-2-skill-composition" class="level3">
+<h3 class="anchored" data-anchor-id="pattern-2-skill-composition">Pattern 2: Skill Composition</h3>
+<p>Build complex skills by composing simpler ones. A “research report” skill might invoke retrieval, analysis, and formatting skills:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> generate_research_report(topic: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Generate a comprehensive research report on a topic.</span></span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a><span class="co">    This skill orchestrates three sub-skills:</span></span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a><span class="co">    1. Knowledge base retrieval — gather relevant documents</span></span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a><span class="co">    2. Data analysis — pull metrics and compute trends</span></span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a><span class="co">    3. Report formatting — structure findings into a polished report</span></span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a><span class="co">        topic: The research topic to investigate.</span></span>
+<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Step 1: Retrieve</span></span>
+<span id="cb19-14"><a href="#cb19-14" aria-hidden="true" tabindex="-1"></a>    docs <span class="op">=</span> search_knowledge_base(topic)</span>
+<span id="cb19-15"><a href="#cb19-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-16"><a href="#cb19-16" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Step 2: Analyze</span></span>
+<span id="cb19-17"><a href="#cb19-17" aria-hidden="true" tabindex="-1"></a>    metrics <span class="op">=</span> query_metrics_database(<span class="ss">f"metrics related to </span><span class="sc">{</span>topic<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb19-18"><a href="#cb19-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-19"><a href="#cb19-19" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Step 3: Format</span></span>
+<span id="cb19-20"><a href="#cb19-20" aria-hidden="true" tabindex="-1"></a>    report <span class="op">=</span> format_report(</span>
+<span id="cb19-21"><a href="#cb19-21" aria-hidden="true" tabindex="-1"></a>        title<span class="op">=</span><span class="ss">f"Research Report: </span><span class="sc">{</span>topic<span class="sc">}</span><span class="ss">"</span>,</span>
+<span id="cb19-22"><a href="#cb19-22" aria-hidden="true" tabindex="-1"></a>        sections<span class="op">=</span><span class="ss">f"## Findings</span><span class="ch">\n</span><span class="sc">{</span>docs<span class="sc">}</span><span class="ch">\n\n</span><span class="ss">## Metrics</span><span class="ch">\n</span><span class="sc">{</span>metrics<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb19-23"><a href="#cb19-23" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb19-24"><a href="#cb19-24" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> report</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="pattern-3-guardrailed-skills" class="level3">
+<h3 class="anchored" data-anchor-id="pattern-3-guardrailed-skills">Pattern 3: Guardrailed Skills</h3>
+<p>Wrap skills with input and output validation using the patterns from <a href="../../posts/agent/Guardrails-and-Safety-for-Autonomous-Retrieval-Agents.html">Guardrails and Safety for Autonomous Retrieval Agents</a>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> safe_database_query(description: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Query the database with safety guardrails.</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a><span class="co">    This tool validates that queries are read-only before execution.</span></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a><span class="co">    Write operations (INSERT, UPDATE, DELETE) are blocked.</span></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a><span class="co">        description: Natural language description of the data needed.</span></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Input guardrail: check for write operations</span></span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>    write_keywords <span class="op">=</span> [<span class="st">"insert"</span>, <span class="st">"update"</span>, <span class="st">"delete"</span>, <span class="st">"drop"</span>, <span class="st">"alter"</span>, <span class="st">"truncate"</span>]</span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="bu">any</span>(kw <span class="kw">in</span> description.lower() <span class="cf">for</span> kw <span class="kw">in</span> write_keywords):</span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> (<span class="st">"Error: Write operations are not allowed through this tool. "</span></span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a>                <span class="st">"Use the admin dashboard for data modifications."</span>)</span>
+<span id="cb20-16"><a href="#cb20-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-17"><a href="#cb20-17" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> query_metrics_database(description)</span>
+<span id="cb20-18"><a href="#cb20-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-19"><a href="#cb20-19" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Output guardrail: check for PII</span></span>
+<span id="cb20-20"><a href="#cb20-20" aria-hidden="true" tabindex="-1"></a>    pii_patterns <span class="op">=</span> [<span class="st">"@"</span>, <span class="st">"SSN"</span>, <span class="st">"social security"</span>, <span class="st">"credit card"</span>]</span>
+<span id="cb20-21"><a href="#cb20-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="bu">any</span>(pattern.lower() <span class="kw">in</span> result.lower() <span class="cf">for</span> pattern <span class="kw">in</span> pii_patterns):</span>
+<span id="cb20-22"><a href="#cb20-22" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"Error: Query results contain potentially sensitive data. Results filtered."</span></span>
+<span id="cb20-23"><a href="#cb20-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-24"><a href="#cb20-24" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> result</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="pattern-4-self-improving-skills" class="level3">
+<h3 class="anchored" data-anchor-id="pattern-4-self-improving-skills">Pattern 4: Self-Improving Skills</h3>
+<p>Add feedback loops where the agent evaluates its own skill usage and adjusts. This builds on the reflection pattern from <a href="../../posts/agent/Design-Patterns-for-AI-Agents.html">Design Patterns for AI Agents</a>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> evaluate_skill_result(</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>    skill_name: <span class="bu">str</span>, query: <span class="bu">str</span>, result: <span class="bu">str</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Evaluate whether a skill produced a useful result.</span></span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a><span class="co">    Use this after calling any skill to verify the output quality.</span></span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a><span class="co">    If the result is poor, the evaluation will suggest improvements.</span></span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a><span class="co">        skill_name: Which skill produced this result.</span></span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a><span class="co">        query: The original query sent to the skill.</span></span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a><span class="co">        result: The skill's output to evaluate.</span></span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> llm.invoke([{</span>
+<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a>        <span class="st">"role"</span>: <span class="st">"system"</span>,</span>
+<span id="cb21-17"><a href="#cb21-17" aria-hidden="true" tabindex="-1"></a>        <span class="st">"content"</span>: (</span>
+<span id="cb21-18"><a href="#cb21-18" aria-hidden="true" tabindex="-1"></a>            <span class="st">"Evaluate this skill result. Rate as: 'good', 'partial', or 'poor'.</span><span class="ch">\n</span><span class="st">"</span></span>
+<span id="cb21-19"><a href="#cb21-19" aria-hidden="true" tabindex="-1"></a>            <span class="st">"If partial or poor, explain what's missing and suggest a better query.</span><span class="ch">\n</span><span class="st">"</span></span>
+<span id="cb21-20"><a href="#cb21-20" aria-hidden="true" tabindex="-1"></a>            <span class="st">"Format: RATING: &lt;rating&gt;</span><span class="ch">\\</span><span class="st">nFEEDBACK: &lt;feedback&gt;"</span></span>
+<span id="cb21-21"><a href="#cb21-21" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb21-22"><a href="#cb21-22" aria-hidden="true" tabindex="-1"></a>    }, {</span>
+<span id="cb21-23"><a href="#cb21-23" aria-hidden="true" tabindex="-1"></a>        <span class="st">"role"</span>: <span class="st">"user"</span>,</span>
+<span id="cb21-24"><a href="#cb21-24" aria-hidden="true" tabindex="-1"></a>        <span class="st">"content"</span>: <span class="ss">f"Skill: </span><span class="sc">{</span>skill_name<span class="sc">}</span><span class="ch">\n</span><span class="ss">Query: </span><span class="sc">{</span>query<span class="sc">}</span><span class="ch">\n</span><span class="ss">Result: </span><span class="sc">{</span>result<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb21-25"><a href="#cb21-25" aria-hidden="true" tabindex="-1"></a>    }])</span>
+<span id="cb21-26"><a href="#cb21-26" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> response.content</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="testing-and-evaluating-skills" class="level2">
+<h2 class="anchored" data-anchor-id="testing-and-evaluating-skills">Testing and Evaluating Skills</h2>
+<section id="unit-testing-skills" class="level3">
+<h3 class="anchored" data-anchor-id="unit-testing-skills">Unit Testing Skills</h3>
+<p>Test each tool independently before composing them into agents:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pytest</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_search_returns_results():</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Verify search returns formatted results for valid queries."""</span></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> search_knowledge_base.invoke({<span class="st">"query"</span>: <span class="st">"rate limiting"</span>})</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="st">"No results found"</span> <span class="kw">not</span> <span class="kw">in</span> result</span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="st">"relevance:"</span> <span class="kw">in</span> result</span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_search_handles_empty_results():</span>
+<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Verify graceful handling of no results."""</span></span>
+<span id="cb22-13"><a href="#cb22-13" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> search_knowledge_base.invoke({<span class="st">"query"</span>: <span class="st">"xyzzy_nonexistent_topic"</span>})</span>
+<span id="cb22-14"><a href="#cb22-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="st">"No results found"</span> <span class="kw">in</span> result <span class="kw">or</span> <span class="st">"rephrasing"</span> <span class="kw">in</span> result</span>
+<span id="cb22-15"><a href="#cb22-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-16"><a href="#cb22-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-17"><a href="#cb22-17" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_calculator_handles_errors():</span>
+<span id="cb22-18"><a href="#cb22-18" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Verify calculator returns helpful errors."""</span></span>
+<span id="cb22-19"><a href="#cb22-19" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> calculate.invoke({<span class="st">"expression"</span>: <span class="st">"1/0"</span>})</span>
+<span id="cb22-20"><a href="#cb22-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="st">"Error"</span> <span class="kw">in</span> result</span>
+<span id="cb22-21"><a href="#cb22-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="st">"try again"</span> <span class="kw">in</span> result.lower() <span class="kw">or</span> <span class="st">"syntax"</span> <span class="kw">in</span> result.lower()</span>
+<span id="cb22-22"><a href="#cb22-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-23"><a href="#cb22-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-24"><a href="#cb22-24" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_query_rewrite_improves_specificity():</span>
+<span id="cb22-25"><a href="#cb22-25" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Verify query rewriting produces more specific queries."""</span></span>
+<span id="cb22-26"><a href="#cb22-26" aria-hidden="true" tabindex="-1"></a>    original <span class="op">=</span> <span class="st">"rate limit"</span></span>
+<span id="cb22-27"><a href="#cb22-27" aria-hidden="true" tabindex="-1"></a>    rewritten <span class="op">=</span> rewrite_query.invoke({</span>
+<span id="cb22-28"><a href="#cb22-28" aria-hidden="true" tabindex="-1"></a>        <span class="st">"original_query"</span>: original,</span>
+<span id="cb22-29"><a href="#cb22-29" aria-hidden="true" tabindex="-1"></a>        <span class="st">"context"</span>: <span class="st">"User wants to know about API rate limiting configuration"</span></span>
+<span id="cb22-30"><a href="#cb22-30" aria-hidden="true" tabindex="-1"></a>    })</span>
+<span id="cb22-31"><a href="#cb22-31" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="bu">len</span>(rewritten) <span class="op">&gt;</span> <span class="bu">len</span>(original)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="integration-testing-with-agent-traces" class="level3">
+<h3 class="anchored" data-anchor-id="integration-testing-with-agent-traces">Integration Testing with Agent Traces</h3>
+<p>Test skills in the context of a full agent run, checking that the agent chooses the right skills:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_agent_uses_retrieval_skill_for_docs_question():</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Agent should use knowledge base for documentation questions."""</span></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> skill_agent.invoke({</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>        <span class="st">"messages"</span>: [{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"How do I configure rate limiting?"</span>}],</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>        <span class="st">"next_skill"</span>: <span class="st">""</span>,</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"skill_outputs"</span>: {},</span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>    })</span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Check that retrieval skill was used</span></span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="st">"retrieval"</span> <span class="kw">in</span> result.get(<span class="st">"skill_outputs"</span>, {})</span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="st">"rate limit"</span> <span class="kw">in</span> result[<span class="st">"messages"</span>][<span class="op">-</span><span class="dv">1</span>].content.lower()</span>
+<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> test_agent_uses_analysis_skill_for_metrics_question():</span>
+<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Agent should use analysis skill for metrics questions."""</span></span>
+<span id="cb23-16"><a href="#cb23-16" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> skill_agent.invoke({</span>
+<span id="cb23-17"><a href="#cb23-17" aria-hidden="true" tabindex="-1"></a>        <span class="st">"messages"</span>: [{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"How many active users do we have?"</span>}],</span>
+<span id="cb23-18"><a href="#cb23-18" aria-hidden="true" tabindex="-1"></a>        <span class="st">"next_skill"</span>: <span class="st">""</span>,</span>
+<span id="cb23-19"><a href="#cb23-19" aria-hidden="true" tabindex="-1"></a>        <span class="st">"skill_outputs"</span>: {},</span>
+<span id="cb23-20"><a href="#cb23-20" aria-hidden="true" tabindex="-1"></a>    })</span>
+<span id="cb23-21"><a href="#cb23-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-22"><a href="#cb23-22" aria-hidden="true" tabindex="-1"></a>    <span class="cf">assert</span> <span class="st">"analysis"</span> <span class="kw">in</span> result.get(<span class="st">"skill_outputs"</span>, {})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="evaluation-criteria" class="level3">
+<h3 class="anchored" data-anchor-id="evaluation-criteria">Evaluation Criteria</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 31%">
+<col style="width: 45%">
+<col style="width: 22%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Criterion</th>
+<th style="text-align: left;">What to Measure</th>
+<th style="text-align: left;">Target</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Tool selection accuracy</strong></td>
+<td style="text-align: left;">Does the agent pick the right skill?</td>
+<td style="text-align: left;">&gt;95% on test cases</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Argument correctness</strong></td>
+<td style="text-align: left;">Are tool inputs properly formatted?</td>
+<td style="text-align: left;">&gt;98% valid inputs</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Result utilization</strong></td>
+<td style="text-align: left;">Does the agent use the tool output in its answer?</td>
+<td style="text-align: left;">&gt;90% of results cited</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Error recovery</strong></td>
+<td style="text-align: left;">Does the agent retry with a different approach on failure?</td>
+<td style="text-align: left;">&gt;80% recovery</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Step efficiency</strong></td>
+<td style="text-align: left;">How many tool calls to answer?</td>
+<td style="text-align: left;">≤3 for simple, ≤6 for complex</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Cost per query</strong></td>
+<td style="text-align: left;">Total tokens consumed</td>
+<td style="text-align: left;">Project-dependent</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="common-pitfalls-and-fixes" class="level2">
+<h2 class="anchored" data-anchor-id="common-pitfalls-and-fixes">Common Pitfalls and Fixes</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 39%">
+<col style="width: 39%">
+<col style="width: 21%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Pitfall</th>
+<th style="text-align: left;">Symptom</th>
+<th style="text-align: left;">Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Vague tool descriptions</strong></td>
+<td style="text-align: left;">Agent picks wrong tool or ignores it</td>
+<td style="text-align: left;">Add specific trigger conditions, examples, and anti-examples</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Too many tools</strong></td>
+<td style="text-align: left;">Tool selection accuracy drops below 80%</td>
+<td style="text-align: left;">Split into multi-agent with 2–4 tools per agent</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Missing error guidance</strong></td>
+<td style="text-align: left;">Agent loops after tool errors</td>
+<td style="text-align: left;">Return actionable error messages with correction hints</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Brittle parameters</strong></td>
+<td style="text-align: left;">Agent passes wrong types or formats</td>
+<td style="text-align: left;">Use fewer parameters, add validation, poka-yoke the interface</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>No output structure</strong></td>
+<td style="text-align: left;">Agent struggles to parse tool results</td>
+<td style="text-align: left;">Return clean markdown; avoid deeply nested JSON</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Skill conflicts</strong></td>
+<td style="text-align: left;">Two skills seem applicable, agent oscillates</td>
+<td style="text-align: left;">Add explicit “do NOT use for” sections in descriptions</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Context window bloat</strong></td>
+<td style="text-align: left;">Too many skill instructions loaded at once</td>
+<td style="text-align: left;">Use progressive disclosure — brief descriptions up front, details in files</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>No versioning</strong></td>
+<td style="text-align: left;">Skill updates break existing workflows</td>
+<td style="text-align: left;">Use the SKILL.md version field; test before deploying</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="conclusion" class="level2">
+<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
+<p>Building skills for agents is the highest-leverage work in agent engineering. The reasoning loop, the orchestration topology, and the model choice all matter — but they’re multiplied by the quality of the skills your agent can execute.</p>
+<p><strong>Key takeaways:</strong></p>
+<ul>
+<li><strong>A skill = tool + instructions + context.</strong> A raw function is a tool. A skill wraps it with descriptions, examples, constraints, and metadata so the agent knows when and how to use it.</li>
+<li><strong>Invest more in ACI than prompts.</strong> Anthropic’s principle holds: tool definitions and descriptions deserve as much engineering attention as your system prompt. Clear naming, rich docstrings, minimal parameters, and actionable errors make the difference.</li>
+<li><strong>Poka-yoke everything.</strong> Design tools so they’re hard to use incorrectly — require absolute paths, validate inputs, return structured errors with correction hints.</li>
+<li><strong>Use the SKILL.md standard.</strong> Both Anthropic and OpenAI have converged on manifest files with YAML frontmatter. Package skills as versioned directories for portability and team sharing.</li>
+<li><strong>Progressive disclosure.</strong> Keep context windows small. Put brief descriptions in the skill manifest and detailed instructions in separate files the agent reads on demand.</li>
+<li><strong>Test skills independently</strong>, then in agent context. Unit test each tool, then trace full agent runs to verify skill selection and result utilization.</li>
+<li><strong>Start simple.</strong> One agent with well-designed tools beats a multi-agent system with poorly designed tools every time. Add orchestration complexity only when tool selection accuracy drops.</li>
+</ul>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li>Anthropic, <a href="https://www.anthropic.com/engineering/building-effective-agents">Building Effective Agents</a> — practical patterns from production agent deployments, including ACI design principles.</li>
+<li>Anthropic, <a href="https://anthropic.skilljar.com/introduction-to-agent-skills">Introduction to Agent Skills</a> — Anthropic Academy course on building, configuring, and sharing skills in Claude Code.</li>
+<li>OpenAI, <a href="https://developers.openai.com/api/docs/guides/tools-skills">Skills API Documentation</a> — OpenAI’s skills platform for uploading, versioning, and mounting agent skills.</li>
+<li>Agent Skills Standard, <a href="https://agentskills.io/home">agentskills.io</a> — open specification for portable, interoperable skill bundles.</li>
+<li>Ng, Andrew, <a href="https://www.deeplearning.ai/the-batch/how-agents-can-improve-llm-performance/">Agentic Design Patterns</a> — four foundational patterns: Reflection, Tool Use, Planning, Multi-Agent Collaboration.</li>
+<li>Weng, Lilian, <a href="https://lilianweng.github.io/posts/2023-06-23-agent/">LLM Powered Autonomous Agents</a> — comprehensive survey of Planning, Memory, and Tool Use components.</li>
+<li>Liu et al., <a href="https://arxiv.org/abs/2405.10467">Architectural Patterns for Foundation Model-Based Agents</a> — catalogue of 18 agent patterns with trade-off analysis.</li>
+</ul>
+</section>
+<section id="read-more" class="level2">
+<h2 class="anchored" data-anchor-id="read-more">Read More</h2>
+<ul>
+<li>Understand the foundational loop that skills execute within: <a href="../../posts/agent/Building-a-ReAct-Agent-from-Scratch.html">Building a ReAct Agent from Scratch</a> covers the Thought-Action-Observation cycle that drives tool use.</li>
+<li>Learn the broader architectural patterns that skills plug into: <a href="../../posts/agent/Design-Patterns-for-AI-Agents.html">Design Patterns for AI Agents</a> covers reflection, planning, and multi-agent collaboration.</li>
+<li>See how tool calling works at the protocol level: <a href="../../posts/agent/Tool-Use-and-Function-Calling-for-Retrieval-Agents.html">Tool Use and Function Calling for Retrieval Agents</a> covers schemas, parallel calls, and error handling.</li>
+<li>Assign each skill to a dedicated agent: <a href="../../posts/agent/Multi-Agent-RAG-Orchestration-Patterns.html">Multi-Agent RAG Orchestration Patterns</a> shows supervisor, swarm, and hierarchical topologies.</li>
+<li>Add safety boundaries to your skills: <a href="../../posts/agent/Guardrails-and-Safety-for-Autonomous-Retrieval-Agents.html">Guardrails and Safety for Autonomous Retrieval Agents</a> covers input/output validation and human-in-the-loop.</li>
+<li>Expose skills over a standard protocol: <a href="../../posts/agent/Build-and-Deploy-MCP-Server-from-Scratch.html">Build and Deploy MCP Server from Scratch</a> shows how to serve tools via the Model Context Protocol.</li>
+<li>Measure whether skills work in practice: <a href="../../posts/agent/Evaluating-and-Debugging-AI-Agents.html">Evaluating and Debugging AI Agents</a> covers trace inspection, tool selection accuracy, and cost analysis.</li>
+</ul>
+<!-- nav-buttons -->
+<p><a href="../../pages/agent.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-robot" aria-label="robot"></i> Explore Agents</a> <a href="../../index.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-house" aria-label="house"></i> Home</a></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/vectoringai\.com");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> 2025-2026 Vectoring AI. All rights reserved. | <a href="../../pages/privacy.html">Privacy Policy</a></p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

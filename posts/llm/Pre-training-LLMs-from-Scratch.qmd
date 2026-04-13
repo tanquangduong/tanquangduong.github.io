@@ -1,0 +1,980 @@
+---
+title: "Pre-training LLMs from Scratch"
+description: "End-to-end guide: from web scraping and data collection to preprocessing, tokenization, and pretraining a small language model with PyTorch and Unsloth"
+colab: <a href="https://colab.research.google.com/github/VectoringAI/ai-engineering/blob/main/llm/pre_training_llms_from_scratch.ipynb"><img src="/images/colab.png" alt="Open in Colab"></a>
+image: /images/llm/training-llm-from-scratch-300px.png
+date: "2026-03-01"
+keywords:
+  - "pretraining"
+  - "data collection"
+  - "web scraping"
+  - "data preprocessing"
+  - "tokenization"
+  - "BPE"
+  - "Common Crawl"
+  - "FineWeb"
+  - "datatrove"
+  - "trafilatura"
+  - "PyTorch"
+  - "Unsloth"
+  - "small language model"
+  - "continued pretraining"
+  - "LoRA"
+  - "deduplication"
+  - "filtering"
+---
+
+<div id="notebook-link" data-url="https://colab.research.google.com/github/VectoringAI/ai-engineering/blob/main/llm/pre_training_llms_from_scratch.ipynb" style="display:none"></div>
+
+
+![Pre-training a language model from scratch with PyTorch](/images/llm/training-llm-from-scratch-300px.png){fig-align="center" width=300}
+
+## Introduction
+
+Training a language model is more than just calling `.train()` — the bulk of the work lies in **data collection, cleaning, and formatting**. Real-world LLM training pipelines spend 80%+ of effort on data, because data quality directly determines model quality.
+
+This article walks through the **complete pipeline** for training a small language model: from raw web data to a working model. We cover web scraping with `trafilatura`, data preprocessing and deduplication with `datatrove`, tokenizer training, and finally pretraining and continued pretraining using **PyTorch** and **Unsloth**. All examples target small models (0.5B–3B parameters) that can run on consumer hardware.
+
+> For fine-tuning an existing model, see [Fine-tuning an LLM with Unsloth and Serving with Ollama](/posts/llm/Fine-tuning-LLM-with-Unsloth-and-serving-it-with-Ollama.html). For post-training alignment, see [Post-Training LLMs for Human Alignment](/posts/llm/Post-Training-LLMs-for-Human-Alignment.html). For reasoning training, see [Training LLMs for Reasoning](/posts/llm/Training-LLMs-for-Reasoning.html).
+
+## The End-to-End Training Pipeline
+
+```{mermaid}
+graph TD
+    A["Raw Sources<br/>(Web, PDFs, Code)"] --> B["Web Scraping<br/>& Text Extraction"]
+    B --> C["Data Cleaning<br/>& Filtering"]
+    C --> D["Deduplication"]
+    D --> E["Tokenization"]
+    E --> F["Pretraining<br/>(from scratch)"]
+    E --> G["Continued Pretraining<br/>(domain adaptation)"]
+    F --> H["Base Model"]
+    G --> H
+    H --> I["Fine-tuning<br/>(SFT / LoRA)"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#f5a623,color:#fff,stroke:#333
+    style C fill:#e74c3c,color:#fff,stroke:#333
+    style D fill:#9b59b6,color:#fff,stroke:#333
+    style E fill:#e67e22,color:#fff,stroke:#333
+    style F fill:#27ae60,color:#fff,stroke:#333
+    style G fill:#1abc9c,color:#fff,stroke:#333
+    style H fill:#C8CFEA,color:#fff,stroke:#333
+    style I fill:#3498db,color:#fff,stroke:#333
+```
+
+| Stage | Tools | Time Share |
+|-------|-------|:----------:|
+| **Data collection** | trafilatura, requests, Common Crawl | ~20% |
+| **Cleaning & filtering** | datatrove, fastText, regex | ~30% |
+| **Deduplication** | datatrove (MinHash, exact) | ~15% |
+| **Tokenization** | sentencepiece, tiktoken, HF tokenizers | ~5% |
+| **Training** | PyTorch, Unsloth, nanotron, TRL | ~30% |
+
+## 1. Data Collection and Web Scraping
+
+Every LLM starts with text data. There are three main sources:
+
+```{mermaid}
+graph TD
+    A{{"Data Sources"}} --> B["Web Scraping<br/>(custom crawls)"]
+    A --> C["Common Crawl<br/>(pre-crawled web)"]
+    A --> D["Curated Datasets<br/>(Wikipedia, books,<br/>code, papers)"]
+
+    B --> B1["trafilatura<br/>BeautifulSoup<br/>Scrapy"]
+    C --> C1["WARC/WET files<br/>96 snapshots<br/>~250B pages"]
+    D --> D1["HuggingFace Hub<br/>The Stack<br/>RedPajama"]
+
+    style A fill:#e74c3c,color:#fff,stroke:#333
+    style B fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#f5a623,color:#fff,stroke:#333
+    style D fill:#27ae60,color:#fff,stroke:#333
+    style B1 fill:#4a90d9,color:#fff,stroke:#333
+    style C1 fill:#f5a623,color:#fff,stroke:#333
+    style D1 fill:#27ae60,color:#fff,stroke:#333
+```
+
+### Web Scraping with Trafilatura
+
+[Trafilatura](https://trafilatura.readthedocs.io/) is the go-to library for extracting clean text from web pages. It's used by HuggingFace (FineWeb), IBM, and Microsoft Research. It handles boilerplate removal, metadata extraction, and outputs clean text.
+
+```python
+import trafilatura
+from trafilatura import fetch_url, extract
+
+# Single URL extraction
+url = "https://en.wikipedia.org/wiki/Large_language_model"
+downloaded = fetch_url(url)
+text = extract(downloaded, include_comments=False, include_tables=True)
+print(text[:500])
+```
+
+### Scraping at Scale
+
+For building a pretraining corpus, you need thousands to millions of pages:
+
+```python
+import trafilatura
+from trafilatura import fetch_url, extract
+from concurrent.futures import ThreadPoolExecutor
+import json
+
+def scrape_url(url):
+    """Scrape a single URL and return structured data."""
+    try:
+        downloaded = fetch_url(url)
+        if downloaded is None:
+            return None
+        text = extract(
+            downloaded,
+            include_comments=False,
+            include_tables=True,
+            favor_recall=True,
+        )
+        if text and len(text) > 200:  # skip very short pages
+            metadata = trafilatura.extract(
+                downloaded, output_format="json"
+            )
+            return {"url": url, "text": text}
+    except Exception:
+        return None
+    return None
+
+# Process URLs in parallel
+urls = [...]  # your list of URLs
+results = []
+with ThreadPoolExecutor(max_workers=8) as executor:
+    for result in executor.map(scrape_url, urls):
+        if result:
+            results.append(result)
+
+# Save as JSONL (datatrove's preferred format)
+with open("scraped_data.jsonl", "w") as f:
+    for item in results:
+        f.write(json.dumps(item) + "\n")
+```
+
+### Using Common Crawl
+
+For large-scale pretraining, start from [Common Crawl](https://commoncrawl.org/) rather than scraping yourself. Common Crawl provides pre-crawled web data in WARC format spanning 96+ snapshots:
+
+```python
+from datatrove.pipeline.readers import WarcReader
+from datatrove.pipeline.extractors import Trafilatura
+from datatrove.pipeline.writers import JsonlWriter
+from datatrove.executor import LocalPipelineExecutor
+
+# Read Common Crawl WARC files and extract text
+pipeline = [
+    WarcReader(
+        data_folder="s3://commoncrawl/crawl-data/CC-MAIN-2024-10/segments/",
+        glob_pattern="*/warc/*.warc.gz",
+        limit=1000,  # limit for testing
+    ),
+    Trafilatura(),  # extract text from HTML
+    JsonlWriter(output_folder="./extracted_data/"),
+]
+
+executor = LocalPipelineExecutor(pipeline=pipeline, tasks=4, workers=4)
+executor.run()
+```
+
+### Curated Datasets from HuggingFace Hub
+
+For quicker starts, use pre-cleaned datasets:
+
+| Dataset | Tokens | Domain | Quality |
+|---------|--------|--------|---------|
+| [FineWeb](https://huggingface.co/datasets/HuggingFaceFW/fineweb) | 15T | Web | High (filtered) |
+| [FineWeb-Edu](https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu) | 1.3T | Educational web | Very high |
+| [The Stack v2](https://huggingface.co/datasets/bigcode/the-stack-v2) | 900B+ | Code (600+ langs) | High |
+| [Cosmopedia](https://huggingface.co/datasets/HuggingFaceTB/cosmopedia) | 25B | Synthetic textbooks | High |
+| [Wikipedia](https://huggingface.co/datasets/wikimedia/wikipedia) | ~4B | Encyclopedia | Very high |
+| [RedPajama-V2](https://huggingface.co/datasets/togethercomputer/RedPajama-Data-V2) | 30T | Mixed web | Medium-high |
+
+## 2. Data Cleaning and Filtering
+
+Raw web text is noisy — full of ads, navigation menus, boilerplate, and low-quality content. Cleaning is the most impactful step in the pipeline.
+
+```{mermaid}
+graph TD
+    A["Raw Text"] --> B["Language<br/>Detection"]
+    B --> C["Quality<br/>Filtering"]
+    C --> D["Content<br/>Filtering"]
+    D --> E["Heuristic<br/>Rules"]
+    E --> F["Clean Text"]
+
+    B -->|"Remove non-target<br/>languages"| B
+    C -->|"Remove low-quality<br/>pages"| C
+    D -->|"Remove toxic,<br/>NSFW, PII"| D
+    E -->|"Length, ratio,<br/>repetition checks"| E
+
+    style A fill:#e74c3c,color:#fff,stroke:#333
+    style B fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#f5a623,color:#fff,stroke:#333
+    style D fill:#9b59b6,color:#fff,stroke:#333
+    style E fill:#e67e22,color:#fff,stroke:#333
+    style F fill:#27ae60,color:#fff,stroke:#333
+```
+
+### Filtering with DataTrove
+
+[DataTrove](https://github.com/huggingface/datatrove) is HuggingFace's library for large-scale data processing. It provides prebuilt filters used to create FineWeb:
+
+```python
+from datatrove.pipeline.readers import JsonlReader
+from datatrove.pipeline.filters import (
+    GopherQualityFilter,
+    GopherRepetitionFilter,
+    LanguageFilter,
+    URLFilter,
+    C4QualityFilter,
+)
+from datatrove.pipeline.writers import JsonlWriter
+from datatrove.executor import LocalPipelineExecutor
+
+pipeline = [
+    JsonlReader(data_folder="./extracted_data/"),
+
+    # Language filter: keep only English
+    LanguageFilter(languages=["en"], language_threshold=0.65),
+
+    # URL-based filter: block known bad domains
+    URLFilter(),
+
+    # Gopher quality filter (from DeepMind's Gopher paper)
+    # Checks: word count, mean word length, symbol-to-word ratio,
+    # fraction of lines ending with ellipsis, alphabetic ratio
+    GopherQualityFilter(
+        min_doc_words=50,
+        max_doc_words=100_000,
+    ),
+
+    # Gopher repetition filter
+    # Removes documents with excessive repeated n-grams/lines
+    GopherRepetitionFilter(),
+
+    # C4 quality filter (from T5/C4 paper)
+    # Checks for sentences ending in punctuation, JS/cookie warnings
+    C4QualityFilter(),
+
+    JsonlWriter(output_folder="./filtered_data/"),
+]
+
+executor = LocalPipelineExecutor(
+    pipeline=pipeline, tasks=8, workers=4,
+    logging_dir="./logs/filtering/"
+)
+executor.run()
+```
+
+### Key Filtering Heuristics
+
+The FineWeb paper documented the most effective filters:
+
+| Filter | What it Checks | Impact |
+|--------|---------------|--------|
+| **Language detection** | fastText classifier score > 0.65 | Removes non-target language |
+| **Word count** | 50 ≤ words ≤ 100,000 | Removes stubs and dumps |
+| **Mean word length** | 3–10 characters average | Catches gibberish |
+| **Symbol ratio** | `#` symbols < 10% of words | Removes markdown artifacts |
+| **Repetition** | Duplicate n-grams < threshold | Removes SEO spam |
+| **Line-level** | Lines ending in punctuation > 80% | Catches navigation text |
+| **Alphabetic ratio** | > 80% alphabetic characters | Removes data tables |
+
+### Educational Quality Classifier
+
+FineWeb-Edu showed that filtering for **educational content** dramatically improves model performance. The classifier was trained on LLM-annotated quality scores:
+
+```python
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import torch
+
+model_name = "HuggingFaceFW/fineweb-edu-classifier"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForSequenceClassification.from_pretrained(model_name)
+
+def score_educational_quality(text):
+    """Score text on educational quality (0-5 scale)."""
+    inputs = tokenizer(
+        text, return_tensors="pt",
+        truncation=True, max_length=512, padding=True
+    )
+    with torch.no_grad():
+        outputs = model(**inputs)
+    score = outputs.logits.squeeze().item()
+    return score
+
+# Keep only high-quality educational content (score >= 3)
+text = "The derivative of x^2 is 2x, by the power rule..."
+score = score_educational_quality(text)
+print(f"Educational score: {score:.2f}")  # ~4.5
+```
+
+## 3. Deduplication
+
+Duplicate content is surprisingly common on the web (30–50% of pages are near-duplicates). Deduplication prevents the model from memorizing repeated content and wastes training compute.
+
+```{mermaid}
+graph TD
+    A{{"Deduplication<br/>Methods"}} --> B["Exact<br/>Deduplication"]
+    A --> C["MinHash LSH<br/>(Near-duplicate)"]
+    A --> D["Sentence-Level<br/>Dedup"]
+
+    B --> B1["Hash each document<br/>Remove exact matches<br/>Fast, catches copies"]
+    C --> C1["Compute MinHash signature<br/>LSH for candidate pairs<br/>Remove if Jaccard > 0.8"]
+    D --> D1["Hash each sentence<br/>Remove repeated sentences<br/>Catches boilerplate"]
+
+    style A fill:#e74c3c,color:#fff,stroke:#333
+    style B fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#f5a623,color:#fff,stroke:#333
+    style D fill:#27ae60,color:#fff,stroke:#333
+    style B1 fill:#4a90d9,color:#fff,stroke:#333
+    style C1 fill:#f5a623,color:#fff,stroke:#333
+    style D1 fill:#27ae60,color:#fff,stroke:#333
+```
+
+### MinHash Deduplication with DataTrove
+
+MinHash is the standard approach for near-duplicate detection at scale:
+
+```python
+from datatrove.pipeline.readers import JsonlReader
+from datatrove.pipeline.dedup import (
+    MinhashDedupSignature,
+    MinhashDedupBuckets,
+    MinhashDedupCluster,
+    MinhashDedupFilter,
+)
+from datatrove.pipeline.writers import JsonlWriter
+from datatrove.executor import LocalPipelineExecutor
+
+# Step 1: Compute MinHash signatures
+stage1 = [
+    JsonlReader(data_folder="./filtered_data/"),
+    MinhashDedupSignature(
+        output_folder="./minhash_sigs/",
+        n_grams=5,        # 5-gram shingles
+        num_buckets=14,    # LSH buckets
+        hashes_per_bucket=8,
+    ),
+]
+
+# Step 2: Find duplicate clusters via LSH buckets
+stage2 = [
+    MinhashDedupBuckets(
+        input_folder="./minhash_sigs/",
+        output_folder="./minhash_buckets/",
+    ),
+]
+
+# Step 3: Cluster duplicates
+stage3 = [
+    MinhashDedupCluster(
+        input_folder="./minhash_buckets/",
+        output_folder="./minhash_clusters/",
+    ),
+]
+
+# Step 4: Filter out duplicates
+stage4 = [
+    JsonlReader(data_folder="./filtered_data/"),
+    MinhashDedupFilter(
+        input_folder="./minhash_clusters/",
+    ),
+    JsonlWriter(output_folder="./deduped_data/"),
+]
+
+# Run stages sequentially
+for i, pipeline in enumerate([stage1, stage2, stage3, stage4]):
+    executor = LocalPipelineExecutor(
+        pipeline=pipeline, tasks=8, workers=4,
+        logging_dir=f"./logs/dedup_stage{i+1}/"
+    )
+    executor.run()
+```
+
+### Deduplication Impact
+
+The FineWeb paper showed deduplication is one of the most impactful steps:
+
+| Dataset | Before Dedup | After Dedup | Removed |
+|---------|:-----------:|:-----------:|:-------:|
+| Common Crawl (1 snapshot) | ~3B pages | ~1.5B pages | ~50% |
+| FineWeb (96 snapshots) | ~40T tokens | 15T tokens | ~63% |
+
+## 4. Tokenization
+
+Tokenization converts text into integer sequences that the model can process. Most modern LLMs use **Byte-Pair Encoding (BPE)** or **SentencePiece** (Unigram).
+
+```{mermaid}
+graph LR
+    A["Raw Text<br/>'Hello world'"] --> B["Tokenizer"]
+    B --> C["Token IDs<br/>[15496, 995]"]
+
+    subgraph Training["Tokenizer Training"]
+        direction TB
+        D["Large text corpus"] --> E["Learn vocabulary<br/>(BPE / Unigram)"]
+        E --> F["Vocabulary<br/>(32K-128K tokens)"]
+    end
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#e74c3c,color:#fff,stroke:#333
+    style C fill:#27ae60,color:#fff,stroke:#333
+    style D fill:#f5a623,color:#fff,stroke:#333
+    style E fill:#9b59b6,color:#fff,stroke:#333
+    style F fill:#1abc9c,color:#fff,stroke:#333
+```
+
+### Training a Custom Tokenizer
+
+If you're pretraining from scratch on a specific domain or language, train a custom tokenizer:
+
+```python
+from tokenizers import (
+    Tokenizer,
+    models,
+    trainers,
+    pre_tokenizers,
+    decoders,
+    normalizers,
+)
+
+# Initialize BPE tokenizer
+tokenizer = Tokenizer(models.BPE())
+tokenizer.normalizer = normalizers.NFC()
+tokenizer.pre_tokenizer = pre_tokenizers.ByteLevel(add_prefix_space=False)
+tokenizer.decoder = decoders.ByteLevel()
+
+# Configure trainer
+trainer = trainers.BpeTrainer(
+    vocab_size=32000,
+    min_frequency=2,
+    special_tokens=["<|endoftext|>", "<|padding|>", "<|begin_of_text|>"],
+    show_progress=True,
+)
+
+# Train on your corpus
+files = ["./deduped_data/part_001.jsonl", "./deduped_data/part_002.jsonl"]
+tokenizer.train(files, trainer)
+
+# Save
+tokenizer.save("my_tokenizer.json")
+
+# Test
+encoded = tokenizer.encode("The transformer architecture")
+print(f"Tokens: {encoded.tokens}")
+print(f"IDs: {encoded.ids}")
+```
+
+### Using an Existing Tokenizer
+
+For continued pretraining or fine-tuning, reuse the base model's tokenizer:
+
+```python
+from transformers import AutoTokenizer
+
+# Llama 3.2 tokenizer (128K vocab, tiktoken-based BPE)
+tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B")
+print(f"Vocab size: {tokenizer.vocab_size}")  # 128256
+
+# Qwen 2.5 tokenizer (151K vocab)
+tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B")
+print(f"Vocab size: {tokenizer.vocab_size}")  # 151936
+
+# Tokenize for pretraining
+text = "Language models learn statistical patterns from text."
+tokens = tokenizer(text, return_tensors="pt")
+print(f"Token count: {tokens['input_ids'].shape[1]}")
+```
+
+### Tokenizing a Dataset for Pretraining
+
+For pretraining, tokenize your entire corpus and save as binary files for fast loading:
+
+```python
+from datatrove.pipeline.readers import JsonlReader
+from datatrove.pipeline.tokens import TokensCounter, DocumentTokenizer
+from datatrove.executor import LocalPipelineExecutor
+
+# Tokenize entire dataset using datatrove
+pipeline = [
+    JsonlReader(data_folder="./deduped_data/"),
+    DocumentTokenizer(
+        output_folder="./tokenized_data/",
+        tokenizer_name_or_path="Qwen/Qwen2.5-0.5B",
+        eos_token="<|endoftext|>",
+    ),
+]
+
+executor = LocalPipelineExecutor(
+    pipeline=pipeline, tasks=8, workers=4,
+    logging_dir="./logs/tokenization/"
+)
+executor.run()
+```
+
+### Tokenizer Comparison
+
+| Tokenizer | Algorithm | Vocab Size | Used By |
+|-----------|-----------|:----------:|---------|
+| **tiktoken (BPE)** | Byte-level BPE | 100K–200K | GPT-4, Llama 3 |
+| **SentencePiece (Unigram)** | Unigram LM | 32K–64K | Llama 1/2, Mistral |
+| **HF Tokenizers (BPE)** | Byte-level BPE | 32K–128K | SmolLM, BLOOM |
+
+## 5. Pretraining from Scratch with PyTorch
+
+Pretraining from scratch means initializing random weights and training on your full corpus. This requires significant compute but gives full control.
+
+```{mermaid}
+graph TD
+    subgraph Architecture["Model Architecture"]
+        direction TB
+        A1["Embedding Layer<br/>(vocab → hidden)"]
+        A2["N × Transformer Blocks<br/>(attention + FFN)"]
+        A3["LM Head<br/>(hidden → vocab)"]
+        A1 --> A2 --> A3
+    end
+
+    subgraph Training["Training Loop"]
+        direction TB
+        B1["Sample batch<br/>of token sequences"]
+        B2["Forward pass:<br/>predict next token"]
+        B3["Cross-entropy loss"]
+        B4["Backward pass<br/>+ optimizer step"]
+        B1 --> B2 --> B3 --> B4
+        B4 -->|"repeat"| B1
+    end
+
+    style A1 fill:#4a90d9,color:#fff,stroke:#333
+    style A2 fill:#f5a623,color:#fff,stroke:#333
+    style A3 fill:#e74c3c,color:#fff,stroke:#333
+    style B1 fill:#27ae60,color:#fff,stroke:#333
+    style B2 fill:#9b59b6,color:#fff,stroke:#333
+    style B3 fill:#e67e22,color:#fff,stroke:#333
+    style B4 fill:#1abc9c,color:#fff,stroke:#333
+```
+
+### Minimal Pretraining with PyTorch
+
+Here is a minimal but complete pretraining script using PyTorch:
+
+```python
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+from transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+)
+
+# --- Config ---
+model_name = "Qwen/Qwen2.5-0.5B"  # use as architecture template
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+seq_length = 1024
+batch_size = 4
+learning_rate = 3e-4
+num_steps = 10000
+
+# --- Dataset ---
+class PretrainDataset(Dataset):
+    """Load pre-tokenized data for causal LM training."""
+    def __init__(self, tokenized_file, seq_length):
+        self.data = torch.load(tokenized_file)  # 1D tensor of token IDs
+        self.seq_length = seq_length
+
+    def __len__(self):
+        return (len(self.data) - 1) // self.seq_length
+
+    def __getitem__(self, idx):
+        start = idx * self.seq_length
+        end = start + self.seq_length
+        x = self.data[start:end]
+        y = self.data[start + 1:end + 1]  # shifted by 1 for next-token prediction
+        return x, y
+
+# --- Initialize model from scratch (random weights) ---
+config = AutoConfig.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_config(config)  # random init
+model.train()
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
+
+print(f"Parameters: {sum(p.numel() for p in model.parameters()) / 1e6:.1f}M")
+
+# --- Optimizer ---
+optimizer = torch.optim.AdamW(
+    model.parameters(),
+    lr=learning_rate,
+    betas=(0.9, 0.95),
+    weight_decay=0.1,
+)
+
+# --- Training loop ---
+dataset = PretrainDataset("tokenized_corpus.pt", seq_length)
+dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+for step, (input_ids, labels) in enumerate(dataloader):
+    if step >= num_steps:
+        break
+    input_ids = input_ids.to(device)
+    labels = labels.to(device)
+
+    outputs = model(input_ids=input_ids, labels=labels)
+    loss = outputs.loss
+
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+    optimizer.step()
+    optimizer.zero_grad()
+
+    if step % 100 == 0:
+        print(f"Step {step}, Loss: {loss.item():.4f}")
+
+# Save
+model.save_pretrained("my-pretrained-model")
+tokenizer.save_pretrained("my-pretrained-model")
+```
+
+### Training Hyperparameters for Small Models
+
+Based on SmolLM, MiniCPM, and Qwen recipes:
+
+| Hyperparameter | Small (135M–360M) | Medium (0.5B–1.7B) | Large (3B) |
+|----------------|:-----------------:|:-------------------:|:----------:|
+| **Learning rate** | 3e-4 | 2e-4 | 2e-4 |
+| **Batch size (tokens)** | 1M | 2M | 2.4M |
+| **Optimizer** | AdamW | AdamW | AdamW |
+| **β1, β2** | 0.9, 0.95 | 0.9, 0.95 | 0.9, 0.95 |
+| **Weight decay** | 0.1 | 0.1 | 0.1 |
+| **Gradient clipping** | 1.0 | 1.0 | 1.0 |
+| **Scheduler** | WSD or Cosine | WSD or Cosine | WSD |
+| **Warmup steps** | 1000 | 2000 | 2000 |
+| **Tokens trained** | 600B | 1T | 11T |
+| **Context length** | 2048 | 2048–4096 | 4096 |
+
+### WSD Learning Rate Scheduler
+
+The **Warmup-Stable-Decay (WSD)** scheduler, introduced by MiniCPM and adopted by SmolLM3, is now preferred over cosine decay:
+
+```python
+import math
+
+def wsd_scheduler(step, total_steps, warmup_steps, lr, decay_fraction=0.1):
+    """Warmup-Stable-Decay learning rate schedule."""
+    decay_start = int(total_steps * (1 - decay_fraction))
+
+    if step < warmup_steps:
+        # Linear warmup
+        return lr * step / warmup_steps
+    elif step < decay_start:
+        # Stable phase
+        return lr
+    else:
+        # Linear decay to 0
+        progress = (step - decay_start) / (total_steps - decay_start)
+        return lr * (1 - progress)
+```
+
+## 6. Continued Pretraining with Unsloth
+
+**Continued pretraining (CPT)** adapts an existing model to a new domain or language. This is far more practical than training from scratch — you inherit the base model's knowledge and only need a fraction of the data.
+
+```{mermaid}
+graph TD
+    A["Pre-trained Base Model<br/>(e.g. Qwen2.5-0.5B)"] --> B["Continued Pretraining<br/>on domain-specific data"]
+    B --> C["Domain-Adapted Model"]
+    C --> D["Fine-tuning (SFT)<br/>on instruction data"]
+    D --> E["Domain Expert Model"]
+
+    subgraph Data["Domain Data Examples"]
+        direction TB
+        F["Medical texts"]
+        G["Legal documents"]
+        H["Code repositories"]
+        I["Scientific papers"]
+    end
+
+    Data --> B
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#e74c3c,color:#fff,stroke:#333
+    style C fill:#f5a623,color:#fff,stroke:#333
+    style D fill:#9b59b6,color:#fff,stroke:#333
+    style E fill:#27ae60,color:#fff,stroke:#333
+    style F fill:#1abc9c,color:#fff,stroke:#333
+    style G fill:#1abc9c,color:#fff,stroke:#333
+    style H fill:#1abc9c,color:#fff,stroke:#333
+    style I fill:#1abc9c,color:#fff,stroke:#333
+```
+
+### Why Continued Pretraining?
+
+| Approach | Data Needed | Compute | Use Case |
+|----------|:-----------:|:-------:|----------|
+| **From scratch** | Trillions of tokens | Very high | General purpose model |
+| **Continued pretraining** | Billions of tokens | Medium | Domain adaptation |
+| **Fine-tuning (SFT)** | Thousands of examples | Low | Task-specific behavior |
+
+### Continued Pretraining with Unsloth
+
+[Unsloth](https://unsloth.ai/) provides an optimized framework for continued pretraining with LoRA, using 2–5x less memory:
+
+```python
+from unsloth import FastLanguageModel
+from datasets import load_dataset
+from trl import SFTTrainer, SFTConfig
+
+# Load base model with Unsloth (4-bit quantized for memory efficiency)
+model, tokenizer = FastLanguageModel.from_pretrained(
+    model_name="unsloth/Qwen2.5-0.5B",
+    max_seq_length=2048,
+    dtype=None,
+    load_in_4bit=True,
+)
+
+# Add LoRA adapters including embed_tokens and lm_head for CPT
+model = FastLanguageModel.get_peft_model(
+    model,
+    r=16,
+    target_modules=[
+        "q_proj", "k_proj", "v_proj", "o_proj",
+        "gate_proj", "up_proj", "down_proj",
+        "lm_head", "embed_tokens",  # important for CPT
+    ],
+    lora_alpha=16,
+    lora_dropout=0,
+    use_gradient_checkpointing="unsloth",
+)
+```
+
+### Preparing Data for Continued Pretraining
+
+For CPT, the data format is simply raw text (no instruction formatting needed):
+
+```python
+from datasets import load_dataset
+
+# Load your domain-specific dataset
+dataset = load_dataset("json", data_files="domain_data.jsonl", split="train")
+
+# Format as plain text for CPT
+def format_for_cpt(example):
+    return {"text": example["text"] + tokenizer.eos_token}
+
+dataset = dataset.map(format_for_cpt)
+```
+
+### Running the Training
+
+```python
+from unsloth import UnslothTrainer, UnslothTrainingArguments
+
+trainer = UnslothTrainer(
+    model=model,
+    tokenizer=tokenizer,
+    train_dataset=dataset,
+    args=UnslothTrainingArguments(
+        output_dir="qwen-0.5b-domain-cpt",
+        per_device_train_batch_size=4,
+        gradient_accumulation_steps=8,
+        num_train_epochs=2,
+        learning_rate=5e-5,
+        embedding_learning_rate=5e-6,  # 10x smaller for embeddings
+        max_seq_length=2048,
+        warmup_steps=100,
+        fp16=not torch.cuda.is_bf16_supported(),
+        bf16=torch.cuda.is_bf16_supported(),
+        logging_steps=10,
+        save_steps=500,
+        weight_decay=0.01,
+        lr_scheduler_type="cosine",
+        seed=42,
+    ),
+    dataset_text_field="text",
+)
+
+trainer.train()
+
+# Save the model
+model.save_pretrained("qwen-0.5b-domain-cpt")
+tokenizer.save_pretrained("qwen-0.5b-domain-cpt")
+```
+
+### Exporting for Deployment
+
+After continued pretraining, export to GGUF for deployment with Ollama or llama.cpp:
+
+```python
+# Merge LoRA weights and save full model
+model.save_pretrained_merged(
+    "qwen-0.5b-domain-merged",
+    tokenizer,
+    save_method="merged_16bit",
+)
+
+# Export to GGUF for llama.cpp / Ollama
+model.save_pretrained_gguf(
+    "qwen-0.5b-domain-gguf",
+    tokenizer,
+    quantization_method="q4_k_m",
+)
+```
+
+> For serving with Ollama or llama.cpp, see [Run LLM locally with Ollama](/posts/llm/Run-LLM-locally-with-Ollama.html) and [Deploying and Serving LLM with Llama.cpp](/posts/llm/Deploying-and-Serving-LLM-with-Llama.cpp.html).
+
+## 7. Data Mixtures and Multi-Stage Training
+
+Real pretraining pipelines use **data mixtures** — carefully balanced proportions of web, code, math, and curated data that evolve across training stages.
+
+```{mermaid}
+graph TD
+    S1["Stage 1: Foundation — 0 to 8T tokens"] --> S2["Stage 2: Upsampling — 8 to 10T tokens"]
+    S2 --> S3["Stage 3: Quality Push — 10 to 11T tokens"]
+
+    S1 --> A1["Web 85%"]
+    S1 --> A2["Code 12%"]
+    S1 --> A3["Math 3%"]
+
+    S2 --> B1["Web 75%"]
+    S2 --> B2["Code 15%"]
+    S2 --> B3["Math 10%"]
+
+    S3 --> C1["Web 63%"]
+    S3 --> C2["Code 24%"]
+    S3 --> C3["Math 13%"]
+
+    style S1 fill:#27ae60,color:#fff,stroke:#333
+    style S2 fill:#27ae60,color:#fff,stroke:#333
+    style S3 fill:#27ae60,color:#fff,stroke:#333
+    style A1 fill:#4a90d9,color:#fff,stroke:#333
+    style A2 fill:#f5a623,color:#fff,stroke:#333
+    style A3 fill:#e74c3c,color:#fff,stroke:#333
+    style B1 fill:#4a90d9,color:#fff,stroke:#333
+    style B2 fill:#f5a623,color:#fff,stroke:#333
+    style B3 fill:#e74c3c,color:#fff,stroke:#333
+    style C1 fill:#4a90d9,color:#fff,stroke:#333
+    style C2 fill:#f5a623,color:#fff,stroke:#333
+    style C3 fill:#e74c3c,color:#fff,stroke:#333
+```
+
+*SmolLM3's three-stage pretraining recipe (11T tokens total). Each stage progressively increases the proportion of high-quality code and math data.*
+
+### Data Sources by Category
+
+**Web data:**
+
+- **FineWeb-Edu**: Educational web content filtered by quality classifier
+- **DCLM**: Cleaned Common Crawl from DataComp
+- **FineWeb2**: Updated web crawl with multilingual support
+
+**Code data:**
+
+- **The Stack v2**: 600+ programming languages
+- **Stack-Edu**: Educationally filtered Python code
+- **StarCoder2 pull requests**: Real code reviews and discussions
+
+**Math data:**
+
+- **FineMath**: High-quality math web pages
+- **InfiWebMath**: Infinite web math extraction
+- **OpenMathReasoning**: NVIDIA's 3.2M math dataset
+
+### Practical Data Mixture for Small Models
+
+For a **1B model on ~100B tokens** (achievable on a single 8×H100 node in ~1 week):
+
+| Source | Proportion | Tokens |
+|--------|:----------:|:------:|
+| FineWeb-Edu (deduplicated) | 60% | 60B |
+| The Stack v2 (Python, JS, Java) | 15% | 15B |
+| Cosmopedia v2 (synthetic textbooks) | 10% | 10B |
+| FineMath + InfiWebMath | 8% | 8B |
+| Wikipedia + Books | 7% | 7B |
+
+## Comparison: From-Scratch vs Continued Pretraining
+
+```{mermaid}
+graph TD
+    A{{"What's your<br/>goal?"}}
+    A -->|"New architecture<br/>or language"| B["Pretrain from<br/>Scratch"]
+    A -->|"Domain adaptation<br/>existing model"| C["Continued<br/>Pretraining"]
+    A -->|"Task-specific<br/>behavior"| D["Fine-tuning<br/>(SFT / LoRA)"]
+
+    B --> B1["Need: trillions of tokens<br/>Multi-GPU cluster<br/>Weeks to months"]
+    C --> C1["Need: billions of tokens<br/>1-8 GPUs<br/>Days to weeks"]
+    D --> D1["Need: thousands of examples<br/>1 GPU<br/>Hours to days"]
+
+    style A fill:#e74c3c,color:#fff,stroke:#333
+    style B fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#f5a623,color:#fff,stroke:#333
+    style D fill:#27ae60,color:#fff,stroke:#333
+    style B1 fill:#4a90d9,color:#fff,stroke:#333
+    style C1 fill:#f5a623,color:#fff,stroke:#333
+    style D1 fill:#27ae60,color:#fff,stroke:#333
+```
+
+| Aspect | From Scratch | Continued Pretraining | Fine-tuning |
+|--------|:------------:|:---------------------:|:-----------:|
+| **Data needed** | Trillions of tokens | Billions of tokens | Thousands of examples |
+| **Compute** | 100s–1000s GPU-days | 10s–100s GPU-days | 1–10 GPU-hours |
+| **Control** | Full (architecture, vocab) | Medium (data, schedule) | Low (task behavior) |
+| **Starting point** | Random weights | Pre-trained weights | Pre-trained weights |
+| **Best for** | New model family | Domain adaptation | Task specialization |
+| **Tools** | nanotron, PyTorch | Unsloth, TRL | Unsloth, TRL |
+
+### Practical Recommendations
+
+For **single consumer GPU** (16–24 GB):
+
+1. Use **continued pretraining** with Unsloth + LoRA on your domain corpus
+2. Follow with **SFT** on instruction data using [Unsloth](/posts/llm/Fine-tuning-LLM-with-Unsloth-and-serving-it-with-Ollama.html)
+3. Export to GGUF and serve with [Ollama](/posts/llm/Run-LLM-locally-with-Ollama.html) or [Llama.cpp](/posts/llm/Deploying-and-Serving-LLM-with-Llama.cpp.html)
+
+For **small cluster** (8 GPUs):
+
+1. **Curate data** using datatrove (scrape → filter → dedup → tokenize)
+2. **Pretrain from scratch** or continued pretraining with PyTorch + nanotron
+3. **Post-train** with [alignment techniques](/posts/llm/Post-Training-LLMs-for-Human-Alignment.html) (DPO/GRPO)
+4. Add [reasoning capabilities](/posts/llm/Training-LLMs-for-Reasoning.html) if needed
+5. Deploy with [vLLM](/posts/llm/Deploying-and-Serving-LLM-with-vLLM.html) for production
+
+## Conclusion
+
+Training an LLM from scratch is a data-centric endeavor. The quality and diversity of your training corpus matters far more than model size — a small model on excellent data will outperform a larger model on noisy data (as demonstrated by Phi, SmolLM, and MiniCPM).
+
+The practical path for most practitioners:
+
+1. **Collect data** using trafilatura or start from FineWeb/Common Crawl
+2. **Clean and filter** with datatrove's quality and repetition filters
+3. **Deduplicate** with MinHash to remove 30–50% of redundant content
+4. **Tokenize** with an existing tokenizer (or train your own for new domains)
+5. **Train** with Unsloth (continued pretraining) or PyTorch (from scratch)
+6. **Iterate** on data quality — this is where the biggest gains come from
+
+The tools are all open source and well-documented. The real challenge is data curation, not model training.
+
+> For the next steps after pretraining, see [Post-Training LLMs for Human Alignment](/posts/llm/Post-Training-LLMs-for-Human-Alignment.html) and [Training LLMs for Reasoning](/posts/llm/Training-LLMs-for-Reasoning.html).
+
+## References
+
+- Penedo et al., *The FineWeb Datasets: Decanting the Web for the Finest Text Data at Scale*, 2024. [arXiv:2406.17557](https://arxiv.org/abs/2406.17557)
+- Ben Allal et al., *SmolLM - blazingly fast and remarkably powerful*, 2024. [HuggingFace Blog](https://huggingface.co/blog/smollm)
+- Bakouch et al., *SmolLM3: smol, multilingual, long-context reasoner*, 2025. [HuggingFace Blog](https://huggingface.co/blog/smollm3)
+- Ben Allal et al., *Cosmopedia: how to create large-scale synthetic data for pre-training*, 2024. [HuggingFace Blog](https://huggingface.co/blog/cosmopedia)
+- Hu et al., *MiniCPM: Unveiling the Potential of Small Language Models with Scalable Training Strategies*, 2024. [arXiv:2404.06395](https://arxiv.org/abs/2404.06395)
+- Barbaresi, A., *Trafilatura: A Web Scraping Library and Command-Line Tool for Text Discovery and Extraction*, ACL 2021. [Paper](https://aclanthology.org/2021.acl-demo.15/)
+- Penedo et al., *DataTrove: large scale data processing*, 2024. [GitHub](https://github.com/huggingface/datatrove)
+- Unsloth Team, *Continued Pretraining*, 2024. [Docs](https://unsloth.ai/docs/basics/continued-pretraining)
+
+## Read More
+
+- Try the [datatrove FineWeb example](https://github.com/huggingface/datatrove/blob/main/examples/fineweb.py) to reproduce the FineWeb pipeline
+- Explore [Cosmopedia](https://huggingface.co/datasets/HuggingFaceTB/cosmopedia) for synthetic pretraining data
+- Use the [Unsloth continued pretraining notebook](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Mistral_v0.3_(7B)-CPT.ipynb) for quick domain adaptation
+- Read the [SmolLM blog post](https://huggingface.co/blog/smollm) for a complete small model training recipe
+
+<!-- nav-buttons -->
+
+[{{< fa brain >}} Explore LLMs](../../pages/llm.qmd){.btn .btn-primary .btn-lg}
+[{{< fa house >}} Home](../../index.qmd){.btn .btn-primary .btn-lg}

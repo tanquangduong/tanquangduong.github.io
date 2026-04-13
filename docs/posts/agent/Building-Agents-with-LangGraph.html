@@ -1,0 +1,2273 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.36">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Vectoring AI">
+<meta name="dcterms.date" content="2026-03-17">
+<meta name="keywords" content="LangGraph, state machine, state graph, conditional routing, cycles, human-in-the-loop, checkpoints, persistence, agent architecture, LangChain, retrieval workflows, StateGraph, MemorySaver, tool calling, streaming, subgraphs, durable execution">
+<meta name="description" content="State machines, conditional routing, cycles, and human-in-the-loop checkpoints for retrieval workflows">
+
+<title>Building Agents with LangGraph – Vectoring AI</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../..//images/favicon.ico" rel="icon">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dbc92dda8186f57fa2e333fbb71d6a9d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-b981e3f33a8ad6ba97cc0b6118e04959.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/all.css" rel="stylesheet">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/latex-fontsize.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-Q4RQ337R0F"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-Q4RQ337R0F', { 'anonymize_ip': true});
+</script>
+<script async="" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9738638303661485" crossorigin="anonymous"></script>
+<!-- Cookie Consent Banner (GDPR compliant) -->
+<style>
+#cookie-consent-banner {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #1d1d1d !important;
+  color: #ffffff !important;
+  padding: 16px 24px;
+  z-index: 9999;
+  font-size: 14px;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+}
+#cookie-consent-banner p {
+  margin: 0 0 12px 0;
+  line-height: 1.5;
+  color: #ffffff !important;
+}
+#cookie-consent-banner a {
+  color: #78b9ff;
+  text-decoration: underline;
+}
+#cookie-consent-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+#cookie-consent-buttons button {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+#btn-accept-all {
+  background: #3B70FE;
+  color: #fff;
+}
+#btn-accept-essential {
+  background: #555;
+  color: #fff;
+}
+#btn-deny {
+  background: transparent;
+  color: #ccc;
+  border: 1px solid #666 !important;
+}
+</style>
+
+<meta property="og:title" content="Building Agents with LangGraph – Vectoring AI">
+<meta property="og:description" content="State machines, conditional routing, cycles, and human-in-the-loop checkpoints for retrieval workflows">
+<meta property="og:image" content="https://vectoringai.com/images/agent/building-agents-langgraph-300px.png">
+<meta property="og:site_name" content="Vectoring AI">
+<meta property="og:image:height" content="200">
+<meta property="og:image:width" content="300">
+<meta name="twitter:title" content="Building Agents with LangGraph – Vectoring AI">
+<meta name="twitter:description" content="State machines, conditional routing, cycles, and human-in-the-loop checkpoints for retrieval workflows">
+<meta name="twitter:image" content="https://vectoringai.com/images/agent/building-agents-langgraph-300px.png">
+<meta name="twitter:image-height" content="200">
+<meta name="twitter:image-width" content="300">
+<meta name="twitter:card" content="summary_large_image">
+</head><body class="nav-sidebar docked quarto-light"><div id="cookie-consent-banner">
+  <p>We use cookies to serve personalized ads (Google AdSense) and analyze traffic.
+    You can accept all cookies, accept only essential cookies, or deny non-essential cookies.
+    <a href="../../pages/privacy.html">Privacy Policy</a>
+  </p>
+  <div id="cookie-consent-buttons">
+    <button id="btn-accept-all">Accept All</button>
+    <button id="btn-accept-essential">Essential Only</button>
+    <button id="btn-deny">Deny</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  var consent = localStorage.getItem("cookie_consent");
+
+  function loadAdSense() {
+    if (document.querySelector('script[src*="adsbygoogle"]')) return;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9738638303661485";
+    s.crossOrigin = "anonymous";
+    document.head.appendChild(s);
+  }
+
+  function showBanner() {
+    document.getElementById("cookie-consent-banner").style.display = "block";
+  }
+
+  function hideBanner() {
+    document.getElementById("cookie-consent-banner").style.display = "none";
+  }
+
+  if (consent === "all") {
+    loadAdSense();
+  } else if (consent === "essential" || consent === "denied") {
+    // Do not load AdSense
+  } else {
+    // No choice made yet — show banner, do not load AdSense
+    window.addEventListener("DOMContentLoaded", showBanner);
+  }
+
+  window.addEventListener("DOMContentLoaded", function() {
+    document.getElementById("btn-accept-all").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "all");
+      hideBanner();
+      loadAdSense();
+    });
+    document.getElementById("btn-accept-essential").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "essential");
+      hideBanner();
+    });
+    document.getElementById("btn-deny").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "denied");
+      hideBanner();
+    });
+  });
+})();
+</script>
+<script>
+// Inject missing Open Graph tags that Facebook requires for proper link sharing
+(function () {
+  if (!document.querySelector('meta[property="og:url"]')) {
+    var m = document.createElement("meta");
+    m.setAttribute("property", "og:url");
+    m.setAttribute("content", window.location.href);
+    document.head.appendChild(m);
+  }
+  if (!document.querySelector('meta[property="og:type"]')) {
+    var t = document.createElement("meta");
+    t.setAttribute("property", "og:type");
+    t.setAttribute("content", "article");
+    document.head.appendChild(t);
+  }
+  // Fix double-slash in og:image (site-url trailing slash + /images/...)
+  var ogImg = document.querySelector('meta[property="og:image"]');
+  if (ogImg) {
+    ogImg.setAttribute("content", ogImg.getAttribute("content").replace(/([^:])\/\//g, "$1/"));
+  }
+  var twImg = document.querySelector('meta[name="twitter:image"]');
+  if (twImg) {
+    twImg.setAttribute("content", twImg.getAttribute("content").replace(/([^:])\/\//g, "$1/"));
+  }
+})();
+</script>
+<style>
+.share-widget {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0.8rem 0 1.2rem 0;
+  padding: 0.5rem 0;
+}
+.share-widget .share-icon {
+  width: 20px;
+  height: 20px;
+  fill: #555;
+}
+.share-widget .share-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #555;
+}
+.share-widget .share-divider {
+  width: 1px;
+  height: 22px;
+  background: #ddd;
+}
+.share-widget a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  transition: transform 0.2s, box-shadow 0.2s;
+  text-decoration: none !important;
+}
+.share-widget a:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.share-widget a svg {
+  width: 20px;
+  height: 20px;
+}
+.notebook-widget {
+  margin: 0 0 1rem 0;
+}
+.notebook-widget a {
+  display: inline-block;
+  transition: transform 0.2s;
+}
+.notebook-widget a:hover {
+  transform: scale(1.05);
+}
+</style>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  if (!window.location.pathname.includes("/posts/")) return;
+
+  var rawTitle = document.title;
+  var rawUrl = window.location.href;
+  var title = encodeURIComponent(rawTitle);
+  var url = encodeURIComponent(rawUrl);
+
+  var widget = document.createElement("div");
+  widget.className = "share-widget";
+  widget.innerHTML =
+    '<svg class="share-icon" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>' +
+    '<span class="share-label">Share</span>' +
+    '<div class="share-divider"></div>' +
+    '<a href="https://twitter.com/intent/tweet?text=' + title + '&url=' + url + '" target="_blank" rel="noopener" title="Share on X"><svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>' +
+    '<a href="https://www.facebook.com/sharer/sharer.php?u=' + url + '" target="_blank" rel="noopener" title="Share on Facebook"><svg viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>' +
+    '<a href="https://www.linkedin.com/shareArticle?mini=true&url=' + url + '&title=' + title + '" target="_blank" rel="noopener" title="Share on LinkedIn"><svg viewBox="0 0 24 24" fill="#0A66C2"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>';
+
+  // Desktop: open a centered popup (standard share UX).
+  // Mobile: let the default target="_blank" navigate so the OS can
+  //         route to the native app (Facebook, LinkedIn, etc.).
+  var isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+  if (!isMobile) {
+    widget.querySelectorAll("a").forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        var w = 600, h = 500;
+        var left = (screen.width - w) / 2;
+        var top = (screen.height - h) / 2;
+        window.open(
+          this.href, "share",
+          "width=" + w + ",height=" + h + ",left=" + left + ",top=" + top + ",noopener,noreferrer"
+        );
+      });
+    });
+  }
+
+  // Insert right after the title-block header, before Keywords
+  var header = document.querySelector("header#title-block-header");
+  if (header && header.nextSibling) {
+    header.parentNode.insertBefore(widget, header.nextSibling);
+  }
+
+  // Add Colab / notebook button if the page has a notebook-link element
+  var nbEl = document.getElementById("notebook-link");
+  if (nbEl && nbEl.dataset.url) {
+    var nbWidget = document.createElement("div");
+    nbWidget.className = "notebook-widget";
+    nbWidget.innerHTML =
+      '<a href="' + nbEl.dataset.url + '" target="_blank" rel="noopener" title="Open notebook in Google Colab">' +
+      '<img src="/images/colab.png" alt="Open in Colab" style="height:28px">' +
+      '</a>';
+    // Insert right after the share widget
+    if (widget.nextSibling) {
+      widget.parentNode.insertBefore(nbWidget, widget.nextSibling);
+    } else if (widget.parentNode) {
+      widget.parentNode.appendChild(nbWidget);
+    }
+  }
+});
+</script>
+<script>
+  var link = document.createElement('link');
+  link.rel = 'canonical';
+  var path = window.location.pathname.replace(/index\.html$/, '');
+  link.href = 'https://vectoringai.com' + path;
+  document.head.appendChild(link);
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var ogTitle = document.querySelector('meta[property="og:title"]');
+  var ogDesc = document.querySelector('meta[property="og:description"]');
+  var ogImage = document.querySelector('meta[property="og:image"]');
+  var dcDate = document.querySelector('meta[name="dcterms.date"]');
+
+  if (!ogTitle) return;
+
+  var isArticle = !!dcDate;
+  var jsonld = {
+    "@context": "https://schema.org",
+    "@type": isArticle ? "Article" : "WebPage",
+    "headline": ogTitle.content.replace(/ – Vectoring AI$/, ''),
+    "description": ogDesc ? ogDesc.content : "",
+    "url": window.location.href,
+    "author": {
+      "@type": "Organization",
+      "name": "Vectoring AI",
+      "url": "https://vectoringai.com/pages/about.html"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Vectoring AI",
+      "url": "https://vectoringai.com",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://vectoringai.com/images/favicon_io/android-chrome-512x512.png"
+      }
+    }
+  };
+
+  if (ogImage) jsonld.image = ogImage.content;
+  if (dcDate) jsonld.datePublished = dcDate.content;
+
+  var el = document.createElement('script');
+  el.type = 'application/ld+json';
+  el.textContent = JSON.stringify(jsonld);
+  document.head.appendChild(el);
+});
+</script>
+<script src="../../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="../../styles.css">
+
+
+
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">
+      Vectoring AI
+      </li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../../">Vectoring AI</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://github.com/VectoringAI" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+    <a href="https://www.youtube.com/@vectoringai" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-youtube"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Home</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">AI Engineering</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/llm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">LLMs</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/agent.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Agents</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/rag.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">RAG</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/benchmark.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Benchmarks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/milestone.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Milestones</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/about.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">About</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title"><strong>Sections</strong></h2>
+   
+  <ul class="collapse">
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#why-state-machines-for-agents" id="toc-why-state-machines-for-agents" class="nav-link" data-scroll-target="#why-state-machines-for-agents">Why State Machines for Agents?</a></li>
+  <li><a href="#core-concepts" id="toc-core-concepts" class="nav-link" data-scroll-target="#core-concepts">Core Concepts</a></li>
+  <li><a href="#quick-start-create_react_agent" id="toc-quick-start-create_react_agent" class="nav-link" data-scroll-target="#quick-start-create_react_agent">Quick Start: <code>create_react_agent</code></a></li>
+  <li><a href="#building-the-graph-manually" id="toc-building-the-graph-manually" class="nav-link" data-scroll-target="#building-the-graph-manually">Building the Graph Manually</a></li>
+  <li><a href="#checkpointing-and-persistence" id="toc-checkpointing-and-persistence" class="nav-link" data-scroll-target="#checkpointing-and-persistence">Checkpointing and Persistence</a></li>
+  <li><a href="#human-in-the-loop" id="toc-human-in-the-loop" class="nav-link" data-scroll-target="#human-in-the-loop">Human-in-the-Loop</a></li>
+  <li><a href="#streaming" id="toc-streaming" class="nav-link" data-scroll-target="#streaming">Streaming</a></li>
+  <li><a href="#conditional-routing-patterns" id="toc-conditional-routing-patterns" class="nav-link" data-scroll-target="#conditional-routing-patterns">Conditional Routing Patterns</a></li>
+  <li><a href="#retrieval-workflows-with-langgraph" id="toc-retrieval-workflows-with-langgraph" class="nav-link" data-scroll-target="#retrieval-workflows-with-langgraph">Retrieval Workflows with LangGraph</a></li>
+  <li><a href="#subgraphs" id="toc-subgraphs" class="nav-link" data-scroll-target="#subgraphs">Subgraphs</a></li>
+  <li><a href="#common-patterns-and-best-practices" id="toc-common-patterns-and-best-practices" class="nav-link" data-scroll-target="#common-patterns-and-best-practices">Common Patterns and Best Practices</a></li>
+  <li><a href="#langgraph-vs.-other-agent-frameworks" id="toc-langgraph-vs.-other-agent-frameworks" class="nav-link" data-scroll-target="#langgraph-vs.-other-agent-frameworks">LangGraph vs.&nbsp;Other Agent Frameworks</a></li>
+  <li><a href="#common-pitfalls-and-how-to-fix-them" id="toc-common-pitfalls-and-how-to-fix-them" class="nav-link" data-scroll-target="#common-pitfalls-and-how-to-fix-them">Common Pitfalls and How to Fix Them</a></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  <li><a href="#read-more" id="toc-read-more" class="nav-link" data-scroll-target="#read-more">Read More</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Building Agents with LangGraph</h1>
+</div>
+
+<div>
+  <div class="description">
+    State machines, conditional routing, cycles, and human-in-the-loop checkpoints for retrieval workflows
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://vectoringai.com/pages/about.html">Vectoring AI</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">March 17, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+<div>
+  <div class="keywords">
+    <div class="block-title">Keywords</div>
+    <p>LangGraph, state machine, state graph, conditional routing, cycles, human-in-the-loop, checkpoints, persistence, agent architecture, LangChain, retrieval workflows, StateGraph, MemorySaver, tool calling, streaming, subgraphs, durable execution</p>
+  </div>
+</div>
+
+</header>
+
+
+<div id="notebook-link" data-url="https://colab.research.google.com/github/VectoringAI/ai-engineering/blob/main/agent/building_agents_with_langgraph.ipynb" style="display:none">
+
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../../images/agent/building-agents-langgraph-300px.png" class="img-fluid figure-img" width="300"></p>
+<figcaption>LangGraph state machine with conditional routing and checkpoints</figcaption>
+</figure>
+</div>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>Most agent frameworks treat the agent as a <strong>function</strong> — input goes in, output comes out, and everything in between is a black box. This works for simple tool-calling loops, but production agents need more: persistent state, conditional branching, cycles that can be interrupted and resumed, and human approval gates that pause execution mid-workflow.</p>
+<p><strong>LangGraph</strong> is a low-level orchestration framework built on top of LangChain that models agents as <strong>state machines</strong> — directed graphs where nodes are processing steps, edges define control flow, and a shared state object threads through the entire execution. It was inspired by <a href="https://research.google/pubs/pub37252/">Pregel</a> (Google’s graph processing framework) and <a href="https://beam.apache.org/">Apache Beam</a>, and its public interface draws from <a href="https://networkx.org/documentation/latest/">NetworkX</a>.</p>
+<p>The key insight: by representing agent logic as an explicit graph, you gain:</p>
+<ul>
+<li><strong>Cycles</strong> — loops that let agents reason, act, observe, and repeat (the ReAct pattern)</li>
+<li><strong>Conditional routing</strong> — edges that branch based on LLM output or state values</li>
+<li><strong>Persistence</strong> — checkpointers that save state after every node, enabling resume-from-failure</li>
+<li><strong>Human-in-the-loop</strong> — interrupts that pause the graph before or after specific nodes for human review</li>
+<li><strong>Streaming</strong> — token-level and event-level streaming of every step in the graph</li>
+</ul>
+<p>This article builds agents with LangGraph from the ground up — starting with core graph primitives, progressing through the prebuilt <code>create_react_agent</code>, then covering manual graph construction, checkpointing, human-in-the-loop patterns, streaming, subgraphs, and retrieval-specific workflows.</p>
+</section>
+<section id="why-state-machines-for-agents" class="level2">
+<h2 class="anchored" data-anchor-id="why-state-machines-for-agents">Why State Machines for Agents?</h2>
+<section id="the-limits-of-linear-chains" class="level3">
+<h3 class="anchored" data-anchor-id="the-limits-of-linear-chains">The Limits of Linear Chains</h3>
+<p>Traditional LLM chains are <strong>directed acyclic graphs (DAGs)</strong> — each step runs exactly once, in order. This is fine for simple pipelines (retrieve → generate → respond), but agents need to loop:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 21%">
+<col style="width: 30%">
+<col style="width: 47%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Pattern</th>
+<th style="text-align: left;">DAG (Chain)</th>
+<th style="text-align: left;">Graph (LangGraph)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Tool calling</strong></td>
+<td style="text-align: left;">Call tools once, return result</td>
+<td style="text-align: left;">Loop: call tools → check result → call more tools if needed</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Error recovery</strong></td>
+<td style="text-align: left;">Fail on first error</td>
+<td style="text-align: left;">Retry with modified query, try alternative tool</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Multi-step reasoning</strong></td>
+<td style="text-align: left;">One reasoning pass</td>
+<td style="text-align: left;">Reason → act → observe → reason again (ReAct loop)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Human approval</strong></td>
+<td style="text-align: left;">Not supported</td>
+<td style="text-align: left;">Pause before sensitive actions, resume after approval</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Conditional flow</strong></td>
+<td style="text-align: left;">Fixed sequence</td>
+<td style="text-align: left;">Route to different nodes based on LLM output or state</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="agents-as-state-machines" class="level3">
+<h3 class="anchored" data-anchor-id="agents-as-state-machines">Agents as State Machines</h3>
+<p>A state machine has three components:</p>
+<ol type="1">
+<li><strong>State</strong> — a shared data structure updated by each node</li>
+<li><strong>Nodes</strong> — processing steps (LLM calls, tool execution, data transformation)</li>
+<li><strong>Edges</strong> — transitions between nodes, including conditional branches</li>
+</ol>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["__start__"] --&gt; B["agent"]
+    B --&gt; C{"Has tool&lt;br/&gt;calls?"}
+    C --&gt;|Yes| D["tools"]
+    C --&gt;|No| E["__end__"]
+    D --&gt; B
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#9b59b6,color:#fff,stroke:#333
+    style C fill:#f5a623,color:#fff,stroke:#333
+    style D fill:#e67e22,color:#fff,stroke:#333
+    style E fill:#1abc9c,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>This is the canonical ReAct agent graph — two nodes (<code>agent</code> and <code>tools</code>), a conditional edge that decides whether to loop or stop, and state that accumulates messages across iterations.</p>
+<p>LangGraph makes this pattern explicit, inspectable, and modifiable — you can add nodes, change routing logic, insert human approval gates, or save/restore state at any point.</p>
+</section>
+</section>
+<section id="core-concepts" class="level2">
+<h2 class="anchored" data-anchor-id="core-concepts">Core Concepts</h2>
+<section id="stategraph-and-state-definition" class="level3">
+<h3 class="anchored" data-anchor-id="stategraph-and-state-definition">StateGraph and State Definition</h3>
+<p>Every LangGraph application starts with a <strong>state definition</strong> — a <code>TypedDict</code> that declares what data flows through the graph:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> TypedDict, Annotated</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.graph <span class="im">import</span> StateGraph</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.graph.message <span class="im">import</span> add_messages</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> AgentState(TypedDict):</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    messages: Annotated[<span class="bu">list</span>, add_messages]  <span class="co"># Append-only message list</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    iteration_count: <span class="bu">int</span>                      <span class="co"># Overwrite on each update</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The <code>Annotated</code> type with a <strong>reducer function</strong> controls how state updates are merged:</p>
+<ul>
+<li><code>Annotated[list, add_messages]</code> — new messages are <strong>appended</strong> to the existing list (reducer: <code>add_messages</code>)</li>
+<li>Plain types like <code>int</code> or <code>str</code> — new values <strong>overwrite</strong> the previous value</li>
+</ul>
+<p>This distinction is critical. Without the reducer, each node would replace the entire message history instead of appending to it.</p>
+<p>LangGraph provides a built-in <code>MessagesState</code> for the common case:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.graph <span class="im">import</span> MessagesState</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Equivalent to:</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># class MessagesState(TypedDict):</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co">#     messages: Annotated[list, add_messages]</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="nodes" class="level3">
+<h3 class="anchored" data-anchor-id="nodes">Nodes</h3>
+<p>Nodes are Python functions (or LangChain runnables) that take the current state and return a partial state update:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_openai <span class="im">import</span> ChatOpenAI</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>llm <span class="op">=</span> ChatOpenAI(model<span class="op">=</span><span class="st">"gpt-4o-mini"</span>, temperature<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> agent_node(state: AgentState) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Call the LLM with the current messages."""</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> llm.invoke(state[<span class="st">"messages"</span>])</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"messages"</span>: [response]}  <span class="co"># Appended via add_messages reducer</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Each node receives the <strong>full state</strong> and returns a <strong>partial update</strong> — only the keys it wants to modify.</p>
+</section>
+<section id="edges-normal-conditional-and-entry" class="level3">
+<h3 class="anchored" data-anchor-id="edges-normal-conditional-and-entry">Edges: Normal, Conditional, and Entry</h3>
+<p><strong>Normal edges</strong> define unconditional transitions:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>graph.add_edge(<span class="st">"tools"</span>, <span class="st">"agent"</span>)  <span class="co"># After tools, always go to agent</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Conditional edges</strong> use a routing function to decide the next node:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.graph <span class="im">import</span> END</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> should_continue(state: AgentState) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Route based on whether the LLM wants to call tools."""</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    last_message <span class="op">=</span> state[<span class="st">"messages"</span>][<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> last_message.tool_calls:</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"tools"</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> END</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>graph.add_conditional_edges(<span class="st">"agent"</span>, should_continue, {</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    <span class="st">"tools"</span>: <span class="st">"tools"</span>,</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    END: END,</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Entry point</strong> sets the first node:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>graph.set_entry_point(<span class="st">"agent"</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Or equivalently:</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.graph <span class="im">import</span> START</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>graph.add_edge(START, <span class="st">"agent"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="compile-and-run" class="level3">
+<h3 class="anchored" data-anchor-id="compile-and-run">Compile and Run</h3>
+<p>After defining nodes and edges, compile the graph into a runnable:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>app <span class="op">=</span> graph.<span class="bu">compile</span>()</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Invoke synchronously</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> app.invoke({</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"messages"</span>: [{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"What is 25 * 4?"</span>}]</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Stream events</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> event <span class="kw">in</span> app.stream({</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    <span class="st">"messages"</span>: [{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"What is 25 * 4?"</span>}]</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>}):</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(event)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The compiled graph exposes the same interface as any LangChain runnable — <code>.invoke()</code>, <code>.stream()</code>, <code>.ainvoke()</code>, <code>.astream()</code> — making it composable with the broader LangChain ecosystem.</p>
+</section>
+</section>
+<section id="quick-start-create_react_agent" class="level2">
+<h2 class="anchored" data-anchor-id="quick-start-create_react_agent">Quick Start: <code>create_react_agent</code></h2>
+<p>For the common ReAct pattern, LangGraph provides a prebuilt one-liner that handles graph construction automatically:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.prebuilt <span class="im">import</span> create_react_agent</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_openai <span class="im">import</span> ChatOpenAI</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_core.tools <span class="im">import</span> tool</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> httpx</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> search_wikipedia(query: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Search Wikipedia and return the first paragraph."""</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>    url <span class="op">=</span> <span class="st">"https://en.wikipedia.org/w/api.php"</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>    params <span class="op">=</span> {</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>        <span class="st">"action"</span>: <span class="st">"query"</span>,</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>        <span class="st">"list"</span>: <span class="st">"search"</span>,</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>        <span class="st">"srsearch"</span>: query,</span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>        <span class="st">"format"</span>: <span class="st">"json"</span>,</span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>        <span class="st">"srlimit"</span>: <span class="dv">1</span>,</span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>    resp <span class="op">=</span> httpx.get(url, params<span class="op">=</span>params, timeout<span class="op">=</span><span class="dv">10</span>)</span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>    results <span class="op">=</span> resp.json().get(<span class="st">"query"</span>, {}).get(<span class="st">"search"</span>, [])</span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> results:</span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"No results found."</span></span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>    page_id <span class="op">=</span> results[<span class="dv">0</span>][<span class="st">"pageid"</span>]</span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>    extract_resp <span class="op">=</span> httpx.get(url, params<span class="op">=</span>{</span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>        <span class="st">"action"</span>: <span class="st">"query"</span>,</span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>        <span class="st">"prop"</span>: <span class="st">"extracts"</span>,</span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>        <span class="st">"exintro"</span>: <span class="va">True</span>,</span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>        <span class="st">"explaintext"</span>: <span class="va">True</span>,</span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>        <span class="st">"pageids"</span>: page_id,</span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a>        <span class="st">"format"</span>: <span class="st">"json"</span>,</span>
+<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a>    }, timeout<span class="op">=</span><span class="dv">10</span>)</span>
+<span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a>    pages <span class="op">=</span> extract_resp.json().get(<span class="st">"query"</span>, {}).get(<span class="st">"pages"</span>, {})</span>
+<span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> pages.get(<span class="bu">str</span>(page_id), {}).get(<span class="st">"extract"</span>, <span class="st">"No extract available."</span>)</span>
+<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-36"><a href="#cb8-36" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb8-37"><a href="#cb8-37" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> calculator(expression: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb8-38"><a href="#cb8-38" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Evaluate a mathematical expression. Supports +, -, *, /, **."""</span></span>
+<span id="cb8-39"><a href="#cb8-39" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb8-40"><a href="#cb8-40" aria-hidden="true" tabindex="-1"></a>        result <span class="op">=</span> <span class="bu">eval</span>(expression, {<span class="st">"__builtins__"</span>: {}}, {<span class="st">"sqrt"</span>: math.sqrt, <span class="st">"abs"</span>: <span class="bu">abs</span>})</span>
+<span id="cb8-41"><a href="#cb8-41" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="bu">str</span>(result)</span>
+<span id="cb8-42"><a href="#cb8-42" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
+<span id="cb8-43"><a href="#cb8-43" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="ss">f"Error: </span><span class="sc">{</span>e<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb8-44"><a href="#cb8-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-45"><a href="#cb8-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-46"><a href="#cb8-46" aria-hidden="true" tabindex="-1"></a><span class="co"># Create the agent in one line</span></span>
+<span id="cb8-47"><a href="#cb8-47" aria-hidden="true" tabindex="-1"></a>llm <span class="op">=</span> ChatOpenAI(model<span class="op">=</span><span class="st">"gpt-4o-mini"</span>, temperature<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb8-48"><a href="#cb8-48" aria-hidden="true" tabindex="-1"></a>agent <span class="op">=</span> create_react_agent(</span>
+<span id="cb8-49"><a href="#cb8-49" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span>llm,</span>
+<span id="cb8-50"><a href="#cb8-50" aria-hidden="true" tabindex="-1"></a>    tools<span class="op">=</span>[search_wikipedia, calculator],</span>
+<span id="cb8-51"><a href="#cb8-51" aria-hidden="true" tabindex="-1"></a>    prompt<span class="op">=</span><span class="st">"You are a research assistant. Always verify facts with tools before answering."</span>,</span>
+<span id="cb8-52"><a href="#cb8-52" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-53"><a href="#cb8-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-54"><a href="#cb8-54" aria-hidden="true" tabindex="-1"></a><span class="co"># Run it</span></span>
+<span id="cb8-55"><a href="#cb8-55" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> agent.invoke({</span>
+<span id="cb8-56"><a href="#cb8-56" aria-hidden="true" tabindex="-1"></a>    <span class="st">"messages"</span>: [{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"What is the population of Tokyo divided by 3?"</span>}]</span>
+<span id="cb8-57"><a href="#cb8-57" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb8-58"><a href="#cb8-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-59"><a href="#cb8-59" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> msg <span class="kw">in</span> result[<span class="st">"messages"</span>]:</span>
+<span id="cb8-60"><a href="#cb8-60" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>msg<span class="sc">.</span><span class="bu">type</span><span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>msg<span class="sc">.</span>content[:<span class="dv">200</span>] <span class="cf">if</span> msg<span class="sc">.</span>content <span class="cf">else</span> <span class="st">'[tool_calls]'</span><span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<pre><code>human: What is the population of Tokyo divided by 3?
+ai: [tool_calls]
+tool: Tokyo, officially the Tokyo Metropolis, is the capital of Japan...population of 13,960,000...
+ai: [tool_calls]
+tool: 4653333.333333333
+ai: The population of Tokyo is approximately 13,960,000. Divided by 3, that gives approximately 4,653,333.</code></pre>
+<p>Under the hood, <code>create_react_agent</code> builds the same two-node graph (agent → tools → agent) with a conditional edge. It accepts customization parameters:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># With a system prompt</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>agent <span class="op">=</span> create_react_agent(</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span>llm,</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    tools<span class="op">=</span>[search_wikipedia, calculator],</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    prompt<span class="op">=</span><span class="st">"You are a helpful assistant. Cite sources when possible."</span>,</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="building-the-graph-manually" class="level2">
+<h2 class="anchored" data-anchor-id="building-the-graph-manually">Building the Graph Manually</h2>
+<p>For full control over the agent’s control flow, build the graph from scratch.</p>
+<section id="step-1-define-state-and-tools" class="level3">
+<h3 class="anchored" data-anchor-id="step-1-define-state-and-tools">Step 1: Define State and Tools</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> TypedDict, Annotated</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.graph <span class="im">import</span> StateGraph, END, START</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.graph.message <span class="im">import</span> add_messages</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.prebuilt <span class="im">import</span> ToolNode</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_openai <span class="im">import</span> ChatOpenAI</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_core.tools <span class="im">import</span> tool</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_core.messages <span class="im">import</span> AIMessage</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> AgentState(TypedDict):</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>    messages: Annotated[<span class="bu">list</span>, add_messages]</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> search_wikipedia(query: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Search Wikipedia and return the first paragraph."""</span></span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>    <span class="im">import</span> httpx</span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>    url <span class="op">=</span> <span class="st">"https://en.wikipedia.org/w/api.php"</span></span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>    params <span class="op">=</span> {</span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>        <span class="st">"action"</span>: <span class="st">"query"</span>, <span class="st">"list"</span>: <span class="st">"search"</span>,</span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>        <span class="st">"srsearch"</span>: query, <span class="st">"format"</span>: <span class="st">"json"</span>, <span class="st">"srlimit"</span>: <span class="dv">1</span>,</span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a>    resp <span class="op">=</span> httpx.get(url, params<span class="op">=</span>params, timeout<span class="op">=</span><span class="dv">10</span>)</span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a>    results <span class="op">=</span> resp.json().get(<span class="st">"query"</span>, {}).get(<span class="st">"search"</span>, [])</span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> results:</span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"No results found."</span></span>
+<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a>    page_id <span class="op">=</span> results[<span class="dv">0</span>][<span class="st">"pageid"</span>]</span>
+<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a>    extract_resp <span class="op">=</span> httpx.get(url, params<span class="op">=</span>{</span>
+<span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a>        <span class="st">"action"</span>: <span class="st">"query"</span>, <span class="st">"prop"</span>: <span class="st">"extracts"</span>, <span class="st">"exintro"</span>: <span class="va">True</span>,</span>
+<span id="cb11-30"><a href="#cb11-30" aria-hidden="true" tabindex="-1"></a>        <span class="st">"explaintext"</span>: <span class="va">True</span>, <span class="st">"pageids"</span>: page_id, <span class="st">"format"</span>: <span class="st">"json"</span>,</span>
+<span id="cb11-31"><a href="#cb11-31" aria-hidden="true" tabindex="-1"></a>    }, timeout<span class="op">=</span><span class="dv">10</span>)</span>
+<span id="cb11-32"><a href="#cb11-32" aria-hidden="true" tabindex="-1"></a>    pages <span class="op">=</span> extract_resp.json().get(<span class="st">"query"</span>, {}).get(<span class="st">"pages"</span>, {})</span>
+<span id="cb11-33"><a href="#cb11-33" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> pages.get(<span class="bu">str</span>(page_id), {}).get(<span class="st">"extract"</span>, <span class="st">"No extract available."</span>)</span>
+<span id="cb11-34"><a href="#cb11-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-35"><a href="#cb11-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-36"><a href="#cb11-36" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb11-37"><a href="#cb11-37" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> calculator(expression: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb11-38"><a href="#cb11-38" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Evaluate a math expression. Supports +, -, *, /, **."""</span></span>
+<span id="cb11-39"><a href="#cb11-39" aria-hidden="true" tabindex="-1"></a>    <span class="im">import</span> math</span>
+<span id="cb11-40"><a href="#cb11-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb11-41"><a href="#cb11-41" aria-hidden="true" tabindex="-1"></a>        result <span class="op">=</span> <span class="bu">eval</span>(expression, {<span class="st">"__builtins__"</span>: {}}, {<span class="st">"sqrt"</span>: math.sqrt, <span class="st">"abs"</span>: <span class="bu">abs</span>})</span>
+<span id="cb11-42"><a href="#cb11-42" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="bu">str</span>(result)</span>
+<span id="cb11-43"><a href="#cb11-43" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
+<span id="cb11-44"><a href="#cb11-44" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="ss">f"Error: </span><span class="sc">{</span>e<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb11-45"><a href="#cb11-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-46"><a href="#cb11-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-47"><a href="#cb11-47" aria-hidden="true" tabindex="-1"></a>tools <span class="op">=</span> [search_wikipedia, calculator]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="step-2-define-the-agent-node" class="level3">
+<h3 class="anchored" data-anchor-id="step-2-define-the-agent-node">Step 2: Define the Agent Node</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>llm <span class="op">=</span> ChatOpenAI(model<span class="op">=</span><span class="st">"gpt-4o-mini"</span>, temperature<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>llm_with_tools <span class="op">=</span> llm.bind_tools(tools)</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> agent_node(state: AgentState) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Call the LLM with the current messages and bound tools."""</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> llm_with_tools.invoke(state[<span class="st">"messages"</span>])</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"messages"</span>: [response]}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="step-3-define-the-routing-function" class="level3">
+<h3 class="anchored" data-anchor-id="step-3-define-the-routing-function">Step 3: Define the Routing Function</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> should_continue(state: AgentState) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Route to tools if the LLM made tool calls, otherwise end."""</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    last_message <span class="op">=</span> state[<span class="st">"messages"</span>][<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="bu">isinstance</span>(last_message, AIMessage) <span class="kw">and</span> last_message.tool_calls:</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"tools"</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> END</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="step-4-assemble-the-graph" class="level3">
+<h3 class="anchored" data-anchor-id="step-4-assemble-the-graph">Step 4: Assemble the Graph</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Create the graph</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>graph <span class="op">=</span> StateGraph(AgentState)</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Add nodes</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>graph.add_node(<span class="st">"agent"</span>, agent_node)</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>graph.add_node(<span class="st">"tools"</span>, ToolNode(tools))</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Add edges</span></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>graph.add_edge(START, <span class="st">"agent"</span>)                         <span class="co"># Start → agent</span></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>graph.add_conditional_edges(<span class="st">"agent"</span>, should_continue, {</span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>    <span class="st">"tools"</span>: <span class="st">"tools"</span>,</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>    END: END,</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>})                                                      <span class="co"># agent → tools OR end</span></span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>graph.add_edge(<span class="st">"tools"</span>, <span class="st">"agent"</span>)                       <span class="co"># tools → agent (loop back)</span></span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Compile</span></span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>app <span class="op">=</span> graph.<span class="bu">compile</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="step-5-run" class="level3">
+<h3 class="anchored" data-anchor-id="step-5-run">Step 5: Run</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> app.invoke({</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"messages"</span>: [{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"What's the weather in Paris and what is 15 * 7?"</span>}]</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> msg <span class="kw">in</span> result[<span class="st">"messages"</span>]:</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    role <span class="op">=</span> msg.<span class="bu">type</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    content <span class="op">=</span> msg.content <span class="cf">if</span> msg.content <span class="cf">else</span> <span class="st">"[tool_calls]"</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>role<span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>content[:<span class="dv">200</span>]<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>This is the same graph that <code>create_react_agent</code> builds internally — but now you can modify any part of it.</p>
+</section>
+</section>
+<section id="checkpointing-and-persistence" class="level2">
+<h2 class="anchored" data-anchor-id="checkpointing-and-persistence">Checkpointing and Persistence</h2>
+<section id="why-persistence-matters" class="level3">
+<h3 class="anchored" data-anchor-id="why-persistence-matters">Why Persistence Matters</h3>
+<p>Without persistence, an agent’s state exists only in memory. If the process crashes, restarts, or the user returns later, everything is lost. LangGraph’s <strong>checkpointers</strong> save a snapshot of the full state after every node execution, enabling:</p>
+<ul>
+<li><strong>Durable execution</strong> — resume from the last successful node after a crash</li>
+<li><strong>Multi-turn conversations</strong> — maintain context across separate API calls using a thread ID</li>
+<li><strong>Time travel</strong> — inspect or replay any previous state in the graph’s execution history</li>
+<li><strong>Branching</strong> — fork from a previous state to explore alternative paths</li>
+</ul>
+</section>
+<section id="in-memory-checkpointing" class="level3">
+<h3 class="anchored" data-anchor-id="in-memory-checkpointing">In-Memory Checkpointing</h3>
+<p>For development and testing:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.checkpoint.memory <span class="im">import</span> MemorySaver</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>checkpointer <span class="op">=</span> MemorySaver()</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>app <span class="op">=</span> graph.<span class="bu">compile</span>(checkpointer<span class="op">=</span>checkpointer)</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a><span class="co"># First turn — provide a thread_id to identify the conversation</span></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>config <span class="op">=</span> {<span class="st">"configurable"</span>: {<span class="st">"thread_id"</span>: <span class="st">"session-42"</span>}}</span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>result1 <span class="op">=</span> app.invoke(</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"messages"</span>: [{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"What is the population of Tokyo?"</span>}]},</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>    config<span class="op">=</span>config,</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Second turn — the agent remembers the conversation</span></span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>result2 <span class="op">=</span> app.invoke(</span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"messages"</span>: [{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"How does that compare to Osaka?"</span>}]},</span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>    config<span class="op">=</span>config,</span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a><span class="co"># The agent has full context from the first turn</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="sqlite-checkpointing-for-production" class="level3">
+<h3 class="anchored" data-anchor-id="sqlite-checkpointing-for-production">SQLite Checkpointing for Production</h3>
+<p>For persistent storage that survives process restarts:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.checkpoint.sqlite <span class="im">import</span> SqliteSaver</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="co"># File-based SQLite — data persists across restarts</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>checkpointer <span class="op">=</span> SqliteSaver.from_conn_string(<span class="st">"checkpoints.db"</span>)</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>app <span class="op">=</span> graph.<span class="bu">compile</span>(checkpointer<span class="op">=</span>checkpointer)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="postgresql-for-multi-process-deployments" class="level3">
+<h3 class="anchored" data-anchor-id="postgresql-for-multi-process-deployments">PostgreSQL for Multi-Process Deployments</h3>
+<p>For horizontal scaling where multiple server instances share state:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.checkpoint.postgres <span class="im">import</span> PostgresSaver</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>checkpointer <span class="op">=</span> PostgresSaver.from_conn_string(</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">"postgresql://user:pass@localhost:5432/agents"</span></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>app <span class="op">=</span> graph.<span class="bu">compile</span>(checkpointer<span class="op">=</span>checkpointer)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="inspecting-state-history" class="level3">
+<h3 class="anchored" data-anchor-id="inspecting-state-history">Inspecting State History</h3>
+<p>Checkpointers enable full state inspection:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>config <span class="op">=</span> {<span class="st">"configurable"</span>: {<span class="st">"thread_id"</span>: <span class="st">"session-42"</span>}}</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Get current state</span></span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>state <span class="op">=</span> app.get_state(config)</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(state.values[<span class="st">"messages"</span>])</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Get full history</span></span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> snapshot <span class="kw">in</span> app.get_state_history(config):</span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Step: </span><span class="sc">{</span>snapshot<span class="sc">.</span>metadata<span class="sc">.</span>get(<span class="st">'step'</span>, <span class="st">'?'</span>)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Node: </span><span class="sc">{</span>snapshot<span class="sc">.</span>metadata<span class="sc">.</span>get(<span class="st">'source'</span>, <span class="st">'?'</span>)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Messages: </span><span class="sc">{</span><span class="bu">len</span>(snapshot.values.get(<span class="st">'messages'</span>, []))<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"---"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="human-in-the-loop" class="level2">
+<h2 class="anchored" data-anchor-id="human-in-the-loop">Human-in-the-Loop</h2>
+<section id="why-agents-need-human-oversight" class="level3">
+<h3 class="anchored" data-anchor-id="why-agents-need-human-oversight">Why Agents Need Human Oversight</h3>
+<p>Agents can call tools that have real-world consequences — executing database queries, sending emails, making API calls, or modifying data. For sensitive actions, you need a human to review and approve before execution.</p>
+<p>LangGraph implements this through <strong>interrupts</strong> — points in the graph where execution pauses, waits for human input, and then resumes.</p>
+</section>
+<section id="interrupt-before-a-node" class="level3">
+<h3 class="anchored" data-anchor-id="interrupt-before-a-node">Interrupt Before a Node</h3>
+<p>The most common pattern: pause <strong>before</strong> the tools node executes, so a human can review the proposed tool calls:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Compile with an interrupt before the tools node</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>app <span class="op">=</span> graph.<span class="bu">compile</span>(</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>    checkpointer<span class="op">=</span>MemorySaver(),</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>    interrupt_before<span class="op">=</span>[<span class="st">"tools"</span>],  <span class="co"># Pause before executing tools</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>config <span class="op">=</span> {<span class="st">"configurable"</span>: {<span class="st">"thread_id"</span>: <span class="st">"review-session"</span>}}</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 1: Run until the interrupt point</span></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> app.invoke(</span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"messages"</span>: [{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"Delete all records from the users table"</span>}]},</span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>    config<span class="op">=</span>config,</span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a><span class="co"># The graph is now paused before the tools node</span></span>
+<span id="cb20-16"><a href="#cb20-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Inspect what tool calls the agent wants to make</span></span>
+<span id="cb20-17"><a href="#cb20-17" aria-hidden="true" tabindex="-1"></a>state <span class="op">=</span> app.get_state(config)</span>
+<span id="cb20-18"><a href="#cb20-18" aria-hidden="true" tabindex="-1"></a>last_message <span class="op">=</span> state.values[<span class="st">"messages"</span>][<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb20-19"><a href="#cb20-19" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Proposed tool calls:"</span>)</span>
+<span id="cb20-20"><a href="#cb20-20" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> tc <span class="kw">in</span> last_message.tool_calls:</span>
+<span id="cb20-21"><a href="#cb20-21" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"  </span><span class="sc">{</span>tc[<span class="st">'name'</span>]<span class="sc">}</span><span class="ss">(</span><span class="sc">{</span>tc[<span class="st">'args'</span>]<span class="sc">}</span><span class="ss">)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="approve-and-resume" class="level3">
+<h3 class="anchored" data-anchor-id="approve-and-resume">Approve and Resume</h3>
+<p>If the human approves, resume with <code>None</code> input — the graph continues from where it paused:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Human approves — resume execution</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> app.invoke(<span class="va">None</span>, config<span class="op">=</span>config)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="reject-and-modify" class="level3">
+<h3 class="anchored" data-anchor-id="reject-and-modify">Reject and Modify</h3>
+<p>If the human rejects, modify the state before resuming:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_core.messages <span class="im">import</span> AIMessage, ToolMessage</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Option 1: Replace the tool call with a safe alternative</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>state <span class="op">=</span> app.get_state(config)</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>last_message <span class="op">=</span> state.values[<span class="st">"messages"</span>][<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Add a mock tool response that short-circuits the dangerous call</span></span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>safe_response <span class="op">=</span> ToolMessage(</span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>    content<span class="op">=</span><span class="st">"Operation blocked by human reviewer. The delete operation was not executed."</span>,</span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>    tool_call_id<span class="op">=</span>last_message.tool_calls[<span class="dv">0</span>][<span class="st">"id"</span>],</span>
+<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a>app.update_state(config, {<span class="st">"messages"</span>: [safe_response]})</span>
+<span id="cb22-13"><a href="#cb22-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-14"><a href="#cb22-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Resume — the agent will see the blocked message and respond accordingly</span></span>
+<span id="cb22-15"><a href="#cb22-15" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> app.invoke(<span class="va">None</span>, config<span class="op">=</span>config)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="interrupt-after-a-node" class="level3">
+<h3 class="anchored" data-anchor-id="interrupt-after-a-node">Interrupt After a Node</h3>
+<p>You can also pause <strong>after</strong> a node to review its output before proceeding:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>app <span class="op">=</span> graph.<span class="bu">compile</span>(</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>    checkpointer<span class="op">=</span>MemorySaver(),</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    interrupt_after<span class="op">=</span>[<span class="st">"agent"</span>],  <span class="co"># Pause after the agent decides</span></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="human-in-the-loop-architecture" class="level3">
+<h3 class="anchored" data-anchor-id="human-in-the-loop-architecture">Human-in-the-Loop Architecture</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["User Query"] --&gt; B["agent"]
+    B --&gt; C{"Has tool&lt;br/&gt;calls?"}
+    C --&gt;|No| D["__end__"]
+    C --&gt;|Yes| E["⏸ INTERRUPT&lt;br/&gt;Human reviews&lt;br/&gt;tool calls"]
+    E --&gt;|Approve| F["tools"]
+    E --&gt;|Reject| G["Modify state&lt;br/&gt;or cancel"]
+    F --&gt; B
+    G --&gt; B
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#9b59b6,color:#fff,stroke:#333
+    style C fill:#f5a623,color:#fff,stroke:#333
+    style D fill:#1abc9c,color:#fff,stroke:#333
+    style E fill:#e74c3c,color:#fff,stroke:#333
+    style F fill:#e67e22,color:#fff,stroke:#333
+    style G fill:#95a5a6,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="streaming" class="level2">
+<h2 class="anchored" data-anchor-id="streaming">Streaming</h2>
+<p>LangGraph provides multiple streaming modes for real-time UI feedback.</p>
+<section id="node-level-streaming" class="level3">
+<h3 class="anchored" data-anchor-id="node-level-streaming">Node-Level Streaming</h3>
+<p>Stream the output of each graph node as it completes:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> event <span class="kw">in</span> app.stream(</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"messages"</span>: [{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"What is the population of Japan?"</span>}]}</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> node_name, node_output <span class="kw">in</span> event.items():</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">--- </span><span class="sc">{</span>node_name<span class="sc">}</span><span class="ss"> ---"</span>)</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="st">"messages"</span> <span class="kw">in</span> node_output:</span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> msg <span class="kw">in</span> node_output[<span class="st">"messages"</span>]:</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>                <span class="bu">print</span>(<span class="ss">f"  </span><span class="sc">{</span>msg<span class="sc">.</span><span class="bu">type</span><span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>msg<span class="sc">.</span>content[:<span class="dv">200</span>] <span class="cf">if</span> msg<span class="sc">.</span>content <span class="cf">else</span> <span class="st">'[tool_calls]'</span><span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="token-level-streaming" class="level3">
+<h3 class="anchored" data-anchor-id="token-level-streaming">Token-Level Streaming</h3>
+<p>Stream individual tokens as the LLM generates them:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="cf">for</span> event <span class="kw">in</span> app.astream_events(</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"messages"</span>: [{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"Explain quantum computing"</span>}]},</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>    version<span class="op">=</span><span class="st">"v2"</span>,</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>):</span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>    kind <span class="op">=</span> event[<span class="st">"event"</span>]</span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> kind <span class="op">==</span> <span class="st">"on_chat_model_stream"</span>:</span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>        content <span class="op">=</span> event[<span class="st">"data"</span>][<span class="st">"chunk"</span>].content</span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> content:</span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(content, end<span class="op">=</span><span class="st">""</span>, flush<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">elif</span> kind <span class="op">==</span> <span class="st">"on_tool_start"</span>:</span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Calling tool: </span><span class="sc">{</span>event[<span class="st">'name'</span>]<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">elif</span> kind <span class="op">==</span> <span class="st">"on_tool_end"</span>:</span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"Tool result: </span><span class="sc">{</span>event[<span class="st">'data'</span>]<span class="sc">.</span>output[:<span class="dv">200</span>]<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="streaming-modes-summary" class="level3">
+<h3 class="anchored" data-anchor-id="streaming-modes-summary">Streaming Modes Summary</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 21%">
+<col style="width: 28%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Mode</th>
+<th style="text-align: left;">Method</th>
+<th style="text-align: left;">What You Get</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Node output</strong></td>
+<td style="text-align: left;"><code>app.stream()</code></td>
+<td style="text-align: left;">Complete output of each node as it finishes</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Token-level</strong></td>
+<td style="text-align: left;"><code>app.astream_events()</code></td>
+<td style="text-align: left;">Individual tokens + tool start/end events</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>State updates</strong></td>
+<td style="text-align: left;"><code>app.stream(stream_mode="updates")</code></td>
+<td style="text-align: left;">Only the state delta from each node</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Full state</strong></td>
+<td style="text-align: left;"><code>app.stream(stream_mode="values")</code></td>
+<td style="text-align: left;">Complete state snapshot after each node</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="conditional-routing-patterns" class="level2">
+<h2 class="anchored" data-anchor-id="conditional-routing-patterns">Conditional Routing Patterns</h2>
+<section id="basic-route-tools-or-end" class="level3">
+<h3 class="anchored" data-anchor-id="basic-route-tools-or-end">Basic Route: Tools or End</h3>
+<p>The simplest pattern — the agent decides whether to call tools or return a final answer:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> route_after_agent(state: AgentState) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>    last_message <span class="op">=</span> state[<span class="st">"messages"</span>][<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="bu">isinstance</span>(last_message, AIMessage) <span class="kw">and</span> last_message.tool_calls:</span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"tools"</span></span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> END</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="multi-path-routing" class="level3">
+<h3 class="anchored" data-anchor-id="multi-path-routing">Multi-Path Routing</h3>
+<p>Route to different specialized nodes based on the query type:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> RoutingState(TypedDict):</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>    messages: Annotated[<span class="bu">list</span>, add_messages]</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>    query_type: <span class="bu">str</span></span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> classify_query(state: RoutingState) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Classify the user's query into a category."""</span></span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> llm.invoke([</span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"system"</span>, <span class="st">"content"</span>: <span class="st">"Classify the query as: factual, math, or conversational. Reply with one word."</span>},</span>
+<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a>        <span class="op">*</span>state[<span class="st">"messages"</span>],</span>
+<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a>    ])</span>
+<span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"query_type"</span>: response.content.strip().lower()}</span>
+<span id="cb27-13"><a href="#cb27-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-14"><a href="#cb27-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-15"><a href="#cb27-15" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> route_by_type(state: RoutingState) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb27-16"><a href="#cb27-16" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Route to the appropriate handler based on query type."""</span></span>
+<span id="cb27-17"><a href="#cb27-17" aria-hidden="true" tabindex="-1"></a>    query_type <span class="op">=</span> state.get(<span class="st">"query_type"</span>, <span class="st">"conversational"</span>)</span>
+<span id="cb27-18"><a href="#cb27-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> query_type <span class="op">==</span> <span class="st">"factual"</span>:</span>
+<span id="cb27-19"><a href="#cb27-19" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"retrieval_agent"</span></span>
+<span id="cb27-20"><a href="#cb27-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">elif</span> query_type <span class="op">==</span> <span class="st">"math"</span>:</span>
+<span id="cb27-21"><a href="#cb27-21" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"calculator_agent"</span></span>
+<span id="cb27-22"><a href="#cb27-22" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="st">"chat_agent"</span></span>
+<span id="cb27-23"><a href="#cb27-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-24"><a href="#cb27-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-25"><a href="#cb27-25" aria-hidden="true" tabindex="-1"></a>graph <span class="op">=</span> StateGraph(RoutingState)</span>
+<span id="cb27-26"><a href="#cb27-26" aria-hidden="true" tabindex="-1"></a>graph.add_node(<span class="st">"classifier"</span>, classify_query)</span>
+<span id="cb27-27"><a href="#cb27-27" aria-hidden="true" tabindex="-1"></a>graph.add_node(<span class="st">"retrieval_agent"</span>, retrieval_node)</span>
+<span id="cb27-28"><a href="#cb27-28" aria-hidden="true" tabindex="-1"></a>graph.add_node(<span class="st">"calculator_agent"</span>, calculator_node)</span>
+<span id="cb27-29"><a href="#cb27-29" aria-hidden="true" tabindex="-1"></a>graph.add_node(<span class="st">"chat_agent"</span>, chat_node)</span>
+<span id="cb27-30"><a href="#cb27-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-31"><a href="#cb27-31" aria-hidden="true" tabindex="-1"></a>graph.add_edge(START, <span class="st">"classifier"</span>)</span>
+<span id="cb27-32"><a href="#cb27-32" aria-hidden="true" tabindex="-1"></a>graph.add_conditional_edges(<span class="st">"classifier"</span>, route_by_type, {</span>
+<span id="cb27-33"><a href="#cb27-33" aria-hidden="true" tabindex="-1"></a>    <span class="st">"retrieval_agent"</span>: <span class="st">"retrieval_agent"</span>,</span>
+<span id="cb27-34"><a href="#cb27-34" aria-hidden="true" tabindex="-1"></a>    <span class="st">"calculator_agent"</span>: <span class="st">"calculator_agent"</span>,</span>
+<span id="cb27-35"><a href="#cb27-35" aria-hidden="true" tabindex="-1"></a>    <span class="st">"chat_agent"</span>: <span class="st">"chat_agent"</span>,</span>
+<span id="cb27-36"><a href="#cb27-36" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb27-37"><a href="#cb27-37" aria-hidden="true" tabindex="-1"></a>graph.add_edge(<span class="st">"retrieval_agent"</span>, END)</span>
+<span id="cb27-38"><a href="#cb27-38" aria-hidden="true" tabindex="-1"></a>graph.add_edge(<span class="st">"calculator_agent"</span>, END)</span>
+<span id="cb27-39"><a href="#cb27-39" aria-hidden="true" tabindex="-1"></a>graph.add_edge(<span class="st">"chat_agent"</span>, END)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["__start__"] --&gt; B["classifier"]
+    B --&gt; C{"Query type?"}
+    C --&gt;|factual| D["retrieval_agent"]
+    C --&gt;|math| E["calculator_agent"]
+    C --&gt;|conversational| F["chat_agent"]
+    D --&gt; G["__end__"]
+    E --&gt; G
+    F --&gt; G
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#9b59b6,color:#fff,stroke:#333
+    style C fill:#f5a623,color:#fff,stroke:#333
+    style D fill:#27ae60,color:#fff,stroke:#333
+    style E fill:#e67e22,color:#fff,stroke:#333
+    style F fill:#3498db,color:#fff,stroke:#333
+    style G fill:#1abc9c,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="cycle-with-max-iterations" class="level3">
+<h3 class="anchored" data-anchor-id="cycle-with-max-iterations">Cycle with Max Iterations</h3>
+<p>Prevent infinite loops by tracking iteration count in state:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> IterativeState(TypedDict):</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>    messages: Annotated[<span class="bu">list</span>, add_messages]</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>    iteration_count: <span class="bu">int</span></span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> agent_with_counter(state: IterativeState) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> llm_with_tools.invoke(state[<span class="st">"messages"</span>])</span>
+<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {</span>
+<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a>        <span class="st">"messages"</span>: [response],</span>
+<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a>        <span class="st">"iteration_count"</span>: state.get(<span class="st">"iteration_count"</span>, <span class="dv">0</span>) <span class="op">+</span> <span class="dv">1</span>,</span>
+<span id="cb28-11"><a href="#cb28-11" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-13"><a href="#cb28-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-14"><a href="#cb28-14" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> should_continue_with_limit(state: IterativeState) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb28-15"><a href="#cb28-15" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Hard limit on iterations</span></span>
+<span id="cb28-16"><a href="#cb28-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> state.get(<span class="st">"iteration_count"</span>, <span class="dv">0</span>) <span class="op">&gt;=</span> <span class="dv">10</span>:</span>
+<span id="cb28-17"><a href="#cb28-17" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> END</span>
+<span id="cb28-18"><a href="#cb28-18" aria-hidden="true" tabindex="-1"></a>    last_message <span class="op">=</span> state[<span class="st">"messages"</span>][<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb28-19"><a href="#cb28-19" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="bu">isinstance</span>(last_message, AIMessage) <span class="kw">and</span> last_message.tool_calls:</span>
+<span id="cb28-20"><a href="#cb28-20" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"tools"</span></span>
+<span id="cb28-21"><a href="#cb28-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> END</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="retrieval-workflows-with-langgraph" class="level2">
+<h2 class="anchored" data-anchor-id="retrieval-workflows-with-langgraph">Retrieval Workflows with LangGraph</h2>
+<section id="rag-agent-retrieve-grade-generate" class="level3">
+<h3 class="anchored" data-anchor-id="rag-agent-retrieve-grade-generate">RAG Agent: Retrieve, Grade, Generate</h3>
+<p>A retrieval agent that can evaluate document relevance and re-query if results are poor:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_openai <span class="im">import</span> OpenAIEmbeddings, ChatOpenAI</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_core.vectorstores <span class="im">import</span> InMemoryVectorStore</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_core.tools <span class="im">import</span> tool</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_core.documents <span class="im">import</span> Document</span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Build a simple vector store</span></span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>embeddings <span class="op">=</span> OpenAIEmbeddings(model<span class="op">=</span><span class="st">"text-embedding-3-small"</span>)</span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>vectorstore <span class="op">=</span> InMemoryVectorStore(embeddings)</span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a>vectorstore.add_documents([</span>
+<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>    Document(page_content<span class="op">=</span><span class="st">"LangGraph models agents as state machines with nodes, edges, and shared state."</span>),</span>
+<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>    Document(page_content<span class="op">=</span><span class="st">"Checkpointers save state after every node, enabling persistence and resume-from-failure."</span>),</span>
+<span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a>    Document(page_content<span class="op">=</span><span class="st">"Human-in-the-loop is implemented via interrupt_before and interrupt_after on graph nodes."</span>),</span>
+<span id="cb29-14"><a href="#cb29-14" aria-hidden="true" tabindex="-1"></a>    Document(page_content<span class="op">=</span><span class="st">"LangGraph supports streaming at both the node level and token level."</span>),</span>
+<span id="cb29-15"><a href="#cb29-15" aria-hidden="true" tabindex="-1"></a>])</span>
+<span id="cb29-16"><a href="#cb29-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-17"><a href="#cb29-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-18"><a href="#cb29-18" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb29-19"><a href="#cb29-19" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> retrieve_docs(query: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb29-20"><a href="#cb29-20" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Search the knowledge base for relevant documents."""</span></span>
+<span id="cb29-21"><a href="#cb29-21" aria-hidden="true" tabindex="-1"></a>    docs <span class="op">=</span> vectorstore.similarity_search(query, k<span class="op">=</span><span class="dv">3</span>)</span>
+<span id="cb29-22"><a href="#cb29-22" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="st">"</span><span class="ch">\n\n</span><span class="st">"</span>.join(<span class="ss">f"[Doc </span><span class="sc">{</span>i<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss">]: </span><span class="sc">{</span>doc<span class="sc">.</span>page_content<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> i, doc <span class="kw">in</span> <span class="bu">enumerate</span>(docs))</span>
+<span id="cb29-23"><a href="#cb29-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-24"><a href="#cb29-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-25"><a href="#cb29-25" aria-hidden="true" tabindex="-1"></a><span class="at">@tool</span></span>
+<span id="cb29-26"><a href="#cb29-26" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> grade_documents(query: <span class="bu">str</span>, documents: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb29-27"><a href="#cb29-27" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Grade whether retrieved documents are relevant to the query.</span></span>
+<span id="cb29-28"><a href="#cb29-28" aria-hidden="true" tabindex="-1"></a><span class="co">    Returns 'relevant' or 'not_relevant'."""</span></span>
+<span id="cb29-29"><a href="#cb29-29" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> llm.invoke([</span>
+<span id="cb29-30"><a href="#cb29-30" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"system"</span>, <span class="st">"content"</span>: <span class="st">"You are a relevance grader. Given a query and documents, "</span></span>
+<span id="cb29-31"><a href="#cb29-31" aria-hidden="true" tabindex="-1"></a>                                       <span class="st">"reply 'relevant' if the documents answer the query, "</span></span>
+<span id="cb29-32"><a href="#cb29-32" aria-hidden="true" tabindex="-1"></a>                                       <span class="st">"otherwise reply 'not_relevant'."</span>},</span>
+<span id="cb29-33"><a href="#cb29-33" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="ss">f"Query: </span><span class="sc">{</span>query<span class="sc">}</span><span class="ch">\n\n</span><span class="ss">Documents:</span><span class="ch">\n</span><span class="sc">{</span>documents<span class="sc">}</span><span class="ss">"</span>},</span>
+<span id="cb29-34"><a href="#cb29-34" aria-hidden="true" tabindex="-1"></a>    ])</span>
+<span id="cb29-35"><a href="#cb29-35" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> response.content.strip().lower()</span>
+<span id="cb29-36"><a href="#cb29-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-37"><a href="#cb29-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-38"><a href="#cb29-38" aria-hidden="true" tabindex="-1"></a>llm <span class="op">=</span> ChatOpenAI(model<span class="op">=</span><span class="st">"gpt-4o-mini"</span>, temperature<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb29-39"><a href="#cb29-39" aria-hidden="true" tabindex="-1"></a>rag_agent <span class="op">=</span> create_react_agent(</span>
+<span id="cb29-40"><a href="#cb29-40" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span>llm,</span>
+<span id="cb29-41"><a href="#cb29-41" aria-hidden="true" tabindex="-1"></a>    tools<span class="op">=</span>[retrieve_docs, grade_documents],</span>
+<span id="cb29-42"><a href="#cb29-42" aria-hidden="true" tabindex="-1"></a>    prompt<span class="op">=</span><span class="st">"You are a RAG assistant. For every question:</span><span class="ch">\n</span><span class="st">"</span></span>
+<span id="cb29-43"><a href="#cb29-43" aria-hidden="true" tabindex="-1"></a>           <span class="st">"1. Use retrieve_docs to find relevant documents</span><span class="ch">\n</span><span class="st">"</span></span>
+<span id="cb29-44"><a href="#cb29-44" aria-hidden="true" tabindex="-1"></a>           <span class="st">"2. Use grade_documents to check relevance</span><span class="ch">\n</span><span class="st">"</span></span>
+<span id="cb29-45"><a href="#cb29-45" aria-hidden="true" tabindex="-1"></a>           <span class="st">"3. If documents are not relevant, reformulate your query and retrieve again</span><span class="ch">\n</span><span class="st">"</span></span>
+<span id="cb29-46"><a href="#cb29-46" aria-hidden="true" tabindex="-1"></a>           <span class="st">"4. Answer based only on retrieved documents. Cite which documents you used."</span>,</span>
+<span id="cb29-47"><a href="#cb29-47" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="corrective-rag-retrieve-grade-re-query-or-generate" class="level3">
+<h3 class="anchored" data-anchor-id="corrective-rag-retrieve-grade-re-query-or-generate">Corrective RAG: Retrieve → Grade → Re-Query or Generate</h3>
+<p>A more structured corrective RAG workflow as an explicit graph:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> CorrRAGState(TypedDict):</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>    messages: Annotated[<span class="bu">list</span>, add_messages]</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>    query: <span class="bu">str</span></span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>    documents: <span class="bu">str</span></span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>    relevance: <span class="bu">str</span></span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>    retries: <span class="bu">int</span></span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> retrieve_node(state: CorrRAGState) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Retrieve documents for the current query."""</span></span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>    docs <span class="op">=</span> vectorstore.similarity_search(state[<span class="st">"query"</span>], k<span class="op">=</span><span class="dv">3</span>)</span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>    doc_text <span class="op">=</span> <span class="st">"</span><span class="ch">\n\n</span><span class="st">"</span>.join(<span class="ss">f"[Doc </span><span class="sc">{</span>i<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss">]: </span><span class="sc">{</span>d<span class="sc">.</span>page_content<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> i, d <span class="kw">in</span> <span class="bu">enumerate</span>(docs))</span>
+<span id="cb30-13"><a href="#cb30-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"documents"</span>: doc_text}</span>
+<span id="cb30-14"><a href="#cb30-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-15"><a href="#cb30-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-16"><a href="#cb30-16" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> grade_node(state: CorrRAGState) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb30-17"><a href="#cb30-17" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Grade document relevance."""</span></span>
+<span id="cb30-18"><a href="#cb30-18" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> llm.invoke([</span>
+<span id="cb30-19"><a href="#cb30-19" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"system"</span>, <span class="st">"content"</span>: <span class="st">"Reply 'relevant' or 'not_relevant'."</span>},</span>
+<span id="cb30-20"><a href="#cb30-20" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="ss">f"Query: </span><span class="sc">{</span>state[<span class="st">'query'</span>]<span class="sc">}</span><span class="ch">\n</span><span class="ss">Documents:</span><span class="ch">\n</span><span class="sc">{</span>state[<span class="st">'documents'</span>]<span class="sc">}</span><span class="ss">"</span>},</span>
+<span id="cb30-21"><a href="#cb30-21" aria-hidden="true" tabindex="-1"></a>    ])</span>
+<span id="cb30-22"><a href="#cb30-22" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"relevance"</span>: response.content.strip().lower()}</span>
+<span id="cb30-23"><a href="#cb30-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-24"><a href="#cb30-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-25"><a href="#cb30-25" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> rewrite_query_node(state: CorrRAGState) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb30-26"><a href="#cb30-26" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Rewrite the query for better retrieval."""</span></span>
+<span id="cb30-27"><a href="#cb30-27" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> llm.invoke([</span>
+<span id="cb30-28"><a href="#cb30-28" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"system"</span>, <span class="st">"content"</span>: <span class="st">"Rewrite this query to get better search results. Return only the new query."</span>},</span>
+<span id="cb30-29"><a href="#cb30-29" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: state[<span class="st">"query"</span>]},</span>
+<span id="cb30-30"><a href="#cb30-30" aria-hidden="true" tabindex="-1"></a>    ])</span>
+<span id="cb30-31"><a href="#cb30-31" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"query"</span>: response.content.strip(), <span class="st">"retries"</span>: state.get(<span class="st">"retries"</span>, <span class="dv">0</span>) <span class="op">+</span> <span class="dv">1</span>}</span>
+<span id="cb30-32"><a href="#cb30-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-33"><a href="#cb30-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-34"><a href="#cb30-34" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> generate_node(state: CorrRAGState) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb30-35"><a href="#cb30-35" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Generate a final answer from the documents."""</span></span>
+<span id="cb30-36"><a href="#cb30-36" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> llm.invoke([</span>
+<span id="cb30-37"><a href="#cb30-37" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"system"</span>, <span class="st">"content"</span>: <span class="st">"Answer the question using only the provided documents."</span>},</span>
+<span id="cb30-38"><a href="#cb30-38" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="ss">f"Question: </span><span class="sc">{</span>state[<span class="st">'query'</span>]<span class="sc">}</span><span class="ch">\n\n</span><span class="ss">Documents:</span><span class="ch">\n</span><span class="sc">{</span>state[<span class="st">'documents'</span>]<span class="sc">}</span><span class="ss">"</span>},</span>
+<span id="cb30-39"><a href="#cb30-39" aria-hidden="true" tabindex="-1"></a>    ])</span>
+<span id="cb30-40"><a href="#cb30-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"messages"</span>: [{<span class="st">"role"</span>: <span class="st">"assistant"</span>, <span class="st">"content"</span>: response.content}]}</span>
+<span id="cb30-41"><a href="#cb30-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-42"><a href="#cb30-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-43"><a href="#cb30-43" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> route_after_grading(state: CorrRAGState) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb30-44"><a href="#cb30-44" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""If relevant, generate. If not, rewrite query (with retry limit)."""</span></span>
+<span id="cb30-45"><a href="#cb30-45" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> state.get(<span class="st">"relevance"</span>) <span class="op">==</span> <span class="st">"relevant"</span>:</span>
+<span id="cb30-46"><a href="#cb30-46" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"generate"</span></span>
+<span id="cb30-47"><a href="#cb30-47" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> state.get(<span class="st">"retries"</span>, <span class="dv">0</span>) <span class="op">&gt;=</span> <span class="dv">2</span>:</span>
+<span id="cb30-48"><a href="#cb30-48" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"generate"</span>  <span class="co"># Give up and generate with what we have</span></span>
+<span id="cb30-49"><a href="#cb30-49" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="st">"rewrite_query"</span></span>
+<span id="cb30-50"><a href="#cb30-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-51"><a href="#cb30-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-52"><a href="#cb30-52" aria-hidden="true" tabindex="-1"></a><span class="co"># Build the graph</span></span>
+<span id="cb30-53"><a href="#cb30-53" aria-hidden="true" tabindex="-1"></a>rag_graph <span class="op">=</span> StateGraph(CorrRAGState)</span>
+<span id="cb30-54"><a href="#cb30-54" aria-hidden="true" tabindex="-1"></a>rag_graph.add_node(<span class="st">"retrieve"</span>, retrieve_node)</span>
+<span id="cb30-55"><a href="#cb30-55" aria-hidden="true" tabindex="-1"></a>rag_graph.add_node(<span class="st">"grade"</span>, grade_node)</span>
+<span id="cb30-56"><a href="#cb30-56" aria-hidden="true" tabindex="-1"></a>rag_graph.add_node(<span class="st">"rewrite_query"</span>, rewrite_query_node)</span>
+<span id="cb30-57"><a href="#cb30-57" aria-hidden="true" tabindex="-1"></a>rag_graph.add_node(<span class="st">"generate"</span>, generate_node)</span>
+<span id="cb30-58"><a href="#cb30-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-59"><a href="#cb30-59" aria-hidden="true" tabindex="-1"></a>rag_graph.add_edge(START, <span class="st">"retrieve"</span>)</span>
+<span id="cb30-60"><a href="#cb30-60" aria-hidden="true" tabindex="-1"></a>rag_graph.add_edge(<span class="st">"retrieve"</span>, <span class="st">"grade"</span>)</span>
+<span id="cb30-61"><a href="#cb30-61" aria-hidden="true" tabindex="-1"></a>rag_graph.add_conditional_edges(<span class="st">"grade"</span>, route_after_grading, {</span>
+<span id="cb30-62"><a href="#cb30-62" aria-hidden="true" tabindex="-1"></a>    <span class="st">"generate"</span>: <span class="st">"generate"</span>,</span>
+<span id="cb30-63"><a href="#cb30-63" aria-hidden="true" tabindex="-1"></a>    <span class="st">"rewrite_query"</span>: <span class="st">"rewrite_query"</span>,</span>
+<span id="cb30-64"><a href="#cb30-64" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb30-65"><a href="#cb30-65" aria-hidden="true" tabindex="-1"></a>rag_graph.add_edge(<span class="st">"rewrite_query"</span>, <span class="st">"retrieve"</span>)  <span class="co"># Cycle back to retrieve</span></span>
+<span id="cb30-66"><a href="#cb30-66" aria-hidden="true" tabindex="-1"></a>rag_graph.add_edge(<span class="st">"generate"</span>, END)</span>
+<span id="cb30-67"><a href="#cb30-67" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-68"><a href="#cb30-68" aria-hidden="true" tabindex="-1"></a>rag_app <span class="op">=</span> rag_graph.<span class="bu">compile</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["__start__"] --&gt; B["retrieve"]
+    B --&gt; C["grade"]
+    C --&gt; D{"Relevant?"}
+    D --&gt;|Yes| E["generate"]
+    D --&gt;|No, retries &lt; 2| F["rewrite_query"]
+    D --&gt;|No, retries &gt;= 2| E
+    F --&gt; B
+    E --&gt; G["__end__"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#27ae60,color:#fff,stroke:#333
+    style C fill:#9b59b6,color:#fff,stroke:#333
+    style D fill:#f5a623,color:#fff,stroke:#333
+    style E fill:#1abc9c,color:#fff,stroke:#333
+    style F fill:#e67e22,color:#fff,stroke:#333
+    style G fill:#95a5a6,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>Run it:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> rag_app.invoke({</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"messages"</span>: [{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"How does LangGraph handle failures?"</span>}],</span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">"query"</span>: <span class="st">"How does LangGraph handle failures?"</span>,</span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">"documents"</span>: <span class="st">""</span>,</span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"relevance"</span>: <span class="st">""</span>,</span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"retries"</span>: <span class="dv">0</span>,</span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(result[<span class="st">"messages"</span>][<span class="op">-</span><span class="dv">1</span>].content)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="subgraphs" class="level2">
+<h2 class="anchored" data-anchor-id="subgraphs">Subgraphs</h2>
+<section id="composing-graphs-as-nodes" class="level3">
+<h3 class="anchored" data-anchor-id="composing-graphs-as-nodes">Composing Graphs as Nodes</h3>
+<p>For complex workflows, break the agent into <strong>subgraphs</strong> — each subgraph is a self-contained graph that can be used as a node in a parent graph:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Define a retrieval subgraph</span></span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>retrieval_graph <span class="op">=</span> StateGraph(AgentState)</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>retrieval_graph.add_node(<span class="st">"retrieve"</span>, retrieve_node)</span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>retrieval_graph.add_node(<span class="st">"grade"</span>, grade_node)</span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>retrieval_graph.add_edge(START, <span class="st">"retrieve"</span>)</span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>retrieval_graph.add_edge(<span class="st">"retrieve"</span>, <span class="st">"grade"</span>)</span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>retrieval_graph.add_edge(<span class="st">"grade"</span>, END)</span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a>retrieval_subgraph <span class="op">=</span> retrieval_graph.<span class="bu">compile</span>()</span>
+<span id="cb32-9"><a href="#cb32-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-10"><a href="#cb32-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Use it as a node in the parent graph</span></span>
+<span id="cb32-11"><a href="#cb32-11" aria-hidden="true" tabindex="-1"></a>parent_graph <span class="op">=</span> StateGraph(AgentState)</span>
+<span id="cb32-12"><a href="#cb32-12" aria-hidden="true" tabindex="-1"></a>parent_graph.add_node(<span class="st">"plan"</span>, planning_node)</span>
+<span id="cb32-13"><a href="#cb32-13" aria-hidden="true" tabindex="-1"></a>parent_graph.add_node(<span class="st">"retrieve"</span>, retrieval_subgraph)  <span class="co"># Subgraph as a node</span></span>
+<span id="cb32-14"><a href="#cb32-14" aria-hidden="true" tabindex="-1"></a>parent_graph.add_node(<span class="st">"synthesize"</span>, synthesis_node)</span>
+<span id="cb32-15"><a href="#cb32-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-16"><a href="#cb32-16" aria-hidden="true" tabindex="-1"></a>parent_graph.add_edge(START, <span class="st">"plan"</span>)</span>
+<span id="cb32-17"><a href="#cb32-17" aria-hidden="true" tabindex="-1"></a>parent_graph.add_edge(<span class="st">"plan"</span>, <span class="st">"retrieve"</span>)</span>
+<span id="cb32-18"><a href="#cb32-18" aria-hidden="true" tabindex="-1"></a>parent_graph.add_edge(<span class="st">"retrieve"</span>, <span class="st">"synthesize"</span>)</span>
+<span id="cb32-19"><a href="#cb32-19" aria-hidden="true" tabindex="-1"></a>parent_graph.add_edge(<span class="st">"synthesize"</span>, END)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Subgraphs are powerful for:</p>
+<ul>
+<li><strong>Modularity</strong> — encapsulate retrieval, reasoning, or validation as reusable components</li>
+<li><strong>Team development</strong> — different teams own different subgraphs</li>
+<li><strong>Testing</strong> — test each subgraph in isolation before composing</li>
+</ul>
+</section>
+<section id="multi-agent-patterns" class="level3">
+<h3 class="anchored" data-anchor-id="multi-agent-patterns">Multi-Agent Patterns</h3>
+<p>Use subgraphs to implement <strong>multi-agent</strong> workflows where different agents handle different aspects of a task:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Research agent — searches and retrieves</span></span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>research_agent <span class="op">=</span> create_react_agent(</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span>llm,</span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>    tools<span class="op">=</span>[search_wikipedia, retrieve_docs],</span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>    prompt<span class="op">=</span><span class="st">"You are a research agent. Find and verify facts."</span>,</span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Analysis agent — reasons over findings</span></span>
+<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a>analysis_agent <span class="op">=</span> create_react_agent(</span>
+<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span>llm,</span>
+<span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a>    tools<span class="op">=</span>[calculator],</span>
+<span id="cb33-12"><a href="#cb33-12" aria-hidden="true" tabindex="-1"></a>    prompt<span class="op">=</span><span class="st">"You are an analysis agent. Process data and compute results."</span>,</span>
+<span id="cb33-13"><a href="#cb33-13" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb33-14"><a href="#cb33-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-15"><a href="#cb33-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-16"><a href="#cb33-16" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MultiAgentState(TypedDict):</span>
+<span id="cb33-17"><a href="#cb33-17" aria-hidden="true" tabindex="-1"></a>    messages: Annotated[<span class="bu">list</span>, add_messages]</span>
+<span id="cb33-18"><a href="#cb33-18" aria-hidden="true" tabindex="-1"></a>    research_complete: <span class="bu">bool</span></span>
+<span id="cb33-19"><a href="#cb33-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-20"><a href="#cb33-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-21"><a href="#cb33-21" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> route_after_research(state: MultiAgentState) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb33-22"><a href="#cb33-22" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> state.get(<span class="st">"research_complete"</span>):</span>
+<span id="cb33-23"><a href="#cb33-23" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"analysis"</span></span>
+<span id="cb33-24"><a href="#cb33-24" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> END</span>
+<span id="cb33-25"><a href="#cb33-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-26"><a href="#cb33-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-27"><a href="#cb33-27" aria-hidden="true" tabindex="-1"></a>multi_graph <span class="op">=</span> StateGraph(MultiAgentState)</span>
+<span id="cb33-28"><a href="#cb33-28" aria-hidden="true" tabindex="-1"></a>multi_graph.add_node(<span class="st">"research"</span>, research_agent)</span>
+<span id="cb33-29"><a href="#cb33-29" aria-hidden="true" tabindex="-1"></a>multi_graph.add_node(<span class="st">"analysis"</span>, analysis_agent)</span>
+<span id="cb33-30"><a href="#cb33-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-31"><a href="#cb33-31" aria-hidden="true" tabindex="-1"></a>multi_graph.add_edge(START, <span class="st">"research"</span>)</span>
+<span id="cb33-32"><a href="#cb33-32" aria-hidden="true" tabindex="-1"></a>multi_graph.add_conditional_edges(<span class="st">"research"</span>, route_after_research, {</span>
+<span id="cb33-33"><a href="#cb33-33" aria-hidden="true" tabindex="-1"></a>    <span class="st">"analysis"</span>: <span class="st">"analysis"</span>,</span>
+<span id="cb33-34"><a href="#cb33-34" aria-hidden="true" tabindex="-1"></a>    END: END,</span>
+<span id="cb33-35"><a href="#cb33-35" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb33-36"><a href="#cb33-36" aria-hidden="true" tabindex="-1"></a>multi_graph.add_edge(<span class="st">"analysis"</span>, END)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="common-patterns-and-best-practices" class="level2">
+<h2 class="anchored" data-anchor-id="common-patterns-and-best-practices">Common Patterns and Best Practices</h2>
+<section id="error-handling" class="level3">
+<h3 class="anchored" data-anchor-id="error-handling">Error Handling</h3>
+<p>Add a fallback node that catches tool errors and lets the agent recover:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langchain_core.messages <span class="im">import</span> ToolMessage</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> handle_tool_error(state: AgentState) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Check the last tool message for errors and provide feedback."""</span></span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a>    messages <span class="op">=</span> state[<span class="st">"messages"</span>]</span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a>    last_msg <span class="op">=</span> messages[<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="bu">isinstance</span>(last_msg, ToolMessage) <span class="kw">and</span> <span class="st">"Error"</span> <span class="kw">in</span> last_msg.content:</span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {<span class="st">"messages"</span>: [</span>
+<span id="cb34-10"><a href="#cb34-10" aria-hidden="true" tabindex="-1"></a>            {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="ss">f"The tool returned an error: </span><span class="sc">{</span>last_msg<span class="sc">.</span>content<span class="sc">}</span><span class="ss">. "</span></span>
+<span id="cb34-11"><a href="#cb34-11" aria-hidden="true" tabindex="-1"></a>                                         <span class="st">"Please try a different approach."</span>}</span>
+<span id="cb34-12"><a href="#cb34-12" aria-hidden="true" tabindex="-1"></a>        ]}</span>
+<span id="cb34-13"><a href="#cb34-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"messages"</span>: []}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="state-management-tips" class="level3">
+<h3 class="anchored" data-anchor-id="state-management-tips">State Management Tips</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Tip</th>
+<th style="text-align: left;">Why</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Use <code>Annotated[list, add_messages]</code> for message lists</td>
+<td style="text-align: left;">Prevents nodes from overwriting message history</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Keep state flat — avoid deeply nested structures</td>
+<td style="text-align: left;">Easier to serialize for checkpointing</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Use separate state keys for workflow flags (<code>is_approved</code>, <code>retries</code>)</td>
+<td style="text-align: left;">Cleaner routing logic</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Initialize all state keys in the input</td>
+<td style="text-align: left;">Avoids <code>KeyError</code> in nodes</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="when-to-use-create_react_agent-vs.-manual-graphs" class="level3">
+<h3 class="anchored" data-anchor-id="when-to-use-create_react_agent-vs.-manual-graphs">When to Use <code>create_react_agent</code> vs.&nbsp;Manual Graphs</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Use Case</th>
+<th style="text-align: left;">Approach</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Standard ReAct agent with tool calling</td>
+<td style="text-align: left;"><code>create_react_agent</code></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Custom routing (e.g., multi-path classification)</td>
+<td style="text-align: left;">Manual <code>StateGraph</code></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Multiple specialized agents in sequence</td>
+<td style="text-align: left;">Manual graph with subgraphs</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Corrective RAG with grade → rewrite → re-retrieve</td>
+<td style="text-align: left;">Manual graph with cycles</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Simple chatbot with memory</td>
+<td style="text-align: left;"><code>create_react_agent</code> + checkpointer</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Production workflow with human approval gates</td>
+<td style="text-align: left;">Manual graph + <code>interrupt_before</code></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="debugging-with-graph-visualization" class="level3">
+<h3 class="anchored" data-anchor-id="debugging-with-graph-visualization">Debugging with Graph Visualization</h3>
+<p>LangGraph can render its graph structure for visual debugging:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Print the graph in ASCII</span></span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>app.get_graph().print_ascii()</span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Or generate a Mermaid diagram</span></span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(app.get_graph().draw_mermaid())</span>
+<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Or render as PNG (requires graphviz)</span></span>
+<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a>app.get_graph().draw_mermaid_png(output_file_path<span class="op">=</span><span class="st">"agent_graph.png"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="langgraph-vs.-other-agent-frameworks" class="level2">
+<h2 class="anchored" data-anchor-id="langgraph-vs.-other-agent-frameworks">LangGraph vs.&nbsp;Other Agent Frameworks</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 15%">
+<col style="width: 18%">
+<col style="width: 36%">
+<col style="width: 13%">
+<col style="width: 15%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Feature</th>
+<th style="text-align: left;">LangGraph</th>
+<th style="text-align: left;">LlamaIndex Workflows</th>
+<th style="text-align: left;">CrewAI</th>
+<th style="text-align: left;">AutoGen</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Abstraction level</strong></td>
+<td style="text-align: left;">Low-level graph primitives</td>
+<td style="text-align: left;">Workflow steps</td>
+<td style="text-align: left;">High-level role-based</td>
+<td style="text-align: left;">Conversational agents</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>State management</strong></td>
+<td style="text-align: left;">Explicit <code>TypedDict</code> with reducers</td>
+<td style="text-align: left;">Context object</td>
+<td style="text-align: left;">Shared memory</td>
+<td style="text-align: left;">Message passing</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Cycles</strong></td>
+<td style="text-align: left;">Native — any node can loop back</td>
+<td style="text-align: left;">Supported via event flow</td>
+<td style="text-align: left;">Task delegation loops</td>
+<td style="text-align: left;">Conversation loops</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Persistence</strong></td>
+<td style="text-align: left;">Built-in checkpointers (Memory, SQLite, Postgres)</td>
+<td style="text-align: left;">Manual</td>
+<td style="text-align: left;">Limited</td>
+<td style="text-align: left;">Limited</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Human-in-the-loop</strong></td>
+<td style="text-align: left;"><code>interrupt_before</code> / <code>interrupt_after</code></td>
+<td style="text-align: left;">Custom event handlers</td>
+<td style="text-align: left;">Human tool</td>
+<td style="text-align: left;">Human input mode</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Streaming</strong></td>
+<td style="text-align: left;">Node-level + token-level + state updates</td>
+<td style="text-align: left;">Event streaming</td>
+<td style="text-align: left;">Limited</td>
+<td style="text-align: left;">Token streaming</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Subgraphs</strong></td>
+<td style="text-align: left;">Native composition</td>
+<td style="text-align: left;">Nested workflows</td>
+<td style="text-align: left;">Sub-tasks</td>
+<td style="text-align: left;">Nested chats</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Best for</strong></td>
+<td style="text-align: left;">Custom agent architectures, retrieval workflows</td>
+<td style="text-align: left;">RAG-centric agents</td>
+<td style="text-align: left;">Role-based multi-agent teams</td>
+<td style="text-align: left;">Research and conversation agents</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="common-pitfalls-and-how-to-fix-them" class="level2">
+<h2 class="anchored" data-anchor-id="common-pitfalls-and-how-to-fix-them">Common Pitfalls and How to Fix Them</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 39%">
+<col style="width: 39%">
+<col style="width: 21%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Pitfall</th>
+<th style="text-align: left;">Symptom</th>
+<th style="text-align: left;">Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Missing reducer on message list</strong></td>
+<td style="text-align: left;">Each node overwrites messages instead of appending</td>
+<td style="text-align: left;">Use <code>Annotated[list, add_messages]</code></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Infinite cycles</strong></td>
+<td style="text-align: left;">Agent loops forever between agent and tools nodes</td>
+<td style="text-align: left;">Add iteration counter in state + max iteration check in routing</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Checkpointer not set</strong></td>
+<td style="text-align: left;"><code>interrupt_before</code> silently does nothing</td>
+<td style="text-align: left;">Always compile with a checkpointer when using interrupts</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>State keys not initialized</strong></td>
+<td style="text-align: left;"><code>KeyError</code> in nodes</td>
+<td style="text-align: left;">Provide all state keys in the initial input</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Tool node errors crash the graph</strong></td>
+<td style="text-align: left;">Unhandled exceptions stop execution</td>
+<td style="text-align: left;">Use <code>ToolNode</code> with <code>handle_tool_errors=True</code> or add error-handling nodes</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Streaming shows no output</strong></td>
+<td style="text-align: left;">Empty stream events</td>
+<td style="text-align: left;">Ensure you’re using <code>astream_events</code> with <code>version="v2"</code> for token-level streaming</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Graph won’t compile</strong></td>
+<td style="text-align: left;">Unreachable nodes or missing edges</td>
+<td style="text-align: left;">Every node must be reachable from START and have a path to END</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="conclusion" class="level2">
+<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
+<p>LangGraph transforms agent development from “LLM in a loop” to <strong>principled state machine engineering</strong>. By making the graph structure explicit, you gain visibility into every decision point, the ability to pause and resume at any node, and persistent state that survives failures and session boundaries.</p>
+<p><strong>Key takeaways:</strong></p>
+<ul>
+<li><strong>State machines &gt; black-box loops</strong>. Explicit graphs let you reason about, debug, and modify agent control flow. Every node, edge, and routing decision is inspectable.</li>
+<li><strong><code>StateGraph</code> + reducers</strong> are the foundation. Define your state with <code>TypedDict</code>, use <code>Annotated</code> reducers for append-only fields, and let nodes return partial state updates.</li>
+<li><strong><code>create_react_agent</code></strong> handles 80% of cases. For standard tool-calling agents, use the prebuilt one-liner and customize with prompts and tool sets.</li>
+<li><strong>Build manually when you need control</strong>. Custom routing (multi-path classification), corrective RAG cycles (retrieve → grade → rewrite → re-retrieve), and multi-agent compositions require manual graph construction.</li>
+<li><strong>Checkpointers enable production features</strong>. <code>MemorySaver</code> for development, <code>SqliteSaver</code> for single-server, <code>PostgresSaver</code> for multi-process deployments. Persistence unlocks multi-turn memory, time travel, and durable execution.</li>
+<li><strong>Human-in-the-loop is a first-class feature</strong>. Use <code>interrupt_before</code> to pause for human approval before sensitive tools execute. Modify state or reject actions before resuming.</li>
+<li><strong>Streaming at every level</strong>. Node-level streaming for step visibility, token-level streaming for real-time UI, state-update streaming for reactive frontends.</li>
+<li><strong>Subgraphs for composition</strong>. Break complex workflows into modular, testable subgraphs. Use them as nodes in parent graphs for multi-agent patterns.</li>
+</ul>
+<p>Start with <code>create_react_agent</code> for rapid prototyping, move to manual <code>StateGraph</code> when you need custom control flow, and add checkpointing and human-in-the-loop when moving to production.</p>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li>Malaviya et al., <a href="https://research.google/pubs/pub37252/">Pregel: A System for Large-Scale Graph Processing</a>, SIGMOD 2010 — Google’s graph processing framework that inspired LangGraph’s architecture.</li>
+<li>Apache Software Foundation, <a href="https://beam.apache.org/">Apache Beam</a> — distributed data processing model that influenced LangGraph’s design.</li>
+<li>Hagberg et al., <a href="https://networkx.org/documentation/latest/">NetworkX</a> — Python graph library whose public interface inspired LangGraph’s API.</li>
+<li>Yao et al., <a href="https://arxiv.org/abs/2210.03629">ReAct: Synergizing Reasoning and Acting in Language Models</a>, ICLR 2023 — the reasoning-acting loop that LangGraph’s prebuilt agent implements.</li>
+<li>LangChain, <a href="https://langchain-ai.github.io/langgraph/">LangGraph Documentation</a> — official docs for StateGraph, checkpointers, and prebuilt agents.</li>
+</ul>
+</section>
+<section id="read-more" class="level2">
+<h2 class="anchored" data-anchor-id="read-more">Read More</h2>
+<ul>
+<li>Understand the ReAct reasoning loop that LangGraph orchestrates with <a href="../../posts/agent/Building-a-ReAct-Agent-from-Scratch.html">Building a ReAct Agent from Scratch</a> — covers the Thought-Action-Observation cycle, parsing, and stopping conditions.</li>
+<li>Connect agents to SQL, APIs, and vector stores with <a href="../../posts/agent/Tool-Use-and-Function-Calling-for-Retrieval-Agents.html">Tool Use and Function Calling for Retrieval Agents</a> — from OpenAI function calling to MCP.</li>
+<li>Build the retrieval pipelines these agents call with <a href="../../posts/rag/Building-a-RAG-Pipeline-from-Scratch.html">Building a RAG Pipeline from Scratch</a> — chunking, embedding, retrieval, and generation.</li>
+<li>Add self-correcting retrieval with <a href="../../posts/rag/Hybrid-and-Corrective-RAG-Architectures.html">Hybrid and Corrective RAG Architectures</a> — the patterns behind the corrective RAG graph in this article.</li>
+<li>Implement agent-driven retrieval routing with <a href="../../posts/rag/Agentic-RAG-When-Retrieval-Needs-Reasoning.html">Agentic RAG: When Retrieval Needs Reasoning</a>.</li>
+<li>Monitor agent behavior in production with <a href="../../posts/llm/Observability-for-Multi-Turn-LLM-Conversations.html">Observability for Multi-Turn LLM Conversations</a>.</li>
+<li>Add safety guardrails with <a href="../../posts/llm/Guardrails-for-LLM-Applications-with-Giskard.html">Guardrails for LLM Applications with Giskard</a>.</li>
+</ul>
+<!-- nav-buttons -->
+<p><a href="../../pages/agent.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-robot" aria-label="robot"></i> Explore Agents</a> <a href="../../index.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-house" aria-label="house"></i> Home</a></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/vectoringai\.com");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> 2025-2026 Vectoring AI. All rights reserved. | <a href="../../pages/privacy.html">Privacy Policy</a></p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

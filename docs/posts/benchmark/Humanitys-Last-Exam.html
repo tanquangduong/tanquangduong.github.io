@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.36">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Vectoring AI">
+<meta name="dcterms.date" content="2026-03-25">
+<meta name="keywords" content="Humanity’s Last Exam, HLE, AI benchmark, frontier LLM evaluation, CAIS, Scale AI, expert-level questions, calibration error, MMLU saturation, multi-modal benchmark, LLM leaderboard">
+<meta name="description" content="The hardest AI benchmark ever built: 2,500 expert-level questions designed to be the final closed-ended academic exam for AI">
+
+<title>Humanity’s Last Exam (HLE) – Vectoring AI</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../..//images/favicon.ico" rel="icon">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dbc92dda8186f57fa2e333fbb71d6a9d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-b981e3f33a8ad6ba97cc0b6118e04959.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/all.css" rel="stylesheet">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/latex-fontsize.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-Q4RQ337R0F"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-Q4RQ337R0F', { 'anonymize_ip': true});
+</script>
+<script async="" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9738638303661485" crossorigin="anonymous"></script>
+<!-- Cookie Consent Banner (GDPR compliant) -->
+<style>
+#cookie-consent-banner {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #1d1d1d !important;
+  color: #ffffff !important;
+  padding: 16px 24px;
+  z-index: 9999;
+  font-size: 14px;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+}
+#cookie-consent-banner p {
+  margin: 0 0 12px 0;
+  line-height: 1.5;
+  color: #ffffff !important;
+}
+#cookie-consent-banner a {
+  color: #78b9ff;
+  text-decoration: underline;
+}
+#cookie-consent-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+#cookie-consent-buttons button {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+#btn-accept-all {
+  background: #3B70FE;
+  color: #fff;
+}
+#btn-accept-essential {
+  background: #555;
+  color: #fff;
+}
+#btn-deny {
+  background: transparent;
+  color: #ccc;
+  border: 1px solid #666 !important;
+}
+</style>
+
+<meta property="og:title" content="Humanity’s Last Exam (HLE) – Vectoring AI">
+<meta property="og:description" content="The hardest AI benchmark ever built: 2,500 expert-level questions designed to be the final closed-ended academic exam for AI">
+<meta property="og:image" content="https://vectoringai.com/images/benchmark/humanitys-last-exam-300px.png">
+<meta property="og:site_name" content="Vectoring AI">
+<meta property="og:image:height" content="200">
+<meta property="og:image:width" content="300">
+<meta name="twitter:title" content="Humanity’s Last Exam (HLE) – Vectoring AI">
+<meta name="twitter:description" content="The hardest AI benchmark ever built: 2,500 expert-level questions designed to be the final closed-ended academic exam for AI">
+<meta name="twitter:image" content="https://vectoringai.com/images/benchmark/humanitys-last-exam-300px.png">
+<meta name="twitter:image-height" content="200">
+<meta name="twitter:image-width" content="300">
+<meta name="twitter:card" content="summary_large_image">
+</head><body class="nav-sidebar docked quarto-light"><div id="cookie-consent-banner">
+  <p>We use cookies to serve personalized ads (Google AdSense) and analyze traffic.
+    You can accept all cookies, accept only essential cookies, or deny non-essential cookies.
+    <a href="../../pages/privacy.html">Privacy Policy</a>
+  </p>
+  <div id="cookie-consent-buttons">
+    <button id="btn-accept-all">Accept All</button>
+    <button id="btn-accept-essential">Essential Only</button>
+    <button id="btn-deny">Deny</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  var consent = localStorage.getItem("cookie_consent");
+
+  function loadAdSense() {
+    if (document.querySelector('script[src*="adsbygoogle"]')) return;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9738638303661485";
+    s.crossOrigin = "anonymous";
+    document.head.appendChild(s);
+  }
+
+  function showBanner() {
+    document.getElementById("cookie-consent-banner").style.display = "block";
+  }
+
+  function hideBanner() {
+    document.getElementById("cookie-consent-banner").style.display = "none";
+  }
+
+  if (consent === "all") {
+    loadAdSense();
+  } else if (consent === "essential" || consent === "denied") {
+    // Do not load AdSense
+  } else {
+    // No choice made yet — show banner, do not load AdSense
+    window.addEventListener("DOMContentLoaded", showBanner);
+  }
+
+  window.addEventListener("DOMContentLoaded", function() {
+    document.getElementById("btn-accept-all").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "all");
+      hideBanner();
+      loadAdSense();
+    });
+    document.getElementById("btn-accept-essential").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "essential");
+      hideBanner();
+    });
+    document.getElementById("btn-deny").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "denied");
+      hideBanner();
+    });
+  });
+})();
+</script>
+<script>
+// Inject missing Open Graph tags that Facebook requires for proper link sharing
+(function () {
+  if (!document.querySelector('meta[property="og:url"]')) {
+    var m = document.createElement("meta");
+    m.setAttribute("property", "og:url");
+    m.setAttribute("content", window.location.href);
+    document.head.appendChild(m);
+  }
+  if (!document.querySelector('meta[property="og:type"]')) {
+    var t = document.createElement("meta");
+    t.setAttribute("property", "og:type");
+    t.setAttribute("content", "article");
+    document.head.appendChild(t);
+  }
+  // Fix double-slash in og:image (site-url trailing slash + /images/...)
+  var ogImg = document.querySelector('meta[property="og:image"]');
+  if (ogImg) {
+    ogImg.setAttribute("content", ogImg.getAttribute("content").replace(/([^:])\/\//g, "$1/"));
+  }
+  var twImg = document.querySelector('meta[name="twitter:image"]');
+  if (twImg) {
+    twImg.setAttribute("content", twImg.getAttribute("content").replace(/([^:])\/\//g, "$1/"));
+  }
+})();
+</script>
+<style>
+.share-widget {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0.8rem 0 1.2rem 0;
+  padding: 0.5rem 0;
+}
+.share-widget .share-icon {
+  width: 20px;
+  height: 20px;
+  fill: #555;
+}
+.share-widget .share-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #555;
+}
+.share-widget .share-divider {
+  width: 1px;
+  height: 22px;
+  background: #ddd;
+}
+.share-widget a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  transition: transform 0.2s, box-shadow 0.2s;
+  text-decoration: none !important;
+}
+.share-widget a:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.share-widget a svg {
+  width: 20px;
+  height: 20px;
+}
+.notebook-widget {
+  margin: 0 0 1rem 0;
+}
+.notebook-widget a {
+  display: inline-block;
+  transition: transform 0.2s;
+}
+.notebook-widget a:hover {
+  transform: scale(1.05);
+}
+</style>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  if (!window.location.pathname.includes("/posts/")) return;
+
+  var rawTitle = document.title;
+  var rawUrl = window.location.href;
+  var title = encodeURIComponent(rawTitle);
+  var url = encodeURIComponent(rawUrl);
+
+  var widget = document.createElement("div");
+  widget.className = "share-widget";
+  widget.innerHTML =
+    '<svg class="share-icon" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>' +
+    '<span class="share-label">Share</span>' +
+    '<div class="share-divider"></div>' +
+    '<a href="https://twitter.com/intent/tweet?text=' + title + '&url=' + url + '" target="_blank" rel="noopener" title="Share on X"><svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>' +
+    '<a href="https://www.facebook.com/sharer/sharer.php?u=' + url + '" target="_blank" rel="noopener" title="Share on Facebook"><svg viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>' +
+    '<a href="https://www.linkedin.com/shareArticle?mini=true&url=' + url + '&title=' + title + '" target="_blank" rel="noopener" title="Share on LinkedIn"><svg viewBox="0 0 24 24" fill="#0A66C2"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>';
+
+  // Desktop: open a centered popup (standard share UX).
+  // Mobile: let the default target="_blank" navigate so the OS can
+  //         route to the native app (Facebook, LinkedIn, etc.).
+  var isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+  if (!isMobile) {
+    widget.querySelectorAll("a").forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        var w = 600, h = 500;
+        var left = (screen.width - w) / 2;
+        var top = (screen.height - h) / 2;
+        window.open(
+          this.href, "share",
+          "width=" + w + ",height=" + h + ",left=" + left + ",top=" + top + ",noopener,noreferrer"
+        );
+      });
+    });
+  }
+
+  // Insert right after the title-block header, before Keywords
+  var header = document.querySelector("header#title-block-header");
+  if (header && header.nextSibling) {
+    header.parentNode.insertBefore(widget, header.nextSibling);
+  }
+
+  // Add Colab / notebook button if the page has a notebook-link element
+  var nbEl = document.getElementById("notebook-link");
+  if (nbEl && nbEl.dataset.url) {
+    var nbWidget = document.createElement("div");
+    nbWidget.className = "notebook-widget";
+    nbWidget.innerHTML =
+      '<a href="' + nbEl.dataset.url + '" target="_blank" rel="noopener" title="Open notebook in Google Colab">' +
+      '<img src="/images/colab.png" alt="Open in Colab" style="height:28px">' +
+      '</a>';
+    // Insert right after the share widget
+    if (widget.nextSibling) {
+      widget.parentNode.insertBefore(nbWidget, widget.nextSibling);
+    } else if (widget.parentNode) {
+      widget.parentNode.appendChild(nbWidget);
+    }
+  }
+});
+</script>
+<script>
+  var link = document.createElement('link');
+  link.rel = 'canonical';
+  var path = window.location.pathname.replace(/index\.html$/, '');
+  link.href = 'https://vectoringai.com' + path;
+  document.head.appendChild(link);
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var ogTitle = document.querySelector('meta[property="og:title"]');
+  var ogDesc = document.querySelector('meta[property="og:description"]');
+  var ogImage = document.querySelector('meta[property="og:image"]');
+  var dcDate = document.querySelector('meta[name="dcterms.date"]');
+
+  if (!ogTitle) return;
+
+  var isArticle = !!dcDate;
+  var jsonld = {
+    "@context": "https://schema.org",
+    "@type": isArticle ? "Article" : "WebPage",
+    "headline": ogTitle.content.replace(/ – Vectoring AI$/, ''),
+    "description": ogDesc ? ogDesc.content : "",
+    "url": window.location.href,
+    "author": {
+      "@type": "Organization",
+      "name": "Vectoring AI",
+      "url": "https://vectoringai.com/pages/about.html"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Vectoring AI",
+      "url": "https://vectoringai.com",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://vectoringai.com/images/favicon_io/android-chrome-512x512.png"
+      }
+    }
+  };
+
+  if (ogImage) jsonld.image = ogImage.content;
+  if (dcDate) jsonld.datePublished = dcDate.content;
+
+  var el = document.createElement('script');
+  el.type = 'application/ld+json';
+  el.textContent = JSON.stringify(jsonld);
+  document.head.appendChild(el);
+});
+</script>
+<script src="../../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="../../styles.css">
+
+
+
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">
+      Vectoring AI
+      </li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../../">Vectoring AI</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://github.com/VectoringAI" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+    <a href="https://www.youtube.com/@vectoringai" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-youtube"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Home</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">AI Engineering</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/llm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">LLMs</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/agent.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Agents</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/rag.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">RAG</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/benchmark.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Benchmarks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/milestone.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Milestones</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/about.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">About</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title"><strong>Sections</strong></h2>
+   
+  <ul class="collapse">
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#what-is-humanitys-last-exam" id="toc-what-is-humanitys-last-exam" class="nav-link" data-scroll-target="#what-is-humanitys-last-exam">What Is Humanity’s Last Exam?</a></li>
+  <li><a href="#who-built-it" id="toc-who-built-it" class="nav-link" data-scroll-target="#who-built-it">Who Built It?</a></li>
+  <li><a href="#what-skills-does-it-test" id="toc-what-skills-does-it-test" class="nav-link" data-scroll-target="#what-skills-does-it-test">What Skills Does It Test?</a></li>
+  <li><a href="#current-leaderboard" id="toc-current-leaderboard" class="nav-link" data-scroll-target="#current-leaderboard">Current Leaderboard</a></li>
+  <li><a href="#where-to-explore-the-benchmark" id="toc-where-to-explore-the-benchmark" class="nav-link" data-scroll-target="#where-to-explore-the-benchmark">Where to Explore the Benchmark</a></li>
+  <li><a href="#understanding-the-metrics" id="toc-understanding-the-metrics" class="nav-link" data-scroll-target="#understanding-the-metrics">Understanding the Metrics</a></li>
+  <li><a href="#why-hle-matters" id="toc-why-hle-matters" class="nav-link" data-scroll-target="#why-hle-matters">Why HLE Matters</a></li>
+  <li><a href="#video-humanitys-last-exam-explained" id="toc-video-humanitys-last-exam-explained" class="nav-link" data-scroll-target="#video-humanitys-last-exam-explained">Video: Humanity’s Last Exam Explained</a></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  <li><a href="#read-more" id="toc-read-more" class="nav-link" data-scroll-target="#read-more">Read More</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Humanity’s Last Exam (HLE)</h1>
+</div>
+
+<div>
+  <div class="description">
+    The hardest AI benchmark ever built: 2,500 expert-level questions designed to be the final closed-ended academic exam for AI
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://vectoringai.com/pages/about.html">Vectoring AI</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">March 25, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+<div>
+  <div class="keywords">
+    <div class="block-title">Keywords</div>
+    <p>Humanity’s Last Exam, HLE, AI benchmark, frontier LLM evaluation, CAIS, Scale AI, expert-level questions, calibration error, MMLU saturation, multi-modal benchmark, LLM leaderboard</p>
+  </div>
+</div>
+
+</header>
+
+
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../../images/benchmark/humanitys-last-exam-300px.png" class="img-fluid figure-img" width="300"></p>
+<figcaption>Humanity’s Last Exam: expert-level AI benchmark with 2500 questions</figcaption>
+</figure>
+</div>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>AI benchmarks are critical for measuring LLM progress — but most of them are already <strong>saturated</strong>. Frontier models now score over 90% on popular benchmarks like MMLU and GPQA, making them ineffective at distinguishing between state-of-the-art models.</p>
+<p><strong>Humanity’s Last Exam (HLE)</strong> was created to address this. It is a multi-modal benchmark at the <strong>frontier of human knowledge</strong>, designed to be the <strong>final closed-ended academic benchmark</strong> of its kind. Where other benchmarks have become routine for frontier LLMs, HLE remains brutally difficult — with even the best models scoring well below 50%.</p>
+<blockquote class="blockquote">
+<p>“HLE tests structured academic problems rather than open-ended research or creative problem-solving abilities, making it a focused measure of technical knowledge and reasoning. HLE may be the last academic exam we need to give to models, but it is far from the last benchmark for AI.” — HLE Paper</p>
+</blockquote>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    A["Traditional Benchmarks&lt;br/&gt;(MMLU, GPQA, etc.)&lt;br/&gt;90%+ accuracy"] --&gt; B["Benchmark&lt;br/&gt;Saturation"]
+    B --&gt; C["Humanity's Last Exam&lt;br/&gt;2,500 expert questions&lt;br/&gt;Best models &lt; 45%"]
+    C --&gt; D["Meaningful signal&lt;br/&gt;for frontier AI"]
+
+    style A fill:#e74c3c,stroke:#333,color:#fff
+    style B fill:#f39c12,stroke:#333,color:#fff
+    style C fill:#27ae60,stroke:#333,color:#fff
+    style D fill:#3498db,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="what-is-humanitys-last-exam" class="level2">
+<h2 class="anchored" data-anchor-id="what-is-humanitys-last-exam">What Is Humanity’s Last Exam?</h2>
+<p><strong>Humanity’s Last Exam (HLE)</strong> is a multi-modal benchmark consisting of <strong>2,500 questions</strong> across dozens of academic subjects — mathematics, humanities, natural sciences, and more. It was designed to test both:</p>
+<ul>
+<li><strong>Depth of reasoning</strong> — world-class mathematical and scientific problems</li>
+<li><strong>Breadth of knowledge</strong> — questions spanning over 100 subject areas</li>
+</ul>
+<section id="key-characteristics" class="level3">
+<h3 class="anchored" data-anchor-id="key-characteristics">Key Characteristics</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Feature</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Total questions</strong></td>
+<td>2,500 (public) + private held-out set</td>
+</tr>
+<tr class="even">
+<td><strong>Subjects covered</strong></td>
+<td>100+ across math, humanities, natural sciences</td>
+</tr>
+<tr class="odd">
+<td><strong>Question types</strong></td>
+<td>Multiple-choice (24%) and short-answer (76%)</td>
+</tr>
+<tr class="even">
+<td><strong>Multi-modal</strong></td>
+<td>14% of questions require understanding images/diagrams</td>
+</tr>
+<tr class="odd">
+<td><strong>Grading</strong></td>
+<td>Automated (closed-form, unambiguous answers)</td>
+</tr>
+<tr class="even">
+<td><strong>Anti-contamination</strong></td>
+<td>Private test set to detect overfitting; canary strings</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="what-makes-it-so-hard" class="level3">
+<h3 class="anchored" data-anchor-id="what-makes-it-so-hard">What Makes It So Hard?</h3>
+<p>Every question in HLE was:</p>
+<ol type="1">
+<li><strong>Created by subject-matter experts</strong> — nearly 1,000 contributors across 500+ institutions in 50+ countries (professors, researchers, PhD holders)</li>
+<li><strong>Required to stump frontier LLMs</strong> — a question only passed the initial bar if models could not answer it correctly</li>
+<li><strong>Manually reviewed</strong> by expert reviewers with graduate degrees in relevant fields</li>
+<li><strong>Verified unsearchable</strong> — questions that could be easily answered via web search were removed</li>
+</ol>
+<p>The dataset started with over <strong>70,000 submissions</strong>. Only 13,000 passed the LLM difficulty filter. After expert human review, a finalized set of 2,500 public questions remained.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["70,000+ submissions&lt;br/&gt;from global experts"] --&gt; B["13,000 passed&lt;br/&gt;LLM difficulty filter"]
+    B --&gt; C["Expert human review&lt;br/&gt;(graduate-level reviewers)"]
+    C --&gt; D["2,700 accepted"]
+    D --&gt; E["Remove searchable&lt;br/&gt;&amp; flagged questions"]
+    E --&gt; F["2,500 finalized&lt;br/&gt;public questions"]
+
+    style A fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style B fill:#f39c12,color:#fff,stroke:#333
+    style C fill:#e67e22,color:#fff,stroke:#333
+    style D fill:#3498db,color:#fff,stroke:#333
+    style E fill:#8e44ad,color:#fff,stroke:#333
+    style F fill:#27ae60,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="who-built-it" class="level2">
+<h2 class="anchored" data-anchor-id="who-built-it">Who Built It?</h2>
+<p>HLE was developed by the <strong>Center for AI Safety (CAIS)</strong> and <strong>Scale AI</strong>, with lead authors:</p>
+<ul>
+<li><strong>Long Phan</strong>, <strong>Nathaniel Li</strong>, <strong>Adam Khoja</strong>, <strong>Richard Ren</strong> — Center for AI Safety</li>
+<li><strong>Alice Gatti</strong>, <strong>Ziwen Han</strong>, <strong>Josephina Hu</strong>, <strong>Hugh Zhang</strong> — Scale AI</li>
+<li><strong>Summer Yue</strong>, <strong>Alexandr Wang</strong> — Scale AI (senior leads)</li>
+<li><strong>Dan Hendrycks</strong> — Center for AI Safety (senior lead)</li>
+</ul>
+<p>Contributors competed for a <strong>$500,000 USD prize pool</strong> ($5,000 for each of the top 50 questions, $500 for the next 500 questions), along with optional co-authorship.</p>
+<section id="publication" class="level3">
+<h3 class="anchored" data-anchor-id="publication">Publication</h3>
+<p>HLE was published in <strong>Nature</strong> (Nature 649, 1139–1146, January 2026), one of the most prestigious scientific journals, underscoring its significance to the research community.</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Resource</th>
+<th>Link</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Nature paper</strong></td>
+<td><a href="https://www.nature.com/articles/s41586-025-09962-4">nature.com/articles/s41586-025-09962-4</a></td>
+</tr>
+<tr class="even">
+<td><strong>arXiv preprint</strong></td>
+<td><a href="https://arxiv.org/abs/2501.14249">arxiv.org/abs/2501.14249</a></td>
+</tr>
+<tr class="odd">
+<td><strong>Website</strong></td>
+<td><a href="https://lastexam.ai/">lastexam.ai</a></td>
+</tr>
+<tr class="even">
+<td><strong>GitHub</strong></td>
+<td><a href="https://github.com/centerforaisafety/hle">github.com/centerforaisafety/hle</a></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="what-skills-does-it-test" class="level2">
+<h2 class="anchored" data-anchor-id="what-skills-does-it-test">What Skills Does It Test?</h2>
+<p>Unlike narrowly focused benchmarks, HLE tests a <strong>broad spectrum of expert-level academic capabilities</strong>:</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    HLE["Humanity's Last Exam&lt;br/&gt;2,500 questions"] --&gt; M["Mathematics&lt;br/&gt;&amp; Logic"]
+    HLE --&gt; S["Natural Sciences&lt;br/&gt;Physics, Chemistry, Biology"]
+    HLE --&gt; H["Humanities&lt;br/&gt;History, Classics, Philosophy"]
+    HLE --&gt; CS["Computer Science&lt;br/&gt;&amp; Engineering"]
+    HLE --&gt; Med["Medicine&lt;br/&gt;&amp; Life Sciences"]
+    HLE --&gt; Other["Other Disciplines&lt;br/&gt;Economics, Law, Linguistics..."]
+
+    style HLE fill:#e74c3c,color:#fff,stroke:#333
+    style M fill:#3498db,color:#fff,stroke:#333
+    style S fill:#27ae60,color:#fff,stroke:#333
+    style H fill:#f39c12,color:#fff,stroke:#333
+    style CS fill:#8e44ad,color:#fff,stroke:#333
+    style Med fill:#e67e22,color:#fff,stroke:#333
+    style Other fill:#6cc3d5,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 42%">
+<col style="width: 57%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Capability</th>
+<th>What HLE Tests</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Deep reasoning</strong></td>
+<td>Multi-step mathematical proofs, complex derivations</td>
+</tr>
+<tr class="even">
+<td><strong>Expert knowledge</strong></td>
+<td>Cutting-edge scientific facts, obscure domain knowledge</td>
+</tr>
+<tr class="odd">
+<td><strong>Multi-modal understanding</strong></td>
+<td>Questions with diagrams, inscriptions, chemical structures</td>
+</tr>
+<tr class="even">
+<td><strong>Calibration</strong></td>
+<td>Whether models know what they don’t know (confidence estimation)</td>
+</tr>
+<tr class="odd">
+<td><strong>Resistance to search</strong></td>
+<td>Knowledge that cannot be trivially retrieved via internet search</td>
+</tr>
+</tbody>
+</table>
+<section id="example-questions" class="level3">
+<h3 class="anchored" data-anchor-id="example-questions">Example Questions</h3>
+<p>HLE questions span extraordinary breadth — from translating <strong>Palmyrene script on Roman tombstones</strong> (Classics) to identifying <strong>the number of paired tendons supported by a hummingbird’s sesamoid bone</strong> (Ecology/Anatomy). This diversity is what makes HLE uniquely challenging.</p>
+</section>
+</section>
+<section id="current-leaderboard" class="level2">
+<h2 class="anchored" data-anchor-id="current-leaderboard">Current Leaderboard</h2>
+<p>The leaderboard below shows model accuracy on HLE as published on the <strong>SEAL LLM Leaderboard by Scale AI</strong>. Rankings use <strong>Rank (Upper Bound)</strong>: 1 + the number of models whose lower CI bound exceeds this model’s upper CI bound, ensuring rankings reflect statistically meaningful differences.</p>
+<blockquote class="blockquote">
+<p><strong>Source:</strong> <a href="https://labs.scale.com/leaderboard/humanitys_last_exam">SEAL LLM Leaderboard — Humanity’s Last Exam</a> (consulted March 28, 2026). Dataset updated April 3, 2025, with finalized 2,500 questions. Judge model: o3-mini.</p>
+</blockquote>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th style="text-align: center;">Rank</th>
+<th>Model</th>
+<th style="text-align: center;">Accuracy (%)</th>
+<th style="text-align: center;">Calibration Error</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">1</td>
+<td><strong>GPT-5.4 Pro</strong></td>
+<td style="text-align: center;">44.32 ± 1.95</td>
+<td style="text-align: center;">38</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">2</td>
+<td><strong>Gemini 3 Pro Preview</strong></td>
+<td style="text-align: center;">37.52 ± 1.90</td>
+<td style="text-align: center;">57</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">2</td>
+<td><strong>GPT-5.4</strong> (xhigh thinking)</td>
+<td style="text-align: center;">36.24 ± 1.88</td>
+<td style="text-align: center;">42</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">2</td>
+<td><strong>Claude Opus 4.6</strong> (thinking max)</td>
+<td style="text-align: center;">34.44 ± 1.86</td>
+<td style="text-align: center;">46</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">4</td>
+<td><strong>GPT-5 Pro</strong></td>
+<td style="text-align: center;">31.64 ± 1.82</td>
+<td style="text-align: center;">49</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">6</td>
+<td><strong>GPT-5.2</strong></td>
+<td style="text-align: center;">27.80 ± 1.76</td>
+<td style="text-align: center;">45</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">6</td>
+<td><strong>GPT-5</strong></td>
+<td style="text-align: center;">25.32 ± 1.70</td>
+<td style="text-align: center;">50</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">6</td>
+<td><strong>Claude Opus 4.5</strong> (thinking)</td>
+<td style="text-align: center;">25.20 ± 1.70</td>
+<td style="text-align: center;">55</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">6</td>
+<td><strong>Kimi K2.5</strong></td>
+<td style="text-align: center;">24.37 ± 1.81</td>
+<td style="text-align: center;">67</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">7</td>
+<td><strong>GPT-5.1</strong> (thinking)</td>
+<td style="text-align: center;">23.68 ± 1.67</td>
+<td style="text-align: center;">55</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">9</td>
+<td><strong>Gemini 2.5 Pro</strong> (Jun 05)</td>
+<td style="text-align: center;">21.64 ± 1.61</td>
+<td style="text-align: center;">72</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">11</td>
+<td><strong>o3</strong> (high)</td>
+<td style="text-align: center;">20.32 ± 1.58</td>
+<td style="text-align: center;">34</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">11</td>
+<td><strong>GPT-5 Mini</strong></td>
+<td style="text-align: center;">19.44 ± 1.55</td>
+<td style="text-align: center;">65</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">11</td>
+<td><strong>o3</strong> (medium)</td>
+<td style="text-align: center;">19.20 ± 1.54</td>
+<td style="text-align: center;">39</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">11</td>
+<td><strong>Claude Opus 4.6</strong> (non-thinking)</td>
+<td style="text-align: center;">19.00 ± 1.54</td>
+<td style="text-align: center;">44</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key takeaway:</strong> Even the best frontier model (GPT-5.4 Pro) scores only <strong>44.32%</strong> — meaning more than half the questions remain unsolved. Most models exhibit high calibration errors, indicating systematic overconfidence.</p>
+<p>For the full, up-to-date leaderboard, visit the links in the next section.</p>
+</section>
+<section id="where-to-explore-the-benchmark" class="level2">
+<h2 class="anchored" data-anchor-id="where-to-explore-the-benchmark">Where to Explore the Benchmark</h2>
+<section id="dashboards-and-leaderboards" class="level3">
+<h3 class="anchored" data-anchor-id="dashboards-and-leaderboards">Dashboards and Leaderboards</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Resource</th>
+<th>Description</th>
+<th>Link</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>SEAL LLM Leaderboard</strong></td>
+<td>Scale AI’s official leaderboard with confidence intervals and calibration</td>
+<td><a href="https://labs.scale.com/leaderboard/humanitys_last_exam">labs.scale.com/leaderboard/humanitys_last_exam</a></td>
+</tr>
+<tr class="even">
+<td><strong>CAIS AI Dashboard</strong></td>
+<td>Center for AI Safety’s dashboard with HLE-Rolling live submission</td>
+<td><a href="https://agi.safe.ai/dashboard">agi.safe.ai/dashboard</a></td>
+</tr>
+<tr class="odd">
+<td><strong>HLE Website</strong></td>
+<td>Official website with paper, results, and progress chart</td>
+<td><a href="https://lastexam.ai/">lastexam.ai</a></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="dataset-and-code" class="level3">
+<h3 class="anchored" data-anchor-id="dataset-and-code">Dataset and Code</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Resource</th>
+<th>Description</th>
+<th>Link</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Hugging Face Dataset</strong></td>
+<td>The full 2,500-question dataset (requires access agreement)</td>
+<td><a href="https://huggingface.co/datasets/cais/hle">huggingface.co/datasets/cais/hle</a></td>
+</tr>
+<tr class="even">
+<td><strong>GitHub Repository</strong></td>
+<td>Evaluation code, prompts, and documentation</td>
+<td><a href="https://github.com/centerforaisafety/hle">github.com/centerforaisafety/hle</a></td>
+</tr>
+<tr class="odd">
+<td><strong>arXiv Paper</strong></td>
+<td>Full technical paper with methodology and analysis</td>
+<td><a href="https://arxiv.org/abs/2501.14249">arxiv.org/abs/2501.14249</a></td>
+</tr>
+<tr class="even">
+<td><strong>Nature Publication</strong></td>
+<td>Peer-reviewed publication</td>
+<td><a href="https://www.nature.com/articles/s41586-025-09962-4">nature.com/articles/s41586-025-09962-4</a></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="load-the-dataset" class="level3">
+<h3 class="anchored" data-anchor-id="load-the-dataset">Load the Dataset</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datasets <span class="im">import</span> load_dataset</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>dataset <span class="op">=</span> load_dataset(<span class="st">"cais/hle"</span>, split<span class="op">=</span><span class="st">"test"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="hle-rolling" class="level3">
+<h3 class="anchored" data-anchor-id="hle-rolling">HLE-Rolling</h3>
+<p>In October 2025, the team released <strong>HLE-Rolling</strong> — a dynamic, evolving fork of the benchmark that accepts new contributions over time. This ensures HLE remains relevant as models improve.</p>
+</section>
+</section>
+<section id="understanding-the-metrics" class="level2">
+<h2 class="anchored" data-anchor-id="understanding-the-metrics">Understanding the Metrics</h2>
+<section id="accuracy" class="level3">
+<h3 class="anchored" data-anchor-id="accuracy">Accuracy</h3>
+<p>The primary metric. Models answer each question, and an automated judge (o3-mini) compares the response against the ground-truth answer. Because answers are closed-form and unambiguous, evaluation is deterministic.</p>
+</section>
+<section id="calibration-error" class="level3">
+<h3 class="anchored" data-anchor-id="calibration-error">Calibration Error</h3>
+<p>Models are prompted to provide both an answer and a <strong>confidence score</strong> (0–100%). Calibration error measures the gap between stated confidence and actual accuracy.</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Scenario</th>
+<th style="text-align: center;">Confidence</th>
+<th style="text-align: center;">Accuracy</th>
+<th style="text-align: center;">Calibration</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Well-calibrated</td>
+<td style="text-align: center;">50%</td>
+<td style="text-align: center;">50%</td>
+<td style="text-align: center;">Good</td>
+</tr>
+<tr class="even">
+<td>Overconfident</td>
+<td style="text-align: center;">85%</td>
+<td style="text-align: center;">10%</td>
+<td style="text-align: center;">Bad (CE: 75+)</td>
+</tr>
+<tr class="odd">
+<td>Current frontier models</td>
+<td style="text-align: center;">60–90%</td>
+<td style="text-align: center;">5–45%</td>
+<td style="text-align: center;">Bad (CE: 34–89)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key insight:</strong> Most frontier models are <strong>systematically overconfident</strong> on HLE — they express high confidence even when wrong. This is strong evidence of confabulation/hallucination. The o3 model family shows the best calibration (CE: 34–39), while older models like GPT-4o exhibit calibration errors of 89.</p>
+</section>
+</section>
+<section id="why-hle-matters" class="level2">
+<h2 class="anchored" data-anchor-id="why-hle-matters">Why HLE Matters</h2>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    A["Benchmark&lt;br/&gt;Saturation"] --&gt; B["Cannot distinguish&lt;br/&gt;frontier models"]
+    B --&gt; C["HLE fills the gap"]
+    C --&gt; D["Informed AI policy&lt;br/&gt;&amp; research"]
+
+    A2["Overconfident&lt;br/&gt;models"] --&gt; B2["Calibration errors&lt;br/&gt;not flagged"]
+    B2 --&gt; C
+    C --&gt; D2["Better safety&lt;br/&gt;assessments"]
+
+    style A fill:#e74c3c,color:#fff,stroke:#333
+    style A2 fill:#e74c3c,color:#fff,stroke:#333
+    style C fill:#27ae60,color:#fff,stroke:#333
+    style D fill:#3498db,color:#fff,stroke:#333
+    style D2 fill:#3498db,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<ol type="1">
+<li><strong>Measures what matters</strong> — Expert-level academic reasoning, not just pattern matching</li>
+<li><strong>Resists saturation</strong> — Even the best models score &lt; 50%</li>
+<li><strong>Exposes overconfidence</strong> — Calibration metrics reveal when models are hallucinating</li>
+<li><strong>Informs policy</strong> — Provides a common reference point for scientists and policymakers</li>
+<li><strong>Anti-contamination</strong> — Private held-out set detects overfitting to the public dataset</li>
+</ol>
+</section>
+<section id="video-humanitys-last-exam-explained" class="level2">
+<h2 class="anchored" data-anchor-id="video-humanitys-last-exam-explained">Video: Humanity’s Last Exam Explained</h2>
+<div class="quarto-video ratio ratio-16x9"><iframe data-external="1" src="https://www.youtube.com/embed/aytiowRbc1M" title="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen=""></iframe></div>
+<blockquote class="blockquote">
+<p>Please subscribe to the <a href="https://www.youtube.com/@vectoringai">Vectoring AI YouTube channel</a> for more video tutorials 🚀</p>
+</blockquote>
+</section>
+<section id="conclusion" class="level2">
+<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
+<p>Humanity’s Last Exam represents a milestone in AI evaluation:</p>
+<ul>
+<li><strong>2,500 expert-crafted questions</strong> across 100+ subjects that frontier LLMs still largely cannot solve</li>
+<li>Built by <strong>~1,000 subject-matter experts</strong> from <strong>500+ institutions</strong> across <strong>50+ countries</strong></li>
+<li>Published in <strong>Nature</strong> — peer-reviewed and validated by the scientific community</li>
+<li>The best model scores <strong>44%</strong> — vast room for improvement remains</li>
+<li><strong>Calibration errors</strong> reveal that models don’t know what they don’t know</li>
+</ul>
+<p>As AI capabilities advance, HLE provides a <strong>meaningful yardstick</strong> for measuring genuine progress — not just incremental improvements on already-saturated benchmarks. When models eventually achieve high accuracy on HLE, it will signal a profound leap in AI’s ability to match expert human knowledge on closed-ended academic questions.</p>
+<p>But as the authors note: <em>“HLE may be the last academic exam we need to give to models, but it is far from the last benchmark for AI.”</em></p>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li>Phan, L., Gatti, A., Han, Z., Li, N. et al.&nbsp;“A benchmark of expert-level academic questions to assess AI capabilities.” <em>Nature</em> 649, 1139–1146 (2026). <a href="https://www.nature.com/articles/s41586-025-09962-4">doi:10.1038/s41586-025-09962-4</a></li>
+<li>Phan, L., Gatti, A., Han, Z., Li, N. et al.&nbsp;“Humanity’s Last Exam.” <em>arXiv preprint</em> arXiv:2501.14249 (2025). <a href="https://arxiv.org/abs/2501.14249">arxiv.org/abs/2501.14249</a></li>
+<li>Center for AI Safety &amp; Scale AI. “Humanity’s Last Exam — Official Website.” <a href="https://lastexam.ai/">lastexam.ai</a></li>
+<li>Scale AI. “SEAL LLM Leaderboard — Humanity’s Last Exam.” <a href="https://labs.scale.com/leaderboard/humanitys_last_exam">labs.scale.com/leaderboard/humanitys_last_exam</a> (consulted March 28, 2026)</li>
+<li>Center for AI Safety. “HLE Dataset.” Hugging Face. <a href="https://huggingface.co/datasets/cais/hle">huggingface.co/datasets/cais/hle</a></li>
+<li>Center for AI Safety. “HLE GitHub Repository.” <a href="https://github.com/centerforaisafety/hle">github.com/centerforaisafety/hle</a></li>
+</ul>
+</section>
+<section id="read-more" class="level2">
+<h2 class="anchored" data-anchor-id="read-more">Read More</h2>
+<ul>
+<li>Track model costs when running evaluations — see <a href="../../posts/llm/FinOps-Best-Practices-for-LLM-Applications.html">FinOps Best Practices for LLM Applications</a></li>
+<li>Deploy models for running your own evaluations — see <a href="../../posts/llm/Deploying-and-Serving-LLM-with-vLLM.html">Deploying and Serving LLM with vLLM</a></li>
+<li>Scale your evaluation infrastructure — see <a href="../../posts/llm/Scaling-LLM-Serving-for-Enterprise-Production.html">Scaling LLM Serving for Enterprise Production</a></li>
+<li>Understand quantization trade-offs for evaluation — see <a href="../../posts/llm/Quantization-Methods-for-LLMs.html">Quantization Methods for LLMs</a></li>
+<li><a href="https://lastexam.ai/">HLE Official Website</a></li>
+<li><a href="https://labs.scale.com/leaderboard/humanitys_last_exam">SEAL LLM Leaderboard</a></li>
+<li><a href="https://huggingface.co/datasets/cais/hle">HLE Dataset on Hugging Face</a></li>
+<li><a href="https://github.com/centerforaisafety/hle">HLE GitHub Repository</a></li>
+</ul>
+<!-- nav-buttons -->
+<p><a href="../../pages/benchmark.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-chart-bar" aria-label="chart-bar"></i> Explore Benchmarks</a> <a href="../../index.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-house" aria-label="house"></i> Home</a></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/vectoringai\.com");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> 2025-2026 Vectoring AI. All rights reserved. | <a href="../../pages/privacy.html">Privacy Policy</a></p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

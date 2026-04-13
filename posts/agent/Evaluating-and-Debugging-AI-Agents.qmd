@@ -1,0 +1,1138 @@
+---
+title: "Evaluating and Debugging AI Agents"
+description: "Trajectory-level scoring, tool-call accuracy, LangSmith traces, agent benchmarks, and failure root-cause analysis"
+colab: <a href="https://colab.research.google.com/github/VectoringAI/ai-engineering/blob/main/agent/evaluating_and_debugging_ai_agents.ipynb"><img src="/images/colab.png" alt="Open in Colab"></a>
+image: /images/agent/evaluating-debugging-ai-agents-300px.png
+date: "2026-03-23"
+keywords:
+  - "agent evaluation"
+  - "trajectory scoring"
+  - "tool-call accuracy"
+  - "LangSmith"
+  - "agent benchmarks"
+  - "AgentBench"
+  - "GAIA"
+  - "tau-bench"
+  - "SWE-bench"
+  - "LLM-as-judge"
+  - "failure analysis"
+  - "agent debugging"
+  - "agent observability"
+  - "agent tracing"
+  - "pass@k"
+  - "step-level evaluation"
+---
+
+<div id="notebook-link" data-url="https://colab.research.google.com/github/VectoringAI/ai-engineering/blob/main/agent/evaluating_and_debugging_ai_agents.ipynb" style="display:none"></div>
+
+
+![AI agent evaluation: trajectory scoring and LangSmith debugging](/images/agent/evaluating-debugging-ai-agents-300px.png){fig-align="center" width=300}
+
+## Introduction
+
+You can build a [ReAct agent](/posts/agent/Building-a-ReAct-Agent-from-Scratch.html) in an afternoon. Getting it to work reliably on Monday, Wednesday, and Friday — with different queries, different retrieved documents, and different model versions — is a different problem entirely.
+
+Evaluating AI agents is fundamentally harder than evaluating LLMs. A chat model takes a prompt and returns text; you compare the text to a reference. An agent takes a goal and produces a **trajectory** — a sequence of thoughts, tool calls, observations, and decisions — before arriving at a final answer. Two trajectories can reach the same correct answer through entirely different paths, or reach a wrong answer despite every individual step looking reasonable.
+
+The GAIA benchmark showed that human respondents solved 92% of questions while GPT-4 with plugins solved only 15%. AgentBench found a "significant disparity" between commercial and open-source models across 8 interactive environments. τ-bench revealed that even GPT-4o succeeds on fewer than 50% of tool-agent-user interaction tasks — and drops below 25% when consistency across multiple trials is measured.
+
+This article covers the full evaluation and debugging stack for retrieval agents: **what to measure** (final-answer correctness, trajectory quality, tool-call accuracy), **how to measure it** (LLM-as-judge, programmatic scorers, benchmarks), **how to trace failures** (LangSmith, structured logging), and **how to systematically debug** when things go wrong.
+
+## Why Agent Evaluation Is Hard
+
+### The Non-Determinism Problem
+
+Agents are non-deterministic by nature. Even with `temperature=0`, the same query can produce different trajectories depending on:
+
+- **Retrieval results** that change as the underlying corpus is updated
+- **Tool outputs** that vary with time (web search, API calls, database contents)
+- **Model updates** that shift behavior between versions
+- **Context window packing** — identical messages in different order can alter responses
+
+This means a single test run proves very little. You need statistical evaluation: run the same query multiple times and measure consistency.
+
+### The Evaluation Dimensions
+
+```{mermaid}
+graph LR
+    AE["Agent Evaluation"] --> FA["Final Answer<br/>Correctness"]
+    AE --> TQ["Trajectory<br/>Quality"]
+    AE --> TC["Tool-Call<br/>Accuracy"]
+    AE --> EF["Efficiency"]
+    AE --> SF["Safety &<br/>Guardrails"]
+
+    FA --> FA1["Exact match"]
+    FA --> FA2["Semantic similarity"]
+    FA --> FA3["LLM-as-judge"]
+
+    TQ --> TQ1["Step correctness"]
+    TQ --> TQ2["Reasoning quality"]
+    TQ --> TQ3["Recovery from errors"]
+
+    TC --> TC1["Correct tool selected"]
+    TC --> TC2["Correct arguments"]
+    TC --> TC3["No unnecessary calls"]
+
+    EF --> EF1["Steps to completion"]
+    EF --> EF2["Token usage"]
+    EF --> EF3["Latency"]
+
+    SF --> SF1["Stays in scope"]
+    SF --> SF2["No data leakage"]
+    SF --> SF3["Respects permissions"]
+
+    style AE fill:#3498db,color:#fff
+    style FA fill:#2ecc71,color:#fff
+    style TQ fill:#9b59b6,color:#fff
+    style TC fill:#e67e22,color:#fff
+    style EF fill:#f39c12,color:#000
+    style SF fill:#e74c3c,color:#fff
+```
+
+| Dimension | What It Measures | Why It Matters |
+|:----------|:-----------------|:---------------|
+| **Final answer correctness** | Is the output right? | The bottom line — users care about the answer |
+| **Trajectory quality** | Did the agent reason well? | A correct answer via bad reasoning is fragile |
+| **Tool-call accuracy** | Did it call the right tools with the right args? | Wrong tools waste time and money |
+| **Efficiency** | Steps, tokens, latency | Cost and user experience |
+| **Safety & guardrails** | Did it stay within bounds? | Prevents data leaks and unauthorized actions |
+
+## Final Answer Evaluation
+
+### Exact Match and Fuzzy Match
+
+The simplest evaluator: does the agent's answer match the expected answer?
+
+```python
+from difflib import SequenceMatcher
+
+
+def exact_match(predicted: str, expected: str) -> bool:
+    """Case-insensitive exact match after normalization."""
+    return predicted.strip().lower() == expected.strip().lower()
+
+
+def fuzzy_match(predicted: str, expected: str, threshold: float = 0.85) -> bool:
+    """Fuzzy string match using sequence similarity."""
+    ratio = SequenceMatcher(
+        None, predicted.strip().lower(), expected.strip().lower()
+    ).ratio()
+    return ratio >= threshold
+```
+
+Exact match works for factual questions with short answers ("Paris", "42", "2024-03-15"). It fails for open-ended answers where multiple phrasings are correct.
+
+### Semantic Similarity
+
+Compare embeddings of the predicted and expected answers:
+
+```python
+from openai import OpenAI
+import numpy as np
+
+client = OpenAI()
+
+
+def embed(text: str) -> list[float]:
+    response = client.embeddings.create(
+        model="text-embedding-3-small", input=text
+    )
+    return response.data[0].embedding
+
+
+def semantic_similarity(predicted: str, expected: str) -> float:
+    """Cosine similarity between embeddings of predicted and expected."""
+    v1 = np.array(embed(predicted))
+    v2 = np.array(embed(expected))
+    return float(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
+```
+
+### LLM-as-Judge
+
+For complex answers, use a strong LLM to judge correctness. Zheng et al. (2023) showed that GPT-4 judges achieve over 80% agreement with human evaluators — the same agreement level as between humans themselves.
+
+```python
+def llm_judge_answer(
+    question: str,
+    predicted: str,
+    expected: str,
+    model: str = "gpt-4o",
+) -> dict:
+    """Use an LLM to judge whether the predicted answer is correct."""
+    prompt = f"""You are an expert evaluator. Judge whether the predicted answer
+correctly addresses the question compared to the expected answer.
+
+Question: {question}
+
+Expected Answer: {expected}
+
+Predicted Answer: {predicted}
+
+Evaluate on these criteria:
+1. **Correctness**: Does the prediction contain the key facts from the expected answer?
+2. **Completeness**: Does it cover all important points?
+3. **Hallucination**: Does it include any false claims not in the expected answer?
+
+Respond with a JSON object:
+{{
+    "correctness": <0.0-1.0>,
+    "completeness": <0.0-1.0>,
+    "hallucination": <0.0-1.0 where 0 means no hallucination>,
+    "overall_score": <0.0-1.0>,
+    "reasoning": "<brief explanation>"
+}}"""
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0,
+        response_format={"type": "json_object"},
+    )
+    import json
+    return json.loads(response.choices[0].message.content)
+```
+
+### Evaluator Comparison
+
+| Evaluator | Latency | Cost | Handles Open-Ended | Handles Partial Correctness |
+|:----------|:--------|:-----|:-------------------|:---------------------------|
+| **Exact match** | ~0ms | Free | No | No |
+| **Fuzzy match** | ~0ms | Free | Slightly | No |
+| **Semantic similarity** | ~100ms | ~$0.0001 | Yes | No (single score) |
+| **LLM-as-judge** | ~2s | ~$0.01 | Yes | Yes (multi-criteria) |
+
+**Recommendation**: Use exact match for factual benchmarks, LLM-as-judge for quality evaluation, and semantic similarity as a fast pre-filter.
+
+## Trajectory-Level Scoring
+
+Final answer correctness tells you *what* the agent got right or wrong, but not *why*. Trajectory-level evaluation scores the **process** — the sequence of thoughts and tool calls — not just the outcome.
+
+### Why Trajectory Matters
+
+Two agents can both answer "Paris has a population of 2.1 million":
+
+- **Agent A**: Thought → `search("capital of France")` → Observation: "Paris" → Thought → `search("population of Paris")` → Observation: "2.1M" → Answer
+- **Agent B**: Thought → `search("population Paris France capital city urban area metro")` → Observation: (irrelevant results) → Thought → `search("Paris population")` → Observation: "2.1M" → Thought → `search("is Paris the capital of France")` → Observation: "Yes" → Answer
+
+Both are correct. Agent A is clearly better: fewer steps, more targeted queries, logical decomposition. Trajectory scoring captures this difference.
+
+### Step-Level Grading
+
+Grade each step independently, then aggregate:
+
+```python
+from dataclasses import dataclass
+
+
+@dataclass
+class TrajectoryStep:
+    """A single step in an agent trajectory."""
+    step_type: str          # "thought", "tool_call", "observation", "answer"
+    content: str
+    tool_name: str | None = None
+    tool_args: dict | None = None
+    tool_result: str | None = None
+
+
+@dataclass
+class StepScore:
+    relevance: float        # Was this step relevant to the goal?
+    correctness: float      # Was the reasoning/action correct?
+    efficiency: float       # Was this step necessary?
+    explanation: str
+
+
+def score_trajectory_step(
+    step: TrajectoryStep,
+    goal: str,
+    previous_steps: list[TrajectoryStep],
+    model: str = "gpt-4o",
+) -> StepScore:
+    """Score an individual trajectory step using an LLM judge."""
+    history = "\n".join(
+        f"  [{s.step_type}] {s.content[:200]}" for s in previous_steps[-5:]
+    )
+
+    prompt = f"""Evaluate this agent step in the context of the goal and history.
+
+Goal: {goal}
+
+Recent History:
+{history}
+
+Current Step:
+  Type: {step.step_type}
+  Content: {step.content[:500]}
+  Tool: {step.tool_name or 'N/A'}
+  Args: {step.tool_args or 'N/A'}
+
+Score each dimension from 0.0 to 1.0:
+- relevance: Is this step relevant to achieving the goal?
+- correctness: Is the reasoning or tool call logically correct?
+- efficiency: Is this step necessary, or could it be skipped?
+
+Respond as JSON: {{"relevance": ..., "correctness": ..., "efficiency": ..., "explanation": "..."}}"""
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0,
+        response_format={"type": "json_object"},
+    )
+    import json
+    data = json.loads(response.choices[0].message.content)
+    return StepScore(**data)
+```
+
+### Trajectory-Level Aggregate Score
+
+Combine step scores into an overall trajectory quality metric:
+
+```python
+def score_trajectory(
+    steps: list[TrajectoryStep],
+    goal: str,
+    expected_answer: str,
+    actual_answer: str,
+) -> dict:
+    """Score an entire agent trajectory."""
+    # Score each step
+    step_scores = []
+    for i, step in enumerate(steps):
+        score = score_trajectory_step(step, goal, steps[:i])
+        step_scores.append(score)
+
+    # Aggregate
+    n = len(step_scores)
+    avg_relevance = sum(s.relevance for s in step_scores) / n if n else 0
+    avg_correctness = sum(s.correctness for s in step_scores) / n if n else 0
+    avg_efficiency = sum(s.efficiency for s in step_scores) / n if n else 0
+
+    # Final answer score
+    answer_score = llm_judge_answer(goal, actual_answer, expected_answer)
+
+    return {
+        "answer_correctness": answer_score["overall_score"],
+        "trajectory_relevance": avg_relevance,
+        "trajectory_correctness": avg_correctness,
+        "trajectory_efficiency": avg_efficiency,
+        "num_steps": n,
+        "step_scores": step_scores,
+        "overall": (
+            0.4 * answer_score["overall_score"]
+            + 0.2 * avg_relevance
+            + 0.2 * avg_correctness
+            + 0.2 * avg_efficiency
+        ),
+    }
+```
+
+```{mermaid}
+graph LR
+    subgraph Trajectory["Agent Trajectory"]
+        S1["Step 1<br/>Thought"] --> S2["Step 2<br/>Tool Call"]
+        S2 --> S3["Step 3<br/>Observation"]
+        S3 --> S4["Step 4<br/>Thought"]
+        S4 --> S5["Step 5<br/>Answer"]
+    end
+
+    subgraph Scoring["Step-Level Scoring"]
+        S1 --> SC1["Relevance: 0.9<br/>Correctness: 1.0<br/>Efficiency: 0.8"]
+        S2 --> SC2["Relevance: 1.0<br/>Correctness: 1.0<br/>Efficiency: 1.0"]
+        S4 --> SC4["Relevance: 0.9<br/>Correctness: 0.9<br/>Efficiency: 0.7"]
+    end
+
+    SC1 --> AGG["Aggregate<br/>Score: 0.87"]
+    SC2 --> AGG
+    SC4 --> AGG
+
+    style Trajectory fill:#f5f5dc
+    style Scoring fill:#f5f5dc
+    style S1 fill:#fff
+    style S2 fill:#fff
+    style S3 fill:#fff
+    style S4 fill:#fff
+    style S5 fill:#fff
+    style SC1 fill:#fff
+    style SC2 fill:#fff
+    style SC4 fill:#fff
+    style AGG fill:#2ecc71,color:#fff
+```
+
+## Tool-Call Accuracy
+
+For retrieval agents, the tools *are* the interface to knowledge. Getting tool calls wrong means getting answers wrong. Tool-call accuracy decomposes into three questions:
+
+1. **Did the agent select the right tool?** (tool selection accuracy)
+2. **Did it pass the right arguments?** (argument accuracy)
+3. **Did it avoid unnecessary calls?** (call efficiency)
+
+### Measuring Tool-Call Accuracy
+
+```python
+from dataclasses import dataclass
+
+
+@dataclass
+class ExpectedToolCall:
+    """A tool call that the ideal trajectory should include."""
+    tool_name: str
+    required_args: dict  # Minimum expected arguments
+    optional: bool = False  # If True, this call is nice-to-have
+
+
+@dataclass
+class ToolCallEvaluation:
+    tool_selection_accuracy: float   # % of expected tools that were called
+    argument_accuracy: float         # % of args that matched expected values
+    precision: float                 # % of actual calls that were expected
+    recall: float                    # % of expected calls that were made
+    unnecessary_calls: int           # Calls not matching any expected call
+
+
+def evaluate_tool_calls(
+    actual_calls: list[dict],
+    expected_calls: list[ExpectedToolCall],
+) -> ToolCallEvaluation:
+    """Evaluate tool call accuracy against expected behavior."""
+    matched_expected = set()
+    matched_actual = set()
+    total_arg_score = 0.0
+    arg_evaluations = 0
+
+    for i, expected in enumerate(expected_calls):
+        if expected.optional:
+            continue
+        for j, actual in enumerate(actual_calls):
+            if actual["name"] == expected.tool_name and j not in matched_actual:
+                matched_expected.add(i)
+                matched_actual.add(j)
+
+                # Score argument accuracy
+                actual_args = actual.get("arguments", {})
+                if expected.required_args:
+                    matches = sum(
+                        1 for k, v in expected.required_args.items()
+                        if k in actual_args and _args_match(actual_args[k], v)
+                    )
+                    total_arg_score += matches / len(expected.required_args)
+                    arg_evaluations += 1
+                break
+
+    required_count = sum(1 for e in expected_calls if not e.optional)
+    recall = len(matched_expected) / required_count if required_count else 1.0
+    precision = len(matched_actual) / len(actual_calls) if actual_calls else 1.0
+    arg_acc = total_arg_score / arg_evaluations if arg_evaluations else 1.0
+    unnecessary = len(actual_calls) - len(matched_actual)
+
+    return ToolCallEvaluation(
+        tool_selection_accuracy=recall,
+        argument_accuracy=arg_acc,
+        precision=precision,
+        recall=recall,
+        unnecessary_calls=unnecessary,
+    )
+
+
+def _args_match(actual, expected) -> bool:
+    """Flexible argument matching — handles type coercion and substring match."""
+    if isinstance(expected, str) and isinstance(actual, str):
+        return expected.lower() in actual.lower()
+    return str(actual) == str(expected)
+```
+
+### Example: Evaluating a Retrieval Agent
+
+```python
+# What the agent actually did
+actual_calls = [
+    {"name": "vector_search", "arguments": {"query": "revenue 2024", "top_k": 5}},
+    {"name": "vector_search", "arguments": {"query": "annual report financials", "top_k": 5}},
+    {"name": "web_search", "arguments": {"query": "company revenue 2024"}},
+]
+
+# What we expected
+expected = [
+    ExpectedToolCall("vector_search", {"query": "revenue 2024"}),
+    ExpectedToolCall("web_search", {"query": "revenue 2024"}, optional=True),
+]
+
+result = evaluate_tool_calls(actual_calls, expected)
+print(f"Selection accuracy: {result.tool_selection_accuracy:.0%}")
+print(f"Argument accuracy:  {result.argument_accuracy:.0%}")
+print(f"Precision:          {result.precision:.0%}")
+print(f"Unnecessary calls:  {result.unnecessary_calls}")
+```
+
+```
+Selection accuracy: 100%
+Argument accuracy:  100%
+Precision:          33%
+Unnecessary calls:  2
+```
+
+The agent found the right answer but made two unnecessary calls — a common pattern worth tracking.
+
+## Agent Benchmarks
+
+Standardized benchmarks let you compare agents across models, architectures, and configurations. Here are the key benchmarks for retrieval and tool-using agents:
+
+### Benchmark Landscape
+
+| Benchmark | Focus | Tasks | Key Metric | Scale |
+|:----------|:------|:------|:-----------|:------|
+| **GAIA** | General assistant abilities | 466 real-world questions | Accuracy (human: 92%, GPT-4: 15%) | 3 difficulty levels |
+| **AgentBench** | LLM-as-agent across environments | 8 environments (OS, DB, web, games) | Overall score, per-env accuracy | ICLR 2024 |
+| **τ-bench** | Tool-agent-user interaction | Retail + airline domains | pass@k (reliability over k trials) | Domain-specific policies |
+| **SWE-bench** | Real-world software engineering | 2,294 GitHub issues | % resolved | Requires code edits |
+| **HotpotQA** | Multi-hop question answering | 113k QA pairs | F1, exact match | Wikipedia-based |
+| **WebArena** | Web browsing autonomy | 812 web tasks | Task success rate | Real web environments |
+
+### The pass@k Metric
+
+τ-bench introduced **pass@k** — the probability that an agent succeeds on *all k* independent trials of the same task. This measures **reliability**, not just capability:
+
+$$\text{pass}^k = \prod_{i=1}^{k} P(\text{success on trial } i)$$
+
+If an agent succeeds 70% of the time on a single trial, its pass@8 reliability is:
+
+$$\text{pass}^8 = 0.7^8 \approx 0.057 = 5.7\%$$
+
+This is why τ-bench found GPT-4o achieving pass@8 below 25% in retail tasks — even high single-trial accuracy collapses under repeated independent runs.
+
+```python
+def compute_pass_at_k(trial_results: list[bool], k: int) -> float:
+    """Compute pass@k: probability of success on all k trials.
+
+    Uses empirical estimation from multiple trial groups.
+    """
+    n = len(trial_results)
+    if n < k:
+        raise ValueError(f"Need at least {k} trials, got {n}")
+
+    # Count successes
+    successes = sum(trial_results)
+    single_pass_rate = successes / n
+
+    # pass@k = (single_pass_rate)^k (assumes independence)
+    return single_pass_rate ** k
+
+
+# Example: 7 successes out of 10 trials
+trials = [True, True, False, True, True, True, False, True, True, False]
+print(f"pass@1: {compute_pass_at_k(trials, 1):.1%}")
+print(f"pass@4: {compute_pass_at_k(trials, 4):.1%}")
+print(f"pass@8: {compute_pass_at_k(trials, 8):.1%}")
+```
+
+```
+pass@1: 70.0%
+pass@4: 24.0%
+pass@8:  5.8%
+```
+
+### Running a Custom Benchmark Suite
+
+Build a task set tailored to your retrieval agent's domain:
+
+```python
+import json
+from dataclasses import dataclass, field
+
+
+@dataclass
+class BenchmarkTask:
+    """A single evaluation task for a retrieval agent."""
+    task_id: str
+    query: str
+    expected_answer: str
+    expected_tool_calls: list[ExpectedToolCall] = field(default_factory=list)
+    difficulty: str = "medium"  # easy, medium, hard
+    category: str = "general"
+
+
+@dataclass
+class BenchmarkResult:
+    task_id: str
+    answer_correct: bool
+    answer_score: float
+    trajectory_score: float
+    tool_accuracy: float
+    num_steps: int
+    latency_seconds: float
+    total_tokens: int
+    error: str | None = None
+
+
+def run_benchmark(
+    agent,
+    tasks: list[BenchmarkTask],
+    num_trials: int = 3,
+) -> dict:
+    """Run a benchmark suite with multiple trials per task."""
+    all_results: dict[str, list[BenchmarkResult]] = {}
+
+    for task in tasks:
+        task_results = []
+        for trial in range(num_trials):
+            result = evaluate_single_task(agent, task)
+            task_results.append(result)
+        all_results[task.task_id] = task_results
+
+    # Compute aggregate metrics
+    summary = compute_benchmark_summary(all_results, tasks)
+    return summary
+
+
+def compute_benchmark_summary(
+    results: dict[str, list[BenchmarkResult]],
+    tasks: list[BenchmarkTask],
+) -> dict:
+    """Aggregate benchmark results into a summary report."""
+    task_pass_rates = {}
+    for task_id, trials in results.items():
+        successes = sum(1 for t in trials if t.answer_correct)
+        task_pass_rates[task_id] = successes / len(trials)
+
+    overall_pass1 = sum(task_pass_rates.values()) / len(task_pass_rates)
+
+    # Group by difficulty
+    difficulty_scores = {}
+    task_lookup = {t.task_id: t for t in tasks}
+    for task_id, rate in task_pass_rates.items():
+        diff = task_lookup[task_id].difficulty
+        difficulty_scores.setdefault(diff, []).append(rate)
+
+    return {
+        "overall_pass@1": overall_pass1,
+        "by_difficulty": {
+            d: sum(rates) / len(rates)
+            for d, rates in difficulty_scores.items()
+        },
+        "per_task": task_pass_rates,
+        "total_tasks": len(tasks),
+    }
+```
+
+## Tracing with LangSmith
+
+**LangSmith** is a framework-agnostic platform for tracing, debugging, and evaluating AI agents. It captures the complete **run tree** — every LLM call, tool invocation, retrieval step, and intermediate result — as a hierarchical trace.
+
+### Setting Up Tracing
+
+```python
+import os
+
+# Set environment variables to enable LangSmith tracing
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_API_KEY"] = "your-langsmith-api-key"
+os.environ["LANGCHAIN_PROJECT"] = "retrieval-agent-eval"
+```
+
+With these set, every LangChain/LangGraph call is automatically traced. For non-LangChain code, use the `@traceable` decorator:
+
+```python
+from langsmith import traceable
+
+
+@traceable(name="retrieval_agent_step")
+def agent_step(query: str, context: list[str]) -> str:
+    """A single agent step that gets traced in LangSmith."""
+    # Your agent logic here
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": "You are a retrieval agent."},
+            {"role": "user", "content": f"Context: {context}\n\nQuery: {query}"},
+        ],
+    )
+    return response.choices[0].message.content
+
+
+@traceable(name="tool_execution")
+def execute_search(query: str, top_k: int = 5) -> list[dict]:
+    """Search execution that gets its own trace span."""
+    # Your search logic here
+    results = vector_store.similarity_search(query, k=top_k)
+    return [{"text": r.page_content, "score": r.metadata.get("score")} for r in results]
+```
+
+### The Run Tree
+
+LangSmith organizes traces as a **run tree** — a hierarchy of parent and child runs that mirrors the agent's execution flow:
+
+```{mermaid}
+graph TB
+    R["Agent Run<br/>query: 'Compare Q3 revenue'<br/>⏱ 8.2s | $0.04"]
+    R --> L1["LLM Call<br/>model: gpt-4o<br/>tokens: 1,240"]
+    R --> T1["Tool: vector_search<br/>query: 'Q3 revenue 2024'<br/>⏱ 0.3s"]
+    R --> L2["LLM Call<br/>model: gpt-4o<br/>tokens: 2,100"]
+    R --> T2["Tool: vector_search<br/>query: 'Q3 revenue 2023'<br/>⏱ 0.2s"]
+    R --> L3["LLM Call<br/>model: gpt-4o<br/>tokens: 1,800"]
+
+    T1 --> T1R["Retrieved 5 chunks<br/>relevance: [0.92, 0.88, ...]"]
+    T2 --> T2R["Retrieved 5 chunks<br/>relevance: [0.91, 0.85, ...]"]
+
+    style R fill:#3498db,color:#fff
+    style L1 fill:#9b59b6,color:#fff
+    style L2 fill:#9b59b6,color:#fff
+    style L3 fill:#9b59b6,color:#fff
+    style T1 fill:#e67e22,color:#fff
+    style T2 fill:#e67e22,color:#fff
+```
+
+Each node in the tree captures:
+
+- **Inputs and outputs** of every LLM call and tool invocation
+- **Latency** for each step
+- **Token counts** and estimated cost
+- **Metadata** (model name, temperature, tool arguments)
+- **Errors** with full stack traces
+
+### Evaluation Datasets in LangSmith
+
+Create a dataset of (input, expected output) pairs and run automated evaluations:
+
+```python
+from langsmith import Client
+
+ls_client = Client()
+
+# Create a dataset
+dataset = ls_client.create_dataset(
+    "retrieval-agent-eval-v1",
+    description="Evaluation tasks for the Q&A retrieval agent",
+)
+
+# Add examples
+examples = [
+    {
+        "inputs": {"query": "What was our Q3 2024 revenue?"},
+        "outputs": {"answer": "Q3 2024 revenue was $12.4M, up 18% YoY."},
+    },
+    {
+        "inputs": {"query": "Summarize the main findings from the safety audit."},
+        "outputs": {
+            "answer": "The audit found 3 critical and 7 minor issues..."
+        },
+    },
+]
+
+for ex in examples:
+    ls_client.create_example(
+        inputs=ex["inputs"],
+        outputs=ex["outputs"],
+        dataset_id=dataset.id,
+    )
+```
+
+### Running Evaluations
+
+```python
+from langsmith.evaluation import evaluate
+
+
+def predict(inputs: dict) -> dict:
+    """Run the agent and return its answer."""
+    result = agent.invoke({"messages": [{"role": "user", "content": inputs["query"]}]})
+    return {"answer": result["messages"][-1].content}
+
+
+def correctness_evaluator(run, example) -> dict:
+    """Custom evaluator that uses LLM-as-judge."""
+    predicted = run.outputs["answer"]
+    expected = example.outputs["answer"]
+    question = example.inputs["query"]
+    score = llm_judge_answer(question, predicted, expected)
+    return {"key": "correctness", "score": score["overall_score"]}
+
+
+# Run the evaluation
+results = evaluate(
+    predict,
+    data="retrieval-agent-eval-v1",
+    evaluators=[correctness_evaluator],
+    experiment_prefix="agent-v2.1",
+)
+```
+
+## Failure Root-Cause Analysis
+
+When an agent fails, the question is not just "what went wrong?" but "where in the trajectory did it go wrong, and why?" Systematic failure analysis turns individual debugging sessions into lasting improvements.
+
+### Failure Taxonomy
+
+```{mermaid}
+graph LR
+    F["Agent Failure"] --> P["Planning<br/>Failures"]
+    F --> T["Tool<br/>Failures"]
+    F --> R["Reasoning<br/>Failures"]
+    F --> E["Execution<br/>Failures"]
+
+    P --> P1["Wrong decomposition<br/>of the query"]
+    P --> P2["Missed sub-question"]
+    P --> P3["Wrong ordering<br/>of steps"]
+
+    T --> T1["Selected wrong tool"]
+    T --> T2["Wrong arguments"]
+    T --> T3["Ignored tool output"]
+    T --> T4["Excessive tool calls"]
+
+    R --> R1["Hallucinated facts"]
+    R --> R2["Contradicted evidence"]
+    R --> R3["Premature conclusion"]
+    R --> R4["Lost context"]
+
+    E --> E1["Tool timeout"]
+    E --> E2["Rate limit hit"]
+    E --> E3["Context overflow"]
+    E --> E4["Parsing error"]
+
+    style F fill:#e74c3c,color:#fff
+    style P fill:#f39c12,color:#000
+    style T fill:#e67e22,color:#fff
+    style R fill:#9b59b6,color:#fff
+    style E fill:#95a5a6,color:#fff
+```
+
+| Failure Category | Example | Root Cause | Fix |
+|:-----------------|:--------|:-----------|:----|
+| **Wrong tool** | Agent uses `web_search` instead of `vector_search` for internal docs | Ambiguous tool descriptions | Improve tool descriptions, add routing hints |
+| **Wrong arguments** | `vector_search(query="?")` with vague query | LLM failed to extract key terms | Add few-shot examples to system prompt |
+| **Hallucination** | Agent invents a statistic not in any retrieved chunk | Retrieved chunks didn't contain the answer | Add "only cite retrieved information" instruction |
+| **Premature answer** | Agent answers after 1 tool call when 3 are needed | Insufficient reasoning depth | Add "verify all sub-questions are answered" check |
+| **Infinite loop** | Agent retries the same failing search 5 times | No loop detection | Add [stopping conditions](/posts/agent/Building-a-ReAct-Agent-from-Scratch.html) and deduplication |
+| **Context overflow** | Long conversation exceeds context window | Too many retrieved chunks accumulated | Summarize earlier context, limit chunk count |
+
+### Automated Failure Classification
+
+Instead of manually reading traces, classify failures programmatically:
+
+```python
+@dataclass
+class FailureAnalysis:
+    category: str        # planning, tool, reasoning, execution
+    subcategory: str     # specific failure type
+    step_index: int      # where in the trajectory it failed
+    severity: str        # critical, major, minor
+    explanation: str
+    suggested_fix: str
+
+
+def analyze_failure(
+    query: str,
+    trajectory: list[TrajectoryStep],
+    expected_answer: str,
+    actual_answer: str,
+    model: str = "gpt-4o",
+) -> FailureAnalysis:
+    """Use an LLM to perform root-cause analysis on a failed trajectory."""
+    traj_str = "\n".join(
+        f"Step {i+1} [{s.step_type}]: {s.content[:200]}"
+        for i, s in enumerate(trajectory)
+    )
+
+    prompt = f"""Analyze why this agent trajectory produced a wrong answer.
+
+Query: {query}
+Expected Answer: {expected_answer}
+Actual Answer: {actual_answer}
+
+Trajectory:
+{traj_str}
+
+Classify the root cause:
+- category: one of [planning, tool, reasoning, execution]
+- subcategory: specific failure (e.g., "wrong_tool", "hallucination", "premature_answer")
+- step_index: which step (1-indexed) first went wrong
+- severity: critical, major, or minor
+- explanation: what happened and why
+- suggested_fix: concrete improvement to prevent this failure
+
+Respond as JSON."""
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0,
+        response_format={"type": "json_object"},
+    )
+    import json
+    data = json.loads(response.choices[0].message.content)
+    return FailureAnalysis(**data)
+```
+
+### Building a Failure Dashboard
+
+Aggregate failure analyses across your evaluation runs to identify systematic issues:
+
+```python
+from collections import Counter
+
+
+def failure_report(analyses: list[FailureAnalysis]) -> dict:
+    """Aggregate failure analyses into a report."""
+    category_counts = Counter(a.category for a in analyses)
+    subcategory_counts = Counter(a.subcategory for a in analyses)
+    severity_counts = Counter(a.severity for a in analyses)
+    avg_step = sum(a.step_index for a in analyses) / len(analyses) if analyses else 0
+
+    # Most common fixes
+    fix_counts = Counter(a.suggested_fix for a in analyses)
+
+    return {
+        "total_failures": len(analyses),
+        "by_category": dict(category_counts.most_common()),
+        "by_subcategory": dict(subcategory_counts.most_common(10)),
+        "by_severity": dict(severity_counts),
+        "avg_failure_step": round(avg_step, 1),
+        "top_suggested_fixes": fix_counts.most_common(5),
+    }
+```
+
+## A Complete Evaluation Pipeline
+
+Here is how all the pieces fit together in a production evaluation workflow:
+
+```{mermaid}
+graph TB
+    subgraph Define["1. Define"]
+        D1["Evaluation Dataset<br/>(queries + expected answers)"]
+        D2["Expected Tool Calls"]
+        D3["Quality Criteria"]
+    end
+
+    subgraph Run["2. Run"]
+        R1["Execute Agent<br/>(multiple trials per task)"]
+        R2["Capture Traces<br/>(LangSmith)"]
+        R3["Record Trajectories"]
+    end
+
+    subgraph Score["3. Score"]
+        S1["Final Answer<br/>(LLM-as-judge)"]
+        S2["Trajectory Quality<br/>(step-level scoring)"]
+        S3["Tool-Call Accuracy<br/>(precision + recall)"]
+        S4["Efficiency<br/>(steps, tokens, latency)"]
+    end
+
+    subgraph Analyze["4. Analyze"]
+        A1["Failure Classification"]
+        A2["Regression Detection"]
+        A3["Improvement Priorities"]
+    end
+
+    Define --> Run --> Score --> Analyze
+
+    style Define fill:#3498db,color:#fff
+    style Run fill:#2ecc71,color:#fff
+    style Score fill:#9b59b6,color:#fff
+    style Analyze fill:#e74c3c,color:#fff
+```
+
+```python
+class AgentEvaluationPipeline:
+    """End-to-end evaluation pipeline for retrieval agents."""
+
+    def __init__(self, agent, evaluator_model: str = "gpt-4o"):
+        self.agent = agent
+        self.evaluator_model = evaluator_model
+
+    def run_evaluation(
+        self,
+        tasks: list[BenchmarkTask],
+        num_trials: int = 3,
+    ) -> dict:
+        """Run the full evaluation pipeline."""
+        results = []
+
+        for task in tasks:
+            for trial in range(num_trials):
+                # Run agent and capture trajectory
+                trajectory, answer, metadata = self._run_and_capture(task)
+
+                # Score final answer
+                answer_eval = llm_judge_answer(
+                    task.query, answer, task.expected_answer,
+                    model=self.evaluator_model,
+                )
+
+                # Score trajectory
+                traj_eval = score_trajectory(
+                    trajectory, task.query,
+                    task.expected_answer, answer,
+                )
+
+                # Score tool calls
+                actual_calls = [
+                    {"name": s.tool_name, "arguments": s.tool_args}
+                    for s in trajectory if s.step_type == "tool_call"
+                ]
+                tool_eval = evaluate_tool_calls(
+                    actual_calls, task.expected_tool_calls,
+                )
+
+                # Failure analysis (if answer is wrong)
+                failure = None
+                if answer_eval["overall_score"] < 0.5:
+                    failure = analyze_failure(
+                        task.query, trajectory,
+                        task.expected_answer, answer,
+                    )
+
+                results.append({
+                    "task_id": task.task_id,
+                    "trial": trial,
+                    "answer_score": answer_eval["overall_score"],
+                    "trajectory_score": traj_eval["overall"],
+                    "tool_precision": tool_eval.precision,
+                    "tool_recall": tool_eval.recall,
+                    "num_steps": len(trajectory),
+                    "tokens": metadata.get("total_tokens", 0),
+                    "latency": metadata.get("latency_seconds", 0),
+                    "failure": failure,
+                })
+
+        return self._aggregate(results)
+
+    def _run_and_capture(self, task):
+        """Run agent and capture trajectory + metadata."""
+        import time
+        start = time.time()
+        # ... run agent, capture steps ...
+        elapsed = time.time() - start
+        # Return (trajectory, final_answer, metadata)
+        return trajectory, answer, {"latency_seconds": elapsed}
+
+    def _aggregate(self, results: list[dict]) -> dict:
+        """Compute aggregate metrics."""
+        n = len(results)
+        return {
+            "num_evaluations": n,
+            "avg_answer_score": sum(r["answer_score"] for r in results) / n,
+            "avg_trajectory_score": sum(r["trajectory_score"] for r in results) / n,
+            "avg_tool_precision": sum(r["tool_precision"] for r in results) / n,
+            "avg_tool_recall": sum(r["tool_recall"] for r in results) / n,
+            "avg_steps": sum(r["num_steps"] for r in results) / n,
+            "avg_latency": sum(r["latency"] for r in results) / n,
+            "failure_rate": sum(1 for r in results if r["failure"]) / n,
+            "failures": [r["failure"] for r in results if r["failure"]],
+        }
+```
+
+## Debugging Playbook
+
+When evaluation reveals a problem, use this systematic approach:
+
+### Step 1: Reproduce with Tracing
+
+```python
+# Enable verbose tracing and re-run the failing query
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+
+result = agent.invoke(
+    {"messages": [{"role": "user", "content": failing_query}]},
+    config={"configurable": {"thread_id": "debug-session-001"}},
+)
+```
+
+### Step 2: Identify the Divergence Point
+
+Compare the successful trajectory (from your evaluation dataset) with the failing one:
+
+```python
+def find_divergence(
+    expected_steps: list[str],
+    actual_steps: list[TrajectoryStep],
+) -> int:
+    """Find the first step where the trajectory diverges from expected."""
+    for i, (expected, actual) in enumerate(zip(expected_steps, actual_steps)):
+        if actual.tool_name and actual.tool_name not in expected:
+            return i
+        if actual.step_type == "answer" and i < len(expected_steps) - 1:
+            return i  # Answered too early
+    return len(actual_steps)  # Diverged at the end (incomplete)
+```
+
+### Step 3: Apply Targeted Fixes
+
+| Root Cause | Fix | Where to Apply |
+|:-----------|:----|:---------------|
+| **Wrong tool selection** | Improve tool descriptions, add negative examples | System prompt / tool schemas |
+| **Bad arguments** | Add few-shot examples of correct tool calls | System prompt |
+| **Hallucination** | Add "only use information from tool results" | System prompt |
+| **Premature stop** | Add "check all sub-questions before answering" | System prompt / stopping logic |
+| **Infinite loop** | Add [stopping conditions and budget limits](/posts/agent/Guardrails-and-Safety-for-Autonomous-Retrieval-Agents.html) | Agent loop |
+| **Context overflow** | Limit retrieved chunks, summarize history | Retrieval config / [memory system](/posts/agent/Memory-Systems-for-Long-Running-Retrieval-Agents.html) |
+| **Inconsistent behavior** | Lower temperature, add structured output | LLM config |
+
+### Step 4: Regression Test
+
+After applying a fix, re-run the full benchmark to verify:
+
+1. The failing task now passes
+2. No previously passing tasks regress
+3. Overall metrics improve or hold steady
+
+```python
+# Before fix
+baseline = pipeline.run_evaluation(tasks, num_trials=3)
+
+# Apply fix...
+
+# After fix
+updated = pipeline.run_evaluation(tasks, num_trials=3)
+
+# Compare
+print(f"Answer score: {baseline['avg_answer_score']:.2f} → {updated['avg_answer_score']:.2f}")
+print(f"Failure rate: {baseline['failure_rate']:.1%} → {updated['failure_rate']:.1%}")
+
+# Check for regressions
+for task_id in baseline["per_task"]:
+    old = baseline["per_task"][task_id]
+    new = updated["per_task"].get(task_id, 0)
+    if new < old - 0.1:
+        print(f"⚠ REGRESSION on {task_id}: {old:.2f} → {new:.2f}")
+```
+
+## Conclusion
+
+Agent evaluation requires thinking at three levels simultaneously: **the answer** (is it correct?), **the trajectory** (did the agent reason well?), and **the tooling** (did it use tools correctly?). Standard LLM evaluation techniques — metrics on final text output — miss two-thirds of the picture.
+
+**Key takeaways:**
+
+- **Measure trajectory, not just outcome.** A correct answer from a sloppy trajectory is fragile. Step-level scoring with LLM-as-judge reveals reasoning quality.
+- **Tool-call accuracy is its own dimension.** For retrieval agents, tool precision and recall directly predict answer quality. Track selection accuracy, argument correctness, and unnecessary calls separately.
+- **Single trials are misleading.** Use pass@k to measure reliability. An agent that succeeds 70% of the time has only 5.7% reliability over 8 trials.
+- **Trace everything.** LangSmith (or equivalent) captures the full run tree — LLM calls, tool invocations, retrieved chunks, latencies. This is your primary debugging tool.
+- **Classify failures systematically.** Automated root-cause analysis with LLM-as-judge turns ad-hoc debugging into a data-driven improvement process. Track failure categories over time to prioritize fixes.
+- **Regression test every change.** Agent behavior is sensitive to prompt changes, model updates, and retrieval config. A fix for one query can break ten others.
+
+Build your evaluation pipeline early — before the agent reaches production — and run it continuously. The cost of evaluation is a fraction of the cost of undetected failures in production.
+
+## References
+
+1. X. Liu et al., "AgentBench: Evaluating LLMs as Agents," *ICLR 2024*, arXiv:2308.03688. Available: [https://arxiv.org/abs/2308.03688](https://arxiv.org/abs/2308.03688)
+2. G. Mialon, C. Fourrier, C. Swift, T. Wolf, Y. LeCun, and T. Scialom, "GAIA: A Benchmark for General AI Assistants," arXiv:2311.12983, 2023. Available: [https://arxiv.org/abs/2311.12983](https://arxiv.org/abs/2311.12983)
+3. S. Yao, N. Shinn, P. Razavi, and K. Narasimhan, "τ-bench: A Benchmark for Tool-Agent-User Interaction in Real-World Domains," arXiv:2406.12045, 2024. Available: [https://arxiv.org/abs/2406.12045](https://arxiv.org/abs/2406.12045)
+4. C. E. Jimenez et al., "SWE-bench: Can Language Models Resolve Real-World GitHub Issues?" *ICLR 2024*, arXiv:2310.06770. Available: [https://arxiv.org/abs/2310.06770](https://arxiv.org/abs/2310.06770)
+5. L. Zheng et al., "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena," *NeurIPS 2023 Datasets and Benchmarks*, arXiv:2306.05685. Available: [https://arxiv.org/abs/2306.05685](https://arxiv.org/abs/2306.05685)
+6. LangChain, "LangSmith Documentation," docs.langchain.com, 2024. Available: [https://docs.langchain.com/langsmith](https://docs.langchain.com/langsmith)
+7. S. Yao et al., "ReAct: Synergizing Reasoning and Acting in Language Models," *ICLR 2023*, arXiv:2210.03629. Available: [https://arxiv.org/abs/2210.03629](https://arxiv.org/abs/2210.03629)
+
+## Read More
+
+- Understand the [Thought-Action-Observation loop](/posts/agent/Building-a-ReAct-Agent-from-Scratch.html) that generates the trajectories you evaluate — including stopping conditions and error recovery.
+- Evaluate how well agents [select and call tools](/posts/agent/Tool-Use-and-Function-Calling-for-Retrieval-Agents.html) — function calling schemas, MCP, and dynamic tool selection.
+- Trace agent execution through [LangGraph state machines](/posts/agent/Building-Agents-with-LangGraph.html) — nodes, edges, checkpointers, and streaming for step-by-step debugging.
+- Debug coordination failures in [multi-agent RAG orchestration](/posts/agent/Multi-Agent-RAG-Orchestration-Patterns.html) — supervisor vs. hierarchical topologies and routing accuracy.
+- Evaluate [memory systems](/posts/agent/Memory-Systems-for-Long-Running-Retrieval-Agents.html) for context loss and retrieval accuracy across long-running sessions.
+- Measure the quality of [query decomposition plans](/posts/agent/Planning-and-Query-Decomposition-for-Complex-Retrieval.html) — plan correctness and sub-question coverage.
+- Benchmark [deep research agents](/posts/agent/Deep-Research-Agents-from-RAG-to-Autonomous-Investigation.html) on source coverage, triangulation accuracy, and report quality.
+- Test [guardrails and safety layers](/posts/agent/Guardrails-and-Safety-for-Autonomous-Retrieval-Agents.html) — verify that budget limits, authorization gates, and injection defenses trigger correctly.
+- Monitor agent behavior in production with [Observability for Multi-Turn LLM Conversations](/posts/llm/Observability-for-Multi-Turn-LLM-Conversations.html).
+- Evaluate the RAG pipeline underlying your agents with [Evaluating RAG Systems](/posts/rag/Evaluating-RAG-Systems.html).
+
+<!-- nav-buttons -->
+
+[{{< fa robot >}} Explore Agents](../../pages/agent.qmd){.btn .btn-primary .btn-lg}
+[{{< fa house >}} Home](../../index.qmd){.btn .btn-primary .btn-lg}

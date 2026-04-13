@@ -1,0 +1,1296 @@
+---
+title: "Memory Systems for Long-Running Retrieval Agents"
+description: "Conversation buffers, working scratchpads, episodic vector recall, and cross-agent memory sharing for persistent agent state"
+colab: <a href="https://colab.research.google.com/github/VectoringAI/ai-engineering/blob/main/agent/memory_systems_for_long_running_retrieval_agents.ipynb"><img src="/images/colab.png" alt="Open in Colab"></a>
+image: /images/agent/memory-systems-retrieval-agents-300px.png
+date: "2026-03-19"
+keywords:
+  - "agent memory"
+  - "conversation buffer"
+  - "working memory"
+  - "scratchpad"
+  - "episodic memory"
+  - "semantic memory"
+  - "procedural memory"
+  - "vector recall"
+  - "cross-agent memory"
+  - "LangGraph"
+  - "LangMem"
+  - "checkpointer"
+  - "BaseStore"
+  - "long-term memory"
+  - "memory consolidation"
+  - "persistent state"
+  - "cross-thread persistence"
+  - "memory namespaces"
+  - "retrieval agents"
+---
+
+<div id="notebook-link" data-url="https://colab.research.google.com/github/VectoringAI/ai-engineering/blob/main/agent/memory_systems_for_long_running_retrieval_agents.ipynb" style="display:none"></div>
+
+
+![Agent memory systems: conversation buffer, episodic, and semantic recall](/images/agent/memory-systems-retrieval-agents-300px.png){fig-align="center" width=300}
+
+## Introduction
+
+An agent that forgets everything between conversations is like a coworker with amnesia — you repeat the same context every morning, clarify the same preferences every session, and watch the same mistakes recur. **Memory is what transforms a stateless tool-calling loop into an adaptive, context-aware system** that improves over time.
+
+The challenge is that "memory" isn't one thing. A retrieval agent running a multi-hour research workflow needs at least four distinct memory capabilities:
+
+1. **Conversation buffers** — the sliding window of recent messages that keeps the LLM grounded in the current dialogue
+2. **Working scratchpads** — structured state that accumulates intermediate results across tool calls within a single task
+3. **Episodic vector recall** — long-term storage of past interactions that the agent can semantically search to learn from experience
+4. **Cross-agent memory sharing** — a persistent store that multiple specialized agents can read from and write to, enabling knowledge transfer across a multi-agent system
+
+Human cognition maps neatly onto these categories. Short-term (working) memory keeps the immediate task context; episodic memory recalls specific past experiences; semantic memory stores accumulated facts and knowledge; and procedural memory encodes learned behaviors. The [CoALA framework (Sumers, Yao, Narasimhan, Griffiths 2024)](https://arxiv.org/abs/2309.02427) formalizes this mapping for LLM agents, and LangChain's [memory-for-agents research](https://blog.langchain.com/memory-for-agents/) adopts the same taxonomy.
+
+This article implements each memory layer for retrieval agents — starting with the simplest conversation buffers, building up to working scratchpads in LangGraph state, adding episodic and semantic long-term memory with vector stores, and finally wiring cross-agent memory sharing through LangGraph's `BaseStore`. Every pattern includes working code, architecture diagrams, and guidance on when (and when not) to use it.
+
+## Memory Taxonomy for Agents
+
+Before diving into implementations, it helps to understand how the different memory types relate to each other and to human cognition:
+
+```{mermaid}
+graph TD
+    subgraph ShortTerm["Short-Term Memory"]
+        A["Conversation Buffer<br/>(recent messages)"]
+        B["Working Scratchpad<br/>(task state)"]
+    end
+
+    subgraph LongTerm["Long-Term Memory"]
+        C["Episodic Memory<br/>(past experiences)"]
+        D["Semantic Memory<br/>(facts & knowledge)"]
+        E["Procedural Memory<br/>(learned behaviors)"]
+    end
+
+    A -->|"summarize / prune"| C
+    B -->|"extract insights"| D
+    C -->|"few-shot examples"| F["Agent Prompt"]
+    D -->|"user profile / facts"| F
+    E -->|"system instructions"| F
+    A -->|"sliding window"| F
+    B -->|"current state"| F
+
+    style ShortTerm fill:#dbeafe,stroke:#3b82f6
+    style LongTerm fill:#fef3c7,stroke:#f59e0b
+    style F fill:#d1fae5,stroke:#10b981
+```
+
+| Memory Type | Scope | Lifetime | Storage | Retrieval | Example |
+|:------------|:------|:---------|:--------|:----------|:--------|
+| **Conversation buffer** | Single thread | Current session | In-memory list | Last N messages | "What did the user just ask?" |
+| **Working scratchpad** | Single task | Current workflow | LangGraph state / checkpointer | Direct key access | "Which documents did I retrieve so far?" |
+| **Episodic memory** | Cross-session | Persistent | Vector store | Semantic search | "How did I handle a similar question last month?" |
+| **Semantic memory** | Cross-session | Persistent | Document store / profile | Lookup + search | "This user prefers concise answers in bullet points" |
+| **Procedural memory** | Cross-session | Persistent | System prompt / rules | Loaded at start | "Always cite sources. Never use informal language." |
+
+The rest of this article implements each layer, bottom-up, starting with the simplest and most universal.
+
+## Conversation Buffers: The Immediate Context Window
+
+### The Problem
+
+Every LLM call is stateless — it sees only what's in the prompt. A "conversation" only exists because your application prepends previous messages to each new request. This message list is the **conversation buffer**, and managing it well is the foundation of all agent memory.
+
+### Full Buffer: Keep Everything
+
+The simplest approach — accumulate every message and pass them all to the LLM:
+
+```python
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o-mini")
+
+# Full conversation buffer — just a list
+conversation = [
+    {"role": "system", "content": "You are a helpful research assistant."},
+]
+
+
+def chat(user_message: str) -> str:
+    conversation.append({"role": "user", "content": user_message})
+    response = llm.invoke(conversation)
+    conversation.append({"role": "assistant", "content": response.content})
+    return response.content
+```
+
+**Limitation**: Context windows are finite. A long research session can accumulate hundreds of messages with tool calls, observations, and intermediate reasoning. At some point, you hit the token limit — or, more practically, LLM quality degrades well before that limit as the context fills with irrelevant earlier messages.
+
+### Sliding Window Buffer
+
+Keep only the last K messages:
+
+```python
+from collections import deque
+
+
+class SlidingWindowBuffer:
+    def __init__(self, max_messages: int = 20):
+        self.messages = deque(maxlen=max_messages)
+        self.system_prompt = None
+
+    def add_system(self, content: str):
+        self.system_prompt = {"role": "system", "content": content}
+
+    def add(self, role: str, content: str):
+        self.messages.append({"role": role, "content": content})
+
+    def get_messages(self) -> list[dict]:
+        msgs = []
+        if self.system_prompt:
+            msgs.append(self.system_prompt)
+        msgs.extend(self.messages)
+        return msgs
+```
+
+The system prompt stays pinned — it's always the first message, outside the sliding window. This ensures the agent's core instructions are never evicted.
+
+### Summary Buffer: Compress Old Context
+
+A smarter approach — summarize older messages instead of dropping them entirely:
+
+```python
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+
+class SummaryBuffer:
+    def __init__(self, max_recent: int = 10):
+        self.summary = ""
+        self.recent_messages: list[dict] = []
+        self.max_recent = max_recent
+
+    def add(self, role: str, content: str):
+        self.recent_messages.append({"role": role, "content": content})
+        if len(self.recent_messages) > self.max_recent * 2:
+            self._compress()
+
+    def _compress(self):
+        """Summarize older messages and keep only the most recent ones."""
+        old_messages = self.recent_messages[: -self.max_recent]
+        self.recent_messages = self.recent_messages[-self.max_recent :]
+
+        old_text = "\n".join(f"{m['role']}: {m['content']}" for m in old_messages)
+        prompt = (
+            f"Previous summary:\n{self.summary}\n\n"
+            f"New messages:\n{old_text}\n\n"
+            "Produce an updated summary of the full conversation so far. "
+            "Focus on key facts, decisions, and open questions."
+        )
+        response = llm.invoke([{"role": "user", "content": prompt}])
+        self.summary = response.content
+
+    def get_messages(self) -> list[dict]:
+        msgs = []
+        if self.summary:
+            msgs.append({
+                "role": "system",
+                "content": f"Summary of earlier conversation:\n{self.summary}",
+            })
+        msgs.extend(self.recent_messages)
+        return msgs
+```
+
+This pattern preserves the key facts from old messages while staying within token limits. LangMem provides a built-in [`summarize_messages`](https://langchain-ai.github.io/langmem/guides/summarization/) utility that handles this automatically.
+
+### Token-Aware Trimming
+
+For production, trim by token count rather than message count:
+
+```python
+import tiktoken
+
+
+def trim_messages_by_tokens(
+    messages: list[dict], max_tokens: int = 8000, model: str = "gpt-4o-mini"
+) -> list[dict]:
+    """Keep the most recent messages that fit within the token budget."""
+    enc = tiktoken.encoding_for_model(model)
+    trimmed = []
+    total_tokens = 0
+
+    # Always keep system message
+    system_msgs = [m for m in messages if m["role"] == "system"]
+    other_msgs = [m for m in messages if m["role"] != "system"]
+
+    for msg in system_msgs:
+        total_tokens += len(enc.encode(msg["content"]))
+        trimmed.append(msg)
+
+    # Add messages from most recent to oldest
+    keep = []
+    for msg in reversed(other_msgs):
+        msg_tokens = len(enc.encode(msg.get("content", "")))
+        if total_tokens + msg_tokens > max_tokens:
+            break
+        total_tokens += msg_tokens
+        keep.append(msg)
+
+    trimmed.extend(reversed(keep))
+    return trimmed
+```
+
+### Conversation Buffers in LangGraph
+
+In LangGraph, conversation memory comes free with checkpointers. The `messages` state key accumulates every message, and the checkpointer persists it:
+
+```python
+from langgraph.graph import StateGraph, MessagesState, START, END
+from langgraph.checkpoint.memory import MemorySaver
+
+
+def agent_node(state: MessagesState) -> dict:
+    response = llm.invoke(state["messages"])
+    return {"messages": [response]}
+
+
+graph = StateGraph(MessagesState)
+graph.add_node("agent", agent_node)
+graph.add_edge(START, "agent")
+graph.add_edge("agent", END)
+
+# MemorySaver keeps full message history per thread
+checkpointer = MemorySaver()
+app = graph.compile(checkpointer=checkpointer)
+
+# Thread ID scopes the conversation
+config = {"configurable": {"thread_id": "user-123-session-1"}}
+app.invoke({"messages": [{"role": "user", "content": "What is RAG?"}]}, config)
+app.invoke({"messages": [{"role": "user", "content": "How does chunking work?"}]}, config)
+# Second call sees the full conversation history automatically
+```
+
+For production, swap `MemorySaver` for `PostgresSaver` or `SqliteSaver` to persist across server restarts.
+
+## Working Scratchpads: Structured Task State
+
+### Beyond Messages: State as Memory
+
+Conversation buffers track the dialogue, but a retrieval agent needs more than messages — it needs to track **intermediate results** across a multi-step workflow. Which documents were retrieved? Which were relevant? What queries have been tried? How many retries remain?
+
+This is **working memory** — structured state that accumulates context across processing steps. In LangGraph, it's the `TypedDict` state definition:
+
+```python
+from typing import TypedDict, Annotated
+from langgraph.graph.message import add_messages
+
+
+class ResearchState(TypedDict):
+    # Conversation buffer (append-only)
+    messages: Annotated[list, add_messages]
+
+    # Working scratchpad fields
+    current_query: str                    # The active search query
+    retrieved_docs: list[dict]            # Accumulated documents
+    graded_docs: list[dict]              # Documents that passed relevance check
+    sources_consulted: list[str]          # Which databases/APIs were queried
+    reasoning_notes: str                  # Agent's working notes
+    iteration: int                        # Current retry count
+    status: str                           # "researching" | "synthesizing" | "done"
+```
+
+### Scratchpad Pattern: Accumulate Across Tool Calls
+
+The scratchpad pattern uses state fields to build up context that no single LLM call produces:
+
+```{mermaid}
+graph TD
+    A["Start"] --> B["Plan Query"]
+    B --> C["Retrieve"]
+    C --> D["Grade & Filter"]
+    D --> E{"Enough<br/>evidence?"}
+    E -->|No| F["Update Scratchpad:<br/>add notes, refine query"]
+    F --> C
+    E -->|Yes| G["Synthesize Answer<br/>from scratchpad"]
+    G --> H["End"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style F fill:#f5a623,color:#fff,stroke:#333
+    style G fill:#1abc9c,color:#fff,stroke:#333
+    style H fill:#1abc9c,color:#fff,stroke:#333
+```
+
+```python
+from langgraph.graph import StateGraph, START, END
+from langchain_openai import ChatOpenAI
+
+
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+
+def plan_query(state: ResearchState) -> dict:
+    """Use scratchpad to plan or refine the search query."""
+    notes = state.get("reasoning_notes", "")
+    sources = state.get("sources_consulted", [])
+
+    prompt = (
+        f"Research question: {state['messages'][-1].content}\n"
+        f"Previous notes: {notes}\n"
+        f"Sources already consulted: {sources}\n"
+        "Plan the next search query. Return only the query string."
+    )
+    response = llm.invoke([{"role": "user", "content": prompt}])
+    return {"current_query": response.content.strip(), "status": "researching"}
+
+
+def retrieve(state: ResearchState) -> dict:
+    """Retrieve documents and add them to the scratchpad."""
+    docs = vectorstore.similarity_search(state["current_query"], k=5)
+    new_docs = [
+        {"content": d.page_content, "source": d.metadata.get("source", "unknown")}
+        for d in docs
+    ]
+
+    existing_docs = state.get("retrieved_docs", [])
+    existing_docs.extend(new_docs)
+
+    sources = state.get("sources_consulted", [])
+    sources.append(f"vector_search:{state['current_query']}")
+
+    return {
+        "retrieved_docs": existing_docs,
+        "sources_consulted": sources,
+    }
+
+
+def grade_and_filter(state: ResearchState) -> dict:
+    """Grade documents and update the scratchpad with notes."""
+    docs = state.get("retrieved_docs", [])
+    current_graded = state.get("graded_docs", [])
+
+    # Grade only new (ungraded) documents
+    new_docs = docs[len(current_graded) :]
+    for doc in new_docs:
+        response = llm.invoke([
+            {"role": "system", "content": "Reply 'relevant' or 'not_relevant'."},
+            {"role": "user", "content": f"Query: {state['current_query']}\nDoc: {doc['content']}"},
+        ])
+        if "relevant" in response.content.lower():
+            current_graded.append(doc)
+
+    notes = state.get("reasoning_notes", "")
+    notes += f"\nIteration {state.get('iteration', 0)}: "
+    notes += f"Retrieved {len(new_docs)} docs, {len(current_graded)} total relevant."
+
+    return {
+        "graded_docs": current_graded,
+        "reasoning_notes": notes,
+        "iteration": state.get("iteration", 0) + 1,
+    }
+
+
+def check_evidence(state: ResearchState) -> str:
+    """Route based on scratchpad state."""
+    if len(state.get("graded_docs", [])) >= 3:
+        return "synthesize"
+    if state.get("iteration", 0) >= 3:
+        return "synthesize"  # Give up after 3 iterations
+    return "refine"
+
+
+def synthesize(state: ResearchState) -> dict:
+    """Use the full scratchpad to generate a grounded answer."""
+    docs_text = "\n\n".join(
+        f"[{d['source']}]: {d['content']}" for d in state.get("graded_docs", [])
+    )
+    notes = state.get("reasoning_notes", "")
+
+    response = llm.invoke([
+        {"role": "system", "content": "Answer the question using the evidence below. Cite sources."},
+        {"role": "user", "content": (
+            f"Question: {state['messages'][-1].content}\n\n"
+            f"Research notes: {notes}\n\n"
+            f"Evidence:\n{docs_text}"
+        )},
+    ])
+    return {"messages": [response], "status": "done"}
+
+
+# Build the graph
+graph = StateGraph(ResearchState)
+graph.add_node("plan_query", plan_query)
+graph.add_node("retrieve", retrieve)
+graph.add_node("grade_and_filter", grade_and_filter)
+graph.add_node("synthesize", synthesize)
+
+graph.add_edge(START, "plan_query")
+graph.add_edge("plan_query", "retrieve")
+graph.add_edge("retrieve", "grade_and_filter")
+graph.add_conditional_edges("grade_and_filter", check_evidence, {
+    "synthesize": "synthesize",
+    "refine": "plan_query",
+})
+graph.add_edge("synthesize", END)
+
+checkpointer = MemorySaver()
+research_agent = graph.compile(checkpointer=checkpointer)
+```
+
+**Why this matters**: The `reasoning_notes`, `graded_docs`, and `sources_consulted` fields form a **working scratchpad** that persists across the entire research cycle. If the agent needs three retrieval iterations, the scratchpad accumulates all intermediate results — no information is lost between loops.
+
+With a checkpointer, this scratchpad also survives interruptions. If the agent is paused for human review (via `interrupt_before`) or the server restarts, the full scratchpad is restored when execution resumes.
+
+### Scratchpad vs. Messages
+
+A common mistake is trying to store structured intermediate state in the message list. This bloats the conversation, pollutes the LLM's context with internal bookkeeping, and makes it hard to extract specific fields later.
+
+| Use Messages For | Use Scratchpad State For |
+|:-----------------|:------------------------|
+| User questions and agent responses | Retrieved document lists |
+| Tool call results the user should see | Relevance scores and grades |
+| Conversation history | Iteration counters and retry state |
+| | Source tracking |
+| | Working notes and reasoning traces |
+
+## Episodic Vector Recall: Learning from Experience
+
+### From Short-Term to Long-Term
+
+Conversation buffers and scratchpads are **within-session** memory — they reset when the thread ends. But production agents need to **learn across sessions**: remembering how they handled similar questions before, what retrieval strategies worked, and what mistakes to avoid.
+
+This is **episodic memory** — the ability to recall specific past interactions (episodes) and use them to guide current behavior. The implementation: store past interactions in a **vector store** and retrieve relevant episodes via semantic search.
+
+### Architecture: Episodic Memory Layer
+
+```{mermaid}
+graph TD
+    subgraph Current["Current Conversation"]
+        A["User Query"] --> B["Agent"]
+        B --> C["Retrieve similar<br/>past episodes"]
+        C --> D["Vector Store<br/>(episodic memory)"]
+        D --> C
+        C --> B
+        B --> E["Response"]
+    end
+
+    subgraph Background["Background Process"]
+        F["Completed<br/>Conversation"] --> G["Extract Episode"]
+        G --> H["Embed & Store<br/>in Vector Store"]
+        H --> D
+    end
+
+    style Current fill:#dbeafe,stroke:#3b82f6
+    style Background fill:#fef3c7,stroke:#f59e0b
+```
+
+### Extracting Episodes from Conversations
+
+An episode captures the **situation, approach, and outcome** of a past interaction:
+
+```python
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_core.vectorstores import InMemoryVectorStore
+
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+episode_store = InMemoryVectorStore(embeddings)
+
+
+def extract_episode(conversation: list[dict]) -> dict:
+    """Extract an episode summary from a completed conversation."""
+    conv_text = "\n".join(f"{m['role']}: {m['content']}" for m in conversation)
+
+    response = llm.invoke([
+        {"role": "system", "content": (
+            "Extract a structured episode from this conversation. Return:\n"
+            "- situation: What was the user trying to accomplish?\n"
+            "- approach: What strategy/tools did the agent use?\n"
+            "- outcome: Was it successful? What worked or didn't work?\n"
+            "- lesson: What should the agent remember for similar future tasks?\n"
+            "Format as a single paragraph combining all four aspects."
+        )},
+        {"role": "user", "content": conv_text},
+    ])
+    return {"content": response.content, "conversation_length": len(conversation)}
+
+
+def store_episode(conversation: list[dict]):
+    """Extract and store an episode from a completed conversation."""
+    episode = extract_episode(conversation)
+    episode_store.add_texts(
+        texts=[episode["content"]],
+        metadatas=[{"type": "episode", "length": episode["conversation_length"]}],
+    )
+
+
+def recall_episodes(query: str, k: int = 3) -> list[str]:
+    """Retrieve relevant past episodes for a given query."""
+    docs = episode_store.similarity_search(query, k=k)
+    return [doc.page_content for doc in docs]
+```
+
+### Using Episodic Memory in a Retrieval Agent
+
+Inject recalled episodes as few-shot context in the system prompt:
+
+```python
+def agent_with_episodic_memory(state: MessagesState) -> dict:
+    """Agent node that recalls relevant past episodes."""
+    user_query = state["messages"][-1].content
+
+    # Recall relevant past episodes
+    episodes = recall_episodes(user_query, k=3)
+
+    system_prompt = "You are a research assistant with access to retrieval tools.\n\n"
+    if episodes:
+        system_prompt += "## Relevant Past Experiences\n"
+        system_prompt += "Use these to guide your approach:\n\n"
+        for i, ep in enumerate(episodes, 1):
+            system_prompt += f"{i}. {ep}\n\n"
+
+    messages = [{"role": "system", "content": system_prompt}] + state["messages"]
+    response = llm.invoke(messages)
+    return {"messages": [response]}
+```
+
+### Episodic Memory with LangMem
+
+LangMem provides a higher-level API for episodic memory management that handles extraction, storage, and retrieval:
+
+```python
+from langgraph.store.memory import InMemoryStore
+from langmem import create_memory_store_manager
+
+# Configure the store with embedding support for semantic search
+store = InMemoryStore(
+    index={"dims": 1536, "embed": "openai:text-embedding-3-small"}
+)
+
+# Create a memory manager for episodic memories
+episodic_manager = create_memory_store_manager(
+    "anthropic:claude-3-5-sonnet-latest",
+    namespace=("episodes", "{user_id}"),
+    schemas=[
+        {
+            "name": "Episode",
+            "description": (
+                "Record notable interactions: what the user asked, "
+                "what approach worked (or didn't), and lessons learned."
+            ),
+            "update_mode": "insert",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "situation": {
+                        "type": "string",
+                        "description": "What was the user trying to accomplish?",
+                    },
+                    "approach": {
+                        "type": "string",
+                        "description": "What strategy and tools were used?",
+                    },
+                    "outcome": {
+                        "type": "string",
+                        "description": "Was it successful? What worked or didn't?",
+                    },
+                    "lesson": {
+                        "type": "string",
+                        "description": "Key takeaway for handling similar tasks.",
+                    },
+                },
+                "required": ["situation", "approach", "outcome", "lesson"],
+            },
+        }
+    ],
+    store=store,
+)
+```
+
+### Hot Path vs. Background Memory Formation
+
+There are two strategies for when to extract and store memories:
+
+**Hot path** — the agent extracts memories during the conversation via tool calls:
+
+```python
+from langmem import create_manage_memory_tool, create_search_memory_tool
+from langgraph.prebuilt import create_react_agent
+
+agent = create_react_agent(
+    "anthropic:claude-3-5-sonnet-latest",
+    tools=[
+        create_manage_memory_tool(namespace=("memories", "{user_id}")),
+        create_search_memory_tool(namespace=("memories", "{user_id}")),
+        # ... other retrieval tools
+    ],
+    store=store,
+    prompt=(
+        "You are a research assistant. When you learn something important about "
+        "the user or discover a useful retrieval strategy, use the memory tool to "
+        "save it for future conversations."
+    ),
+)
+```
+
+**Background** — a separate process extracts memories after the conversation:
+
+```python
+from langmem import create_memory_store_manager
+
+# Background memory manager runs after the conversation ends
+background_manager = create_memory_store_manager(
+    "anthropic:claude-3-5-sonnet-latest",
+    namespace=("memories", "{user_id}"),
+    schemas=[user_profile_schema, episode_schema],
+    store=store,
+)
+
+# After a conversation completes, extract memories
+async def process_completed_conversation(messages: list, user_id: str):
+    config = {"configurable": {"user_id": user_id}}
+    await background_manager.ainvoke({"messages": messages}, config)
+```
+
+| Approach | Latency | Recall | Complexity |
+|:---------|:--------|:-------|:-----------|
+| **Hot path** | Higher (memory tool calls add latency) | Immediate — available in same conversation | Agent must balance memory + task |
+| **Background** | None (runs asynchronously) | Delayed — available in next conversation | Separate process, debouncing logic |
+
+For production, LangGraph supports **debounced background processing** — memory extraction is scheduled after a period of inactivity, so rapid back-and-forth messages don't trigger redundant extractions.
+
+## Semantic Memory: Facts and Knowledge Profiles
+
+### Profiles vs. Collections
+
+Episodic memory stores experiences. **Semantic memory** stores facts and knowledge — things the agent "knows" about the user, the domain, or the world. LangMem distinguishes two representations:
+
+**Profiles** — a single structured document per entity that's continuously updated:
+
+```python
+user_profile_schema = {
+    "name": "UserProfile",
+    "description": "Maintain up-to-date information about the user.",
+    "update_mode": "patch",  # Always update the same document
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "preferred_name": {"type": "string"},
+            "role": {"type": "string", "description": "User's job role or title"},
+            "expertise_areas": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Domains the user has expertise in",
+            },
+            "preferred_sources": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Data sources or databases the user prefers",
+            },
+            "response_style": {
+                "type": "string",
+                "description": "How the user likes answers formatted (concise, detailed, bullet points, etc.)",
+            },
+        },
+    },
+}
+```
+
+With `update_mode: "patch"`, new information updates the existing profile rather than creating a new document. If the user says "I'm a senior ML engineer" in one session and "I prefer answers in bullet points" in another, both facts merge into a single profile.
+
+**Collections** — an unbounded set of individual memory entries retrieved by semantic search:
+
+```python
+knowledge_schema = {
+    "name": "DomainKnowledge",
+    "description": "Facts and knowledge the agent has learned from research sessions.",
+    "update_mode": "insert",  # Creates new entries, can update existing ones
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "topic": {"type": "string", "description": "The subject area"},
+            "fact": {"type": "string", "description": "The specific knowledge"},
+            "source": {"type": "string", "description": "Where this was learned"},
+            "confidence": {
+                "type": "string",
+                "enum": ["high", "medium", "low"],
+                "description": "How confident the agent is in this fact",
+            },
+        },
+        "required": ["topic", "fact"],
+    },
+}
+```
+
+### Loading Semantic Memory into the Agent
+
+At the start of each conversation, load the user profile and search for relevant knowledge:
+
+```python
+from langgraph.store.base import BaseStore
+
+
+def build_memory_prompt(store: BaseStore, user_id: str, query: str) -> str:
+    """Build a system prompt section from semantic memories."""
+    prompt_parts = []
+
+    # Load user profile (direct lookup — always the same key)
+    profile_items = store.search(namespace=("profiles", user_id))
+    if profile_items:
+        profile = profile_items[0].value
+        prompt_parts.append(f"## User Profile\n{profile}")
+
+    # Search for relevant domain knowledge (semantic search)
+    knowledge_items = store.search(
+        namespace=("knowledge", user_id),
+        query=query,
+        limit=5,
+    )
+    if knowledge_items:
+        prompt_parts.append("## Relevant Knowledge")
+        for item in knowledge_items:
+            val = item.value
+            prompt_parts.append(f"- [{val.get('topic')}] {val.get('fact')}")
+
+    return "\n\n".join(prompt_parts)
+```
+
+### Choosing Between Profiles and Collections
+
+| Use Profiles When | Use Collections When |
+|:------------------|:--------------------|
+| You need the "current state" of an entity | You need to track many distinct facts |
+| Information is mutually exclusive (name, role) | Information accumulates without replacing |
+| You want users to view/edit their representation | You need semantic search over memories |
+| Schema is well-defined in advance | Facts are diverse and unpredictable |
+
+## Cross-Agent Memory Sharing
+
+### The Multi-Agent Memory Problem
+
+In a multi-agent system — where specialized agents handle retrieval, analysis, citation, and synthesis — each agent accumulates its own context. But insights from one agent are often valuable to another:
+
+- The **retrieval agent** discovers that a particular database has outdated data → the **routing agent** should prefer other sources next time
+- The **analysis agent** identifies that the user's questions always focus on cost implications → the **synthesis agent** should emphasize cost data in responses
+- The **citation agent** learns the user's preferred citation format → all agents generating output should follow it
+
+Without shared memory, each agent operates in isolation, and the system as a whole fails to learn.
+
+### Architecture: Shared Memory Store
+
+```{mermaid}
+graph TD
+    subgraph Agents["Specialized Agents"]
+        A["Retriever<br/>Agent"]
+        B["Analyzer<br/>Agent"]
+        C["Synthesizer<br/>Agent"]
+    end
+
+    subgraph SharedMemory["Shared Memory (BaseStore)"]
+        D["User Profile<br/>(profiles, user_id)"]
+        E["Domain Knowledge<br/>(knowledge, user_id)"]
+        F["Agent Observations<br/>(observations, user_id)"]
+        G["Retrieval History<br/>(retrieval, user_id)"]
+    end
+
+    A -->|"write: source quality"| F
+    A -->|"write: retrieved docs"| G
+    B -->|"read: retrieved docs"| G
+    B -->|"write: analysis insights"| F
+    C -->|"read: user profile"| D
+    C -->|"read: all observations"| F
+    C -->|"write: domain facts"| E
+
+    style Agents fill:#dbeafe,stroke:#3b82f6
+    style SharedMemory fill:#fef3c7,stroke:#f59e0b
+```
+
+### Implementing Cross-Agent Memory with LangGraph's BaseStore
+
+LangGraph's `BaseStore` is the foundation for cross-agent memory sharing. It provides namespaced key-value storage with semantic search, accessible from any node in any graph:
+
+```python
+from langgraph.store.memory import InMemoryStore
+from langgraph.graph import StateGraph, MessagesState, START, END
+from langgraph.prebuilt import create_react_agent
+from langgraph.checkpoint.memory import MemorySaver
+
+# Shared store — all agents read/write to the same store
+shared_store = InMemoryStore(
+    index={"dims": 1536, "embed": "openai:text-embedding-3-small"}
+)
+
+
+# --- Retriever Agent ---
+def retriever_node(state: MessagesState, *, store: BaseStore, config) -> dict:
+    """Retriever agent that logs source quality to shared memory."""
+    user_id = config["configurable"]["user_id"]
+    query = state["messages"][-1].content
+
+    # Check shared memory for known source quality issues
+    observations = store.search(
+        namespace=("observations", user_id), query="source quality", limit=3
+    )
+    avoid_sources = [
+        obs.value.get("source")
+        for obs in observations
+        if obs.value.get("type") == "avoid_source"
+    ]
+
+    # Retrieve documents (filtering out known-bad sources)
+    docs = retrieve_from_sources(query, exclude=avoid_sources)
+
+    # Log retrieval to shared memory
+    store.put(
+        namespace=("retrieval", user_id),
+        key=f"retrieval-{hash(query)}",
+        value={
+            "query": query,
+            "num_docs": len(docs),
+            "sources": list({d.metadata["source"] for d in docs}),
+        },
+    )
+
+    doc_text = "\n\n".join(d.page_content for d in docs)
+    return {"messages": [{"role": "assistant", "content": f"Retrieved:\n{doc_text}"}]}
+
+
+# --- Analyzer Agent ---
+def analyzer_node(state: MessagesState, *, store: BaseStore, config) -> dict:
+    """Analyzer that reads retrieval history and writes insights."""
+    user_id = config["configurable"]["user_id"]
+
+    # Read retrieval history from shared memory
+    retrieval_items = store.search(namespace=("retrieval", user_id), limit=5)
+    retrieval_context = "\n".join(
+        f"- Query: {r.value['query']}, Docs: {r.value['num_docs']}"
+        for r in retrieval_items
+    )
+
+    analysis_prompt = (
+        f"Analyze the retrieved documents in the conversation.\n"
+        f"Recent retrieval history:\n{retrieval_context}\n\n"
+        "Identify key insights, patterns, and any source quality issues."
+    )
+    response = llm.invoke(
+        [{"role": "system", "content": analysis_prompt}] + state["messages"]
+    )
+
+    # Write analysis insights to shared memory
+    store.put(
+        namespace=("observations", user_id),
+        key=f"analysis-{hash(response.content[:50])}",
+        value={"type": "insight", "content": response.content[:200]},
+    )
+
+    return {"messages": [response]}
+```
+
+### Cross-Thread Persistence: Memory That Survives Sessions
+
+The key distinction in LangGraph:
+
+- **Checkpointers** (MemorySaver, PostgresSaver) → **within-thread** memory. Each `thread_id` has its own conversation history and scratchpad state.
+- **BaseStore** (InMemoryStore, AsyncPostgresStore) → **cross-thread** memory. A single store shared across all threads, namespaced by user, organization, or any custom key.
+
+```{mermaid}
+graph TD
+    subgraph Thread1["Thread A (Session 1)"]
+        A1["Messages"] --> A2["Scratchpad State"]
+    end
+
+    subgraph Thread2["Thread B (Session 2)"]
+        B1["Messages"] --> B2["Scratchpad State"]
+    end
+
+    subgraph CrossThread["Cross-Thread Store"]
+        C1["User Profile"]
+        C2["Episodic Memories"]
+        C3["Domain Knowledge"]
+        C4["Agent Observations"]
+    end
+
+    A2 -.->|"write"| CrossThread
+    B2 -.->|"write"| CrossThread
+    CrossThread -.->|"read"| A1
+    CrossThread -.->|"read"| B1
+
+    CP1["Checkpointer<br/>(per-thread)"] --> Thread1
+    CP1 --> Thread2
+    ST1["BaseStore<br/>(cross-thread)"] --> CrossThread
+
+    style Thread1 fill:#dbeafe,stroke:#3b82f6
+    style Thread2 fill:#dbeafe,stroke:#3b82f6
+    style CrossThread fill:#fef3c7,stroke:#f59e0b
+```
+
+```python
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.store.postgres.aio import AsyncPostgresStore
+
+
+async def create_production_agent():
+    """Create an agent with both per-thread and cross-thread memory."""
+    # Per-thread memory (conversation history + scratchpad)
+    checkpointer = AsyncPostgresSaver.from_conn_string(
+        "postgresql://user:pass@localhost/agentdb"
+    )
+    await checkpointer.setup()
+
+    # Cross-thread memory (user profiles, episodes, knowledge)
+    store = AsyncPostgresStore.from_conn_string(
+        "postgresql://user:pass@localhost/agentdb"
+    )
+    await store.setup()
+
+    graph = build_research_agent_graph()
+    return graph.compile(checkpointer=checkpointer, store=store)
+```
+
+### Memory Namespacing Strategies
+
+Namespaces determine who can see what. Design them around your access patterns:
+
+| Namespace Pattern | Who Sees It | Example Use |
+|:------------------|:------------|:------------|
+| `("profiles", user_id)` | All agents for one user | User preferences, response style |
+| `("knowledge", user_id)` | All agents for one user | Domain facts learned from conversations |
+| `("knowledge", org_id)` | All users in an org | Shared organizational knowledge base |
+| `("episodes", user_id)` | All agents for one user | Past interaction summaries |
+| `("observations", user_id, agent_name)` | One specific agent per user | Agent-specific learned behaviors |
+| `("global", "retrieval_tips")` | All agents, all users | System-wide retrieval strategy tips |
+
+## Procedural Memory: Evolving Agent Behavior
+
+### Self-Improving System Prompts
+
+The most advanced (and least common) memory type: an agent that **updates its own instructions** based on experience. LangMem's prompt optimization makes this practical:
+
+```python
+from langmem import create_prompt_optimizer
+
+optimizer = create_prompt_optimizer(
+    "anthropic:claude-3-5-sonnet-latest",
+    kind="prompt_memory",
+    config={"store": store, "namespace": ("prompts", "research_agent")},
+)
+
+
+async def optimize_after_feedback(
+    conversation: list[dict], feedback: str, current_prompt: str
+):
+    """Update the agent's system prompt based on user feedback."""
+    result = await optimizer.ainvoke(
+        {
+            "messages": conversation,
+            "feedback": feedback,
+            "current_prompt": current_prompt,
+        }
+    )
+    return result["updated_prompt"]
+```
+
+In practice, procedural memory is best applied cautiously — let users review and approve prompt changes rather than having the agent silently rewrite its own behavior.
+
+## Full Architecture: Combining All Memory Layers
+
+Putting it all together — a retrieval agent with all four memory layers:
+
+```{mermaid}
+graph TD
+    subgraph Input["Input"]
+        A["User Query"]
+    end
+
+    subgraph MemoryLoad["Memory Loading"]
+        B["Load User Profile<br/>(semantic memory)"]
+        C["Recall Past Episodes<br/>(episodic memory)"]
+        D["Load System Prompt<br/>(procedural memory)"]
+    end
+
+    subgraph Agent["Agent Loop"]
+        E["Plan Query<br/>(working scratchpad)"]
+        F["Retrieve Documents"]
+        G["Grade & Filter"]
+        H["Update Scratchpad"]
+        I{"Enough<br/>evidence?"}
+        J["Synthesize Answer"]
+    end
+
+    subgraph MemorySave["Memory Saving"]
+        K["Update User Profile"]
+        L["Store Episode"]
+        M["Save Domain Knowledge"]
+    end
+
+    A --> B & C & D
+    B & C & D --> E
+    E --> F --> G --> H --> I
+    I -->|No| E
+    I -->|Yes| J
+    J --> K & L & M
+
+    style Input fill:#dbeafe,stroke:#3b82f6
+    style MemoryLoad fill:#fef3c7,stroke:#f59e0b
+    style Agent fill:#d1fae5,stroke:#10b981
+    style MemorySave fill:#fce7f3,stroke:#ec4899
+```
+
+### Implementation: Multi-Layer Memory Agent
+
+```python
+from typing import TypedDict, Annotated
+from langgraph.graph import StateGraph, START, END
+from langgraph.graph.message import add_messages
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.store.memory import InMemoryStore
+from langgraph.store.base import BaseStore
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+store = InMemoryStore(
+    index={"dims": 1536, "embed": "openai:text-embedding-3-small"}
+)
+
+
+class FullMemoryState(TypedDict):
+    messages: Annotated[list, add_messages]
+    current_query: str
+    retrieved_docs: list[dict]
+    graded_docs: list[dict]
+    reasoning_notes: str
+    iteration: int
+    memory_context: str  # Loaded long-term memory
+
+
+def load_memory(state: FullMemoryState, *, store: BaseStore, config) -> dict:
+    """Load all long-term memory layers at the start of a conversation."""
+    user_id = config["configurable"]["user_id"]
+    query = state["messages"][-1].content
+    context_parts = []
+
+    # 1. Semantic memory: user profile
+    profiles = store.search(namespace=("profiles", user_id))
+    if profiles:
+        context_parts.append(f"## User Profile\n{profiles[0].value}")
+
+    # 2. Episodic memory: relevant past experiences
+    episodes = store.search(
+        namespace=("episodes", user_id), query=query, limit=3
+    )
+    if episodes:
+        context_parts.append("## Relevant Past Experiences")
+        for ep in episodes:
+            context_parts.append(f"- {ep.value.get('content', '')}")
+
+    # 3. Semantic memory: relevant domain knowledge
+    knowledge = store.search(
+        namespace=("knowledge", user_id), query=query, limit=5
+    )
+    if knowledge:
+        context_parts.append("## Known Facts")
+        for k in knowledge:
+            context_parts.append(f"- {k.value.get('fact', '')}")
+
+    return {"memory_context": "\n\n".join(context_parts)}
+
+
+def plan_with_memory(state: FullMemoryState) -> dict:
+    """Plan the search query using loaded memory context."""
+    memory = state.get("memory_context", "")
+    notes = state.get("reasoning_notes", "")
+
+    prompt = (
+        f"You are a research assistant.\n\n{memory}\n\n"
+        f"Previous research notes: {notes}\n\n"
+        f"User question: {state['messages'][-1].content}\n\n"
+        "Plan the best search query. Return only the query."
+    )
+    response = llm.invoke([{"role": "user", "content": prompt}])
+    return {"current_query": response.content.strip()}
+
+
+def retrieve_docs(state: FullMemoryState) -> dict:
+    """Retrieve and accumulate documents in the scratchpad."""
+    docs = vectorstore.similarity_search(state["current_query"], k=5)
+    new_docs = [
+        {"content": d.page_content, "source": d.metadata.get("source", "unknown")}
+        for d in docs
+    ]
+    existing = state.get("retrieved_docs", [])
+    existing.extend(new_docs)
+    return {"retrieved_docs": existing}
+
+
+def grade_docs(state: FullMemoryState) -> dict:
+    """Grade and update working notes."""
+    graded = state.get("graded_docs", [])
+    new_docs = state.get("retrieved_docs", [])[len(graded):]
+
+    for doc in new_docs:
+        response = llm.invoke([
+            {"role": "system", "content": "Reply 'relevant' or 'not_relevant'."},
+            {"role": "user", "content": f"Query: {state['current_query']}\nDoc: {doc['content']}"},
+        ])
+        if "relevant" in response.content.lower():
+            graded.append(doc)
+
+    iteration = state.get("iteration", 0) + 1
+    notes = state.get("reasoning_notes", "")
+    notes += f"\nIteration {iteration}: {len(new_docs)} retrieved, {len(graded)} total relevant."
+    return {"graded_docs": graded, "reasoning_notes": notes, "iteration": iteration}
+
+
+def should_continue(state: FullMemoryState) -> str:
+    if len(state.get("graded_docs", [])) >= 3 or state.get("iteration", 0) >= 3:
+        return "synthesize"
+    return "plan"
+
+
+def synthesize_answer(state: FullMemoryState) -> dict:
+    """Generate final answer using all accumulated context."""
+    memory = state.get("memory_context", "")
+    docs_text = "\n\n".join(
+        f"[{d['source']}]: {d['content']}" for d in state.get("graded_docs", [])
+    )
+    response = llm.invoke([
+        {"role": "system", "content": (
+            f"Answer the question using the evidence and user context below.\n\n"
+            f"{memory}\n\nEvidence:\n{docs_text}"
+        )},
+        {"role": "user", "content": state["messages"][-1].content},
+    ])
+    return {"messages": [response]}
+
+
+def save_memory(state: FullMemoryState, *, store: BaseStore, config) -> dict:
+    """Save learnings to long-term memory after the conversation."""
+    user_id = config["configurable"]["user_id"]
+    notes = state.get("reasoning_notes", "")
+    query = state["messages"][-1].content
+
+    # Save episode
+    store.put(
+        namespace=("episodes", user_id),
+        key=f"ep-{hash(query)}",
+        value={
+            "content": f"User asked about '{query}'. {notes}",
+            "type": "research_episode",
+        },
+    )
+    return {}
+
+
+# Build the full graph
+graph = StateGraph(FullMemoryState)
+graph.add_node("load_memory", load_memory)
+graph.add_node("plan", plan_with_memory)
+graph.add_node("retrieve", retrieve_docs)
+graph.add_node("grade", grade_docs)
+graph.add_node("synthesize", synthesize_answer)
+graph.add_node("save_memory", save_memory)
+
+graph.add_edge(START, "load_memory")
+graph.add_edge("load_memory", "plan")
+graph.add_edge("plan", "retrieve")
+graph.add_edge("retrieve", "grade")
+graph.add_conditional_edges("grade", should_continue, {
+    "synthesize": "synthesize",
+    "plan": "plan",
+})
+graph.add_edge("synthesize", "save_memory")
+graph.add_edge("save_memory", END)
+
+checkpointer = MemorySaver()
+full_memory_agent = graph.compile(checkpointer=checkpointer, store=store)
+
+# Use it
+config = {"configurable": {"thread_id": "session-1", "user_id": "alice"}}
+result = full_memory_agent.invoke(
+    {"messages": [{"role": "user", "content": "What are the latest advances in RAG?"}]},
+    config,
+)
+```
+
+## Memory Storage Backends
+
+### Choosing the Right Backend
+
+Different deployment scenarios call for different storage:
+
+| Backend | Scope | Best For | Persistence |
+|:--------|:------|:---------|:------------|
+| `MemorySaver` / `InMemoryStore` | Development | Local testing, notebooks | Lost on restart |
+| `SqliteSaver` / file-based store | Single server | Small deployments, prototypes | Survives restart |
+| `PostgresSaver` / `AsyncPostgresStore` | Multi-server | Production, multi-process | Full durability |
+| Redis + vector store | Multi-server, low-latency | High-throughput read-heavy workloads | Configurable |
+
+### Production Setup with PostgreSQL
+
+```python
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.store.postgres.aio import AsyncPostgresStore
+
+DB_URI = "postgresql://agent_user:secure_password@db-host:5432/agent_memory"
+
+
+async def setup_production_memory():
+    # Thread-scoped checkpointer (conversation history + scratchpad)
+    checkpointer = AsyncPostgresSaver.from_conn_string(DB_URI)
+    await checkpointer.setup()
+
+    # Cross-thread store (long-term memory)
+    store = AsyncPostgresStore.from_conn_string(DB_URI)
+    await store.setup()
+
+    # Compile graph with both memory layers
+    agent = build_research_graph()
+    return agent.compile(checkpointer=checkpointer, store=store)
+```
+
+## Common Pitfalls and How to Fix Them
+
+| Pitfall | Symptom | Fix |
+|:--------|:--------|:----|
+| **No conversation buffer management** | Token limit exceeded after long sessions | Implement sliding window or summary buffer |
+| **Scratchpad in messages** | LLM distracted by internal bookkeeping | Use separate `TypedDict` state fields |
+| **Over-extracting memories** | Low precision — irrelevant memories flood the prompt | Tune extraction prompts; use schemas to constrain what's stored |
+| **Under-extracting memories** | Low recall — agent never remembers useful context | Run memory extraction in background on all conversations |
+| **No memory namespacing** | User A sees User B's memories | Always namespace by `user_id` at minimum |
+| **InMemoryStore in production** | Memories lost on server restart | Use `AsyncPostgresStore` for durability |
+| **Loading all memories into prompt** | Prompt too long, LLM quality degrades | Use semantic search to load only relevant memories |
+| **Never cleaning up old memories** | Stale or contradictory memories accumulate | Use LangMem's consolidation to merge/invalidate old entries |
+| **Ignoring memory in multi-agent systems** | Agents repeat work or contradict each other | Implement shared `BaseStore` with agent-specific namespaces |
+
+## Conclusion
+
+Memory is what separates a demo agent from a production system. Without it, every conversation starts from zero — the agent never learns the user's preferences, never remembers that a particular data source is unreliable, and never improves its retrieval strategy based on past experience.
+
+**Key takeaways:**
+
+- **Conversation buffers** are the foundation — but you must manage them. Use sliding windows or summary compression to stay within token limits. LangGraph checkpointers handle the persistence automatically.
+- **Working scratchpads** give agents structured memory within a task. Define `TypedDict` state fields for intermediate results, and let the checkpointer persist them across interruptions. Don't store structured task state in the message list.
+- **Episodic vector recall** lets agents learn from experience. Extract episode summaries from completed conversations, embed them in a vector store, and inject relevant episodes as few-shot context in future sessions. Use background processing to avoid latency overhead.
+- **Semantic memory** (profiles + collections) stores facts and knowledge. Profiles for well-structured per-user state, collections for unbounded domain knowledge. Load via direct lookup (profiles) or semantic search (collections).
+- **Cross-agent memory sharing** via LangGraph's `BaseStore` lets specialized agents share insights. Namespace memories by user, organization, and agent role. The store provides the same API for both per-thread and cross-thread access.
+- **Procedural memory** evolves agent behavior over time. Start conservatively — let users approve prompt changes rather than having agents silently rewrite their own instructions.
+- **Choose your backend** based on deployment: `MemorySaver` for development, `PostgresSaver` for production. The API is the same — swap backends without changing agent logic.
+
+Start with a conversation buffer and a checkpointer. Add a working scratchpad when your agent needs multi-step retrieval. Introduce episodic memory when you want cross-session learning. Layer in cross-agent sharing when you move to multi-agent architectures.
+
+
+## References
+
+- Sumers, Yao, Narasimhan, Griffiths, [Cognitive Architectures for Language Agents (CoALA)](https://arxiv.org/abs/2309.02427), 2024 — formalizes the mapping of human memory types (procedural, semantic, episodic) to LLM agent architectures.
+- Harrison Chase, [Memory for Agents](https://blog.langchain.com/memory-for-agents/), LangChain Blog, 2024 — application-specific memory taxonomy and update strategies.
+- LangChain, [Launching Long-Term Memory Support in LangGraph](https://blog.langchain.com/launching-long-term-memory-support-in-langgraph/), LangChain Blog, 2024 — cross-thread memory via BaseStore.
+- LangChain, [LangMem: Long-term Memory in LLM Applications](https://langchain-ai.github.io/langmem/concepts/conceptual_guide/), 2025 — memory managers, prompt optimizers, and memory tools.
+- LangChain, [LangGraph Memory Template](https://github.com/langchain-ai/memory-template), 2024 — reference implementation for patch and insert memory schemas with debounced background processing.
+
+
+## Read More
+
+- Build the agent architectures that use these memory systems with [Building Agents with LangGraph](/posts/agent/Building-Agents-with-LangGraph.html) — covers StateGraph, checkpointers, human-in-the-loop, and subgraphs.
+- Coordinate multiple memory-enabled agents with [Multi-Agent RAG Orchestration Patterns](/posts/agent/Multi-Agent-RAG-Orchestration-Patterns.html) — supervisor, swarm, and hierarchical topologies.
+- Understand the reasoning loop that drives tool selection with [Building a ReAct Agent from Scratch](/posts/agent/Building-a-ReAct-Agent-from-Scratch.html) — the Thought-Action-Observation cycle.
+- Wire agents to retrieval tools with [Tool Use and Function Calling for Retrieval Agents](/posts/agent/Tool-Use-and-Function-Calling-for-Retrieval-Agents.html) — from function calling to MCP.
+- Build the retrieval pipelines these agents query with [Building a RAG Pipeline from Scratch](/posts/rag/Building-a-RAG-Pipeline-from-Scratch.html).
+- Add self-correcting retrieval with [Hybrid and Corrective RAG Architectures](/posts/rag/Hybrid-and-Corrective-RAG-Architectures.html).
+- Scale memory-backed agents in production with [RAG in Production: Scaling, Caching, and Observability](/posts/rag/RAG-in-Production-Scaling-Caching-and-Observability.html).
+- Monitor multi-turn agent behavior with [Observability for Multi-Turn LLM Conversations](/posts/llm/Observability-for-Multi-Turn-LLM-Conversations.html).
+
+<!-- nav-buttons -->
+
+[{{< fa robot >}} Explore Agents](../../pages/agent.qmd){.btn .btn-primary .btn-lg}
+[{{< fa house >}} Home](../../index.qmd){.btn .btn-primary .btn-lg}

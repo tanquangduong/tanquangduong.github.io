@@ -1,0 +1,2356 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.36">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Vectoring AI">
+<meta name="dcterms.date" content="2026-03-05">
+<meta name="keywords" content="FinOps, LLM cost optimization, prompt caching, semantic caching, KV cache, continuous batching, quantization, model routing, GPTCache, vLLM, token optimization, prompt compression, cost monitoring, autoscaling, spot instances">
+<meta name="description" content="From prompt caching to model routing: a practical guide to cutting LLM inference costs by 10x with semantic caching, continuous batching, quantization, prompt optimization, and cost-aware architecture">
+
+<title>FinOps Best Practices for LLM Applications – Vectoring AI</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../..//images/favicon.ico" rel="icon">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dbc92dda8186f57fa2e333fbb71d6a9d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-b981e3f33a8ad6ba97cc0b6118e04959.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/all.css" rel="stylesheet">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/latex-fontsize.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-Q4RQ337R0F"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-Q4RQ337R0F', { 'anonymize_ip': true});
+</script>
+<script async="" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9738638303661485" crossorigin="anonymous"></script>
+<!-- Cookie Consent Banner (GDPR compliant) -->
+<style>
+#cookie-consent-banner {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #1d1d1d !important;
+  color: #ffffff !important;
+  padding: 16px 24px;
+  z-index: 9999;
+  font-size: 14px;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+}
+#cookie-consent-banner p {
+  margin: 0 0 12px 0;
+  line-height: 1.5;
+  color: #ffffff !important;
+}
+#cookie-consent-banner a {
+  color: #78b9ff;
+  text-decoration: underline;
+}
+#cookie-consent-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+#cookie-consent-buttons button {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+#btn-accept-all {
+  background: #3B70FE;
+  color: #fff;
+}
+#btn-accept-essential {
+  background: #555;
+  color: #fff;
+}
+#btn-deny {
+  background: transparent;
+  color: #ccc;
+  border: 1px solid #666 !important;
+}
+</style>
+
+<meta property="og:title" content="FinOps Best Practices for LLM Applications – Vectoring AI">
+<meta property="og:description" content="From prompt caching to model routing: a practical guide to cutting LLM inference costs by 10x with semantic caching, continuous batching, quantization, prompt optimization, and cost-aware architecture">
+<meta property="og:image" content="https://vectoringai.com/images/llm/finops-llm-300px.png">
+<meta property="og:site_name" content="Vectoring AI">
+<meta property="og:image:height" content="200">
+<meta property="og:image:width" content="300">
+<meta name="twitter:title" content="FinOps Best Practices for LLM Applications – Vectoring AI">
+<meta name="twitter:description" content="From prompt caching to model routing: a practical guide to cutting LLM inference costs by 10x with semantic caching, continuous batching, quantization, prompt optimization, and cost-aware architecture">
+<meta name="twitter:image" content="https://vectoringai.com/images/llm/finops-llm-300px.png">
+<meta name="twitter:image-height" content="200">
+<meta name="twitter:image-width" content="300">
+<meta name="twitter:card" content="summary_large_image">
+</head><body class="nav-sidebar docked quarto-light"><div id="cookie-consent-banner">
+  <p>We use cookies to serve personalized ads (Google AdSense) and analyze traffic.
+    You can accept all cookies, accept only essential cookies, or deny non-essential cookies.
+    <a href="../../pages/privacy.html">Privacy Policy</a>
+  </p>
+  <div id="cookie-consent-buttons">
+    <button id="btn-accept-all">Accept All</button>
+    <button id="btn-accept-essential">Essential Only</button>
+    <button id="btn-deny">Deny</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  var consent = localStorage.getItem("cookie_consent");
+
+  function loadAdSense() {
+    if (document.querySelector('script[src*="adsbygoogle"]')) return;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9738638303661485";
+    s.crossOrigin = "anonymous";
+    document.head.appendChild(s);
+  }
+
+  function showBanner() {
+    document.getElementById("cookie-consent-banner").style.display = "block";
+  }
+
+  function hideBanner() {
+    document.getElementById("cookie-consent-banner").style.display = "none";
+  }
+
+  if (consent === "all") {
+    loadAdSense();
+  } else if (consent === "essential" || consent === "denied") {
+    // Do not load AdSense
+  } else {
+    // No choice made yet — show banner, do not load AdSense
+    window.addEventListener("DOMContentLoaded", showBanner);
+  }
+
+  window.addEventListener("DOMContentLoaded", function() {
+    document.getElementById("btn-accept-all").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "all");
+      hideBanner();
+      loadAdSense();
+    });
+    document.getElementById("btn-accept-essential").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "essential");
+      hideBanner();
+    });
+    document.getElementById("btn-deny").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "denied");
+      hideBanner();
+    });
+  });
+})();
+</script>
+<script>
+// Inject missing Open Graph tags that Facebook requires for proper link sharing
+(function () {
+  if (!document.querySelector('meta[property="og:url"]')) {
+    var m = document.createElement("meta");
+    m.setAttribute("property", "og:url");
+    m.setAttribute("content", window.location.href);
+    document.head.appendChild(m);
+  }
+  if (!document.querySelector('meta[property="og:type"]')) {
+    var t = document.createElement("meta");
+    t.setAttribute("property", "og:type");
+    t.setAttribute("content", "article");
+    document.head.appendChild(t);
+  }
+  // Fix double-slash in og:image (site-url trailing slash + /images/...)
+  var ogImg = document.querySelector('meta[property="og:image"]');
+  if (ogImg) {
+    ogImg.setAttribute("content", ogImg.getAttribute("content").replace(/([^:])\/\//g, "$1/"));
+  }
+  var twImg = document.querySelector('meta[name="twitter:image"]');
+  if (twImg) {
+    twImg.setAttribute("content", twImg.getAttribute("content").replace(/([^:])\/\//g, "$1/"));
+  }
+})();
+</script>
+<style>
+.share-widget {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0.8rem 0 1.2rem 0;
+  padding: 0.5rem 0;
+}
+.share-widget .share-icon {
+  width: 20px;
+  height: 20px;
+  fill: #555;
+}
+.share-widget .share-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #555;
+}
+.share-widget .share-divider {
+  width: 1px;
+  height: 22px;
+  background: #ddd;
+}
+.share-widget a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  transition: transform 0.2s, box-shadow 0.2s;
+  text-decoration: none !important;
+}
+.share-widget a:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.share-widget a svg {
+  width: 20px;
+  height: 20px;
+}
+.notebook-widget {
+  margin: 0 0 1rem 0;
+}
+.notebook-widget a {
+  display: inline-block;
+  transition: transform 0.2s;
+}
+.notebook-widget a:hover {
+  transform: scale(1.05);
+}
+</style>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  if (!window.location.pathname.includes("/posts/")) return;
+
+  var rawTitle = document.title;
+  var rawUrl = window.location.href;
+  var title = encodeURIComponent(rawTitle);
+  var url = encodeURIComponent(rawUrl);
+
+  var widget = document.createElement("div");
+  widget.className = "share-widget";
+  widget.innerHTML =
+    '<svg class="share-icon" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>' +
+    '<span class="share-label">Share</span>' +
+    '<div class="share-divider"></div>' +
+    '<a href="https://twitter.com/intent/tweet?text=' + title + '&url=' + url + '" target="_blank" rel="noopener" title="Share on X"><svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>' +
+    '<a href="https://www.facebook.com/sharer/sharer.php?u=' + url + '" target="_blank" rel="noopener" title="Share on Facebook"><svg viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>' +
+    '<a href="https://www.linkedin.com/shareArticle?mini=true&url=' + url + '&title=' + title + '" target="_blank" rel="noopener" title="Share on LinkedIn"><svg viewBox="0 0 24 24" fill="#0A66C2"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>';
+
+  // Desktop: open a centered popup (standard share UX).
+  // Mobile: let the default target="_blank" navigate so the OS can
+  //         route to the native app (Facebook, LinkedIn, etc.).
+  var isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+  if (!isMobile) {
+    widget.querySelectorAll("a").forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        var w = 600, h = 500;
+        var left = (screen.width - w) / 2;
+        var top = (screen.height - h) / 2;
+        window.open(
+          this.href, "share",
+          "width=" + w + ",height=" + h + ",left=" + left + ",top=" + top + ",noopener,noreferrer"
+        );
+      });
+    });
+  }
+
+  // Insert right after the title-block header, before Keywords
+  var header = document.querySelector("header#title-block-header");
+  if (header && header.nextSibling) {
+    header.parentNode.insertBefore(widget, header.nextSibling);
+  }
+
+  // Add Colab / notebook button if the page has a notebook-link element
+  var nbEl = document.getElementById("notebook-link");
+  if (nbEl && nbEl.dataset.url) {
+    var nbWidget = document.createElement("div");
+    nbWidget.className = "notebook-widget";
+    nbWidget.innerHTML =
+      '<a href="' + nbEl.dataset.url + '" target="_blank" rel="noopener" title="Open notebook in Google Colab">' +
+      '<img src="/images/colab.png" alt="Open in Colab" style="height:28px">' +
+      '</a>';
+    // Insert right after the share widget
+    if (widget.nextSibling) {
+      widget.parentNode.insertBefore(nbWidget, widget.nextSibling);
+    } else if (widget.parentNode) {
+      widget.parentNode.appendChild(nbWidget);
+    }
+  }
+});
+</script>
+<script>
+  var link = document.createElement('link');
+  link.rel = 'canonical';
+  var path = window.location.pathname.replace(/index\.html$/, '');
+  link.href = 'https://vectoringai.com' + path;
+  document.head.appendChild(link);
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var ogTitle = document.querySelector('meta[property="og:title"]');
+  var ogDesc = document.querySelector('meta[property="og:description"]');
+  var ogImage = document.querySelector('meta[property="og:image"]');
+  var dcDate = document.querySelector('meta[name="dcterms.date"]');
+
+  if (!ogTitle) return;
+
+  var isArticle = !!dcDate;
+  var jsonld = {
+    "@context": "https://schema.org",
+    "@type": isArticle ? "Article" : "WebPage",
+    "headline": ogTitle.content.replace(/ – Vectoring AI$/, ''),
+    "description": ogDesc ? ogDesc.content : "",
+    "url": window.location.href,
+    "author": {
+      "@type": "Organization",
+      "name": "Vectoring AI",
+      "url": "https://vectoringai.com/pages/about.html"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Vectoring AI",
+      "url": "https://vectoringai.com",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://vectoringai.com/images/favicon_io/android-chrome-512x512.png"
+      }
+    }
+  };
+
+  if (ogImage) jsonld.image = ogImage.content;
+  if (dcDate) jsonld.datePublished = dcDate.content;
+
+  var el = document.createElement('script');
+  el.type = 'application/ld+json';
+  el.textContent = JSON.stringify(jsonld);
+  document.head.appendChild(el);
+});
+</script>
+<script src="../../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="../../styles.css">
+
+
+
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">
+      Vectoring AI
+      </li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../../">Vectoring AI</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://github.com/VectoringAI" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+    <a href="https://www.youtube.com/@vectoringai" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-youtube"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Home</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">AI Engineering</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/llm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">LLMs</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/agent.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Agents</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/rag.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">RAG</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/benchmark.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Benchmarks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/milestone.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Milestones</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/about.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">About</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title"><strong>Sections</strong></h2>
+   
+  <ul class="collapse">
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#understanding-llm-cost-structure" id="toc-understanding-llm-cost-structure" class="nav-link" data-scroll-target="#understanding-llm-cost-structure">1. Understanding LLM Cost Structure</a></li>
+  <li><a href="#prompt-caching-the-biggest-win" id="toc-prompt-caching-the-biggest-win" class="nav-link" data-scroll-target="#prompt-caching-the-biggest-win">2. Prompt Caching: The Biggest Win</a></li>
+  <li><a href="#model-routing-right-model-for-the-right-task" id="toc-model-routing-right-model-for-the-right-task" class="nav-link" data-scroll-target="#model-routing-right-model-for-the-right-task">3. Model Routing: Right Model for the Right Task</a></li>
+  <li><a href="#prompt-optimization-fewer-tokens-lower-cost" id="toc-prompt-optimization-fewer-tokens-lower-cost" class="nav-link" data-scroll-target="#prompt-optimization-fewer-tokens-lower-cost">4. Prompt Optimization: Fewer Tokens, Lower Cost</a></li>
+  <li><a href="#semantic-caching-reuse-answers-for-similar-questions" id="toc-semantic-caching-reuse-answers-for-similar-questions" class="nav-link" data-scroll-target="#semantic-caching-reuse-answers-for-similar-questions">5. Semantic Caching: Reuse Answers for Similar Questions</a></li>
+  <li><a href="#serving-optimization-more-throughput-per-gpu" id="toc-serving-optimization-more-throughput-per-gpu" class="nav-link" data-scroll-target="#serving-optimization-more-throughput-per-gpu">6. Serving Optimization: More Throughput per GPU</a></li>
+  <li><a href="#infrastructure-optimization" id="toc-infrastructure-optimization" class="nav-link" data-scroll-target="#infrastructure-optimization">7. Infrastructure Optimization</a></li>
+  <li><a href="#cost-monitoring-and-alerting" id="toc-cost-monitoring-and-alerting" class="nav-link" data-scroll-target="#cost-monitoring-and-alerting">8. Cost Monitoring and Alerting</a></li>
+  <li><a href="#putting-it-all-together-a-cost-optimized-llm-pipeline" id="toc-putting-it-all-together-a-cost-optimized-llm-pipeline" class="nav-link" data-scroll-target="#putting-it-all-together-a-cost-optimized-llm-pipeline">9. Putting It All Together: A Cost-Optimized LLM Pipeline</a></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  <li><a href="#read-more" id="toc-read-more" class="nav-link" data-scroll-target="#read-more">Read More</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">FinOps Best Practices for LLM Applications</h1>
+</div>
+
+<div>
+  <div class="description">
+    From prompt caching to model routing: a practical guide to cutting LLM inference costs by 10x with semantic caching, continuous batching, quantization, prompt optimization, and cost-aware architecture
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://vectoringai.com/pages/about.html">Vectoring AI</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">March 5, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+<div>
+  <div class="keywords">
+    <div class="block-title">Keywords</div>
+    <p>FinOps, LLM cost optimization, prompt caching, semantic caching, KV cache, continuous batching, quantization, model routing, GPTCache, vLLM, token optimization, prompt compression, cost monitoring, autoscaling, spot instances</p>
+  </div>
+</div>
+
+</header>
+
+
+<div id="notebook-link" data-url="https://colab.research.google.com/github/VectoringAI/ai-engineering/blob/main/llm/finops_best_practices_for_llm_applications.ipynb" style="display:none">
+
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../../images/llm/finops-llm-300px.png" class="img-fluid figure-img" width="300"></p>
+<figcaption>FinOps cost optimization strategies for LLM inference</figcaption>
+</figure>
+</div>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>Running LLMs in production is expensive. A single GPT-4-class API call can cost $0.03–$0.06 per request, and self-hosted models require $15,000–$40,000 GPUs per node. At scale — millions of requests per day — these costs compound rapidly, often dominating the total infrastructure budget.</p>
+<p><strong>FinOps for LLMs</strong> is the discipline of maximizing the value delivered per dollar spent on LLM inference. Unlike traditional cloud FinOps (focused on compute and storage), LLM FinOps targets a unique cost structure: per-token pricing for API providers and per-GPU-hour pricing for self-hosted deployments.</p>
+<p>This article covers the full spectrum of cost optimization techniques — from zero-effort wins like prompt caching to architectural strategies like model routing and semantic caching. Each technique includes implementation code, expected savings, and trade-offs.</p>
+<blockquote class="blockquote">
+<p>For the full serving infrastructure stack, see <a href="../../posts/llm/Scaling-LLM-Serving-for-Enterprise-Production.html">Scaling LLM Serving for Enterprise Production</a>. For model compression techniques, see <a href="../../posts/llm/Quantization-Methods-for-LLMs.html">Quantization Methods for LLMs</a>.</p>
+</blockquote>
+</section>
+<section id="understanding-llm-cost-structure" class="level2">
+<h2 class="anchored" data-anchor-id="understanding-llm-cost-structure">1. Understanding LLM Cost Structure</h2>
+<p>Before optimizing, you need to understand what you’re paying for. LLM costs differ fundamentally between API-based and self-hosted deployments.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    Cost["LLM Cost"] --&gt; API["API-Based&lt;br/&gt;(OpenAI, Anthropic, etc.)"]
+    Cost --&gt; Self["Self-Hosted&lt;br/&gt;(vLLM, TGI, etc.)"]
+
+    API --&gt; InputTok["Input Tokens&lt;br/&gt;$1-15 / MTok"]
+    API --&gt; OutputTok["Output Tokens&lt;br/&gt;$2-75 / MTok"]
+    API --&gt; CacheTok["Cached Tokens&lt;br/&gt;0.1x input price"]
+
+    Self --&gt; GPU["GPU Compute&lt;br/&gt;$1-4 / GPU-hour"]
+    Self --&gt; Mem["GPU Memory&lt;br/&gt;Limits batch size"]
+    Self --&gt; Net["Network &amp; Storage&lt;br/&gt;Model weights, KV cache"]
+
+    style Cost fill:#e74c3c,color:#fff,stroke:#333
+    style API fill:#3498db,color:#fff,stroke:#333
+    style Self fill:#8e44ad,color:#fff,stroke:#333
+    style InputTok fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style OutputTok fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style CacheTok fill:#27ae60,color:#fff,stroke:#333
+    style GPU fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style Mem fill:#ecf0f1,color:#333,stroke:#bdc3c7
+    style Net fill:#ecf0f1,color:#333,stroke:#bdc3c7
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="api-provider-pricing-per-million-tokens" class="level3">
+<h3 class="anchored" data-anchor-id="api-provider-pricing-per-million-tokens">API Provider Pricing (per million tokens)</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 17%">
+<col style="width: 7%">
+<col style="width: 14%">
+<col style="width: 8%">
+<col style="width: 51%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Provider / Model</th>
+<th style="text-align: center;">Input</th>
+<th style="text-align: center;">Cached Input</th>
+<th style="text-align: center;">Output</th>
+<th style="text-align: center;">Cost per 1M Requests (500 tok in, 200 tok out)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>GPT-4o</strong></td>
+<td style="text-align: center;">$2.50</td>
+<td style="text-align: center;">$1.25</td>
+<td style="text-align: center;">$10.00</td>
+<td style="text-align: center;">$3,250</td>
+</tr>
+<tr class="even">
+<td><strong>GPT-4o-mini</strong></td>
+<td style="text-align: center;">$0.15</td>
+<td style="text-align: center;">$0.075</td>
+<td style="text-align: center;">$0.60</td>
+<td style="text-align: center;">$195</td>
+</tr>
+<tr class="odd">
+<td><strong>Claude Sonnet 4</strong></td>
+<td style="text-align: center;">$3.00</td>
+<td style="text-align: center;">$0.30</td>
+<td style="text-align: center;">$15.00</td>
+<td style="text-align: center;">$4,500</td>
+</tr>
+<tr class="even">
+<td><strong>Claude Haiku 3.5</strong></td>
+<td style="text-align: center;">$0.80</td>
+<td style="text-align: center;">$0.08</td>
+<td style="text-align: center;">$4.00</td>
+<td style="text-align: center;">$1,200</td>
+</tr>
+<tr class="odd">
+<td><strong>Llama 3.1 70B (self-hosted)</strong></td>
+<td style="text-align: center;">~$0</td>
+<td style="text-align: center;">~$0</td>
+<td style="text-align: center;">~$0</td>
+<td style="text-align: center;">~$50 (GPU cost only)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key insight:</strong> Output tokens cost 2–5x more than input tokens across all providers. Cached input tokens cost only <strong>10%</strong> of normal input tokens. This asymmetry drives most optimization strategies.</p>
+</section>
+<section id="the-cost-optimization-hierarchy" class="level3">
+<h3 class="anchored" data-anchor-id="the-cost-optimization-hierarchy">The Cost Optimization Hierarchy</h3>
+<p>Not all optimizations are equal. The following hierarchy ranks techniques by ease of implementation and typical savings:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 18%">
+<col style="width: 20%">
+<col style="width: 14%">
+<col style="width: 30%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: center;">Priority</th>
+<th>Technique</th>
+<th style="text-align: center;">Effort</th>
+<th style="text-align: center;">Typical Savings</th>
+<th style="text-align: center;">Section</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">1</td>
+<td>Prompt caching (provider-side)</td>
+<td style="text-align: center;">Zero</td>
+<td style="text-align: center;">50-90% on input tokens</td>
+<td style="text-align: center;">§2</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">2</td>
+<td>Model routing (right-size models)</td>
+<td style="text-align: center;">Low</td>
+<td style="text-align: center;">60-90% overall</td>
+<td style="text-align: center;">§3</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">3</td>
+<td>Prompt optimization (fewer tokens)</td>
+<td style="text-align: center;">Low</td>
+<td style="text-align: center;">20-50% on input tokens</td>
+<td style="text-align: center;">§4</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">4</td>
+<td>Semantic caching</td>
+<td style="text-align: center;">Medium</td>
+<td style="text-align: center;">50-80% on repeated queries</td>
+<td style="text-align: center;">§5</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">5</td>
+<td>Continuous batching &amp; serving optimization</td>
+<td style="text-align: center;">Medium</td>
+<td style="text-align: center;">2-10x throughput</td>
+<td style="text-align: center;">§6</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">6</td>
+<td>Quantization</td>
+<td style="text-align: center;">Medium</td>
+<td style="text-align: center;">1.5-2x throughput</td>
+<td style="text-align: center;">§6</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">7</td>
+<td>Infrastructure optimization (spot, autoscaling)</td>
+<td style="text-align: center;">High</td>
+<td style="text-align: center;">30-70% on compute</td>
+<td style="text-align: center;">§7</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="prompt-caching-the-biggest-win" class="level2">
+<h2 class="anchored" data-anchor-id="prompt-caching-the-biggest-win">2. Prompt Caching: The Biggest Win</h2>
+<p>Prompt caching is the single most impactful cost optimization for LLM applications. It works by reusing the computed KV cache from repeated prompt prefixes, avoiding redundant computation.</p>
+<section id="how-provider-prompt-caching-works" class="level3">
+<h3 class="anchored" data-anchor-id="how-provider-prompt-caching-works">How Provider Prompt Caching Works</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    R1["Request 1&lt;br/&gt;System + Context + Query A"] --&gt;|"Full processing"| LLM["LLM Engine"]
+    LLM --&gt;|"Cache system+context prefix"| Cache["KV Cache Store"]
+    R2["Request 2&lt;br/&gt;System + Context + Query B"] --&gt;|"Cache hit on prefix"| Cache
+    Cache --&gt;|"Skip prefix computation"| LLM2["LLM Engine&lt;br/&gt;Process only Query B"]
+
+    style R1 fill:#e74c3c,color:#fff,stroke:#333
+    style R2 fill:#27ae60,color:#fff,stroke:#333
+    style LLM fill:#3498db,color:#fff,stroke:#333
+    style LLM2 fill:#3498db,color:#fff,stroke:#333
+    style Cache fill:#f39c12,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>All major providers now support automatic prompt caching:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 14%">
+<col style="width: 17%">
+<col style="width: 17%">
+<col style="width: 16%">
+<col style="width: 32%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Provider</th>
+<th style="text-align: center;">Activation</th>
+<th style="text-align: center;">Min Tokens</th>
+<th style="text-align: center;">Cache TTL</th>
+<th style="text-align: center;">Input Cost Reduction</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>OpenAI</strong></td>
+<td style="text-align: center;">Automatic</td>
+<td style="text-align: center;">1,024</td>
+<td style="text-align: center;">5-10 min (up to 1 hr)</td>
+<td style="text-align: center;">50%</td>
+</tr>
+<tr class="even">
+<td><strong>Anthropic</strong></td>
+<td style="text-align: center;">Automatic or explicit</td>
+<td style="text-align: center;">1,024-4,096</td>
+<td style="text-align: center;">5 min (up to 1 hr)</td>
+<td style="text-align: center;">90%</td>
+</tr>
+<tr class="odd">
+<td><strong>vLLM (self-hosted)</strong></td>
+<td style="text-align: center;"><code>--enable-prefix-caching</code></td>
+<td style="text-align: center;">None</td>
+<td style="text-align: center;">In-memory</td>
+<td style="text-align: center;">Reduced TTFT</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="openai-prompt-caching" class="level3">
+<h3 class="anchored" data-anchor-id="openai-prompt-caching">OpenAI Prompt Caching</h3>
+<p>OpenAI caching is fully automatic — no code changes required. Structure your prompt with static content first:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> openai <span class="im">import</span> OpenAI</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> OpenAI()</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Static system prompt + context at the beginning (cacheable)</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Dynamic user query at the end</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> client.chat.completions.create(</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span><span class="st">"gpt-4o"</span>,</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    messages<span class="op">=</span>[</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>        {</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>            <span class="st">"role"</span>: <span class="st">"system"</span>,</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>            <span class="st">"content"</span>: LONG_SYSTEM_PROMPT  <span class="co"># 2000+ tokens, cached automatically</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>        },</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>        {</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>            <span class="st">"role"</span>: <span class="st">"user"</span>,</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>            <span class="st">"content"</span>: [</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>                {</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"type"</span>: <span class="st">"text"</span>,</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"text"</span>: LARGE_CONTEXT_DOCUMENT  <span class="co"># Cached across requests</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>                }</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>            ]</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>        },</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>        {</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>            <span class="st">"role"</span>: <span class="st">"user"</span>,</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>            <span class="st">"content"</span>: user_query  <span class="co"># Only this varies per request</span></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>        }</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>    ]</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a><span class="co"># Check cache utilization</span></span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>usage <span class="op">=</span> response.usage</span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>cached <span class="op">=</span> usage.prompt_tokens_details.cached_tokens</span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>total_input <span class="op">=</span> usage.prompt_tokens</span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Cache hit: </span><span class="sc">{</span>cached<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span>total_input<span class="sc">}</span><span class="ss"> tokens (</span><span class="sc">{</span>cached<span class="op">/</span>total_input<span class="op">*</span><span class="dv">100</span><span class="sc">:.0f}</span><span class="ss">%)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="anthropic-prompt-caching" class="level3">
+<h3 class="anchored" data-anchor-id="anthropic-prompt-caching">Anthropic Prompt Caching</h3>
+<p>Anthropic’s caching supports both automatic and explicit modes. Explicit mode gives finer control:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> anthropic</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> anthropic.Anthropic()</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Automatic caching: just add cache_control at the top level</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> client.messages.create(</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span><span class="st">"claude-sonnet-4-20250514"</span>,</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    max_tokens<span class="op">=</span><span class="dv">1024</span>,</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    cache_control<span class="op">=</span>{<span class="st">"type"</span>: <span class="st">"ephemeral"</span>},  <span class="co"># Auto-cache last block</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    system<span class="op">=</span><span class="st">"You are a helpful legal assistant specializing in contract review."</span>,</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    messages<span class="op">=</span>[</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: LARGE_CONTRACT_TEXT},</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"assistant"</span>, <span class="st">"content"</span>: <span class="st">"I've reviewed the contract. What questions do you have?"</span>},</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"What are the termination clauses?"</span>}</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    ]</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="co"># Explicit caching: mark specific blocks</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> client.messages.create(</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span><span class="st">"claude-sonnet-4-20250514"</span>,</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    max_tokens<span class="op">=</span><span class="dv">1024</span>,</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>    system<span class="op">=</span>[</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>        {</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>            <span class="st">"type"</span>: <span class="st">"text"</span>,</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>            <span class="st">"text"</span>: LONG_INSTRUCTIONS,</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>            <span class="st">"cache_control"</span>: {<span class="st">"type"</span>: <span class="st">"ephemeral"</span>}  <span class="co"># Cache this block</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>        }</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>    ],</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    messages<span class="op">=</span>[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: user_query}]</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a><span class="co"># Monitor cache performance</span></span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Cache read: </span><span class="sc">{</span>response<span class="sc">.</span>usage<span class="sc">.</span>cache_read_input_tokens<span class="sc">}</span><span class="ss"> tokens"</span>)</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Cache write: </span><span class="sc">{</span>response<span class="sc">.</span>usage<span class="sc">.</span>cache_creation_input_tokens<span class="sc">}</span><span class="ss"> tokens"</span>)</span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Uncached: </span><span class="sc">{</span>response<span class="sc">.</span>usage<span class="sc">.</span>input_tokens<span class="sc">}</span><span class="ss"> tokens"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="vllm-automatic-prefix-caching-self-hosted" class="level3">
+<h3 class="anchored" data-anchor-id="vllm-automatic-prefix-caching-self-hosted">vLLM Automatic Prefix Caching (Self-Hosted)</h3>
+<p>For self-hosted deployments, vLLM’s Automatic Prefix Caching (APC) eliminates redundant prefill computation:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Enable prefix caching — single flag</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">vllm</span> serve meta-llama/Llama-3.1-8B-Instruct <span class="dt">\</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--enable-prefix-caching</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>APC is particularly effective for:</p>
+<ul>
+<li><strong>Long document QA:</strong> Same document queried repeatedly with different questions</li>
+<li><strong>Multi-turn chat:</strong> Each turn reuses the conversation prefix</li>
+<li><strong>Shared system prompts:</strong> All users share the same instruction prefix</li>
+</ul>
+</section>
+<section id="prompt-structure-for-maximum-cache-hits" class="level3">
+<h3 class="anchored" data-anchor-id="prompt-structure-for-maximum-cache-hits">Prompt Structure for Maximum Cache Hits</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># BAD: Dynamic content at the beginning breaks the cache</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>messages <span class="op">=</span> [</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"role"</span>: <span class="st">"system"</span>, <span class="st">"content"</span>: <span class="ss">f"Today is </span><span class="sc">{</span>datetime<span class="sc">.</span>now()<span class="sc">}</span><span class="ss">. You are a helpful assistant."</span>},</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: document <span class="op">+</span> <span class="st">"</span><span class="ch">\n\n</span><span class="st">"</span> <span class="op">+</span> question}</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="co"># GOOD: Static content first, dynamic content last</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>messages <span class="op">=</span> [</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"role"</span>: <span class="st">"system"</span>, <span class="st">"content"</span>: <span class="st">"You are a helpful assistant."</span>},  <span class="co"># Stable prefix</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: document},                          <span class="co"># Cached document</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: question}                           <span class="co"># Only this changes</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="model-routing-right-model-for-the-right-task" class="level2">
+<h2 class="anchored" data-anchor-id="model-routing-right-model-for-the-right-task">3. Model Routing: Right Model for the Right Task</h2>
+<p>Not every request needs the most powerful model. <strong>Model routing</strong> directs each request to the cheapest model that can handle it effectively — often saving 60-90%.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    Req["Incoming Request"] --&gt; Router["Model Router&lt;br/&gt;Classify complexity"]
+    Router --&gt;|"Simple: facts, formatting"| Small["Small Model&lt;br/&gt;GPT-4o-mini / Haiku&lt;br/&gt;$0.15-0.80 / MTok"]
+    Router --&gt;|"Medium: analysis, summarization"| Med["Medium Model&lt;br/&gt;GPT-4o / Sonnet&lt;br/&gt;$2.50-3.00 / MTok"]
+    Router --&gt;|"Complex: reasoning, code"| Large["Large Model&lt;br/&gt;GPT-4o / Opus&lt;br/&gt;$10-15 / MTok"]
+
+    Small --&gt; Resp["Response"]
+    Med --&gt; Resp
+    Large --&gt; Resp
+
+    style Req fill:#3498db,color:#fff,stroke:#333
+    style Router fill:#e67e22,color:#fff,stroke:#333
+    style Small fill:#27ae60,color:#fff,stroke:#333
+    style Med fill:#f39c12,color:#fff,stroke:#333
+    style Large fill:#e74c3c,color:#fff,stroke:#333
+    style Resp fill:#ecf0f1,color:#333,stroke:#bdc3c7
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="implementing-a-simple-model-router" class="level3">
+<h3 class="anchored" data-anchor-id="implementing-a-simple-model-router">Implementing a Simple Model Router</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> openai <span class="im">import</span> OpenAI</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> OpenAI()</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 1: Use a cheap model to classify request complexity</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> classify_complexity(user_message: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Use a small model to classify the task complexity."""</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> client.chat.completions.create(</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>        model<span class="op">=</span><span class="st">"gpt-4o-mini"</span>,</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>        messages<span class="op">=</span>[</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>            {</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>                <span class="st">"role"</span>: <span class="st">"system"</span>,</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>                <span class="st">"content"</span>: (</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"Classify the following user request as 'simple', 'medium', or 'complex'.</span><span class="ch">\n</span><span class="st">"</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"- simple: factual lookups, formatting, translation, simple Q&amp;A</span><span class="ch">\n</span><span class="st">"</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"- medium: summarization, analysis, moderate reasoning</span><span class="ch">\n</span><span class="st">"</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"- complex: multi-step reasoning, code generation, creative writing</span><span class="ch">\n</span><span class="st">"</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"Respond with only one word."</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>                )</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>            },</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>            {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: user_message}</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>        ],</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>        max_tokens<span class="op">=</span><span class="dv">5</span>,</span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>        temperature<span class="op">=</span><span class="dv">0</span></span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> response.choices[<span class="dv">0</span>].message.content.strip().lower()</span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 2: Route to the appropriate model</span></span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>MODEL_MAP <span class="op">=</span> {</span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>    <span class="st">"simple"</span>: <span class="st">"gpt-4o-mini"</span>,</span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a>    <span class="st">"medium"</span>: <span class="st">"gpt-4o"</span>,</span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a>    <span class="st">"complex"</span>: <span class="st">"gpt-4o"</span>,</span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> route_request(user_message: <span class="bu">str</span>, system_prompt: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a>    complexity <span class="op">=</span> classify_complexity(user_message)</span>
+<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a>    model <span class="op">=</span> MODEL_MAP.get(complexity, <span class="st">"gpt-4o-mini"</span>)</span>
+<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> client.chat.completions.create(</span>
+<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a>        model<span class="op">=</span>model,</span>
+<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a>        messages<span class="op">=</span>[</span>
+<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a>            {<span class="st">"role"</span>: <span class="st">"system"</span>, <span class="st">"content"</span>: system_prompt},</span>
+<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a>            {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: user_message}</span>
+<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a>        ]</span>
+<span id="cb5-45"><a href="#cb5-45" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> response.choices[<span class="dv">0</span>].message.content</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="cost-impact-of-model-routing" class="level3">
+<h3 class="anchored" data-anchor-id="cost-impact-of-model-routing">Cost Impact of Model Routing</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 19%">
+<col style="width: 45%">
+<col style="width: 21%">
+<col style="width: 13%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: center;">Traffic Mix</th>
+<th style="text-align: center;">Without Routing (all GPT-4o)</th>
+<th style="text-align: center;">With Routing</th>
+<th style="text-align: center;">Savings</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">70% simple, 20% medium, 10% complex</td>
+<td style="text-align: center;">$3,250 / 1M req</td>
+<td style="text-align: center;">$650 / 1M req</td>
+<td style="text-align: center;"><strong>80%</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">50% simple, 30% medium, 20% complex</td>
+<td style="text-align: center;">$3,250 / 1M req</td>
+<td style="text-align: center;">$1,175 / 1M req</td>
+<td style="text-align: center;"><strong>64%</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">20% simple, 40% medium, 40% complex</td>
+<td style="text-align: center;">$3,250 / 1M req</td>
+<td style="text-align: center;">$2,210 / 1M req</td>
+<td style="text-align: center;"><strong>32%</strong></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="cascade-pattern-try-small-first-escalate-on-failure" class="level3">
+<h3 class="anchored" data-anchor-id="cascade-pattern-try-small-first-escalate-on-failure">Cascade Pattern: Try Small First, Escalate on Failure</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> json</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> cascade_request(user_message: <span class="bu">str</span>, system_prompt: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Try the cheapest model first; escalate if quality is low."""</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Try small model first</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> client.chat.completions.create(</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>        model<span class="op">=</span><span class="st">"gpt-4o-mini"</span>,</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>        messages<span class="op">=</span>[</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>            {<span class="st">"role"</span>: <span class="st">"system"</span>, <span class="st">"content"</span>: system_prompt},</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>            {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: user_message}</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>        ]</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>    answer <span class="op">=</span> response.choices[<span class="dv">0</span>].message.content</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Self-check: ask the same small model if the answer is confident</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>    check <span class="op">=</span> client.chat.completions.create(</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>        model<span class="op">=</span><span class="st">"gpt-4o-mini"</span>,</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>        messages<span class="op">=</span>[</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>            {</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>                <span class="st">"role"</span>: <span class="st">"system"</span>,</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>                <span class="st">"content"</span>: <span class="st">"Rate the confidence of this answer: 'high' or 'low'. Respond with one word."</span></span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>            },</span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>            {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="ss">f"Question: </span><span class="sc">{</span>user_message<span class="sc">}</span><span class="ch">\n</span><span class="ss">Answer: </span><span class="sc">{</span>answer<span class="sc">}</span><span class="ss">"</span>}</span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>        ],</span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>        max_tokens<span class="op">=</span><span class="dv">5</span></span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="st">"low"</span> <span class="kw">in</span> check.choices[<span class="dv">0</span>].message.content.lower():</span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Escalate to larger model</span></span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a>        response <span class="op">=</span> client.chat.completions.create(</span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>            model<span class="op">=</span><span class="st">"gpt-4o"</span>,</span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a>            messages<span class="op">=</span>[</span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a>                {<span class="st">"role"</span>: <span class="st">"system"</span>, <span class="st">"content"</span>: system_prompt},</span>
+<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a>                {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: user_message}</span>
+<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a>            ]</span>
+<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a>        answer <span class="op">=</span> response.choices[<span class="dv">0</span>].message.content</span>
+<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> answer</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="prompt-optimization-fewer-tokens-lower-cost" class="level2">
+<h2 class="anchored" data-anchor-id="prompt-optimization-fewer-tokens-lower-cost">4. Prompt Optimization: Fewer Tokens, Lower Cost</h2>
+<p>Every token in your prompt costs money. Reducing prompt length directly reduces costs — and often improves latency too.</p>
+<section id="token-saving-techniques" class="level3">
+<h3 class="anchored" data-anchor-id="token-saving-techniques">Token-Saving Techniques</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 18%">
+<col style="width: 16%">
+<col style="width: 39%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Technique</th>
+<th style="text-align: center;">Before</th>
+<th style="text-align: center;">After</th>
+<th style="text-align: center;">Token Reduction</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Remove verbose instructions</strong></td>
+<td style="text-align: center;">“Please provide a detailed answer to the following question…”</td>
+<td style="text-align: center;">“Answer:”</td>
+<td style="text-align: center;">~80%</td>
+</tr>
+<tr class="even">
+<td><strong>Use abbreviations in system prompt</strong></td>
+<td style="text-align: center;">“You are a helpful assistant that specializes in…”</td>
+<td style="text-align: center;">“You are a [domain] expert.”</td>
+<td style="text-align: center;">~50%</td>
+</tr>
+<tr class="odd">
+<td><strong>Structured output</strong></td>
+<td style="text-align: center;">“Return the data as a JSON with fields name, age, city”</td>
+<td style="text-align: center;">JSON schema in <code>response_format</code></td>
+<td style="text-align: center;">~40%</td>
+</tr>
+<tr class="even">
+<td><strong>Few-shot → zero-shot</strong></td>
+<td style="text-align: center;">5 examples × 200 tokens = 1000 tokens</td>
+<td style="text-align: center;">Clear instruction only</td>
+<td style="text-align: center;">~90%</td>
+</tr>
+<tr class="odd">
+<td><strong>Summarize context</strong></td>
+<td style="text-align: center;">Full 10,000-token document</td>
+<td style="text-align: center;">Pre-summarized 2,000-token version</td>
+<td style="text-align: center;">~80%</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="output-token-control" class="level3">
+<h3 class="anchored" data-anchor-id="output-token-control">Output Token Control</h3>
+<p>Since output tokens cost 2-5x more than input tokens, limiting output length is critical:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> client.chat.completions.create(</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span><span class="st">"gpt-4o"</span>,</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    messages<span class="op">=</span>[</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>        {</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>            <span class="st">"role"</span>: <span class="st">"system"</span>,</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>            <span class="st">"content"</span>: <span class="st">"Answer concisely in 1-2 sentences. No preamble."</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>        },</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>        {<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: user_query}</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    ],</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    max_tokens<span class="op">=</span><span class="dv">150</span>,  <span class="co"># Hard cap on output tokens</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    temperature<span class="op">=</span><span class="dv">0</span>    <span class="co"># Deterministic = shorter, more focused</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="context-window-management-for-multi-turn-chat" class="level3">
+<h3 class="anchored" data-anchor-id="context-window-management-for-multi-turn-chat">Context Window Management for Multi-Turn Chat</h3>
+<p>Long conversations accumulate tokens rapidly. Manage context to avoid runaway costs:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> manage_conversation_context(</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    messages: <span class="bu">list</span>[<span class="bu">dict</span>],</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    max_context_tokens: <span class="bu">int</span> <span class="op">=</span> <span class="dv">4000</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>) <span class="op">-&gt;</span> <span class="bu">list</span>[<span class="bu">dict</span>]:</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Keep conversation within budget by summarizing old messages."""</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    <span class="im">import</span> tiktoken</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    enc <span class="op">=</span> tiktoken.encoding_for_model(<span class="st">"gpt-4o"</span>)</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Count current tokens</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>    total_tokens <span class="op">=</span> <span class="bu">sum</span>(<span class="bu">len</span>(enc.encode(m[<span class="st">"content"</span>])) <span class="cf">for</span> m <span class="kw">in</span> messages)</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> total_tokens <span class="op">&lt;=</span> max_context_tokens:</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> messages</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Keep system prompt + last N messages, summarize the rest</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>    system_msg <span class="op">=</span> messages[<span class="dv">0</span>]  <span class="co"># Always keep system prompt</span></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>    recent_messages <span class="op">=</span> messages[<span class="op">-</span><span class="dv">4</span>:]  <span class="co"># Keep last 2 turns</span></span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Summarize older messages</span></span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>    old_messages <span class="op">=</span> messages[<span class="dv">1</span>:<span class="op">-</span><span class="dv">4</span>]</span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> old_messages:</span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>        summary_text <span class="op">=</span> <span class="st">"</span><span class="ch">\n</span><span class="st">"</span>.join(</span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>            <span class="ss">f"</span><span class="sc">{</span>m[<span class="st">'role'</span>]<span class="sc">}</span><span class="ss">: </span><span class="sc">{</span>m[<span class="st">'content'</span>][:<span class="dv">200</span>]<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> m <span class="kw">in</span> old_messages</span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>        summary <span class="op">=</span> client.chat.completions.create(</span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>            model<span class="op">=</span><span class="st">"gpt-4o-mini"</span>,  <span class="co"># Use cheap model for summarization</span></span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>            messages<span class="op">=</span>[{</span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>                <span class="st">"role"</span>: <span class="st">"user"</span>,</span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>                <span class="st">"content"</span>: <span class="ss">f"Summarize this conversation in 2-3 sentences:</span><span class="ch">\n</span><span class="sc">{</span>summary_text<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a>            }],</span>
+<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a>            max_tokens<span class="op">=</span><span class="dv">150</span></span>
+<span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a>        ).choices[<span class="dv">0</span>].message.content</span>
+<span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> [</span>
+<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a>            system_msg,</span>
+<span id="cb8-36"><a href="#cb8-36" aria-hidden="true" tabindex="-1"></a>            {<span class="st">"role"</span>: <span class="st">"system"</span>, <span class="st">"content"</span>: <span class="ss">f"Previous conversation summary: </span><span class="sc">{</span>summary<span class="sc">}</span><span class="ss">"</span>},</span>
+<span id="cb8-37"><a href="#cb8-37" aria-hidden="true" tabindex="-1"></a>            <span class="op">*</span>recent_messages</span>
+<span id="cb8-38"><a href="#cb8-38" aria-hidden="true" tabindex="-1"></a>        ]</span>
+<span id="cb8-39"><a href="#cb8-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-40"><a href="#cb8-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> [system_msg, <span class="op">*</span>recent_messages]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="semantic-caching-reuse-answers-for-similar-questions" class="level2">
+<h2 class="anchored" data-anchor-id="semantic-caching-reuse-answers-for-similar-questions">5. Semantic Caching: Reuse Answers for Similar Questions</h2>
+<p>While prompt caching reuses computation for identical prefixes, <strong>semantic caching</strong> goes further — it returns cached answers for <em>semantically similar</em> questions, completely avoiding LLM calls.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    Q["User Query"] --&gt; Embed["Generate Embedding"]
+    Embed --&gt; Search["Vector Similarity Search"]
+    Search --&gt;|"Similar query found&lt;br/&gt;(distance &lt; threshold)"| Hit["Cache Hit&lt;br/&gt;Return cached answer"]
+    Search --&gt;|"No similar query"| Miss["Cache Miss&lt;br/&gt;Call LLM"]
+    Miss --&gt; Store["Store query + answer&lt;br/&gt;in vector DB"]
+    Store --&gt; Resp["Return answer"]
+    Hit --&gt; Resp
+
+    style Q fill:#3498db,color:#fff,stroke:#333
+    style Embed fill:#9b59b6,color:#fff,stroke:#333
+    style Search fill:#e67e22,color:#fff,stroke:#333
+    style Hit fill:#27ae60,color:#fff,stroke:#333
+    style Miss fill:#e74c3c,color:#fff,stroke:#333
+    style Store fill:#f39c12,color:#fff,stroke:#333
+    style Resp fill:#ecf0f1,color:#333,stroke:#bdc3c7
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="gptcache-open-source-semantic-cache" class="level3">
+<h3 class="anchored" data-anchor-id="gptcache-open-source-semantic-cache">GPTCache: Open-Source Semantic Cache</h3>
+<p>GPTCache is a dedicated library for building semantic caches for LLM queries. It uses embedding models and vector stores to find similar past queries:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> gptcache <span class="im">import</span> cache</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> gptcache.adapter <span class="im">import</span> openai</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> gptcache.embedding <span class="im">import</span> Onnx</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> gptcache.manager <span class="im">import</span> CacheBase, VectorBase, get_data_manager</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> gptcache.similarity_evaluation.distance <span class="im">import</span> SearchDistanceEvaluation</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Initialize embedding model</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>onnx <span class="op">=</span> Onnx()</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Set up cache storage (SQLite) + vector store (FAISS)</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>data_manager <span class="op">=</span> get_data_manager(</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>    CacheBase(<span class="st">"sqlite"</span>),</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>    VectorBase(<span class="st">"faiss"</span>, dimension<span class="op">=</span>onnx.dimension)</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Initialize cache with semantic similarity</span></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>cache.init(</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>    embedding_func<span class="op">=</span>onnx.to_embeddings,</span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>    data_manager<span class="op">=</span>data_manager,</span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>    similarity_evaluation<span class="op">=</span>SearchDistanceEvaluation()</span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>cache.set_openai_key()</span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a><span class="co"># Now use OpenAI as usual — GPTCache intercepts identical/similar queries</span></span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> openai.ChatCompletion.create(</span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span><span class="st">"gpt-4o-mini"</span>,</span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a>    messages<span class="op">=</span>[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"What is the capital of France?"</span>}]</span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a><span class="co"># Second call with similar query hits cache</span></span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> openai.ChatCompletion.create(</span>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span><span class="st">"gpt-4o-mini"</span>,</span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a>    messages<span class="op">=</span>[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: <span class="st">"Tell me the capital city of France"</span>}]</span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a><span class="co"># ^ This returns the cached answer without calling OpenAI</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="building-a-custom-semantic-cache" class="level3">
+<h3 class="anchored" data-anchor-id="building-a-custom-semantic-cache">Building a Custom Semantic Cache</h3>
+<p>For production use, a custom semantic cache gives more control:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> hashlib</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> openai <span class="im">import</span> OpenAI</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> OpenAI()</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> SemanticCache:</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, similarity_threshold: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.92</span>):</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.threshold <span class="op">=</span> similarity_threshold</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.cache: <span class="bu">list</span>[<span class="bu">dict</span>] <span class="op">=</span> []  <span class="co"># In production, use a vector DB</span></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.exact_cache: <span class="bu">dict</span>[<span class="bu">str</span>, <span class="bu">str</span>] <span class="op">=</span> {}</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _get_embedding(<span class="va">self</span>, text: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">list</span>[<span class="bu">float</span>]:</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>        response <span class="op">=</span> client.embeddings.create(</span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>            model<span class="op">=</span><span class="st">"text-embedding-3-small"</span>,  <span class="co"># $0.02 / 1M tokens</span></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>            <span class="bu">input</span><span class="op">=</span>text</span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> response.data[<span class="dv">0</span>].embedding</span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _cosine_similarity(<span class="va">self</span>, a: <span class="bu">list</span>[<span class="bu">float</span>], b: <span class="bu">list</span>[<span class="bu">float</span>]) <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a>        a, b <span class="op">=</span> np.array(a), np.array(b)</span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="bu">float</span>(np.dot(a, b) <span class="op">/</span> (np.linalg.norm(a) <span class="op">*</span> np.linalg.norm(b)))</span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> get(<span class="va">self</span>, query: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span> <span class="op">|</span> <span class="va">None</span>:</span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Check exact match first (free)</span></span>
+<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a>        key <span class="op">=</span> hashlib.sha256(query.encode()).hexdigest()</span>
+<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> key <span class="kw">in</span> <span class="va">self</span>.exact_cache:</span>
+<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="va">self</span>.exact_cache[key]</span>
+<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Check semantic similarity</span></span>
+<span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a>        query_embedding <span class="op">=</span> <span class="va">self</span>._get_embedding(query)</span>
+<span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a>        best_score, best_answer <span class="op">=</span> <span class="fl">0.0</span>, <span class="va">None</span></span>
+<span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> entry <span class="kw">in</span> <span class="va">self</span>.cache:</span>
+<span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a>            score <span class="op">=</span> <span class="va">self</span>._cosine_similarity(query_embedding, entry[<span class="st">"embedding"</span>])</span>
+<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> score <span class="op">&gt;</span> best_score:</span>
+<span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a>                best_score <span class="op">=</span> score</span>
+<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a>                best_answer <span class="op">=</span> entry[<span class="st">"answer"</span>]</span>
+<span id="cb10-39"><a href="#cb10-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-40"><a href="#cb10-40" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> best_score <span class="op">&gt;=</span> <span class="va">self</span>.threshold:</span>
+<span id="cb10-41"><a href="#cb10-41" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> best_answer</span>
+<span id="cb10-42"><a href="#cb10-42" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">None</span></span>
+<span id="cb10-43"><a href="#cb10-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-44"><a href="#cb10-44" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="bu">set</span>(<span class="va">self</span>, query: <span class="bu">str</span>, answer: <span class="bu">str</span>):</span>
+<span id="cb10-45"><a href="#cb10-45" aria-hidden="true" tabindex="-1"></a>        key <span class="op">=</span> hashlib.sha256(query.encode()).hexdigest()</span>
+<span id="cb10-46"><a href="#cb10-46" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.exact_cache[key] <span class="op">=</span> answer</span>
+<span id="cb10-47"><a href="#cb10-47" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.cache.append({</span>
+<span id="cb10-48"><a href="#cb10-48" aria-hidden="true" tabindex="-1"></a>            <span class="st">"query"</span>: query,</span>
+<span id="cb10-49"><a href="#cb10-49" aria-hidden="true" tabindex="-1"></a>            <span class="st">"embedding"</span>: <span class="va">self</span>._get_embedding(query),</span>
+<span id="cb10-50"><a href="#cb10-50" aria-hidden="true" tabindex="-1"></a>            <span class="st">"answer"</span>: answer</span>
+<span id="cb10-51"><a href="#cb10-51" aria-hidden="true" tabindex="-1"></a>        })</span>
+<span id="cb10-52"><a href="#cb10-52" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-53"><a href="#cb10-53" aria-hidden="true" tabindex="-1"></a><span class="co"># Usage</span></span>
+<span id="cb10-54"><a href="#cb10-54" aria-hidden="true" tabindex="-1"></a>sem_cache <span class="op">=</span> SemanticCache(similarity_threshold<span class="op">=</span><span class="fl">0.92</span>)</span>
+<span id="cb10-55"><a href="#cb10-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-56"><a href="#cb10-56" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> cached_completion(query: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb10-57"><a href="#cb10-57" aria-hidden="true" tabindex="-1"></a>    cached <span class="op">=</span> sem_cache.get(query)</span>
+<span id="cb10-58"><a href="#cb10-58" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> cached:</span>
+<span id="cb10-59"><a href="#cb10-59" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> cached  <span class="co"># Free!</span></span>
+<span id="cb10-60"><a href="#cb10-60" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-61"><a href="#cb10-61" aria-hidden="true" tabindex="-1"></a>    response <span class="op">=</span> client.chat.completions.create(</span>
+<span id="cb10-62"><a href="#cb10-62" aria-hidden="true" tabindex="-1"></a>        model<span class="op">=</span><span class="st">"gpt-4o"</span>,</span>
+<span id="cb10-63"><a href="#cb10-63" aria-hidden="true" tabindex="-1"></a>        messages<span class="op">=</span>[{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: query}]</span>
+<span id="cb10-64"><a href="#cb10-64" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb10-65"><a href="#cb10-65" aria-hidden="true" tabindex="-1"></a>    answer <span class="op">=</span> response.choices[<span class="dv">0</span>].message.content</span>
+<span id="cb10-66"><a href="#cb10-66" aria-hidden="true" tabindex="-1"></a>    sem_cache.<span class="bu">set</span>(query, answer)</span>
+<span id="cb10-67"><a href="#cb10-67" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> answer</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="when-semantic-caching-works-best" class="level3">
+<h3 class="anchored" data-anchor-id="when-semantic-caching-works-best">When Semantic Caching Works Best</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Scenario</th>
+<th style="text-align: center;">Cache Hit Rate</th>
+<th style="text-align: center;">Cost Savings</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Customer support FAQ</strong></td>
+<td style="text-align: center;">60-80%</td>
+<td style="text-align: center;">60-80%</td>
+</tr>
+<tr class="even">
+<td><strong>Documentation Q&amp;A</strong></td>
+<td style="text-align: center;">40-60%</td>
+<td style="text-align: center;">40-60%</td>
+</tr>
+<tr class="odd">
+<td><strong>Code explanation</strong></td>
+<td style="text-align: center;">30-50%</td>
+<td style="text-align: center;">30-50%</td>
+</tr>
+<tr class="even">
+<td><strong>Creative writing</strong></td>
+<td style="text-align: center;">5-10%</td>
+<td style="text-align: center;">5-10%</td>
+</tr>
+<tr class="odd">
+<td><strong>Unique analysis per user</strong></td>
+<td style="text-align: center;">&lt;5%</td>
+<td style="text-align: center;">&lt;5%</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Trade-off:</strong> Semantic caching can return stale or slightly mismatched answers. Set the similarity threshold conservatively (0.92+) and implement cache invalidation for time-sensitive data.</p>
+</section>
+</section>
+<section id="serving-optimization-more-throughput-per-gpu" class="level2">
+<h2 class="anchored" data-anchor-id="serving-optimization-more-throughput-per-gpu">6. Serving Optimization: More Throughput per GPU</h2>
+<p>For self-hosted deployments, the cost equation is simple: <strong>cost = GPU-hours / total requests processed</strong>. Maximizing throughput per GPU directly reduces per-request cost.</p>
+<section id="continuous-batching" class="level3">
+<h3 class="anchored" data-anchor-id="continuous-batching">Continuous Batching</h3>
+<p>Static batching wastes GPU cycles while waiting for the longest sequence in a batch to finish. Continuous batching dynamically inserts new requests when others complete — achieving <strong>2-23x throughput improvement</strong>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># vLLM uses continuous batching by default</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="ex">vllm</span> serve meta-llama/Llama-3.1-8B-Instruct</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Tune batch size for your workload</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="ex">vllm</span> serve meta-llama/Llama-3.1-8B-Instruct <span class="dt">\</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">--max-num-seqs</span> 256 <span class="dt">\ </span>       <span class="co"># Max concurrent sequences</span></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    <span class="ex">--max-num-batched-tokens</span> 8192  <span class="co"># Max tokens per batch</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="quantization-fit-more-in-less-memory" class="level3">
+<h3 class="anchored" data-anchor-id="quantization-fit-more-in-less-memory">Quantization: Fit More in Less Memory</h3>
+<p>Quantization reduces model precision, allowing larger batch sizes (more requests per GPU). The throughput gain often exceeds the minor quality loss:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># AWQ 4-bit: ~2x memory savings, minimal quality loss</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="ex">vllm</span> serve TheBloke/Llama-3.1-70B-AWQ <span class="dt">\</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--quantization</span> awq <span class="dt">\</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">--tensor-parallel-size</span> 2  <span class="co"># 2 GPUs instead of 4</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="co"># FP8: ~2x memory savings, near-zero quality loss (Hopper GPUs)</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="ex">vllm</span> serve meta-llama/Llama-3.1-70B-Instruct <span class="dt">\</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">--quantization</span> fp8</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<blockquote class="blockquote">
+<p>For a deep dive into quantization methods, see <a href="../../posts/llm/Quantization-Methods-for-LLMs.html">Quantization Methods for LLMs</a>.</p>
+</blockquote>
+</section>
+<section id="speculative-decoding" class="level3">
+<h3 class="anchored" data-anchor-id="speculative-decoding">Speculative Decoding</h3>
+<p>Use a small draft model to predict multiple tokens, verified in parallel by the main model. This reduces the number of expensive forward passes:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="ex">vllm</span> serve meta-llama/Llama-3.1-70B-Instruct <span class="dt">\</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">--speculative-model</span> meta-llama/Llama-3.2-1B-Instruct <span class="dt">\</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--num-speculative-tokens</span> 5 <span class="dt">\</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">--tensor-parallel-size</span> 4</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="throughput-optimization-summary" class="level3">
+<h3 class="anchored" data-anchor-id="throughput-optimization-summary">Throughput Optimization Summary</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 19%">
+<col style="width: 38%">
+<col style="width: 28%">
+<col style="width: 14%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Technique</th>
+<th style="text-align: center;">Throughput Multiplier</th>
+<th style="text-align: center;">Quality Impact</th>
+<th style="text-align: center;">Effort</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Continuous batching</strong> (vs.&nbsp;static)</td>
+<td style="text-align: center;">2-23x</td>
+<td style="text-align: center;">None</td>
+<td style="text-align: center;">Built-in (vLLM)</td>
+</tr>
+<tr class="even">
+<td><strong>PagedAttention</strong></td>
+<td style="text-align: center;">2-4x</td>
+<td style="text-align: center;">None</td>
+<td style="text-align: center;">Built-in (vLLM)</td>
+</tr>
+<tr class="odd">
+<td><strong>AWQ quantization</strong> (4-bit)</td>
+<td style="text-align: center;">1.5-2x</td>
+<td style="text-align: center;">Minor (&lt;1% degradation)</td>
+<td style="text-align: center;">1 flag</td>
+</tr>
+<tr class="even">
+<td><strong>FP8 quantization</strong></td>
+<td style="text-align: center;">1.5-2x</td>
+<td style="text-align: center;">Negligible</td>
+<td style="text-align: center;">1 flag (Hopper GPUs)</td>
+</tr>
+<tr class="odd">
+<td><strong>Prefix caching</strong></td>
+<td style="text-align: center;">2-5x (shared prefixes)</td>
+<td style="text-align: center;">None</td>
+<td style="text-align: center;">1 flag</td>
+</tr>
+<tr class="even">
+<td><strong>Speculative decoding</strong></td>
+<td style="text-align: center;">1.3-2x</td>
+<td style="text-align: center;">None</td>
+<td style="text-align: center;">Needs draft model</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="infrastructure-optimization" class="level2">
+<h2 class="anchored" data-anchor-id="infrastructure-optimization">7. Infrastructure Optimization</h2>
+<p>Beyond model and prompt optimizations, infrastructure choices significantly impact cost.</p>
+<section id="autoscaling-dont-pay-for-idle-gpus" class="level3">
+<h3 class="anchored" data-anchor-id="autoscaling-dont-pay-for-idle-gpus">Autoscaling: Don’t Pay for Idle GPUs</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph Day["Traffic Pattern"]
+        Morning["Morning&lt;br/&gt;Low traffic"] --&gt; Peak["Peak Hours&lt;br/&gt;High traffic"]
+        Peak --&gt; Evening["Evening&lt;br/&gt;Medium traffic"]
+        Evening --&gt; Night["Night&lt;br/&gt;Minimal traffic"]
+    end
+
+    subgraph Scaling["GPU Allocation"]
+        S1["2 replicas"] --&gt; S2["8 replicas"]
+        S2 --&gt; S3["4 replicas"]
+        S3 --&gt; S4["1 replica"]
+    end
+
+    Morning -.-&gt; S1
+    Peak -.-&gt; S2
+    Evening -.-&gt; S3
+    Night -.-&gt; S4
+
+    style Morning fill:#27ae60,color:#fff,stroke:#333
+    style Peak fill:#e74c3c,color:#fff,stroke:#333
+    style Evening fill:#e67e22,color:#fff,stroke:#333
+    style Night fill:#3498db,color:#fff,stroke:#333
+    style S1 fill:#27ae60,color:#fff,stroke:#333
+    style S2 fill:#e74c3c,color:#fff,stroke:#333
+    style S3 fill:#e67e22,color:#fff,stroke:#333
+    style S4 fill:#3498db,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>Kubernetes HPA for vLLM based on queue depth:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> autoscaling/v2</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="fu">kind</span><span class="kw">:</span><span class="at"> HorizontalPodAutoscaler</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="fu">metadata</span><span class="kw">:</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">name</span><span class="kw">:</span><span class="at"> vllm-hpa</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="fu">spec</span><span class="kw">:</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">scaleTargetRef</span><span class="kw">:</span></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">apiVersion</span><span class="kw">:</span><span class="at"> apps/v1</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">kind</span><span class="kw">:</span><span class="at"> Deployment</span></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">name</span><span class="kw">:</span><span class="at"> vllm-deployment</span></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">minReplicas</span><span class="kw">:</span><span class="at"> </span><span class="dv">1</span><span class="co">       # Scale to zero with KEDA if needed</span></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">maxReplicas</span><span class="kw">:</span><span class="at"> </span><span class="dv">16</span></span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">behavior</span><span class="kw">:</span></span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">scaleUp</span><span class="kw">:</span></span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">stabilizationWindowSeconds</span><span class="kw">:</span><span class="at"> </span><span class="dv">60</span><span class="co">   # React quickly to spikes</span></span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">scaleDown</span><span class="kw">:</span></span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">stabilizationWindowSeconds</span><span class="kw">:</span><span class="at"> </span><span class="dv">300</span><span class="co">  # Cool down slowly</span></span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">metrics</span><span class="kw">:</span></span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="kw">-</span><span class="at"> </span><span class="fu">type</span><span class="kw">:</span><span class="at"> Pods</span></span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">pods</span><span class="kw">:</span></span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">metric</span><span class="kw">:</span></span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">name</span><span class="kw">:</span><span class="at"> vllm_num_requests_waiting</span></span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">target</span><span class="kw">:</span></span>
+<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">type</span><span class="kw">:</span><span class="at"> AverageValue</span></span>
+<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">averageValue</span><span class="kw">:</span><span class="at"> </span><span class="st">"5"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<blockquote class="blockquote">
+<p>For the full Kubernetes orchestration guide, see <a href="../../posts/llm/Scaling-LLM-Serving-for-Enterprise-Production.html">Scaling LLM Serving for Enterprise Production</a>.</p>
+</blockquote>
+</section>
+<section id="spot-preemptible-instances" class="level3">
+<h3 class="anchored" data-anchor-id="spot-preemptible-instances">Spot / Preemptible Instances</h3>
+<p>For fault-tolerant workloads (batch processing, evaluation), spot instances offer 60-70% savings:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th style="text-align: center;">Instance Type</th>
+<th style="text-align: center;">On-Demand (A100 80GB)</th>
+<th style="text-align: center;">Spot Price</th>
+<th style="text-align: center;">Savings</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">AWS p4d.24xlarge</td>
+<td style="text-align: center;">~$32.77/hr</td>
+<td style="text-align: center;">~$10-15/hr</td>
+<td style="text-align: center;"><strong>55-70%</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">GCP a2-highgpu-8g</td>
+<td style="text-align: center;">~$29.39/hr</td>
+<td style="text-align: center;">~$8-12/hr</td>
+<td style="text-align: center;"><strong>60-73%</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">Azure ND96amsr_A100_v4</td>
+<td style="text-align: center;">~$32.77/hr</td>
+<td style="text-align: center;">~$10-15/hr</td>
+<td style="text-align: center;"><strong>55-70%</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key requirement:</strong> Your serving layer must handle preemption gracefully. Use Kubernetes with pod disruption budgets and multi-replica deployments.</p>
+</section>
+<section id="gpu-selection-for-cost-efficiency" class="level3">
+<h3 class="anchored" data-anchor-id="gpu-selection-for-cost-efficiency">GPU Selection for Cost Efficiency</h3>
+<p>Not all GPUs are cost-efficient for inference. Memory bandwidth matters more than raw FLOPS:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 6%">
+<col style="width: 25%">
+<col style="width: 14%">
+<col style="width: 39%">
+<col style="width: 13%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>GPU</th>
+<th style="text-align: center;">$/hr (On-Demand)</th>
+<th style="text-align: center;">Memory BW</th>
+<th style="text-align: center;">Inference $/MTok (8B model)</th>
+<th style="text-align: center;">Best For</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>L4</strong></td>
+<td style="text-align: center;">~$0.80</td>
+<td style="text-align: center;">300 GB/s</td>
+<td style="text-align: center;">$0.005</td>
+<td style="text-align: center;">Budget inference</td>
+</tr>
+<tr class="even">
+<td><strong>L40S</strong></td>
+<td style="text-align: center;">~$1.50</td>
+<td style="text-align: center;">864 GB/s</td>
+<td style="text-align: center;">$0.003</td>
+<td style="text-align: center;">Mid-tier inference</td>
+</tr>
+<tr class="odd">
+<td><strong>A100 80GB</strong></td>
+<td style="text-align: center;">~$4.00</td>
+<td style="text-align: center;">2.0 TB/s</td>
+<td style="text-align: center;">$0.002</td>
+<td style="text-align: center;">Large models</td>
+</tr>
+<tr class="even">
+<td><strong>H100 SXM</strong></td>
+<td style="text-align: center;">~$8.00</td>
+<td style="text-align: center;">3.35 TB/s</td>
+<td style="text-align: center;">$0.001</td>
+<td style="text-align: center;">Maximum throughput</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rule of thumb:</strong> L4s offer the best $/token for small models (≤13B). A100s win for 70B+ models. H100s win at scale when GPU utilization is kept high (&gt;80%).</p>
+</section>
+</section>
+<section id="cost-monitoring-and-alerting" class="level2">
+<h2 class="anchored" data-anchor-id="cost-monitoring-and-alerting">8. Cost Monitoring and Alerting</h2>
+<p>You can’t optimize what you don’t measure. Build observability into your LLM pipeline:</p>
+<section id="key-metrics-to-track" class="level3">
+<h3 class="anchored" data-anchor-id="key-metrics-to-track">Key Metrics to Track</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 32%">
+<col style="width: 36%">
+<col style="width: 32%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th style="text-align: center;">Formula</th>
+<th style="text-align: center;">Target</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Cost per request</strong></td>
+<td style="text-align: center;">Total spend / total requests</td>
+<td style="text-align: center;">&lt; your SLA threshold</td>
+</tr>
+<tr class="even">
+<td><strong>Cost per token</strong></td>
+<td style="text-align: center;">Total spend / total tokens</td>
+<td style="text-align: center;">Trending down</td>
+</tr>
+<tr class="odd">
+<td><strong>Cache hit rate</strong></td>
+<td style="text-align: center;">Cached tokens / total input tokens</td>
+<td style="text-align: center;">&gt; 50%</td>
+</tr>
+<tr class="even">
+<td><strong>Model routing ratio</strong></td>
+<td style="text-align: center;">Cheap model calls / total calls</td>
+<td style="text-align: center;">&gt; 60%</td>
+</tr>
+<tr class="odd">
+<td><strong>GPU utilization</strong></td>
+<td style="text-align: center;">Active GPU time / total GPU time</td>
+<td style="text-align: center;">&gt; 70%</td>
+</tr>
+<tr class="even">
+<td><strong>Tokens per GPU-second</strong></td>
+<td style="text-align: center;">Total tokens / total GPU-seconds</td>
+<td style="text-align: center;">Trending up</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="implementing-cost-tracking" class="level3">
+<h3 class="anchored" data-anchor-id="implementing-cost-tracking">Implementing Cost Tracking</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dataclasses <span class="im">import</span> dataclass, field</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> CostTracker:</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Track LLM costs across your application."""</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Pricing per million tokens (customize per provider)</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>    pricing: <span class="bu">dict</span> <span class="op">=</span> field(default_factory<span class="op">=</span><span class="kw">lambda</span>: {</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>        <span class="st">"gpt-4o"</span>: {<span class="st">"input"</span>: <span class="fl">2.50</span>, <span class="st">"cached"</span>: <span class="fl">1.25</span>, <span class="st">"output"</span>: <span class="fl">10.00</span>},</span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>        <span class="st">"gpt-4o-mini"</span>: {<span class="st">"input"</span>: <span class="fl">0.15</span>, <span class="st">"cached"</span>: <span class="fl">0.075</span>, <span class="st">"output"</span>: <span class="fl">0.60</span>},</span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>    })</span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>    total_cost: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.0</span></span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>    total_requests: <span class="bu">int</span> <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>    cache_hits: <span class="bu">int</span> <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> track(<span class="va">self</span>, model: <span class="bu">str</span>, input_tokens: <span class="bu">int</span>, output_tokens: <span class="bu">int</span>,</span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>              cached_tokens: <span class="bu">int</span> <span class="op">=</span> <span class="dv">0</span>):</span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>        prices <span class="op">=</span> <span class="va">self</span>.pricing.get(model, <span class="va">self</span>.pricing[<span class="st">"gpt-4o-mini"</span>])</span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>        uncached_input <span class="op">=</span> input_tokens <span class="op">-</span> cached_tokens</span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>        cost <span class="op">=</span> (</span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a>            uncached_input <span class="op">*</span> prices[<span class="st">"input"</span>] <span class="op">/</span> <span class="dv">1_000_000</span></span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a>            <span class="op">+</span> cached_tokens <span class="op">*</span> prices[<span class="st">"cached"</span>] <span class="op">/</span> <span class="dv">1_000_000</span></span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a>            <span class="op">+</span> output_tokens <span class="op">*</span> prices[<span class="st">"output"</span>] <span class="op">/</span> <span class="dv">1_000_000</span></span>
+<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.total_cost <span class="op">+=</span> cost</span>
+<span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.total_requests <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> cached_tokens <span class="op">&gt;</span> <span class="dv">0</span>:</span>
+<span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.cache_hits <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb15-31"><a href="#cb15-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-32"><a href="#cb15-32" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> cost</span>
+<span id="cb15-33"><a href="#cb15-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-34"><a href="#cb15-34" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> report(<span class="va">self</span>):</span>
+<span id="cb15-35"><a href="#cb15-35" aria-hidden="true" tabindex="-1"></a>        avg_cost <span class="op">=</span> <span class="va">self</span>.total_cost <span class="op">/</span> <span class="bu">max</span>(<span class="va">self</span>.total_requests, <span class="dv">1</span>)</span>
+<span id="cb15-36"><a href="#cb15-36" aria-hidden="true" tabindex="-1"></a>        hit_rate <span class="op">=</span> <span class="va">self</span>.cache_hits <span class="op">/</span> <span class="bu">max</span>(<span class="va">self</span>.total_requests, <span class="dv">1</span>) <span class="op">*</span> <span class="dv">100</span></span>
+<span id="cb15-37"><a href="#cb15-37" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> {</span>
+<span id="cb15-38"><a href="#cb15-38" aria-hidden="true" tabindex="-1"></a>            <span class="st">"total_cost"</span>: <span class="ss">f"$</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>total_cost<span class="sc">:.4f}</span><span class="ss">"</span>,</span>
+<span id="cb15-39"><a href="#cb15-39" aria-hidden="true" tabindex="-1"></a>            <span class="st">"total_requests"</span>: <span class="va">self</span>.total_requests,</span>
+<span id="cb15-40"><a href="#cb15-40" aria-hidden="true" tabindex="-1"></a>            <span class="st">"avg_cost_per_request"</span>: <span class="ss">f"$</span><span class="sc">{</span>avg_cost<span class="sc">:.6f}</span><span class="ss">"</span>,</span>
+<span id="cb15-41"><a href="#cb15-41" aria-hidden="true" tabindex="-1"></a>            <span class="st">"cache_hit_rate"</span>: <span class="ss">f"</span><span class="sc">{</span>hit_rate<span class="sc">:.1f}</span><span class="ss">%"</span></span>
+<span id="cb15-42"><a href="#cb15-42" aria-hidden="true" tabindex="-1"></a>        }</span>
+<span id="cb15-43"><a href="#cb15-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-44"><a href="#cb15-44" aria-hidden="true" tabindex="-1"></a><span class="co"># Usage</span></span>
+<span id="cb15-45"><a href="#cb15-45" aria-hidden="true" tabindex="-1"></a>tracker <span class="op">=</span> CostTracker()</span>
+<span id="cb15-46"><a href="#cb15-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-47"><a href="#cb15-47" aria-hidden="true" tabindex="-1"></a>response <span class="op">=</span> client.chat.completions.create(model<span class="op">=</span><span class="st">"gpt-4o"</span>, messages<span class="op">=</span>[...])</span>
+<span id="cb15-48"><a href="#cb15-48" aria-hidden="true" tabindex="-1"></a>tracker.track(</span>
+<span id="cb15-49"><a href="#cb15-49" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span><span class="st">"gpt-4o"</span>,</span>
+<span id="cb15-50"><a href="#cb15-50" aria-hidden="true" tabindex="-1"></a>    input_tokens<span class="op">=</span>response.usage.prompt_tokens,</span>
+<span id="cb15-51"><a href="#cb15-51" aria-hidden="true" tabindex="-1"></a>    output_tokens<span class="op">=</span>response.usage.completion_tokens,</span>
+<span id="cb15-52"><a href="#cb15-52" aria-hidden="true" tabindex="-1"></a>    cached_tokens<span class="op">=</span>response.usage.prompt_tokens_details.cached_tokens</span>
+<span id="cb15-53"><a href="#cb15-53" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb15-54"><a href="#cb15-54" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(tracker.report())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="setting-budget-alerts" class="level3">
+<h3 class="anchored" data-anchor-id="setting-budget-alerts">Setting Budget Alerts</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> BudgetGuard:</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Prevent runaway LLM costs."""</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, daily_budget: <span class="bu">float</span> <span class="op">=</span> <span class="fl">100.0</span>):</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.daily_budget <span class="op">=</span> daily_budget</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.daily_spend <span class="op">=</span> <span class="fl">0.0</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> check(<span class="va">self</span>, estimated_cost: <span class="bu">float</span>) <span class="op">-&gt;</span> <span class="bu">bool</span>:</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.daily_spend <span class="op">+</span> estimated_cost <span class="op">&gt;</span> <span class="va">self</span>.daily_budget:</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>            <span class="cf">raise</span> <span class="pp">RuntimeError</span>(</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f"Daily budget exceeded: $</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>daily_spend<span class="sc">:.2f}</span><span class="ss"> / $</span><span class="sc">{</span><span class="va">self</span><span class="sc">.</span>daily_budget<span class="sc">:.2f}</span><span class="ss">"</span></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>            )</span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.daily_spend <span class="op">+=</span> estimated_cost</span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">True</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="putting-it-all-together-a-cost-optimized-llm-pipeline" class="level2">
+<h2 class="anchored" data-anchor-id="putting-it-all-together-a-cost-optimized-llm-pipeline">9. Putting It All Together: A Cost-Optimized LLM Pipeline</h2>
+<p>Here is a reference architecture combining all the techniques:</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    User["User Request"] --&gt; Guard["Budget Guard&lt;br/&gt;Check daily limit"]
+    Guard --&gt; SC["Semantic Cache&lt;br/&gt;Check for similar queries"]
+    SC --&gt;|"Cache hit"| Resp["Response"]
+    SC --&gt;|"Cache miss"| Router["Model Router&lt;br/&gt;Classify complexity"]
+    Router --&gt;|"Simple"| Small["Small Model&lt;br/&gt;gpt-4o-mini"]
+    Router --&gt;|"Complex"| Large["Large Model&lt;br/&gt;gpt-4o"]
+    Small --&gt; PC["Prompt Caching&lt;br/&gt;Reuse prefix KV cache"]
+    Large --&gt; PC
+    PC --&gt; LLM["LLM Inference"]
+    LLM --&gt; Track["Cost Tracker&lt;br/&gt;Log tokens + cost"]
+    Track --&gt; Store["Store in Cache"]
+    Store --&gt; Resp
+
+    style User fill:#3498db,color:#fff,stroke:#333
+    style Guard fill:#e74c3c,color:#fff,stroke:#333
+    style SC fill:#f39c12,color:#fff,stroke:#333
+    style Router fill:#e67e22,color:#fff,stroke:#333
+    style Small fill:#27ae60,color:#fff,stroke:#333
+    style Large fill:#8e44ad,color:#fff,stroke:#333
+    style PC fill:#2980b9,color:#fff,stroke:#333
+    style LLM fill:#3498db,color:#fff,stroke:#333
+    style Track fill:#95a5a6,color:#fff,stroke:#333
+    style Store fill:#f39c12,color:#fff,stroke:#333
+    style Resp fill:#ecf0f1,color:#333,stroke:#bdc3c7
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="expected-combined-savings" class="level3">
+<h3 class="anchored" data-anchor-id="expected-combined-savings">Expected Combined Savings</h3>
+<p>Starting from a baseline of <strong>$10,000/month</strong> on GPT-4o for 3M requests:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th style="text-align: center;">Optimization</th>
+<th style="text-align: center;">Monthly Cost</th>
+<th style="text-align: center;">Savings vs.&nbsp;Baseline</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">Baseline (all GPT-4o, no optimization)</td>
+<td style="text-align: center;">$10,000</td>
+<td style="text-align: center;">—</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">+ Prompt caching (60% hit rate)</td>
+<td style="text-align: center;">$6,400</td>
+<td style="text-align: center;">36%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">+ Model routing (70% to mini)</td>
+<td style="text-align: center;">$2,100</td>
+<td style="text-align: center;">79%</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">+ Semantic caching (40% hit rate)</td>
+<td style="text-align: center;">$1,260</td>
+<td style="text-align: center;">87%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">+ Prompt optimization (30% fewer tokens)</td>
+<td style="text-align: center;">$880</td>
+<td style="text-align: center;"><strong>91%</strong></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="conclusion" class="level2">
+<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
+<p>LLM FinOps is not a single technique — it is a layered strategy where each optimization compounds on the previous:</p>
+<ol type="1">
+<li><strong>Prompt caching</strong> — Free, automatic, and delivers 50-90% savings on repeated prefixes. Structure prompts with static content first.</li>
+<li><strong>Model routing</strong> — Match model capability to task complexity. Most requests don’t need the most powerful model.</li>
+<li><strong>Prompt optimization</strong> — Fewer tokens means lower cost. Control output length, summarize context, eliminate verbosity.</li>
+<li><strong>Semantic caching</strong> — Avoid LLM calls entirely for similar questions. High-value for FAQ and support workloads.</li>
+<li><strong>Serving optimization</strong> — Continuous batching, quantization, and speculative decoding maximize throughput per GPU.</li>
+<li><strong>Infrastructure</strong> — Autoscaling, spot instances, and GPU selection minimize idle compute.</li>
+<li><strong>Monitoring</strong> — Track cost per request, cache hit rates, and model routing ratios to continuously improve.</li>
+</ol>
+<p>The key insight is that <strong>the cheapest LLM call is the one you never make</strong>. Cache aggressively, route intelligently, and monitor relentlessly.</p>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ol type="1">
+<li>OpenAI Prompt Caching Guide: <a href="https://developers.openai.com/api/docs/guides/prompt-caching">https://developers.openai.com/api/docs/guides/prompt-caching</a></li>
+<li>Anthropic Prompt Caching Documentation: <a href="https://platform.claude.com/docs/en/docs/build-with-claude/prompt-caching">https://platform.claude.com/docs/en/docs/build-with-claude/prompt-caching</a></li>
+<li>GPTCache — Semantic Cache for LLM Queries: <a href="https://github.com/zilliztech/GPTCache">https://github.com/zilliztech/GPTCache</a></li>
+<li>vLLM Automatic Prefix Caching: <a href="https://docs.vllm.ai/en/latest/features/automatic_prefix_caching.html">https://docs.vllm.ai/en/latest/features/automatic_prefix_caching.html</a></li>
+<li>Anyscale — How Continuous Batching Enables 23x Throughput: <a href="https://www.anyscale.com/blog/continuous-batching-llm-inference">https://www.anyscale.com/blog/continuous-batching-llm-inference</a></li>
+<li>Kwon, W. et al.&nbsp;(2023). <em>Efficient Memory Management for Large Language Model Serving with PagedAttention</em>. SOSP 2023.</li>
+<li>Yu, G. et al.&nbsp;(2022). <em>Orca: A Distributed Serving System for Transformer-Based Generative Models</em>. OSDI ’22.</li>
+<li>OpenAI Pricing: <a href="https://openai.com/pricing">https://openai.com/pricing</a></li>
+<li>Anthropic Pricing: <a href="https://www.anthropic.com/pricing">https://www.anthropic.com/pricing</a></li>
+<li>FinOps Foundation — AI Cost Management Working Group: <a href="https://www.finops.org/wg/ai-cost-management/">https://www.finops.org/wg/ai-cost-management/</a></li>
+</ol>
+</section>
+<section id="read-more" class="level2">
+<h2 class="anchored" data-anchor-id="read-more">Read More</h2>
+<ul>
+<li><strong>Scale your serving layer:</strong> See <a href="../../posts/llm/Scaling-LLM-Serving-for-Enterprise-Production.html">Scaling LLM Serving for Enterprise Production</a> for Kubernetes orchestration, load balancing, and multi-node deployment</li>
+<li><strong>Compress your models:</strong> See <a href="../../posts/llm/Quantization-Methods-for-LLMs.html">Quantization Methods for LLMs</a> for AWQ, GPTQ, and FP8 quantization to reduce GPU memory and increase throughput</li>
+<li><strong>Protect your endpoints:</strong> See <a href="../../posts/llm/Guardrails-for-LLM-Applications-with-Giskard.html">Guardrails for LLM Applications with Giskard</a> for safety screening that prevents costly misuse</li>
+<li><strong>Optimize decoding:</strong> See <a href="../../posts/llm/Decoding-Methods-for-Text-Generation-with-LLMs.html">Decoding Methods for Text Generation with LLMs</a> for generation strategies that balance quality and token count</li>
+</ul>
+<!-- nav-buttons -->
+<p><a href="../../pages/llm.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-brain" aria-label="brain"></i> Explore LLMs</a> <a href="../../index.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-house" aria-label="house"></i> Home</a></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/vectoringai\.com");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> 2025-2026 Vectoring AI. All rights reserved. | <a href="../../pages/privacy.html">Privacy Policy</a></p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

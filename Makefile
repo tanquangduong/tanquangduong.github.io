@@ -2,7 +2,6 @@
 
 render:
 	quarto render
-	python fix-sitemap.py
 
 publish: render
 	git add .

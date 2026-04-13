@@ -1,0 +1,2354 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.36">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Vectoring AI">
+<meta name="dcterms.date" content="2026-03-01">
+<meta name="keywords" content="pretraining, data collection, web scraping, data preprocessing, tokenization, BPE, Common Crawl, FineWeb, datatrove, trafilatura, PyTorch, Unsloth, small language model, continued pretraining, LoRA, deduplication, filtering">
+<meta name="description" content="End-to-end guide: from web scraping and data collection to preprocessing, tokenization, and pretraining a small language model with PyTorch and Unsloth">
+
+<title>Pre-training LLMs from Scratch – Vectoring AI</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../..//images/favicon.ico" rel="icon">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dbc92dda8186f57fa2e333fbb71d6a9d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-b981e3f33a8ad6ba97cc0b6118e04959.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/all.css" rel="stylesheet">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/latex-fontsize.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-Q4RQ337R0F"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-Q4RQ337R0F', { 'anonymize_ip': true});
+</script>
+<script async="" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9738638303661485" crossorigin="anonymous"></script>
+<!-- Cookie Consent Banner (GDPR compliant) -->
+<style>
+#cookie-consent-banner {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #1d1d1d !important;
+  color: #ffffff !important;
+  padding: 16px 24px;
+  z-index: 9999;
+  font-size: 14px;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+}
+#cookie-consent-banner p {
+  margin: 0 0 12px 0;
+  line-height: 1.5;
+  color: #ffffff !important;
+}
+#cookie-consent-banner a {
+  color: #78b9ff;
+  text-decoration: underline;
+}
+#cookie-consent-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+#cookie-consent-buttons button {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+#btn-accept-all {
+  background: #3B70FE;
+  color: #fff;
+}
+#btn-accept-essential {
+  background: #555;
+  color: #fff;
+}
+#btn-deny {
+  background: transparent;
+  color: #ccc;
+  border: 1px solid #666 !important;
+}
+</style>
+
+<meta property="og:title" content="Pre-training LLMs from Scratch – Vectoring AI">
+<meta property="og:description" content="End-to-end guide: from web scraping and data collection to preprocessing, tokenization, and pretraining a small language model with PyTorch and Unsloth">
+<meta property="og:image" content="https://vectoringai.com/images/llm/training-llm-from-scratch-300px.png">
+<meta property="og:site_name" content="Vectoring AI">
+<meta property="og:image:height" content="200">
+<meta property="og:image:width" content="300">
+<meta name="twitter:title" content="Pre-training LLMs from Scratch – Vectoring AI">
+<meta name="twitter:description" content="End-to-end guide: from web scraping and data collection to preprocessing, tokenization, and pretraining a small language model with PyTorch and Unsloth">
+<meta name="twitter:image" content="https://vectoringai.com/images/llm/training-llm-from-scratch-300px.png">
+<meta name="twitter:image-height" content="200">
+<meta name="twitter:image-width" content="300">
+<meta name="twitter:card" content="summary_large_image">
+</head><body class="nav-sidebar docked quarto-light"><div id="cookie-consent-banner">
+  <p>We use cookies to serve personalized ads (Google AdSense) and analyze traffic.
+    You can accept all cookies, accept only essential cookies, or deny non-essential cookies.
+    <a href="../../pages/privacy.html">Privacy Policy</a>
+  </p>
+  <div id="cookie-consent-buttons">
+    <button id="btn-accept-all">Accept All</button>
+    <button id="btn-accept-essential">Essential Only</button>
+    <button id="btn-deny">Deny</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  var consent = localStorage.getItem("cookie_consent");
+
+  function loadAdSense() {
+    if (document.querySelector('script[src*="adsbygoogle"]')) return;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9738638303661485";
+    s.crossOrigin = "anonymous";
+    document.head.appendChild(s);
+  }
+
+  function showBanner() {
+    document.getElementById("cookie-consent-banner").style.display = "block";
+  }
+
+  function hideBanner() {
+    document.getElementById("cookie-consent-banner").style.display = "none";
+  }
+
+  if (consent === "all") {
+    loadAdSense();
+  } else if (consent === "essential" || consent === "denied") {
+    // Do not load AdSense
+  } else {
+    // No choice made yet — show banner, do not load AdSense
+    window.addEventListener("DOMContentLoaded", showBanner);
+  }
+
+  window.addEventListener("DOMContentLoaded", function() {
+    document.getElementById("btn-accept-all").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "all");
+      hideBanner();
+      loadAdSense();
+    });
+    document.getElementById("btn-accept-essential").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "essential");
+      hideBanner();
+    });
+    document.getElementById("btn-deny").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "denied");
+      hideBanner();
+    });
+  });
+})();
+</script>
+<script>
+// Inject missing Open Graph tags that Facebook requires for proper link sharing
+(function () {
+  if (!document.querySelector('meta[property="og:url"]')) {
+    var m = document.createElement("meta");
+    m.setAttribute("property", "og:url");
+    m.setAttribute("content", window.location.href);
+    document.head.appendChild(m);
+  }
+  if (!document.querySelector('meta[property="og:type"]')) {
+    var t = document.createElement("meta");
+    t.setAttribute("property", "og:type");
+    t.setAttribute("content", "article");
+    document.head.appendChild(t);
+  }
+  // Fix double-slash in og:image (site-url trailing slash + /images/...)
+  var ogImg = document.querySelector('meta[property="og:image"]');
+  if (ogImg) {
+    ogImg.setAttribute("content", ogImg.getAttribute("content").replace(/([^:])\/\//g, "$1/"));
+  }
+  var twImg = document.querySelector('meta[name="twitter:image"]');
+  if (twImg) {
+    twImg.setAttribute("content", twImg.getAttribute("content").replace(/([^:])\/\//g, "$1/"));
+  }
+})();
+</script>
+<style>
+.share-widget {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0.8rem 0 1.2rem 0;
+  padding: 0.5rem 0;
+}
+.share-widget .share-icon {
+  width: 20px;
+  height: 20px;
+  fill: #555;
+}
+.share-widget .share-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #555;
+}
+.share-widget .share-divider {
+  width: 1px;
+  height: 22px;
+  background: #ddd;
+}
+.share-widget a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  transition: transform 0.2s, box-shadow 0.2s;
+  text-decoration: none !important;
+}
+.share-widget a:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.share-widget a svg {
+  width: 20px;
+  height: 20px;
+}
+.notebook-widget {
+  margin: 0 0 1rem 0;
+}
+.notebook-widget a {
+  display: inline-block;
+  transition: transform 0.2s;
+}
+.notebook-widget a:hover {
+  transform: scale(1.05);
+}
+</style>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  if (!window.location.pathname.includes("/posts/")) return;
+
+  var rawTitle = document.title;
+  var rawUrl = window.location.href;
+  var title = encodeURIComponent(rawTitle);
+  var url = encodeURIComponent(rawUrl);
+
+  var widget = document.createElement("div");
+  widget.className = "share-widget";
+  widget.innerHTML =
+    '<svg class="share-icon" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>' +
+    '<span class="share-label">Share</span>' +
+    '<div class="share-divider"></div>' +
+    '<a href="https://twitter.com/intent/tweet?text=' + title + '&url=' + url + '" target="_blank" rel="noopener" title="Share on X"><svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>' +
+    '<a href="https://www.facebook.com/sharer/sharer.php?u=' + url + '" target="_blank" rel="noopener" title="Share on Facebook"><svg viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>' +
+    '<a href="https://www.linkedin.com/shareArticle?mini=true&url=' + url + '&title=' + title + '" target="_blank" rel="noopener" title="Share on LinkedIn"><svg viewBox="0 0 24 24" fill="#0A66C2"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>';
+
+  // Desktop: open a centered popup (standard share UX).
+  // Mobile: let the default target="_blank" navigate so the OS can
+  //         route to the native app (Facebook, LinkedIn, etc.).
+  var isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+  if (!isMobile) {
+    widget.querySelectorAll("a").forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        var w = 600, h = 500;
+        var left = (screen.width - w) / 2;
+        var top = (screen.height - h) / 2;
+        window.open(
+          this.href, "share",
+          "width=" + w + ",height=" + h + ",left=" + left + ",top=" + top + ",noopener,noreferrer"
+        );
+      });
+    });
+  }
+
+  // Insert right after the title-block header, before Keywords
+  var header = document.querySelector("header#title-block-header");
+  if (header && header.nextSibling) {
+    header.parentNode.insertBefore(widget, header.nextSibling);
+  }
+
+  // Add Colab / notebook button if the page has a notebook-link element
+  var nbEl = document.getElementById("notebook-link");
+  if (nbEl && nbEl.dataset.url) {
+    var nbWidget = document.createElement("div");
+    nbWidget.className = "notebook-widget";
+    nbWidget.innerHTML =
+      '<a href="' + nbEl.dataset.url + '" target="_blank" rel="noopener" title="Open notebook in Google Colab">' +
+      '<img src="/images/colab.png" alt="Open in Colab" style="height:28px">' +
+      '</a>';
+    // Insert right after the share widget
+    if (widget.nextSibling) {
+      widget.parentNode.insertBefore(nbWidget, widget.nextSibling);
+    } else if (widget.parentNode) {
+      widget.parentNode.appendChild(nbWidget);
+    }
+  }
+});
+</script>
+<script>
+  var link = document.createElement('link');
+  link.rel = 'canonical';
+  var path = window.location.pathname.replace(/index\.html$/, '');
+  link.href = 'https://vectoringai.com' + path;
+  document.head.appendChild(link);
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var ogTitle = document.querySelector('meta[property="og:title"]');
+  var ogDesc = document.querySelector('meta[property="og:description"]');
+  var ogImage = document.querySelector('meta[property="og:image"]');
+  var dcDate = document.querySelector('meta[name="dcterms.date"]');
+
+  if (!ogTitle) return;
+
+  var isArticle = !!dcDate;
+  var jsonld = {
+    "@context": "https://schema.org",
+    "@type": isArticle ? "Article" : "WebPage",
+    "headline": ogTitle.content.replace(/ – Vectoring AI$/, ''),
+    "description": ogDesc ? ogDesc.content : "",
+    "url": window.location.href,
+    "author": {
+      "@type": "Organization",
+      "name": "Vectoring AI",
+      "url": "https://vectoringai.com/pages/about.html"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Vectoring AI",
+      "url": "https://vectoringai.com",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://vectoringai.com/images/favicon_io/android-chrome-512x512.png"
+      }
+    }
+  };
+
+  if (ogImage) jsonld.image = ogImage.content;
+  if (dcDate) jsonld.datePublished = dcDate.content;
+
+  var el = document.createElement('script');
+  el.type = 'application/ld+json';
+  el.textContent = JSON.stringify(jsonld);
+  document.head.appendChild(el);
+});
+</script>
+<script src="../../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="../../styles.css">
+
+
+
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">
+      Vectoring AI
+      </li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../../">Vectoring AI</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://github.com/VectoringAI" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+    <a href="https://www.youtube.com/@vectoringai" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-youtube"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Home</span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">AI Engineering</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/llm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">LLMs</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/agent.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Agents</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/rag.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">RAG</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/benchmark.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Benchmarks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/milestone.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Milestones</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/about.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">About</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title"><strong>Sections</strong></h2>
+   
+  <ul class="collapse">
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#the-end-to-end-training-pipeline" id="toc-the-end-to-end-training-pipeline" class="nav-link" data-scroll-target="#the-end-to-end-training-pipeline">The End-to-End Training Pipeline</a></li>
+  <li><a href="#data-collection-and-web-scraping" id="toc-data-collection-and-web-scraping" class="nav-link" data-scroll-target="#data-collection-and-web-scraping">1. Data Collection and Web Scraping</a></li>
+  <li><a href="#data-cleaning-and-filtering" id="toc-data-cleaning-and-filtering" class="nav-link" data-scroll-target="#data-cleaning-and-filtering">2. Data Cleaning and Filtering</a></li>
+  <li><a href="#deduplication" id="toc-deduplication" class="nav-link" data-scroll-target="#deduplication">3. Deduplication</a></li>
+  <li><a href="#tokenization" id="toc-tokenization" class="nav-link" data-scroll-target="#tokenization">4. Tokenization</a></li>
+  <li><a href="#pretraining-from-scratch-with-pytorch" id="toc-pretraining-from-scratch-with-pytorch" class="nav-link" data-scroll-target="#pretraining-from-scratch-with-pytorch">5. Pretraining from Scratch with PyTorch</a></li>
+  <li><a href="#continued-pretraining-with-unsloth" id="toc-continued-pretraining-with-unsloth" class="nav-link" data-scroll-target="#continued-pretraining-with-unsloth">6. Continued Pretraining with Unsloth</a></li>
+  <li><a href="#data-mixtures-and-multi-stage-training" id="toc-data-mixtures-and-multi-stage-training" class="nav-link" data-scroll-target="#data-mixtures-and-multi-stage-training">7. Data Mixtures and Multi-Stage Training</a></li>
+  <li><a href="#comparison-from-scratch-vs-continued-pretraining" id="toc-comparison-from-scratch-vs-continued-pretraining" class="nav-link" data-scroll-target="#comparison-from-scratch-vs-continued-pretraining">Comparison: From-Scratch vs Continued Pretraining</a></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
+  <li><a href="#read-more" id="toc-read-more" class="nav-link" data-scroll-target="#read-more">Read More</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Pre-training LLMs from Scratch</h1>
+</div>
+
+<div>
+  <div class="description">
+    End-to-end guide: from web scraping and data collection to preprocessing, tokenization, and pretraining a small language model with PyTorch and Unsloth
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://vectoringai.com/pages/about.html">Vectoring AI</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">March 1, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+<div>
+  <div class="keywords">
+    <div class="block-title">Keywords</div>
+    <p>pretraining, data collection, web scraping, data preprocessing, tokenization, BPE, Common Crawl, FineWeb, datatrove, trafilatura, PyTorch, Unsloth, small language model, continued pretraining, LoRA, deduplication, filtering</p>
+  </div>
+</div>
+
+</header>
+
+
+<div id="notebook-link" data-url="https://colab.research.google.com/github/VectoringAI/ai-engineering/blob/main/llm/pre_training_llms_from_scratch.ipynb" style="display:none">
+
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../../images/llm/training-llm-from-scratch-300px.png" class="img-fluid figure-img" width="300"></p>
+<figcaption>Pre-training a language model from scratch with PyTorch</figcaption>
+</figure>
+</div>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>Training a language model is more than just calling <code>.train()</code> — the bulk of the work lies in <strong>data collection, cleaning, and formatting</strong>. Real-world LLM training pipelines spend 80%+ of effort on data, because data quality directly determines model quality.</p>
+<p>This article walks through the <strong>complete pipeline</strong> for training a small language model: from raw web data to a working model. We cover web scraping with <code>trafilatura</code>, data preprocessing and deduplication with <code>datatrove</code>, tokenizer training, and finally pretraining and continued pretraining using <strong>PyTorch</strong> and <strong>Unsloth</strong>. All examples target small models (0.5B–3B parameters) that can run on consumer hardware.</p>
+<blockquote class="blockquote">
+<p>For fine-tuning an existing model, see <a href="../../posts/llm/Fine-tuning-LLM-with-Unsloth-and-serving-it-with-Ollama.html">Fine-tuning an LLM with Unsloth and Serving with Ollama</a>. For post-training alignment, see <a href="../../posts/llm/Post-Training-LLMs-for-Human-Alignment.html">Post-Training LLMs for Human Alignment</a>. For reasoning training, see <a href="../../posts/llm/Training-LLMs-for-Reasoning.html">Training LLMs for Reasoning</a>.</p>
+</blockquote>
+</section>
+<section id="the-end-to-end-training-pipeline" class="level2">
+<h2 class="anchored" data-anchor-id="the-end-to-end-training-pipeline">The End-to-End Training Pipeline</h2>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["Raw Sources&lt;br/&gt;(Web, PDFs, Code)"] --&gt; B["Web Scraping&lt;br/&gt;&amp; Text Extraction"]
+    B --&gt; C["Data Cleaning&lt;br/&gt;&amp; Filtering"]
+    C --&gt; D["Deduplication"]
+    D --&gt; E["Tokenization"]
+    E --&gt; F["Pretraining&lt;br/&gt;(from scratch)"]
+    E --&gt; G["Continued Pretraining&lt;br/&gt;(domain adaptation)"]
+    F --&gt; H["Base Model"]
+    G --&gt; H
+    H --&gt; I["Fine-tuning&lt;br/&gt;(SFT / LoRA)"]
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#f5a623,color:#fff,stroke:#333
+    style C fill:#e74c3c,color:#fff,stroke:#333
+    style D fill:#9b59b6,color:#fff,stroke:#333
+    style E fill:#e67e22,color:#fff,stroke:#333
+    style F fill:#27ae60,color:#fff,stroke:#333
+    style G fill:#1abc9c,color:#fff,stroke:#333
+    style H fill:#C8CFEA,color:#fff,stroke:#333
+    style I fill:#3498db,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Stage</th>
+<th>Tools</th>
+<th style="text-align: center;">Time Share</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Data collection</strong></td>
+<td>trafilatura, requests, Common Crawl</td>
+<td style="text-align: center;">~20%</td>
+</tr>
+<tr class="even">
+<td><strong>Cleaning &amp; filtering</strong></td>
+<td>datatrove, fastText, regex</td>
+<td style="text-align: center;">~30%</td>
+</tr>
+<tr class="odd">
+<td><strong>Deduplication</strong></td>
+<td>datatrove (MinHash, exact)</td>
+<td style="text-align: center;">~15%</td>
+</tr>
+<tr class="even">
+<td><strong>Tokenization</strong></td>
+<td>sentencepiece, tiktoken, HF tokenizers</td>
+<td style="text-align: center;">~5%</td>
+</tr>
+<tr class="odd">
+<td><strong>Training</strong></td>
+<td>PyTorch, Unsloth, nanotron, TRL</td>
+<td style="text-align: center;">~30%</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="data-collection-and-web-scraping" class="level2">
+<h2 class="anchored" data-anchor-id="data-collection-and-web-scraping">1. Data Collection and Web Scraping</h2>
+<p>Every LLM starts with text data. There are three main sources:</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A{{"Data Sources"}} --&gt; B["Web Scraping&lt;br/&gt;(custom crawls)"]
+    A --&gt; C["Common Crawl&lt;br/&gt;(pre-crawled web)"]
+    A --&gt; D["Curated Datasets&lt;br/&gt;(Wikipedia, books,&lt;br/&gt;code, papers)"]
+
+    B --&gt; B1["trafilatura&lt;br/&gt;BeautifulSoup&lt;br/&gt;Scrapy"]
+    C --&gt; C1["WARC/WET files&lt;br/&gt;96 snapshots&lt;br/&gt;~250B pages"]
+    D --&gt; D1["HuggingFace Hub&lt;br/&gt;The Stack&lt;br/&gt;RedPajama"]
+
+    style A fill:#e74c3c,color:#fff,stroke:#333
+    style B fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#f5a623,color:#fff,stroke:#333
+    style D fill:#27ae60,color:#fff,stroke:#333
+    style B1 fill:#4a90d9,color:#fff,stroke:#333
+    style C1 fill:#f5a623,color:#fff,stroke:#333
+    style D1 fill:#27ae60,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="web-scraping-with-trafilatura" class="level3">
+<h3 class="anchored" data-anchor-id="web-scraping-with-trafilatura">Web Scraping with Trafilatura</h3>
+<p><a href="https://trafilatura.readthedocs.io/">Trafilatura</a> is the go-to library for extracting clean text from web pages. It’s used by HuggingFace (FineWeb), IBM, and Microsoft Research. It handles boilerplate removal, metadata extraction, and outputs clean text.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> trafilatura</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> trafilatura <span class="im">import</span> fetch_url, extract</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Single URL extraction</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>url <span class="op">=</span> <span class="st">"https://en.wikipedia.org/wiki/Large_language_model"</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>downloaded <span class="op">=</span> fetch_url(url)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>text <span class="op">=</span> extract(downloaded, include_comments<span class="op">=</span><span class="va">False</span>, include_tables<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(text[:<span class="dv">500</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="scraping-at-scale" class="level3">
+<h3 class="anchored" data-anchor-id="scraping-at-scale">Scraping at Scale</h3>
+<p>For building a pretraining corpus, you need thousands to millions of pages:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> trafilatura</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> trafilatura <span class="im">import</span> fetch_url, extract</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> concurrent.futures <span class="im">import</span> ThreadPoolExecutor</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> json</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> scrape_url(url):</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Scrape a single URL and return structured data."""</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>        downloaded <span class="op">=</span> fetch_url(url)</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> downloaded <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="va">None</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>        text <span class="op">=</span> extract(</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>            downloaded,</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>            include_comments<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>            include_tables<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>            favor_recall<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> text <span class="kw">and</span> <span class="bu">len</span>(text) <span class="op">&gt;</span> <span class="dv">200</span>:  <span class="co"># skip very short pages</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>            metadata <span class="op">=</span> trafilatura.extract(</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>                downloaded, output_format<span class="op">=</span><span class="st">"json"</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>            )</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> {<span class="st">"url"</span>: url, <span class="st">"text"</span>: text}</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span>:</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">None</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="va">None</span></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a><span class="co"># Process URLs in parallel</span></span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>urls <span class="op">=</span> [...]  <span class="co"># your list of URLs</span></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>results <span class="op">=</span> []</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> ThreadPoolExecutor(max_workers<span class="op">=</span><span class="dv">8</span>) <span class="im">as</span> executor:</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> result <span class="kw">in</span> executor.<span class="bu">map</span>(scrape_url, urls):</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> result:</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>            results.append(result)</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a><span class="co"># Save as JSONL (datatrove's preferred format)</span></span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">"scraped_data.jsonl"</span>, <span class="st">"w"</span>) <span class="im">as</span> f:</span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> item <span class="kw">in</span> results:</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>        f.write(json.dumps(item) <span class="op">+</span> <span class="st">"</span><span class="ch">\n</span><span class="st">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="using-common-crawl" class="level3">
+<h3 class="anchored" data-anchor-id="using-common-crawl">Using Common Crawl</h3>
+<p>For large-scale pretraining, start from <a href="https://commoncrawl.org/">Common Crawl</a> rather than scraping yourself. Common Crawl provides pre-crawled web data in WARC format spanning 96+ snapshots:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datatrove.pipeline.readers <span class="im">import</span> WarcReader</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datatrove.pipeline.extractors <span class="im">import</span> Trafilatura</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datatrove.pipeline.writers <span class="im">import</span> JsonlWriter</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datatrove.executor <span class="im">import</span> LocalPipelineExecutor</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Read Common Crawl WARC files and extract text</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>pipeline <span class="op">=</span> [</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    WarcReader(</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>        data_folder<span class="op">=</span><span class="st">"s3://commoncrawl/crawl-data/CC-MAIN-2024-10/segments/"</span>,</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>        glob_pattern<span class="op">=</span><span class="st">"*/warc/*.warc.gz"</span>,</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>        limit<span class="op">=</span><span class="dv">1000</span>,  <span class="co"># limit for testing</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    Trafilatura(),  <span class="co"># extract text from HTML</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    JsonlWriter(output_folder<span class="op">=</span><span class="st">"./extracted_data/"</span>),</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>executor <span class="op">=</span> LocalPipelineExecutor(pipeline<span class="op">=</span>pipeline, tasks<span class="op">=</span><span class="dv">4</span>, workers<span class="op">=</span><span class="dv">4</span>)</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>executor.run()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="curated-datasets-from-huggingface-hub" class="level3">
+<h3 class="anchored" data-anchor-id="curated-datasets-from-huggingface-hub">Curated Datasets from HuggingFace Hub</h3>
+<p>For quicker starts, use pre-cleaned datasets:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Dataset</th>
+<th>Tokens</th>
+<th>Domain</th>
+<th>Quality</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="https://huggingface.co/datasets/HuggingFaceFW/fineweb">FineWeb</a></td>
+<td>15T</td>
+<td>Web</td>
+<td>High (filtered)</td>
+</tr>
+<tr class="even">
+<td><a href="https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu">FineWeb-Edu</a></td>
+<td>1.3T</td>
+<td>Educational web</td>
+<td>Very high</td>
+</tr>
+<tr class="odd">
+<td><a href="https://huggingface.co/datasets/bigcode/the-stack-v2">The Stack v2</a></td>
+<td>900B+</td>
+<td>Code (600+ langs)</td>
+<td>High</td>
+</tr>
+<tr class="even">
+<td><a href="https://huggingface.co/datasets/HuggingFaceTB/cosmopedia">Cosmopedia</a></td>
+<td>25B</td>
+<td>Synthetic textbooks</td>
+<td>High</td>
+</tr>
+<tr class="odd">
+<td><a href="https://huggingface.co/datasets/wikimedia/wikipedia">Wikipedia</a></td>
+<td>~4B</td>
+<td>Encyclopedia</td>
+<td>Very high</td>
+</tr>
+<tr class="even">
+<td><a href="https://huggingface.co/datasets/togethercomputer/RedPajama-Data-V2">RedPajama-V2</a></td>
+<td>30T</td>
+<td>Mixed web</td>
+<td>Medium-high</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="data-cleaning-and-filtering" class="level2">
+<h2 class="anchored" data-anchor-id="data-cleaning-and-filtering">2. Data Cleaning and Filtering</h2>
+<p>Raw web text is noisy — full of ads, navigation menus, boilerplate, and low-quality content. Cleaning is the most impactful step in the pipeline.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["Raw Text"] --&gt; B["Language&lt;br/&gt;Detection"]
+    B --&gt; C["Quality&lt;br/&gt;Filtering"]
+    C --&gt; D["Content&lt;br/&gt;Filtering"]
+    D --&gt; E["Heuristic&lt;br/&gt;Rules"]
+    E --&gt; F["Clean Text"]
+
+    B --&gt;|"Remove non-target&lt;br/&gt;languages"| B
+    C --&gt;|"Remove low-quality&lt;br/&gt;pages"| C
+    D --&gt;|"Remove toxic,&lt;br/&gt;NSFW, PII"| D
+    E --&gt;|"Length, ratio,&lt;br/&gt;repetition checks"| E
+
+    style A fill:#e74c3c,color:#fff,stroke:#333
+    style B fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#f5a623,color:#fff,stroke:#333
+    style D fill:#9b59b6,color:#fff,stroke:#333
+    style E fill:#e67e22,color:#fff,stroke:#333
+    style F fill:#27ae60,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="filtering-with-datatrove" class="level3">
+<h3 class="anchored" data-anchor-id="filtering-with-datatrove">Filtering with DataTrove</h3>
+<p><a href="https://github.com/huggingface/datatrove">DataTrove</a> is HuggingFace’s library for large-scale data processing. It provides prebuilt filters used to create FineWeb:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datatrove.pipeline.readers <span class="im">import</span> JsonlReader</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datatrove.pipeline.filters <span class="im">import</span> (</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    GopherQualityFilter,</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    GopherRepetitionFilter,</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    LanguageFilter,</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    URLFilter,</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    C4QualityFilter,</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datatrove.pipeline.writers <span class="im">import</span> JsonlWriter</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datatrove.executor <span class="im">import</span> LocalPipelineExecutor</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>pipeline <span class="op">=</span> [</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    JsonlReader(data_folder<span class="op">=</span><span class="st">"./extracted_data/"</span>),</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Language filter: keep only English</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>    LanguageFilter(languages<span class="op">=</span>[<span class="st">"en"</span>], language_threshold<span class="op">=</span><span class="fl">0.65</span>),</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>    <span class="co"># URL-based filter: block known bad domains</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>    URLFilter(),</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Gopher quality filter (from DeepMind's Gopher paper)</span></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Checks: word count, mean word length, symbol-to-word ratio,</span></span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>    <span class="co"># fraction of lines ending with ellipsis, alphabetic ratio</span></span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>    GopherQualityFilter(</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>        min_doc_words<span class="op">=</span><span class="dv">50</span>,</span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>        max_doc_words<span class="op">=</span><span class="dv">100_000</span>,</span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Gopher repetition filter</span></span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Removes documents with excessive repeated n-grams/lines</span></span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a>    GopherRepetitionFilter(),</span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a>    <span class="co"># C4 quality filter (from T5/C4 paper)</span></span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Checks for sentences ending in punctuation, JS/cookie warnings</span></span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a>    C4QualityFilter(),</span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a>    JsonlWriter(output_folder<span class="op">=</span><span class="st">"./filtered_data/"</span>),</span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a>executor <span class="op">=</span> LocalPipelineExecutor(</span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a>    pipeline<span class="op">=</span>pipeline, tasks<span class="op">=</span><span class="dv">8</span>, workers<span class="op">=</span><span class="dv">4</span>,</span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a>    logging_dir<span class="op">=</span><span class="st">"./logs/filtering/"</span></span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a>executor.run()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="key-filtering-heuristics" class="level3">
+<h3 class="anchored" data-anchor-id="key-filtering-heuristics">Key Filtering Heuristics</h3>
+<p>The FineWeb paper documented the most effective filters:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 48%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Filter</th>
+<th>What it Checks</th>
+<th>Impact</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Language detection</strong></td>
+<td>fastText classifier score &gt; 0.65</td>
+<td>Removes non-target language</td>
+</tr>
+<tr class="even">
+<td><strong>Word count</strong></td>
+<td>50 ≤ words ≤ 100,000</td>
+<td>Removes stubs and dumps</td>
+</tr>
+<tr class="odd">
+<td><strong>Mean word length</strong></td>
+<td>3–10 characters average</td>
+<td>Catches gibberish</td>
+</tr>
+<tr class="even">
+<td><strong>Symbol ratio</strong></td>
+<td><code>#</code> symbols &lt; 10% of words</td>
+<td>Removes markdown artifacts</td>
+</tr>
+<tr class="odd">
+<td><strong>Repetition</strong></td>
+<td>Duplicate n-grams &lt; threshold</td>
+<td>Removes SEO spam</td>
+</tr>
+<tr class="even">
+<td><strong>Line-level</strong></td>
+<td>Lines ending in punctuation &gt; 80%</td>
+<td>Catches navigation text</td>
+</tr>
+<tr class="odd">
+<td><strong>Alphabetic ratio</strong></td>
+<td>&gt; 80% alphabetic characters</td>
+<td>Removes data tables</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="educational-quality-classifier" class="level3">
+<h3 class="anchored" data-anchor-id="educational-quality-classifier">Educational Quality Classifier</h3>
+<p>FineWeb-Edu showed that filtering for <strong>educational content</strong> dramatically improves model performance. The classifier was trained on LLM-annotated quality scores:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> transformers <span class="im">import</span> AutoTokenizer, AutoModelForSequenceClassification</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>model_name <span class="op">=</span> <span class="st">"HuggingFaceFW/fineweb-edu-classifier"</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>tokenizer <span class="op">=</span> AutoTokenizer.from_pretrained(model_name)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> AutoModelForSequenceClassification.from_pretrained(model_name)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> score_educational_quality(text):</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Score text on educational quality (0-5 scale)."""</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    inputs <span class="op">=</span> tokenizer(</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>        text, return_tensors<span class="op">=</span><span class="st">"pt"</span>,</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>        truncation<span class="op">=</span><span class="va">True</span>, max_length<span class="op">=</span><span class="dv">512</span>, padding<span class="op">=</span><span class="va">True</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">with</span> torch.no_grad():</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>        outputs <span class="op">=</span> model(<span class="op">**</span>inputs)</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    score <span class="op">=</span> outputs.logits.squeeze().item()</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> score</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a><span class="co"># Keep only high-quality educational content (score &gt;= 3)</span></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>text <span class="op">=</span> <span class="st">"The derivative of x^2 is 2x, by the power rule..."</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>score <span class="op">=</span> score_educational_quality(text)</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Educational score: </span><span class="sc">{</span>score<span class="sc">:.2f}</span><span class="ss">"</span>)  <span class="co"># ~4.5</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="deduplication" class="level2">
+<h2 class="anchored" data-anchor-id="deduplication">3. Deduplication</h2>
+<p>Duplicate content is surprisingly common on the web (30–50% of pages are near-duplicates). Deduplication prevents the model from memorizing repeated content and wastes training compute.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A{{"Deduplication&lt;br/&gt;Methods"}} --&gt; B["Exact&lt;br/&gt;Deduplication"]
+    A --&gt; C["MinHash LSH&lt;br/&gt;(Near-duplicate)"]
+    A --&gt; D["Sentence-Level&lt;br/&gt;Dedup"]
+
+    B --&gt; B1["Hash each document&lt;br/&gt;Remove exact matches&lt;br/&gt;Fast, catches copies"]
+    C --&gt; C1["Compute MinHash signature&lt;br/&gt;LSH for candidate pairs&lt;br/&gt;Remove if Jaccard &gt; 0.8"]
+    D --&gt; D1["Hash each sentence&lt;br/&gt;Remove repeated sentences&lt;br/&gt;Catches boilerplate"]
+
+    style A fill:#e74c3c,color:#fff,stroke:#333
+    style B fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#f5a623,color:#fff,stroke:#333
+    style D fill:#27ae60,color:#fff,stroke:#333
+    style B1 fill:#4a90d9,color:#fff,stroke:#333
+    style C1 fill:#f5a623,color:#fff,stroke:#333
+    style D1 fill:#27ae60,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="minhash-deduplication-with-datatrove" class="level3">
+<h3 class="anchored" data-anchor-id="minhash-deduplication-with-datatrove">MinHash Deduplication with DataTrove</h3>
+<p>MinHash is the standard approach for near-duplicate detection at scale:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datatrove.pipeline.readers <span class="im">import</span> JsonlReader</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datatrove.pipeline.dedup <span class="im">import</span> (</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    MinhashDedupSignature,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    MinhashDedupBuckets,</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    MinhashDedupCluster,</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    MinhashDedupFilter,</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datatrove.pipeline.writers <span class="im">import</span> JsonlWriter</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datatrove.executor <span class="im">import</span> LocalPipelineExecutor</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 1: Compute MinHash signatures</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>stage1 <span class="op">=</span> [</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>    JsonlReader(data_folder<span class="op">=</span><span class="st">"./filtered_data/"</span>),</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>    MinhashDedupSignature(</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>        output_folder<span class="op">=</span><span class="st">"./minhash_sigs/"</span>,</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>        n_grams<span class="op">=</span><span class="dv">5</span>,        <span class="co"># 5-gram shingles</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>        num_buckets<span class="op">=</span><span class="dv">14</span>,    <span class="co"># LSH buckets</span></span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>        hashes_per_bucket<span class="op">=</span><span class="dv">8</span>,</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 2: Find duplicate clusters via LSH buckets</span></span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>stage2 <span class="op">=</span> [</span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>    MinhashDedupBuckets(</span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>        input_folder<span class="op">=</span><span class="st">"./minhash_sigs/"</span>,</span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>        output_folder<span class="op">=</span><span class="st">"./minhash_buckets/"</span>,</span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 3: Cluster duplicates</span></span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>stage3 <span class="op">=</span> [</span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a>    MinhashDedupCluster(</span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a>        input_folder<span class="op">=</span><span class="st">"./minhash_buckets/"</span>,</span>
+<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a>        output_folder<span class="op">=</span><span class="st">"./minhash_clusters/"</span>,</span>
+<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 4: Filter out duplicates</span></span>
+<span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a>stage4 <span class="op">=</span> [</span>
+<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a>    JsonlReader(data_folder<span class="op">=</span><span class="st">"./filtered_data/"</span>),</span>
+<span id="cb6-41"><a href="#cb6-41" aria-hidden="true" tabindex="-1"></a>    MinhashDedupFilter(</span>
+<span id="cb6-42"><a href="#cb6-42" aria-hidden="true" tabindex="-1"></a>        input_folder<span class="op">=</span><span class="st">"./minhash_clusters/"</span>,</span>
+<span id="cb6-43"><a href="#cb6-43" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb6-44"><a href="#cb6-44" aria-hidden="true" tabindex="-1"></a>    JsonlWriter(output_folder<span class="op">=</span><span class="st">"./deduped_data/"</span>),</span>
+<span id="cb6-45"><a href="#cb6-45" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb6-46"><a href="#cb6-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-47"><a href="#cb6-47" aria-hidden="true" tabindex="-1"></a><span class="co"># Run stages sequentially</span></span>
+<span id="cb6-48"><a href="#cb6-48" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i, pipeline <span class="kw">in</span> <span class="bu">enumerate</span>([stage1, stage2, stage3, stage4]):</span>
+<span id="cb6-49"><a href="#cb6-49" aria-hidden="true" tabindex="-1"></a>    executor <span class="op">=</span> LocalPipelineExecutor(</span>
+<span id="cb6-50"><a href="#cb6-50" aria-hidden="true" tabindex="-1"></a>        pipeline<span class="op">=</span>pipeline, tasks<span class="op">=</span><span class="dv">8</span>, workers<span class="op">=</span><span class="dv">4</span>,</span>
+<span id="cb6-51"><a href="#cb6-51" aria-hidden="true" tabindex="-1"></a>        logging_dir<span class="op">=</span><span class="ss">f"./logs/dedup_stage</span><span class="sc">{</span>i<span class="op">+</span><span class="dv">1</span><span class="sc">}</span><span class="ss">/"</span></span>
+<span id="cb6-52"><a href="#cb6-52" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb6-53"><a href="#cb6-53" aria-hidden="true" tabindex="-1"></a>    executor.run()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="deduplication-impact" class="level3">
+<h3 class="anchored" data-anchor-id="deduplication-impact">Deduplication Impact</h3>
+<p>The FineWeb paper showed deduplication is one of the most impactful steps:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Dataset</th>
+<th style="text-align: center;">Before Dedup</th>
+<th style="text-align: center;">After Dedup</th>
+<th style="text-align: center;">Removed</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Common Crawl (1 snapshot)</td>
+<td style="text-align: center;">~3B pages</td>
+<td style="text-align: center;">~1.5B pages</td>
+<td style="text-align: center;">~50%</td>
+</tr>
+<tr class="even">
+<td>FineWeb (96 snapshots)</td>
+<td style="text-align: center;">~40T tokens</td>
+<td style="text-align: center;">15T tokens</td>
+<td style="text-align: center;">~63%</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="tokenization" class="level2">
+<h2 class="anchored" data-anchor-id="tokenization">4. Tokenization</h2>
+<p>Tokenization converts text into integer sequences that the model can process. Most modern LLMs use <strong>Byte-Pair Encoding (BPE)</strong> or <strong>SentencePiece</strong> (Unigram).</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    A["Raw Text&lt;br/&gt;'Hello world'"] --&gt; B["Tokenizer"]
+    B --&gt; C["Token IDs&lt;br/&gt;[15496, 995]"]
+
+    subgraph Training["Tokenizer Training"]
+        direction TB
+        D["Large text corpus"] --&gt; E["Learn vocabulary&lt;br/&gt;(BPE / Unigram)"]
+        E --&gt; F["Vocabulary&lt;br/&gt;(32K-128K tokens)"]
+    end
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#e74c3c,color:#fff,stroke:#333
+    style C fill:#27ae60,color:#fff,stroke:#333
+    style D fill:#f5a623,color:#fff,stroke:#333
+    style E fill:#9b59b6,color:#fff,stroke:#333
+    style F fill:#1abc9c,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="training-a-custom-tokenizer" class="level3">
+<h3 class="anchored" data-anchor-id="training-a-custom-tokenizer">Training a Custom Tokenizer</h3>
+<p>If you’re pretraining from scratch on a specific domain or language, train a custom tokenizer:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> tokenizers <span class="im">import</span> (</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    Tokenizer,</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    models,</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    trainers,</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    pre_tokenizers,</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    decoders,</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    normalizers,</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Initialize BPE tokenizer</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>tokenizer <span class="op">=</span> Tokenizer(models.BPE())</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>tokenizer.normalizer <span class="op">=</span> normalizers.NFC()</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>tokenizer.pre_tokenizer <span class="op">=</span> pre_tokenizers.ByteLevel(add_prefix_space<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>tokenizer.decoder <span class="op">=</span> decoders.ByteLevel()</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Configure trainer</span></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>trainer <span class="op">=</span> trainers.BpeTrainer(</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>    vocab_size<span class="op">=</span><span class="dv">32000</span>,</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>    min_frequency<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>    special_tokens<span class="op">=</span>[<span class="st">"&lt;|endoftext|&gt;"</span>, <span class="st">"&lt;|padding|&gt;"</span>, <span class="st">"&lt;|begin_of_text|&gt;"</span>],</span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>    show_progress<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a><span class="co"># Train on your corpus</span></span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>files <span class="op">=</span> [<span class="st">"./deduped_data/part_001.jsonl"</span>, <span class="st">"./deduped_data/part_002.jsonl"</span>]</span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>tokenizer.train(files, trainer)</span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a><span class="co"># Save</span></span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>tokenizer.save(<span class="st">"my_tokenizer.json"</span>)</span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a><span class="co"># Test</span></span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a>encoded <span class="op">=</span> tokenizer.encode(<span class="st">"The transformer architecture"</span>)</span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Tokens: </span><span class="sc">{</span>encoded<span class="sc">.</span>tokens<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"IDs: </span><span class="sc">{</span>encoded<span class="sc">.</span>ids<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="using-an-existing-tokenizer" class="level3">
+<h3 class="anchored" data-anchor-id="using-an-existing-tokenizer">Using an Existing Tokenizer</h3>
+<p>For continued pretraining or fine-tuning, reuse the base model’s tokenizer:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> transformers <span class="im">import</span> AutoTokenizer</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Llama 3.2 tokenizer (128K vocab, tiktoken-based BPE)</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>tokenizer <span class="op">=</span> AutoTokenizer.from_pretrained(<span class="st">"meta-llama/Llama-3.2-1B"</span>)</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Vocab size: </span><span class="sc">{</span>tokenizer<span class="sc">.</span>vocab_size<span class="sc">}</span><span class="ss">"</span>)  <span class="co"># 128256</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Qwen 2.5 tokenizer (151K vocab)</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>tokenizer <span class="op">=</span> AutoTokenizer.from_pretrained(<span class="st">"Qwen/Qwen2.5-0.5B"</span>)</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Vocab size: </span><span class="sc">{</span>tokenizer<span class="sc">.</span>vocab_size<span class="sc">}</span><span class="ss">"</span>)  <span class="co"># 151936</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Tokenize for pretraining</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>text <span class="op">=</span> <span class="st">"Language models learn statistical patterns from text."</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>tokens <span class="op">=</span> tokenizer(text, return_tensors<span class="op">=</span><span class="st">"pt"</span>)</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Token count: </span><span class="sc">{</span>tokens[<span class="st">'input_ids'</span>]<span class="sc">.</span>shape[<span class="dv">1</span>]<span class="sc">}</span><span class="ss">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="tokenizing-a-dataset-for-pretraining" class="level3">
+<h3 class="anchored" data-anchor-id="tokenizing-a-dataset-for-pretraining">Tokenizing a Dataset for Pretraining</h3>
+<p>For pretraining, tokenize your entire corpus and save as binary files for fast loading:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datatrove.pipeline.readers <span class="im">import</span> JsonlReader</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datatrove.pipeline.tokens <span class="im">import</span> TokensCounter, DocumentTokenizer</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datatrove.executor <span class="im">import</span> LocalPipelineExecutor</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Tokenize entire dataset using datatrove</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>pipeline <span class="op">=</span> [</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    JsonlReader(data_folder<span class="op">=</span><span class="st">"./deduped_data/"</span>),</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    DocumentTokenizer(</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>        output_folder<span class="op">=</span><span class="st">"./tokenized_data/"</span>,</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>        tokenizer_name_or_path<span class="op">=</span><span class="st">"Qwen/Qwen2.5-0.5B"</span>,</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>        eos_token<span class="op">=</span><span class="st">"&lt;|endoftext|&gt;"</span>,</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>executor <span class="op">=</span> LocalPipelineExecutor(</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>    pipeline<span class="op">=</span>pipeline, tasks<span class="op">=</span><span class="dv">8</span>, workers<span class="op">=</span><span class="dv">4</span>,</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>    logging_dir<span class="op">=</span><span class="st">"./logs/tokenization/"</span></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>executor.run()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="tokenizer-comparison" class="level3">
+<h3 class="anchored" data-anchor-id="tokenizer-comparison">Tokenizer Comparison</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 27%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tokenizer</th>
+<th>Algorithm</th>
+<th style="text-align: center;">Vocab Size</th>
+<th>Used By</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>tiktoken (BPE)</strong></td>
+<td>Byte-level BPE</td>
+<td style="text-align: center;">100K–200K</td>
+<td>GPT-4, Llama 3</td>
+</tr>
+<tr class="even">
+<td><strong>SentencePiece (Unigram)</strong></td>
+<td>Unigram LM</td>
+<td style="text-align: center;">32K–64K</td>
+<td>Llama 1/2, Mistral</td>
+</tr>
+<tr class="odd">
+<td><strong>HF Tokenizers (BPE)</strong></td>
+<td>Byte-level BPE</td>
+<td style="text-align: center;">32K–128K</td>
+<td>SmolLM, BLOOM</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="pretraining-from-scratch-with-pytorch" class="level2">
+<h2 class="anchored" data-anchor-id="pretraining-from-scratch-with-pytorch">5. Pretraining from Scratch with PyTorch</h2>
+<p>Pretraining from scratch means initializing random weights and training on your full corpus. This requires significant compute but gives full control.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph Architecture["Model Architecture"]
+        direction TB
+        A1["Embedding Layer&lt;br/&gt;(vocab → hidden)"]
+        A2["N × Transformer Blocks&lt;br/&gt;(attention + FFN)"]
+        A3["LM Head&lt;br/&gt;(hidden → vocab)"]
+        A1 --&gt; A2 --&gt; A3
+    end
+
+    subgraph Training["Training Loop"]
+        direction TB
+        B1["Sample batch&lt;br/&gt;of token sequences"]
+        B2["Forward pass:&lt;br/&gt;predict next token"]
+        B3["Cross-entropy loss"]
+        B4["Backward pass&lt;br/&gt;+ optimizer step"]
+        B1 --&gt; B2 --&gt; B3 --&gt; B4
+        B4 --&gt;|"repeat"| B1
+    end
+
+    style A1 fill:#4a90d9,color:#fff,stroke:#333
+    style A2 fill:#f5a623,color:#fff,stroke:#333
+    style A3 fill:#e74c3c,color:#fff,stroke:#333
+    style B1 fill:#27ae60,color:#fff,stroke:#333
+    style B2 fill:#9b59b6,color:#fff,stroke:#333
+    style B3 fill:#e67e22,color:#fff,stroke:#333
+    style B4 fill:#1abc9c,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="minimal-pretraining-with-pytorch" class="level3">
+<h3 class="anchored" data-anchor-id="minimal-pretraining-with-pytorch">Minimal Pretraining with PyTorch</h3>
+<p>Here is a minimal but complete pretraining script using PyTorch:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> torch.nn <span class="im">as</span> nn</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> torch.utils.data <span class="im">import</span> Dataset, DataLoader</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> transformers <span class="im">import</span> (</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    AutoConfig,</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    AutoModelForCausalLM,</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    AutoTokenizer,</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Config ---</span></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>model_name <span class="op">=</span> <span class="st">"Qwen/Qwen2.5-0.5B"</span>  <span class="co"># use as architecture template</span></span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>tokenizer <span class="op">=</span> AutoTokenizer.from_pretrained(model_name)</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>seq_length <span class="op">=</span> <span class="dv">1024</span></span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>batch_size <span class="op">=</span> <span class="dv">4</span></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>learning_rate <span class="op">=</span> <span class="fl">3e-4</span></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>num_steps <span class="op">=</span> <span class="dv">10000</span></span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Dataset ---</span></span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> PretrainDataset(Dataset):</span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Load pre-tokenized data for causal LM training."""</span></span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, tokenized_file, seq_length):</span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.data <span class="op">=</span> torch.load(tokenized_file)  <span class="co"># 1D tensor of token IDs</span></span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.seq_length <span class="op">=</span> seq_length</span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__len__</span>(<span class="va">self</span>):</span>
+<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> (<span class="bu">len</span>(<span class="va">self</span>.data) <span class="op">-</span> <span class="dv">1</span>) <span class="op">//</span> <span class="va">self</span>.seq_length</span>
+<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__getitem__</span>(<span class="va">self</span>, idx):</span>
+<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a>        start <span class="op">=</span> idx <span class="op">*</span> <span class="va">self</span>.seq_length</span>
+<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a>        end <span class="op">=</span> start <span class="op">+</span> <span class="va">self</span>.seq_length</span>
+<span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a>        x <span class="op">=</span> <span class="va">self</span>.data[start:end]</span>
+<span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a>        y <span class="op">=</span> <span class="va">self</span>.data[start <span class="op">+</span> <span class="dv">1</span>:end <span class="op">+</span> <span class="dv">1</span>]  <span class="co"># shifted by 1 for next-token prediction</span></span>
+<span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> x, y</span>
+<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Initialize model from scratch (random weights) ---</span></span>
+<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a>config <span class="op">=</span> AutoConfig.from_pretrained(model_name)</span>
+<span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> AutoModelForCausalLM.from_config(config)  <span class="co"># random init</span></span>
+<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a>model.train()</span>
+<span id="cb10-39"><a href="#cb10-39" aria-hidden="true" tabindex="-1"></a>device <span class="op">=</span> torch.device(<span class="st">"cuda"</span> <span class="cf">if</span> torch.cuda.is_available() <span class="cf">else</span> <span class="st">"cpu"</span>)</span>
+<span id="cb10-40"><a href="#cb10-40" aria-hidden="true" tabindex="-1"></a>model.to(device)</span>
+<span id="cb10-41"><a href="#cb10-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-42"><a href="#cb10-42" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Parameters: </span><span class="sc">{</span><span class="bu">sum</span>(p.numel() <span class="cf">for</span> p <span class="kw">in</span> model.parameters()) <span class="op">/</span> <span class="fl">1e6</span><span class="sc">:.1f}</span><span class="ss">M"</span>)</span>
+<span id="cb10-43"><a href="#cb10-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-44"><a href="#cb10-44" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Optimizer ---</span></span>
+<span id="cb10-45"><a href="#cb10-45" aria-hidden="true" tabindex="-1"></a>optimizer <span class="op">=</span> torch.optim.AdamW(</span>
+<span id="cb10-46"><a href="#cb10-46" aria-hidden="true" tabindex="-1"></a>    model.parameters(),</span>
+<span id="cb10-47"><a href="#cb10-47" aria-hidden="true" tabindex="-1"></a>    lr<span class="op">=</span>learning_rate,</span>
+<span id="cb10-48"><a href="#cb10-48" aria-hidden="true" tabindex="-1"></a>    betas<span class="op">=</span>(<span class="fl">0.9</span>, <span class="fl">0.95</span>),</span>
+<span id="cb10-49"><a href="#cb10-49" aria-hidden="true" tabindex="-1"></a>    weight_decay<span class="op">=</span><span class="fl">0.1</span>,</span>
+<span id="cb10-50"><a href="#cb10-50" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb10-51"><a href="#cb10-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-52"><a href="#cb10-52" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Training loop ---</span></span>
+<span id="cb10-53"><a href="#cb10-53" aria-hidden="true" tabindex="-1"></a>dataset <span class="op">=</span> PretrainDataset(<span class="st">"tokenized_corpus.pt"</span>, seq_length)</span>
+<span id="cb10-54"><a href="#cb10-54" aria-hidden="true" tabindex="-1"></a>dataloader <span class="op">=</span> DataLoader(dataset, batch_size<span class="op">=</span>batch_size, shuffle<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb10-55"><a href="#cb10-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-56"><a href="#cb10-56" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> step, (input_ids, labels) <span class="kw">in</span> <span class="bu">enumerate</span>(dataloader):</span>
+<span id="cb10-57"><a href="#cb10-57" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> step <span class="op">&gt;=</span> num_steps:</span>
+<span id="cb10-58"><a href="#cb10-58" aria-hidden="true" tabindex="-1"></a>        <span class="cf">break</span></span>
+<span id="cb10-59"><a href="#cb10-59" aria-hidden="true" tabindex="-1"></a>    input_ids <span class="op">=</span> input_ids.to(device)</span>
+<span id="cb10-60"><a href="#cb10-60" aria-hidden="true" tabindex="-1"></a>    labels <span class="op">=</span> labels.to(device)</span>
+<span id="cb10-61"><a href="#cb10-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-62"><a href="#cb10-62" aria-hidden="true" tabindex="-1"></a>    outputs <span class="op">=</span> model(input_ids<span class="op">=</span>input_ids, labels<span class="op">=</span>labels)</span>
+<span id="cb10-63"><a href="#cb10-63" aria-hidden="true" tabindex="-1"></a>    loss <span class="op">=</span> outputs.loss</span>
+<span id="cb10-64"><a href="#cb10-64" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-65"><a href="#cb10-65" aria-hidden="true" tabindex="-1"></a>    loss.backward()</span>
+<span id="cb10-66"><a href="#cb10-66" aria-hidden="true" tabindex="-1"></a>    torch.nn.utils.clip_grad_norm_(model.parameters(), <span class="fl">1.0</span>)</span>
+<span id="cb10-67"><a href="#cb10-67" aria-hidden="true" tabindex="-1"></a>    optimizer.step()</span>
+<span id="cb10-68"><a href="#cb10-68" aria-hidden="true" tabindex="-1"></a>    optimizer.zero_grad()</span>
+<span id="cb10-69"><a href="#cb10-69" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-70"><a href="#cb10-70" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> step <span class="op">%</span> <span class="dv">100</span> <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb10-71"><a href="#cb10-71" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"Step </span><span class="sc">{</span>step<span class="sc">}</span><span class="ss">, Loss: </span><span class="sc">{</span>loss<span class="sc">.</span>item()<span class="sc">:.4f}</span><span class="ss">"</span>)</span>
+<span id="cb10-72"><a href="#cb10-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-73"><a href="#cb10-73" aria-hidden="true" tabindex="-1"></a><span class="co"># Save</span></span>
+<span id="cb10-74"><a href="#cb10-74" aria-hidden="true" tabindex="-1"></a>model.save_pretrained(<span class="st">"my-pretrained-model"</span>)</span>
+<span id="cb10-75"><a href="#cb10-75" aria-hidden="true" tabindex="-1"></a>tokenizer.save_pretrained(<span class="st">"my-pretrained-model"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="training-hyperparameters-for-small-models" class="level3">
+<h3 class="anchored" data-anchor-id="training-hyperparameters-for-small-models">Training Hyperparameters for Small Models</h3>
+<p>Based on SmolLM, MiniCPM, and Qwen recipes:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 23%">
+<col style="width: 27%">
+<col style="width: 30%">
+<col style="width: 17%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Hyperparameter</th>
+<th style="text-align: center;">Small (135M–360M)</th>
+<th style="text-align: center;">Medium (0.5B–1.7B)</th>
+<th style="text-align: center;">Large (3B)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Learning rate</strong></td>
+<td style="text-align: center;">3e-4</td>
+<td style="text-align: center;">2e-4</td>
+<td style="text-align: center;">2e-4</td>
+</tr>
+<tr class="even">
+<td><strong>Batch size (tokens)</strong></td>
+<td style="text-align: center;">1M</td>
+<td style="text-align: center;">2M</td>
+<td style="text-align: center;">2.4M</td>
+</tr>
+<tr class="odd">
+<td><strong>Optimizer</strong></td>
+<td style="text-align: center;">AdamW</td>
+<td style="text-align: center;">AdamW</td>
+<td style="text-align: center;">AdamW</td>
+</tr>
+<tr class="even">
+<td><strong>β1, β2</strong></td>
+<td style="text-align: center;">0.9, 0.95</td>
+<td style="text-align: center;">0.9, 0.95</td>
+<td style="text-align: center;">0.9, 0.95</td>
+</tr>
+<tr class="odd">
+<td><strong>Weight decay</strong></td>
+<td style="text-align: center;">0.1</td>
+<td style="text-align: center;">0.1</td>
+<td style="text-align: center;">0.1</td>
+</tr>
+<tr class="even">
+<td><strong>Gradient clipping</strong></td>
+<td style="text-align: center;">1.0</td>
+<td style="text-align: center;">1.0</td>
+<td style="text-align: center;">1.0</td>
+</tr>
+<tr class="odd">
+<td><strong>Scheduler</strong></td>
+<td style="text-align: center;">WSD or Cosine</td>
+<td style="text-align: center;">WSD or Cosine</td>
+<td style="text-align: center;">WSD</td>
+</tr>
+<tr class="even">
+<td><strong>Warmup steps</strong></td>
+<td style="text-align: center;">1000</td>
+<td style="text-align: center;">2000</td>
+<td style="text-align: center;">2000</td>
+</tr>
+<tr class="odd">
+<td><strong>Tokens trained</strong></td>
+<td style="text-align: center;">600B</td>
+<td style="text-align: center;">1T</td>
+<td style="text-align: center;">11T</td>
+</tr>
+<tr class="even">
+<td><strong>Context length</strong></td>
+<td style="text-align: center;">2048</td>
+<td style="text-align: center;">2048–4096</td>
+<td style="text-align: center;">4096</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="wsd-learning-rate-scheduler" class="level3">
+<h3 class="anchored" data-anchor-id="wsd-learning-rate-scheduler">WSD Learning Rate Scheduler</h3>
+<p>The <strong>Warmup-Stable-Decay (WSD)</strong> scheduler, introduced by MiniCPM and adopted by SmolLM3, is now preferred over cosine decay:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> math</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> wsd_scheduler(step, total_steps, warmup_steps, lr, decay_fraction<span class="op">=</span><span class="fl">0.1</span>):</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Warmup-Stable-Decay learning rate schedule."""</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    decay_start <span class="op">=</span> <span class="bu">int</span>(total_steps <span class="op">*</span> (<span class="dv">1</span> <span class="op">-</span> decay_fraction))</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> step <span class="op">&lt;</span> warmup_steps:</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Linear warmup</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> lr <span class="op">*</span> step <span class="op">/</span> warmup_steps</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">elif</span> step <span class="op">&lt;</span> decay_start:</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Stable phase</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> lr</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Linear decay to 0</span></span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>        progress <span class="op">=</span> (step <span class="op">-</span> decay_start) <span class="op">/</span> (total_steps <span class="op">-</span> decay_start)</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> lr <span class="op">*</span> (<span class="dv">1</span> <span class="op">-</span> progress)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+</section>
+<section id="continued-pretraining-with-unsloth" class="level2">
+<h2 class="anchored" data-anchor-id="continued-pretraining-with-unsloth">6. Continued Pretraining with Unsloth</h2>
+<p><strong>Continued pretraining (CPT)</strong> adapts an existing model to a new domain or language. This is far more practical than training from scratch — you inherit the base model’s knowledge and only need a fraction of the data.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["Pre-trained Base Model&lt;br/&gt;(e.g. Qwen2.5-0.5B)"] --&gt; B["Continued Pretraining&lt;br/&gt;on domain-specific data"]
+    B --&gt; C["Domain-Adapted Model"]
+    C --&gt; D["Fine-tuning (SFT)&lt;br/&gt;on instruction data"]
+    D --&gt; E["Domain Expert Model"]
+
+    subgraph Data["Domain Data Examples"]
+        direction TB
+        F["Medical texts"]
+        G["Legal documents"]
+        H["Code repositories"]
+        I["Scientific papers"]
+    end
+
+    Data --&gt; B
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#e74c3c,color:#fff,stroke:#333
+    style C fill:#f5a623,color:#fff,stroke:#333
+    style D fill:#9b59b6,color:#fff,stroke:#333
+    style E fill:#27ae60,color:#fff,stroke:#333
+    style F fill:#1abc9c,color:#fff,stroke:#333
+    style G fill:#1abc9c,color:#fff,stroke:#333
+    style H fill:#1abc9c,color:#fff,stroke:#333
+    style I fill:#1abc9c,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="why-continued-pretraining" class="level3">
+<h3 class="anchored" data-anchor-id="why-continued-pretraining">Why Continued Pretraining?</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 23%">
+<col style="width: 30%">
+<col style="width: 21%">
+<col style="width: 23%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Approach</th>
+<th style="text-align: center;">Data Needed</th>
+<th style="text-align: center;">Compute</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>From scratch</strong></td>
+<td style="text-align: center;">Trillions of tokens</td>
+<td style="text-align: center;">Very high</td>
+<td>General purpose model</td>
+</tr>
+<tr class="even">
+<td><strong>Continued pretraining</strong></td>
+<td style="text-align: center;">Billions of tokens</td>
+<td style="text-align: center;">Medium</td>
+<td>Domain adaptation</td>
+</tr>
+<tr class="odd">
+<td><strong>Fine-tuning (SFT)</strong></td>
+<td style="text-align: center;">Thousands of examples</td>
+<td style="text-align: center;">Low</td>
+<td>Task-specific behavior</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="continued-pretraining-with-unsloth-1" class="level3">
+<h3 class="anchored" data-anchor-id="continued-pretraining-with-unsloth-1">Continued Pretraining with Unsloth</h3>
+<p><a href="https://unsloth.ai/">Unsloth</a> provides an optimized framework for continued pretraining with LoRA, using 2–5x less memory:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> unsloth <span class="im">import</span> FastLanguageModel</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datasets <span class="im">import</span> load_dataset</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> trl <span class="im">import</span> SFTTrainer, SFTConfig</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Load base model with Unsloth (4-bit quantized for memory efficiency)</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>model, tokenizer <span class="op">=</span> FastLanguageModel.from_pretrained(</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    model_name<span class="op">=</span><span class="st">"unsloth/Qwen2.5-0.5B"</span>,</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    max_seq_length<span class="op">=</span><span class="dv">2048</span>,</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>    dtype<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    load_in_4bit<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Add LoRA adapters including embed_tokens and lm_head for CPT</span></span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> FastLanguageModel.get_peft_model(</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>    model,</span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>    r<span class="op">=</span><span class="dv">16</span>,</span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>    target_modules<span class="op">=</span>[</span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>        <span class="st">"q_proj"</span>, <span class="st">"k_proj"</span>, <span class="st">"v_proj"</span>, <span class="st">"o_proj"</span>,</span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>        <span class="st">"gate_proj"</span>, <span class="st">"up_proj"</span>, <span class="st">"down_proj"</span>,</span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>        <span class="st">"lm_head"</span>, <span class="st">"embed_tokens"</span>,  <span class="co"># important for CPT</span></span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a>    ],</span>
+<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a>    lora_alpha<span class="op">=</span><span class="dv">16</span>,</span>
+<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a>    lora_dropout<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a>    use_gradient_checkpointing<span class="op">=</span><span class="st">"unsloth"</span>,</span>
+<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="preparing-data-for-continued-pretraining" class="level3">
+<h3 class="anchored" data-anchor-id="preparing-data-for-continued-pretraining">Preparing Data for Continued Pretraining</h3>
+<p>For CPT, the data format is simply raw text (no instruction formatting needed):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datasets <span class="im">import</span> load_dataset</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Load your domain-specific dataset</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>dataset <span class="op">=</span> load_dataset(<span class="st">"json"</span>, data_files<span class="op">=</span><span class="st">"domain_data.jsonl"</span>, split<span class="op">=</span><span class="st">"train"</span>)</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Format as plain text for CPT</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> format_for_cpt(example):</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"text"</span>: example[<span class="st">"text"</span>] <span class="op">+</span> tokenizer.eos_token}</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>dataset <span class="op">=</span> dataset.<span class="bu">map</span>(format_for_cpt)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="running-the-training" class="level3">
+<h3 class="anchored" data-anchor-id="running-the-training">Running the Training</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> unsloth <span class="im">import</span> UnslothTrainer, UnslothTrainingArguments</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>trainer <span class="op">=</span> UnslothTrainer(</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    model<span class="op">=</span>model,</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    tokenizer<span class="op">=</span>tokenizer,</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    train_dataset<span class="op">=</span>dataset,</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>    args<span class="op">=</span>UnslothTrainingArguments(</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>        output_dir<span class="op">=</span><span class="st">"qwen-0.5b-domain-cpt"</span>,</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>        per_device_train_batch_size<span class="op">=</span><span class="dv">4</span>,</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>        gradient_accumulation_steps<span class="op">=</span><span class="dv">8</span>,</span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>        num_train_epochs<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>        learning_rate<span class="op">=</span><span class="fl">5e-5</span>,</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>        embedding_learning_rate<span class="op">=</span><span class="fl">5e-6</span>,  <span class="co"># 10x smaller for embeddings</span></span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>        max_seq_length<span class="op">=</span><span class="dv">2048</span>,</span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>        warmup_steps<span class="op">=</span><span class="dv">100</span>,</span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>        fp16<span class="op">=</span><span class="kw">not</span> torch.cuda.is_bf16_supported(),</span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>        bf16<span class="op">=</span>torch.cuda.is_bf16_supported(),</span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>        logging_steps<span class="op">=</span><span class="dv">10</span>,</span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>        save_steps<span class="op">=</span><span class="dv">500</span>,</span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>        weight_decay<span class="op">=</span><span class="fl">0.01</span>,</span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>        lr_scheduler_type<span class="op">=</span><span class="st">"cosine"</span>,</span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a>        seed<span class="op">=</span><span class="dv">42</span>,</span>
+<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a>    dataset_text_field<span class="op">=</span><span class="st">"text"</span>,</span>
+<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-27"><a href="#cb14-27" aria-hidden="true" tabindex="-1"></a>trainer.train()</span>
+<span id="cb14-28"><a href="#cb14-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-29"><a href="#cb14-29" aria-hidden="true" tabindex="-1"></a><span class="co"># Save the model</span></span>
+<span id="cb14-30"><a href="#cb14-30" aria-hidden="true" tabindex="-1"></a>model.save_pretrained(<span class="st">"qwen-0.5b-domain-cpt"</span>)</span>
+<span id="cb14-31"><a href="#cb14-31" aria-hidden="true" tabindex="-1"></a>tokenizer.save_pretrained(<span class="st">"qwen-0.5b-domain-cpt"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="exporting-for-deployment" class="level3">
+<h3 class="anchored" data-anchor-id="exporting-for-deployment">Exporting for Deployment</h3>
+<p>After continued pretraining, export to GGUF for deployment with Ollama or llama.cpp:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Merge LoRA weights and save full model</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>model.save_pretrained_merged(</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">"qwen-0.5b-domain-merged"</span>,</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>    tokenizer,</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>    save_method<span class="op">=</span><span class="st">"merged_16bit"</span>,</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Export to GGUF for llama.cpp / Ollama</span></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>model.save_pretrained_gguf(</span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>    <span class="st">"qwen-0.5b-domain-gguf"</span>,</span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>    tokenizer,</span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>    quantization_method<span class="op">=</span><span class="st">"q4_k_m"</span>,</span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<blockquote class="blockquote">
+<p>For serving with Ollama or llama.cpp, see <a href="../../posts/llm/Run-LLM-locally-with-Ollama.html">Run LLM locally with Ollama</a> and <a href="../../posts/llm/Deploying-and-Serving-LLM-with-Llama.cpp.html">Deploying and Serving LLM with Llama.cpp</a>.</p>
+</blockquote>
+</section>
+</section>
+<section id="data-mixtures-and-multi-stage-training" class="level2">
+<h2 class="anchored" data-anchor-id="data-mixtures-and-multi-stage-training">7. Data Mixtures and Multi-Stage Training</h2>
+<p>Real pretraining pipelines use <strong>data mixtures</strong> — carefully balanced proportions of web, code, math, and curated data that evolve across training stages.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    S1["Stage 1: Foundation — 0 to 8T tokens"] --&gt; S2["Stage 2: Upsampling — 8 to 10T tokens"]
+    S2 --&gt; S3["Stage 3: Quality Push — 10 to 11T tokens"]
+
+    S1 --&gt; A1["Web 85%"]
+    S1 --&gt; A2["Code 12%"]
+    S1 --&gt; A3["Math 3%"]
+
+    S2 --&gt; B1["Web 75%"]
+    S2 --&gt; B2["Code 15%"]
+    S2 --&gt; B3["Math 10%"]
+
+    S3 --&gt; C1["Web 63%"]
+    S3 --&gt; C2["Code 24%"]
+    S3 --&gt; C3["Math 13%"]
+
+    style S1 fill:#27ae60,color:#fff,stroke:#333
+    style S2 fill:#27ae60,color:#fff,stroke:#333
+    style S3 fill:#27ae60,color:#fff,stroke:#333
+    style A1 fill:#4a90d9,color:#fff,stroke:#333
+    style A2 fill:#f5a623,color:#fff,stroke:#333
+    style A3 fill:#e74c3c,color:#fff,stroke:#333
+    style B1 fill:#4a90d9,color:#fff,stroke:#333
+    style B2 fill:#f5a623,color:#fff,stroke:#333
+    style B3 fill:#e74c3c,color:#fff,stroke:#333
+    style C1 fill:#4a90d9,color:#fff,stroke:#333
+    style C2 fill:#f5a623,color:#fff,stroke:#333
+    style C3 fill:#e74c3c,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p><em>SmolLM3’s three-stage pretraining recipe (11T tokens total). Each stage progressively increases the proportion of high-quality code and math data.</em></p>
+<section id="data-sources-by-category" class="level3">
+<h3 class="anchored" data-anchor-id="data-sources-by-category">Data Sources by Category</h3>
+<p><strong>Web data:</strong></p>
+<ul>
+<li><strong>FineWeb-Edu</strong>: Educational web content filtered by quality classifier</li>
+<li><strong>DCLM</strong>: Cleaned Common Crawl from DataComp</li>
+<li><strong>FineWeb2</strong>: Updated web crawl with multilingual support</li>
+</ul>
+<p><strong>Code data:</strong></p>
+<ul>
+<li><strong>The Stack v2</strong>: 600+ programming languages</li>
+<li><strong>Stack-Edu</strong>: Educationally filtered Python code</li>
+<li><strong>StarCoder2 pull requests</strong>: Real code reviews and discussions</li>
+</ul>
+<p><strong>Math data:</strong></p>
+<ul>
+<li><strong>FineMath</strong>: High-quality math web pages</li>
+<li><strong>InfiWebMath</strong>: Infinite web math extraction</li>
+<li><strong>OpenMathReasoning</strong>: NVIDIA’s 3.2M math dataset</li>
+</ul>
+</section>
+<section id="practical-data-mixture-for-small-models" class="level3">
+<h3 class="anchored" data-anchor-id="practical-data-mixture-for-small-models">Practical Data Mixture for Small Models</h3>
+<p>For a <strong>1B model on ~100B tokens</strong> (achievable on a single 8×H100 node in ~1 week):</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Source</th>
+<th style="text-align: center;">Proportion</th>
+<th style="text-align: center;">Tokens</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>FineWeb-Edu (deduplicated)</td>
+<td style="text-align: center;">60%</td>
+<td style="text-align: center;">60B</td>
+</tr>
+<tr class="even">
+<td>The Stack v2 (Python, JS, Java)</td>
+<td style="text-align: center;">15%</td>
+<td style="text-align: center;">15B</td>
+</tr>
+<tr class="odd">
+<td>Cosmopedia v2 (synthetic textbooks)</td>
+<td style="text-align: center;">10%</td>
+<td style="text-align: center;">10B</td>
+</tr>
+<tr class="even">
+<td>FineMath + InfiWebMath</td>
+<td style="text-align: center;">8%</td>
+<td style="text-align: center;">8B</td>
+</tr>
+<tr class="odd">
+<td>Wikipedia + Books</td>
+<td style="text-align: center;">7%</td>
+<td style="text-align: center;">7B</td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="comparison-from-scratch-vs-continued-pretraining" class="level2">
+<h2 class="anchored" data-anchor-id="comparison-from-scratch-vs-continued-pretraining">Comparison: From-Scratch vs Continued Pretraining</h2>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A{{"What's your&lt;br/&gt;goal?"}}
+    A --&gt;|"New architecture&lt;br/&gt;or language"| B["Pretrain from&lt;br/&gt;Scratch"]
+    A --&gt;|"Domain adaptation&lt;br/&gt;existing model"| C["Continued&lt;br/&gt;Pretraining"]
+    A --&gt;|"Task-specific&lt;br/&gt;behavior"| D["Fine-tuning&lt;br/&gt;(SFT / LoRA)"]
+
+    B --&gt; B1["Need: trillions of tokens&lt;br/&gt;Multi-GPU cluster&lt;br/&gt;Weeks to months"]
+    C --&gt; C1["Need: billions of tokens&lt;br/&gt;1-8 GPUs&lt;br/&gt;Days to weeks"]
+    D --&gt; D1["Need: thousands of examples&lt;br/&gt;1 GPU&lt;br/&gt;Hours to days"]
+
+    style A fill:#e74c3c,color:#fff,stroke:#333
+    style B fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#f5a623,color:#fff,stroke:#333
+    style D fill:#27ae60,color:#fff,stroke:#333
+    style B1 fill:#4a90d9,color:#fff,stroke:#333
+    style C1 fill:#f5a623,color:#fff,stroke:#333
+    style D1 fill:#27ae60,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 13%">
+<col style="width: 24%">
+<col style="width: 39%">
+<col style="width: 22%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Aspect</th>
+<th style="text-align: center;">From Scratch</th>
+<th style="text-align: center;">Continued Pretraining</th>
+<th style="text-align: center;">Fine-tuning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Data needed</strong></td>
+<td style="text-align: center;">Trillions of tokens</td>
+<td style="text-align: center;">Billions of tokens</td>
+<td style="text-align: center;">Thousands of examples</td>
+</tr>
+<tr class="even">
+<td><strong>Compute</strong></td>
+<td style="text-align: center;">100s–1000s GPU-days</td>
+<td style="text-align: center;">10s–100s GPU-days</td>
+<td style="text-align: center;">1–10 GPU-hours</td>
+</tr>
+<tr class="odd">
+<td><strong>Control</strong></td>
+<td style="text-align: center;">Full (architecture, vocab)</td>
+<td style="text-align: center;">Medium (data, schedule)</td>
+<td style="text-align: center;">Low (task behavior)</td>
+</tr>
+<tr class="even">
+<td><strong>Starting point</strong></td>
+<td style="text-align: center;">Random weights</td>
+<td style="text-align: center;">Pre-trained weights</td>
+<td style="text-align: center;">Pre-trained weights</td>
+</tr>
+<tr class="odd">
+<td><strong>Best for</strong></td>
+<td style="text-align: center;">New model family</td>
+<td style="text-align: center;">Domain adaptation</td>
+<td style="text-align: center;">Task specialization</td>
+</tr>
+<tr class="even">
+<td><strong>Tools</strong></td>
+<td style="text-align: center;">nanotron, PyTorch</td>
+<td style="text-align: center;">Unsloth, TRL</td>
+<td style="text-align: center;">Unsloth, TRL</td>
+</tr>
+</tbody>
+</table>
+<section id="practical-recommendations" class="level3">
+<h3 class="anchored" data-anchor-id="practical-recommendations">Practical Recommendations</h3>
+<p>For <strong>single consumer GPU</strong> (16–24 GB):</p>
+<ol type="1">
+<li>Use <strong>continued pretraining</strong> with Unsloth + LoRA on your domain corpus</li>
+<li>Follow with <strong>SFT</strong> on instruction data using <a href="../../posts/llm/Fine-tuning-LLM-with-Unsloth-and-serving-it-with-Ollama.html">Unsloth</a></li>
+<li>Export to GGUF and serve with <a href="../../posts/llm/Run-LLM-locally-with-Ollama.html">Ollama</a> or <a href="../../posts/llm/Deploying-and-Serving-LLM-with-Llama.cpp.html">Llama.cpp</a></li>
+</ol>
+<p>For <strong>small cluster</strong> (8 GPUs):</p>
+<ol type="1">
+<li><strong>Curate data</strong> using datatrove (scrape → filter → dedup → tokenize)</li>
+<li><strong>Pretrain from scratch</strong> or continued pretraining with PyTorch + nanotron</li>
+<li><strong>Post-train</strong> with <a href="../../posts/llm/Post-Training-LLMs-for-Human-Alignment.html">alignment techniques</a> (DPO/GRPO)</li>
+<li>Add <a href="../../posts/llm/Training-LLMs-for-Reasoning.html">reasoning capabilities</a> if needed</li>
+<li>Deploy with <a href="../../posts/llm/Deploying-and-Serving-LLM-with-vLLM.html">vLLM</a> for production</li>
+</ol>
+</section>
+</section>
+<section id="conclusion" class="level2">
+<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
+<p>Training an LLM from scratch is a data-centric endeavor. The quality and diversity of your training corpus matters far more than model size — a small model on excellent data will outperform a larger model on noisy data (as demonstrated by Phi, SmolLM, and MiniCPM).</p>
+<p>The practical path for most practitioners:</p>
+<ol type="1">
+<li><strong>Collect data</strong> using trafilatura or start from FineWeb/Common Crawl</li>
+<li><strong>Clean and filter</strong> with datatrove’s quality and repetition filters</li>
+<li><strong>Deduplicate</strong> with MinHash to remove 30–50% of redundant content</li>
+<li><strong>Tokenize</strong> with an existing tokenizer (or train your own for new domains)</li>
+<li><strong>Train</strong> with Unsloth (continued pretraining) or PyTorch (from scratch)</li>
+<li><strong>Iterate</strong> on data quality — this is where the biggest gains come from</li>
+</ol>
+<p>The tools are all open source and well-documented. The real challenge is data curation, not model training.</p>
+<blockquote class="blockquote">
+<p>For the next steps after pretraining, see <a href="../../posts/llm/Post-Training-LLMs-for-Human-Alignment.html">Post-Training LLMs for Human Alignment</a> and <a href="../../posts/llm/Training-LLMs-for-Reasoning.html">Training LLMs for Reasoning</a>.</p>
+</blockquote>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li>Penedo et al., <em>The FineWeb Datasets: Decanting the Web for the Finest Text Data at Scale</em>, 2024. <a href="https://arxiv.org/abs/2406.17557">arXiv:2406.17557</a></li>
+<li>Ben Allal et al., <em>SmolLM - blazingly fast and remarkably powerful</em>, 2024. <a href="https://huggingface.co/blog/smollm">HuggingFace Blog</a></li>
+<li>Bakouch et al., <em>SmolLM3: smol, multilingual, long-context reasoner</em>, 2025. <a href="https://huggingface.co/blog/smollm3">HuggingFace Blog</a></li>
+<li>Ben Allal et al., <em>Cosmopedia: how to create large-scale synthetic data for pre-training</em>, 2024. <a href="https://huggingface.co/blog/cosmopedia">HuggingFace Blog</a></li>
+<li>Hu et al., <em>MiniCPM: Unveiling the Potential of Small Language Models with Scalable Training Strategies</em>, 2024. <a href="https://arxiv.org/abs/2404.06395">arXiv:2404.06395</a></li>
+<li>Barbaresi, A., <em>Trafilatura: A Web Scraping Library and Command-Line Tool for Text Discovery and Extraction</em>, ACL 2021. <a href="https://aclanthology.org/2021.acl-demo.15/">Paper</a></li>
+<li>Penedo et al., <em>DataTrove: large scale data processing</em>, 2024. <a href="https://github.com/huggingface/datatrove">GitHub</a></li>
+<li>Unsloth Team, <em>Continued Pretraining</em>, 2024. <a href="https://unsloth.ai/docs/basics/continued-pretraining">Docs</a></li>
+</ul>
+</section>
+<section id="read-more" class="level2">
+<h2 class="anchored" data-anchor-id="read-more">Read More</h2>
+<ul>
+<li>Try the <a href="https://github.com/huggingface/datatrove/blob/main/examples/fineweb.py">datatrove FineWeb example</a> to reproduce the FineWeb pipeline</li>
+<li>Explore <a href="https://huggingface.co/datasets/HuggingFaceTB/cosmopedia">Cosmopedia</a> for synthetic pretraining data</li>
+<li>Use the <a href="https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Mistral_v0.3_(7B)-CPT.ipynb">Unsloth continued pretraining notebook</a> for quick domain adaptation</li>
+<li>Read the <a href="https://huggingface.co/blog/smollm">SmolLM blog post</a> for a complete small model training recipe</li>
+</ul>
+<!-- nav-buttons -->
+<p><a href="../../pages/llm.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-brain" aria-label="brain"></i> Explore LLMs</a> <a href="../../index.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-house" aria-label="house"></i> Home</a></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/vectoringai\.com");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> 2025-2026 Vectoring AI. All rights reserved. | <a href="../../pages/privacy.html">Privacy Policy</a></p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
