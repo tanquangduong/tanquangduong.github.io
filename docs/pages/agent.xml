@@ -10,7 +10,1984 @@
 <atom:link href="https://vectoringai.com/pages/agent.xml" rel="self" type="application/rss+xml"/>
 <description>Technical tutorials on AI Agents: autonomous agents, multi-agent systems, tool use, planning, and more.</description>
 <generator>quarto-1.9.36</generator>
-<lastBuildDate>Thu, 23 Apr 2026 12:33:16 GMT</lastBuildDate>
+<lastBuildDate>Thu, 23 Apr 2026 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>Harness Engineering for AI Agents</title>
+  <dc:creator>Quang Duong</dc:creator>
+  <link>https://vectoringai.com/posts/agent/Harness-Engineering-for-AI-Agents.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="https://vectoringai.com/images/agent/harness-engineering-ai-agents-300px.png" class="img-fluid figure-img" width="300"></p>
+<figcaption>Harness engineering: the systems layer wrapping LLM intelligence into production agents</figcaption>
+</figure>
+</div>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>An agent is not just a model. An agent is a <strong>model plus a harness</strong> — the entire system of code, tools, prompts, middleware, and execution infrastructure that wraps the LLM and makes it useful. The model contains the intelligence; the harness makes that intelligence operational.</p>
+<p>This distinction has become a central theme in agent engineering. LangChain defines it simply: <strong>“If you’re not the model, you’re the harness.”</strong> When Anthropic’s Claude Code source code was leaked, it revealed <a href="https://www.reddit.com/r/technology/comments/1scyuod/anthropic_leaked_512k_lines_of_claude_codebut/">512K lines of code</a> — that code is the harness. Even the makers of the most capable model in the world invest heavily in the systems layer around it.</p>
+<p>Harness engineering is the discipline of designing, building, and iteratively improving this systems layer. It sits at the intersection of <a href="../../posts/agent/Design-Patterns-for-AI-Agents.html">design patterns</a>, <a href="../../posts/agent/Building-Skills-for-AI-Agents.html">tool engineering</a>, <a href="../../posts/agent/Memory-Systems-for-Long-Running-Retrieval-Agents.html">memory systems</a>, and <a href="../../posts/agent/Evaluating-and-Debugging-AI-Agents.html">evaluation</a> — connecting all these concerns into a coherent runtime that enables agents to do real work.</p>
+<p>This article covers what a harness is, why it matters, what its core components are, how to customize it with middleware, and how to iteratively improve it using traces and automated analysis.</p>
+</section>
+<section id="what-is-an-agent-harness" class="level2">
+<h2 class="anchored" data-anchor-id="what-is-an-agent-harness">What Is an Agent Harness?</h2>
+<section id="the-equation-agent-model-harness" class="level3">
+<h3 class="anchored" data-anchor-id="the-equation-agent-model-harness">The Equation: Agent = Model + Harness</h3>
+<p>A raw LLM takes in text and produces text. Out of the box, it cannot:</p>
+<ul>
+<li>Maintain durable state across interactions</li>
+<li>Execute code or run commands</li>
+<li>Access real-time knowledge</li>
+<li>Set up environments and install packages</li>
+<li>Coordinate with other agents</li>
+</ul>
+<p>The harness provides all of this. It is every piece of code, configuration, and execution logic that is not the model itself.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 34%">
+<col style="width: 37%">
+<col style="width: 28%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Component</th>
+<th style="text-align: left;">What It Does</th>
+<th style="text-align: left;">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>System Prompts</strong></td>
+<td style="text-align: left;">Instructions, persona, constraints injected into context</td>
+<td style="text-align: left;">“You are a coding agent. Always verify your work before completing.”</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Tools &amp; Skills</strong></td>
+<td style="text-align: left;">Callable functions, APIs, and their descriptions</td>
+<td style="text-align: left;"><code>bash</code>, <code>read_file</code>, <code>web_search</code>, MCP servers</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Bundled Infrastructure</strong></td>
+<td style="text-align: left;">Filesystem, sandbox, browser, code interpreter</td>
+<td style="text-align: left;">Docker containers, Daytona sandboxes</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Orchestration Logic</strong></td>
+<td style="text-align: left;">Subagent spawning, handoffs, model routing</td>
+<td style="text-align: left;">Supervisor patterns, parallel workers</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Hooks / Middleware</strong></td>
+<td style="text-align: left;">Deterministic checks around model and tool calls</td>
+<td style="text-align: left;">Compaction, loop detection, PII redaction</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Memory Systems</strong></td>
+<td style="text-align: left;">AGENTS.md files, long-term memory stores, context injection</td>
+<td style="text-align: left;">Filesystem-based memory, vector stores</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Context Management</strong></td>
+<td style="text-align: left;">Compaction, tool-call offloading, progressive disclosure</td>
+<td style="text-align: left;">Summarization when context fills up</td>
+</tr>
+</tbody>
+</table>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["Agent = Model + Harness"] --&gt; B["Model&lt;br/&gt;&lt;small&gt;LLM weights, intelligence&lt;/small&gt;"]
+    A --&gt; C["Harness&lt;br/&gt;&lt;small&gt;Everything else&lt;/small&gt;"]
+    C --&gt; D["System Prompts"]
+    C --&gt; E["Tools &amp; Skills"]
+    C --&gt; F["Infrastructure&lt;br/&gt;&lt;small&gt;Filesystem, sandbox&lt;/small&gt;"]
+    C --&gt; G["Orchestration&lt;br/&gt;&lt;small&gt;Subagents, routing&lt;/small&gt;"]
+    C --&gt; H["Middleware&lt;br/&gt;&lt;small&gt;Hooks, checks&lt;/small&gt;"]
+    C --&gt; I["Memory&lt;br/&gt;&lt;small&gt;Short-term, long-term&lt;/small&gt;"]
+    C --&gt; J["Context Management&lt;br/&gt;&lt;small&gt;Compaction, offloading&lt;/small&gt;"]
+
+    style A fill:#9b59b6,color:#fff,stroke:#333
+    style B fill:#e67e22,color:#fff,stroke:#333
+    style C fill:#3498db,color:#fff,stroke:#333
+    style D fill:#27ae60,color:#fff,stroke:#333
+    style E fill:#27ae60,color:#fff,stroke:#333
+    style F fill:#27ae60,color:#fff,stroke:#333
+    style G fill:#27ae60,color:#fff,stroke:#333
+    style H fill:#27ae60,color:#fff,stroke:#333
+    style I fill:#27ae60,color:#fff,stroke:#333
+    style J fill:#27ae60,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="real-world-harnesses" class="level3">
+<h3 class="anchored" data-anchor-id="real-world-harnesses">Real-World Harnesses</h3>
+<p>Every major agent product is built on a harness:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 46%">
+<col style="width: 23%">
+<col style="width: 30%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Agent Product</th>
+<th style="text-align: left;">Model</th>
+<th style="text-align: left;">Harness</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Claude Code</strong></td>
+<td style="text-align: left;">Claude Sonnet/Opus</td>
+<td style="text-align: left;">~512K lines of orchestration, tool management, context engineering</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>OpenAI Codex</strong></td>
+<td style="text-align: left;">GPT-5.2-Codex</td>
+<td style="text-align: left;">Container runtime, apply_patch tool, encrypted compaction</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Deep Agents</strong></td>
+<td style="text-align: left;">Model-agnostic</td>
+<td style="text-align: left;">Open-source harness with middleware stack, memory plugins</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>OpenClaw</strong></td>
+<td style="text-align: left;">Multiple models</td>
+<td style="text-align: left;">Pi framework + SOUL.md + skill system</td>
+</tr>
+</tbody>
+</table>
+<p>The key insight: <strong>even when web search or code execution appears “built into” a provider’s API, it’s still a harness</strong> — a lightweight system behind the API that orchestrates the model with those tools via tool calling.</p>
+</section>
+<section id="where-harness-engineering-fits" class="level3">
+<h3 class="anchored" data-anchor-id="where-harness-engineering-fits">Where Harness Engineering Fits</h3>
+<p>Harness engineering is not one thing — it connects multiple concerns in the agent development lifecycle:</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    A["Design Patterns"] --&gt; H["Harness Engineering"]
+    B["Skills &amp; Tools"] --&gt; H
+    C["Memory Systems"] --&gt; H
+    D["Guardrails &amp; Safety"] --&gt; H
+    E["Evaluation &amp; Debugging"] --&gt; H
+    H --&gt; F["Production Agent"]
+
+    style H fill:#9b59b6,color:#fff,stroke:#333
+    style F fill:#27ae60,color:#fff,stroke:#333
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#4a90d9,color:#fff,stroke:#333
+    style D fill:#4a90d9,color:#fff,stroke:#333
+    style E fill:#4a90d9,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p><a href="../../posts/agent/Design-Patterns-for-AI-Agents.html">Design patterns</a> define the architectural blueprint — ReAct loops, orchestrator-workers, evaluator-optimizer. The harness is where those patterns become running code. <a href="../../posts/agent/Building-Skills-for-AI-Agents.html">Skills</a> are the capabilities the harness loads and exposes. <a href="../../posts/agent/Memory-Systems-for-Long-Running-Retrieval-Agents.html">Memory</a> is managed by the harness. <a href="../../posts/agent/Guardrails-and-Safety-for-Autonomous-Retrieval-Agents.html">Guardrails</a> are enforced by harness middleware. And <a href="../../posts/agent/Evaluating-and-Debugging-AI-Agents.html">evaluation</a> produces the traces that drive harness improvement.</p>
+</section>
+</section>
+<section id="core-harness-primitives" class="level2">
+<h2 class="anchored" data-anchor-id="core-harness-primitives">Core Harness Primitives</h2>
+<section id="filesystem-the-foundation" class="level3">
+<h3 class="anchored" data-anchor-id="filesystem-the-foundation">Filesystem: The Foundation</h3>
+<p>The filesystem is the most foundational harness primitive because of what it unlocks:</p>
+<ul>
+<li><strong>Workspace</strong>: Agents get a workspace to read data, code, and documentation</li>
+<li><strong>Durable state</strong>: Work can be incrementally added and offloaded instead of holding everything in context. Intermediate outputs persist across sessions</li>
+<li><strong>Collaboration surface</strong>: Multiple agents and humans can coordinate through shared files</li>
+<li><strong>Memory</strong>: Standards like <code>AGENTS.md</code> and <code>CLAUDE.md</code> are filesystem-based memory that gets injected into context on agent start</li>
+</ul>
+<p>Git adds versioning so agents can track work, rollback errors, and branch experiments.</p>
+</section>
+<section id="code-execution-the-general-purpose-tool" class="level3">
+<h3 class="anchored" data-anchor-id="code-execution-the-general-purpose-tool">Code Execution: The General-Purpose Tool</h3>
+<p>The main agent execution pattern is a <a href="../../posts/agent/Building-a-ReAct-Agent-from-Scratch.html">ReAct loop</a> — reason, act via tool call, observe, repeat. But harnesses can only execute the tools they have logic for. Instead of building tools for every possible action, harnesses ship with bash/code execution as a general-purpose tool:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Instead of pre-building every tool...</span></span>
+<span id="cb1-2"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb1-3"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> install_package(name: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>): ...</span>
+<span id="cb1-4"></span>
+<span id="cb1-5"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb1-6"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> run_tests(path: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>): ...</span>
+<span id="cb1-7"></span>
+<span id="cb1-8"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb1-9"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> check_syntax(<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">file</span>: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>): ...</span>
+<span id="cb1-10"></span>
+<span id="cb1-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># ...give the agent a general-purpose tool</span></span>
+<span id="cb1-12"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb1-13"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> bash(command: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb1-14">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Execute a bash command in the agent's sandbox.</span></span>
+<span id="cb1-15"></span>
+<span id="cb1-16"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Use this for installing packages, running tests, checking syntax,</span></span>
+<span id="cb1-17"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    and any other command-line operation. The agent can design its own</span></span>
+<span id="cb1-18"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    tools on the fly via code.</span></span>
+<span id="cb1-19"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    """</span></span>
+<span id="cb1-20">    ...</span></code></pre></div></div>
+<p>This is a major step toward general-purpose autonomy — the model can solve problems by writing and executing code rather than being constrained to a fixed set of pre-configured tools.</p>
+</section>
+<section id="sandboxes-safe-execution-environments" class="level3">
+<h3 class="anchored" data-anchor-id="sandboxes-safe-execution-environments">Sandboxes: Safe Execution Environments</h3>
+<p>Running agent-generated code locally is risky and does not scale. Sandboxes provide:</p>
+<ul>
+<li><strong>Isolation</strong>: Secure execution of agent-generated code</li>
+<li><strong>Scale</strong>: Environments created on demand, fanned out across tasks, torn down when done</li>
+<li><strong>Defaults</strong>: Pre-installed runtimes, packages, CLIs for git and testing, browsers for verification</li>
+</ul>
+<p>The model does not configure its own execution environment. Deciding where the agent runs, what tools are available, what it can access, and how it verifies its work — these are all harness-level design decisions.</p>
+</section>
+<section id="context-management-battling-context-rot" class="level3">
+<h3 class="anchored" data-anchor-id="context-management-battling-context-rot">Context Management: Battling Context Rot</h3>
+<p><a href="https://research.trychroma.com/context-rot">Context rot</a> describes how model performance degrades as the context window fills. Harnesses are fundamentally <strong>delivery mechanisms for good context engineering</strong>:</p>
+<p><strong>Compaction</strong> — When the context window approaches its limit, the harness summarizes the existing conversation so the agent can continue working without losing critical information.</p>
+<p><strong>Tool-call offloading</strong> — Large tool outputs clutter the context. The harness keeps the head and tail tokens of tool outputs above a threshold and offloads the full output to the filesystem so the model can access it if needed.</p>
+<p><strong>Progressive skill disclosure</strong> — Instead of loading all skill instructions into context on start (which degrades performance before the agent begins working), harnesses load brief descriptions upfront and full instructions on demand. This connects directly to the progressive disclosure pattern from <a href="../../posts/agent/Building-Skills-for-AI-Agents.html">Building Skills for AI Agents</a>.</p>
+</section>
+<section id="memory-tied-to-the-harness" class="level3">
+<h3 class="anchored" data-anchor-id="memory-tied-to-the-harness">Memory: Tied to the Harness</h3>
+<p>A critical insight from Sarah Wooders (CTO of Letta): <strong>“Asking to plug memory into an agent harness is like asking to plug driving into a car.”</strong> Managing context — and therefore memory — is a core capability and responsibility of the harness.</p>
+<p>The harness decides:</p>
+<ul>
+<li>How is the <code>AGENTS.md</code> or <code>CLAUDE.md</code> file loaded into context?</li>
+<li>How is skill metadata shown to the agent?</li>
+<li>Can the agent modify its own system instructions?</li>
+<li>What survives compaction, and what is lost?</li>
+<li>Are interactions stored and made queryable?</li>
+<li>How is memory metadata presented to the agent?</li>
+</ul>
+<p><strong>Short-term memory</strong> (messages, tool results) is handled directly by the harness. <strong>Long-term memory</strong> (cross-session) needs to be updated and read by the harness. This has a critical implication: <strong>if you use a closed harness, you don’t own your memory</strong>. Memory creates lock-in that model providers do not get from just the model.</p>
+<p>For a deeper treatment of memory architectures, see <a href="../../posts/agent/Memory-Systems-for-Long-Running-Retrieval-Agents.html">Memory Systems for Long-Running Retrieval Agents</a>.</p>
+</section>
+</section>
+<section id="customizing-harnesses-with-middleware" class="level2">
+<h2 class="anchored" data-anchor-id="customizing-harnesses-with-middleware">Customizing Harnesses with Middleware</h2>
+<section id="what-is-agent-middleware" class="level3">
+<h3 class="anchored" data-anchor-id="what-is-agent-middleware">What Is Agent Middleware?</h3>
+<p>The core of every agent harness is simple: an LLM running in a loop, calling tools. Middleware exposes hooks that let you run custom logic before and after each step, so you control what happens at every stage:</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph Agent_Loop ["Agent Loop"]
+        A["before_agent&lt;br/&gt;&lt;small&gt;Load memory, validate input&lt;/small&gt;"]
+        B["before_model&lt;br/&gt;&lt;small&gt;Trim history, catch PII&lt;/small&gt;"]
+        C["wrap_model_call&lt;br/&gt;&lt;small&gt;Caching, retries, tool selection&lt;/small&gt;"]
+        D["Model Call"]
+        E["after_model&lt;br/&gt;&lt;small&gt;Human-in-the-loop&lt;/small&gt;"]
+        F["wrap_tool_call&lt;br/&gt;&lt;small&gt;Inject context, gate tools&lt;/small&gt;"]
+        G["Tool Execution"]
+        H["after_agent&lt;br/&gt;&lt;small&gt;Save results, clean up&lt;/small&gt;"]
+    end
+
+    A --&gt; B --&gt; C --&gt; D --&gt; E --&gt; F --&gt; G
+    G --&gt;|"Loop"| B
+    G --&gt;|"Done"| H
+
+    style D fill:#e67e22,color:#fff,stroke:#333
+    style G fill:#27ae60,color:#fff,stroke:#333
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#4a90d9,color:#fff,stroke:#333
+    style C fill:#4a90d9,color:#fff,stroke:#333
+    style E fill:#4a90d9,color:#fff,stroke:#333
+    style F fill:#4a90d9,color:#fff,stroke:#333
+    style H fill:#4a90d9,color:#fff,stroke:#333
+    style Agent_Loop fill:#e8f4fd
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 19%">
+<col style="width: 45%">
+<col style="width: 35%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Hook</th>
+<th style="text-align: left;">When It Fires</th>
+<th style="text-align: left;">Use Cases</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><code>before_agent</code></td>
+<td style="text-align: left;">Once on invocation</td>
+<td style="text-align: left;">Load memory, connect to resources, validate input</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>before_model</code></td>
+<td style="text-align: left;">Before each model call</td>
+<td style="text-align: left;">Trim history, catch PII before it hits the LLM</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><code>wrap_model_call</code></td>
+<td style="text-align: left;">Wraps model call end-to-end</td>
+<td style="text-align: left;">Caching, retries, dynamic tool selection</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>after_model</code></td>
+<td style="text-align: left;">After model responds, before tool execution</td>
+<td style="text-align: left;">Human-in-the-loop, content moderation</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><code>wrap_tool_call</code></td>
+<td style="text-align: left;">Wraps tool execution</td>
+<td style="text-align: left;">Inject context, intercept results, gate which tools run</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>after_agent</code></td>
+<td style="text-align: left;">Once on completion</td>
+<td style="text-align: left;">Save results, send notifications, clean up</td>
+</tr>
+</tbody>
+</table>
+<p>Middleware is composable — mix and match to build application-specific harnesses.</p>
+</section>
+<section id="common-middleware-patterns" class="level3">
+<h3 class="anchored" data-anchor-id="common-middleware-patterns">Common Middleware Patterns</h3>
+<p><strong>PII Detection</strong> — Deterministic policy enforcement that cannot live in a prompt. You cannot prompt your way to HIPAA compliance:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langchain.middleware <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> PIIMiddleware</span>
+<span id="cb2-2"></span>
+<span id="cb2-3"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Masks/redacts/hashes PII on model inputs, outputs, and tool outputs</span></span>
+<span id="cb2-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Raises PIIDetectionError for critical PII detection situations</span></span>
+<span id="cb2-5">pii_middleware <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> PIIMiddleware(</span>
+<span id="cb2-6">    action<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"redact"</span>,  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># or "mask", "hash"</span></span>
+<span id="cb2-7">    on_critical<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"raise"</span>,</span>
+<span id="cb2-8">)</span></code></pre></div></div>
+<p><strong>Dynamic Tool Selection</strong> — A fast LLM identifies which tools from a registry are relevant for a given request, binding only those tools to the main model call. This minimizes context bloat from unnecessary tools:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langchain.middleware <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> LLMToolSelectorMiddleware</span>
+<span id="cb3-2"></span>
+<span id="cb3-3"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Runs a fast model in wrap_model_call to select relevant tools</span></span>
+<span id="cb3-4">tool_selector <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> LLMToolSelectorMiddleware(</span>
+<span id="cb3-5">    selector_model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>ChatOpenAI(model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"gpt-4o-mini"</span>),</span>
+<span id="cb3-6">    tool_registry<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>all_available_tools,</span>
+<span id="cb3-7">)</span></code></pre></div></div>
+<p><strong>Summarization and Context Offloading</strong> — Prevents context overflow by summarizing message history and offloading verbose tool outputs to the filesystem:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langchain.middleware <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> SummarizationMiddleware</span>
+<span id="cb4-2"></span>
+<span id="cb4-3"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Summarizes history when it exceeds token threshold</span></span>
+<span id="cb4-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Extends verbose tool outputs to filesystem</span></span>
+<span id="cb4-5">summarization <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> SummarizationMiddleware(</span>
+<span id="cb4-6">    token_threshold<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100_000</span>,</span>
+<span id="cb4-7">    offload_tool_outputs<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb4-8">)</span></code></pre></div></div>
+<p><strong>Loop Detection</strong> — Tracks per-file edit counts and nudges reconsideration when the agent enters “doom loops” (10+ edits to the same file without progress):</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">class</span> LoopDetectionMiddleware(AgentMiddleware):</span>
+<span id="cb5-2">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Detect and break doom loops where the agent makes</span></span>
+<span id="cb5-3"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    repeated small variations to the same broken approach."""</span></span>
+<span id="cb5-4"></span>
+<span id="cb5-5">    <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">__init__</span>(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>, max_edits_per_file: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>):</span>
+<span id="cb5-6">        <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.edit_counts <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {}</span>
+<span id="cb5-7">        <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.max_edits <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> max_edits_per_file</span>
+<span id="cb5-8"></span>
+<span id="cb5-9">    <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> wrap_tool_call(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>, tool_name, tool_input, call_fn):</span>
+<span id="cb5-10">        result <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> call_fn(tool_name, tool_input)</span>
+<span id="cb5-11"></span>
+<span id="cb5-12">        <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Track edits per file</span></span>
+<span id="cb5-13">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> tool_name <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> (<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"edit_file"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"write_file"</span>):</span>
+<span id="cb5-14">            path <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> tool_input.get(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"path"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">""</span>)</span>
+<span id="cb5-15">            <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.edit_counts[path] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.edit_counts.get(path, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span></span>
+<span id="cb5-16"></span>
+<span id="cb5-17">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.edit_counts[path] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;=</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.max_edits:</span>
+<span id="cb5-18">                result <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+=</span> (</span>
+<span id="cb5-19">                    <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">⚠️ You have edited </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>path<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">.</span>edit_counts[path]<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> times. "</span></span>
+<span id="cb5-20">                    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Consider reconsidering your approach entirely."</span></span>
+<span id="cb5-21">                )</span>
+<span id="cb5-22"></span>
+<span id="cb5-23">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> result</span></code></pre></div></div>
+<p><strong>Pre-Completion Checklist</strong> — Intercepts the agent before it exits and forces a verification pass against the task specification:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">class</span> PreCompletionChecklistMiddleware(AgentMiddleware):</span>
+<span id="cb6-2">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Force the agent to verify its work before completing."""</span></span>
+<span id="cb6-3"></span>
+<span id="cb6-4">    <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> after_model(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>, response):</span>
+<span id="cb6-5">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> response.is_final_answer:</span>
+<span id="cb6-6">            <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Reinject a verification prompt instead of exiting</span></span>
+<span id="cb6-7">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>.inject_message(</span>
+<span id="cb6-8">                <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Before completing, verify your solution:</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb6-9">                <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"1. Re-read the original task specification</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb6-10">                <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"2. Run all tests and check output</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb6-11">                <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"3. Compare results against what was asked (not your own code)</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb6-12">                <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"4. Confirm all requirements are met"</span></span>
+<span id="cb6-13">            )</span>
+<span id="cb6-14">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> response</span></code></pre></div></div>
+</section>
+<section id="composing-a-full-middleware-stack" class="level3">
+<h3 class="anchored" data-anchor-id="composing-a-full-middleware-stack">Composing a Full Middleware Stack</h3>
+<p>A production harness like LangChain’s Deep Agents composes multiple middleware layers:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langchain.agents <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> create_agent</span>
+<span id="cb7-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langchain.middleware <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> (</span>
+<span id="cb7-3">    SummarizationMiddleware,</span>
+<span id="cb7-4">    ShellToolMiddleware,</span>
+<span id="cb7-5">    PIIMiddleware,</span>
+<span id="cb7-6">    ModelRetryMiddleware,</span>
+<span id="cb7-7">)</span>
+<span id="cb7-8"></span>
+<span id="cb7-9">agent <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> create_agent(</span>
+<span id="cb7-10">    model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>ChatOpenAI(model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"gpt-4o"</span>),</span>
+<span id="cb7-11">    tools<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[...],</span>
+<span id="cb7-12">    system_prompt<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"You are a coding assistant..."</span>,</span>
+<span id="cb7-13">    middleware<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[</span>
+<span id="cb7-14">        ShellToolMiddleware(),              <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Initialize shell on start</span></span>
+<span id="cb7-15">        PIIMiddleware(action<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"redact"</span>),      <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Enforce PII policy</span></span>
+<span id="cb7-16">        ModelRetryMiddleware(max_retries<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>), <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Handle API failures</span></span>
+<span id="cb7-17">        SummarizationMiddleware(             <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Manage context window</span></span>
+<span id="cb7-18">            token_threshold<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100_000</span></span>
+<span id="cb7-19">        ),</span>
+<span id="cb7-20">        LoopDetectionMiddleware(             <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Break doom loops</span></span>
+<span id="cb7-21">            max_edits_per_file<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span></span>
+<span id="cb7-22">        ),</span>
+<span id="cb7-23">        PreCompletionChecklistMiddleware(),  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Force verification</span></span>
+<span id="cb7-24">    ],</span>
+<span id="cb7-25">)</span></code></pre></div></div>
+</section>
+</section>
+<section id="the-harness-improvement-loop" class="level2">
+<h2 class="anchored" data-anchor-id="the-harness-improvement-loop">The Harness Improvement Loop</h2>
+<section id="why-traces-are-the-core" class="level3">
+<h3 class="anchored" data-anchor-id="why-traces-are-the-core">Why Traces Are the Core</h3>
+<p>The most powerful aspect of harness engineering is that harnesses can be <strong>iteratively improved</strong> using execution traces. This is fundamentally different from model training — you are improving the system around the model, not the model itself.</p>
+<p>The recipe:</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    A["Run Agent&lt;br/&gt;on Tasks"] --&gt; B["Collect Traces&lt;br/&gt;(LangSmith)"]
+    B --&gt; C["Analyze Failures&lt;br/&gt;(Automated)"]
+    C --&gt; D["Propose Harness&lt;br/&gt;Changes"]
+    D --&gt; E["Evaluate"]
+    E --&gt;|"Repeat"| A
+
+    style A fill:#4a90d9,color:#fff,stroke:#333
+    style B fill:#27ae60,color:#fff,stroke:#333
+    style C fill:#e67e22,color:#fff,stroke:#333
+    style D fill:#9b59b6,color:#fff,stroke:#333
+    style E fill:#e74c3c,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<ol type="1">
+<li><strong>Run</strong> the agent over a set of tasks</li>
+<li><strong>Collect</strong> full execution traces — every model call, tool invocation, and result</li>
+<li><strong>Analyze</strong> failures using automated trace-analysis agents that diagnose error patterns</li>
+<li><strong>Propose</strong> targeted changes to the harness (prompts, tools, middleware)</li>
+<li><strong>Evaluate</strong> and repeat</li>
+</ol>
+<p>This works similarly to <a href="https://en.wikipedia.org/wiki/Boosting_(machine_learning)">boosting</a> in machine learning — each round focuses on the mistakes from the previous round.</p>
+</section>
+<section id="case-study-deep-agents-on-terminalbench-2.0" class="level3">
+<h3 class="anchored" data-anchor-id="case-study-deep-agents-on-terminalbench-2.0">Case Study: Deep Agents on TerminalBench 2.0</h3>
+<p>LangChain demonstrated the power of harness engineering by improving their Deep Agents coding agent from <strong>52.8% to 66.5%</strong> on <a href="https://www.tbench.ai/leaderboard/terminal-bench/2.0">TerminalBench 2.0</a> — a <strong>+13.7 point improvement by only changing the harness</strong>, keeping the model (GPT-5.2-Codex) fixed.</p>
+<p>The knobs they turned:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 27%">
+<col style="width: 36%">
+<col style="width: 36%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Knob</th>
+<th style="text-align: left;">Change</th>
+<th style="text-align: left;">Impact</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>System Prompt</strong></td>
+<td style="text-align: left;">Added structured problem-solving guidance: Plan → Build → Verify → Fix</td>
+<td style="text-align: left;">Agents stopped at first plausible solution less often</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Self-Verification</strong></td>
+<td style="text-align: left;">Added <code>PreCompletionChecklistMiddleware</code> to force testing before exit</td>
+<td style="text-align: left;">Caught errors that agents missed in self-review</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Context Injection</strong></td>
+<td style="text-align: left;">Added <code>LocalContextMiddleware</code> to map directory structures and discover tools on start</td>
+<td style="text-align: left;">Reduced search errors and onboarding time</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Loop Detection</strong></td>
+<td style="text-align: left;">Added <code>LoopDetectionMiddleware</code> to break doom loops</td>
+<td style="text-align: left;">Recovered from repeated failed approaches</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Reasoning Budget</strong></td>
+<td style="text-align: left;">Used a “reasoning sandwich” — xhigh for planning, high for implementation, xhigh for verification</td>
+<td style="text-align: left;">Balanced compute spend vs.&nbsp;timeout limits</td>
+</tr>
+</tbody>
+</table>
+<p>The trace analysis workflow was itself built as a reusable Agent Skill:</p>
+<ol type="1">
+<li>Fetch experiment traces from LangSmith</li>
+<li>Spawn parallel error-analysis agents — each examines a subset of failed traces</li>
+<li>Main agent synthesizes findings and proposes changes</li>
+<li>Human reviews and approves targeted harness changes</li>
+</ol>
+</section>
+<section id="meta-harness-automated-harness-optimization" class="level3">
+<h3 class="anchored" data-anchor-id="meta-harness-automated-harness-optimization">Meta-Harness: Automated Harness Optimization</h3>
+<p>The <a href="https://arxiv.org/abs/2603.28052">Meta-Harness</a> paper from Stanford (Lee et al., 2026) formalizes harness optimization as a search problem. The key innovation: give the proposer agent access to the <strong>full execution context</strong> rather than compressed summaries.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    A["Filesystem"] --&gt; B["All Prior Candidates'&lt;br/&gt;Source Code"]
+    A --&gt; C["Execution Traces&lt;br/&gt;&amp; Error Logs"]
+    A --&gt; D["Scores"]
+    B --&gt; E["Proposer Agent&lt;br/&gt;(Claude Code)"]
+    C --&gt; E
+    D --&gt; E
+    E --&gt; F["Proposed Harness"]
+    F --&gt; G["Evaluate on&lt;br/&gt;Held-out Tasks"]
+    G --&gt; H["Store Logs"]
+    H --&gt; A
+
+    style E fill:#9b59b6,color:#fff,stroke:#333
+    style A fill:#3498db,color:#fff,stroke:#333
+    style G fill:#27ae60,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p>The proposer is a coding agent (Claude Code) that reads a filesystem containing all prior candidates’ source code, execution traces, and scores. It uses standard tools (<code>grep</code>, <code>cat</code>) to search through up to <strong>10M tokens of diagnostic context per step</strong> — compared to at most 26K for prior methods like Self-Refine or OPRO.</p>
+<p>Results:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 34%">
+<col style="width: 37%">
+<col style="width: 28%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Benchmark</th>
+<th style="text-align: left;">Improvement</th>
+<th style="text-align: left;">Ranking</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>TerminalBench 2.0 (Opus 4.6)</strong></td>
+<td style="text-align: left;">76.4% pass rate</td>
+<td style="text-align: left;">#2 among all Opus 4.6 agents</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>TerminalBench 2.0 (Haiku 4.5)</strong></td>
+<td style="text-align: left;">37.6% pass rate</td>
+<td style="text-align: left;">#1 among all Haiku 4.5 agents</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Text Classification</strong></td>
+<td style="text-align: left;">+7.7 points over ACE</td>
+<td style="text-align: left;">Using 4x fewer context tokens</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Math Reasoning</strong></td>
+<td style="text-align: left;">+4.7 points average</td>
+<td style="text-align: left;">Transfers across 5 unseen models</td>
+</tr>
+</tbody>
+</table>
+<p>The most striking finding: harness improvements <strong>transfer across models</strong>. A retrieval harness optimized on one model improved accuracy on five held-out models. This suggests that good harness engineering captures domain knowledge that benefits any sufficiently capable model.</p>
+</section>
+</section>
+<section id="continual-learning-at-three-layers" class="level2">
+<h2 class="anchored" data-anchor-id="continual-learning-at-three-layers">Continual Learning at Three Layers</h2>
+<p>Harness engineering is one of three layers where AI agents can learn and improve over time:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 15%">
+<col style="width: 24%">
+<col style="width: 31%">
+<col style="width: 28%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Layer</th>
+<th style="text-align: left;">What Is It</th>
+<th style="text-align: left;">How It Learns</th>
+<th style="text-align: left;">Granularity</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Model</strong></td>
+<td style="text-align: left;">LLM weights</td>
+<td style="text-align: left;">SFT, RL (GRPO), fine-tuning</td>
+<td style="text-align: left;">Agent-level (risk of catastrophic forgetting)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Harness</strong></td>
+<td style="text-align: left;">Code + always-present instructions/tools</td>
+<td style="text-align: left;">Trace analysis → propose code changes</td>
+<td style="text-align: left;">Agent-level</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Context</strong></td>
+<td style="text-align: left;">Instructions, skills, memory outside the harness</td>
+<td style="text-align: left;">Update AGENTS.md, skills, user preferences</td>
+<td style="text-align: left;">Agent, user, or org-level</td>
+</tr>
+</tbody>
+</table>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph "Agentic System"
+        M["Model Layer&lt;br/&gt;&lt;small&gt;LLM weights&lt;/small&gt;"]
+        H["Harness Layer&lt;br/&gt;&lt;small&gt;Code, prompts, tools, middleware&lt;/small&gt;"]
+        C["Context Layer&lt;br/&gt;&lt;small&gt;AGENTS.md, skills, memory&lt;/small&gt;"]
+    end
+
+    M --&gt; H --&gt; C
+
+    subgraph "Learning Methods"
+        ML["SFT, RL, Fine-tuning"]
+        HL["Trace Analysis →&lt;br/&gt;Harness Code Changes"]
+        CL["Memory Updates&lt;br/&gt;Online &amp; Offline"]
+    end
+
+    ML -.-&gt; M
+    HL -.-&gt; H
+    CL -.-&gt; C
+
+    style M fill:#e67e22,color:#fff,stroke:#333
+    style H fill:#3498db,color:#fff,stroke:#333
+    style C fill:#27ae60,color:#fff,stroke:#333
+    style ML fill:#e67e22,color:#fff,stroke:#333
+    style HL fill:#3498db,color:#fff,stroke:#333
+    style CL fill:#27ae60,color:#fff,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p><strong>Example — Claude Code:</strong></p>
+<ul>
+<li><strong>Model</strong>: Claude Sonnet/Opus (updated by Anthropic)</li>
+<li><strong>Harness</strong>: Claude Code application (~512K lines)</li>
+<li><strong>Context</strong>: <code>CLAUDE.md</code>, <code>/skills</code>, <code>mcp.json</code> (user-configurable)</li>
+</ul>
+<p><strong>Example — OpenClaw:</strong></p>
+<ul>
+<li><strong>Model</strong>: Multiple (model-agnostic)</li>
+<li><strong>Harness</strong>: Pi + scaffolding</li>
+<li><strong>Context</strong>: <code>SOUL.md</code>, skills from CrawHub (agent-level context that updates over time via “dreaming”)</li>
+</ul>
+<p>Context-layer learning is the most accessible and happens in two ways:</p>
+<ul>
+<li><strong>Offline (“dreaming”)</strong>: Analyze recent traces in a background job, extract insights, update memory — as OpenClaw does with its <code>SOUL.md</code></li>
+<li><strong>In the hot path</strong>: The agent updates its memory while working on the current task — either prompted by the user or based on core harness instructions</li>
+</ul>
+</section>
+<section id="harness-engineering-in-practice" class="level2">
+<h2 class="anchored" data-anchor-id="harness-engineering-in-practice">Harness Engineering in Practice</h2>
+<section id="principle-1-context-engineering-on-behalf-of-agents" class="level3">
+<h3 class="anchored" data-anchor-id="principle-1-context-engineering-on-behalf-of-agents">Principle 1: Context Engineering on Behalf of Agents</h3>
+<p>Context assembly is difficult for agents, especially in unseen environments. The harness should onboard the agent with:</p>
+<ul>
+<li>Directory structures and available tools</li>
+<li>Coding best practices and problem-solving strategies</li>
+<li>Environment constraints (timeouts, resource limits)</li>
+<li>Evaluation criteria</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">class</span> LocalContextMiddleware(AgentMiddleware):</span>
+<span id="cb8-2">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Map the agent's working environment on start."""</span></span>
+<span id="cb8-3"></span>
+<span id="cb8-4">    <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> before_agent(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">self</span>, state):</span>
+<span id="cb8-5">        <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Discover directory structure</span></span>
+<span id="cb8-6">        dir_tree <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> run_bash(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"find . -maxdepth 3 -type f | head -50"</span>)</span>
+<span id="cb8-7"></span>
+<span id="cb8-8">        <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Discover available tools</span></span>
+<span id="cb8-9">        python_version <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> run_bash(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"python3 --version 2&gt;&amp;1"</span>)</span>
+<span id="cb8-10">        available_tools <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> run_bash(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"which git pytest npm 2&gt;/dev/null"</span>)</span>
+<span id="cb8-11"></span>
+<span id="cb8-12">        state[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"system_context"</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> (</span>
+<span id="cb8-13">            <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Working directory contents:</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>dir_tree<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb8-14">            <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Environment: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>python_version<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb8-15">            <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Available tools: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>available_tools<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb8-16">        )</span>
+<span id="cb8-17">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> state</span></code></pre></div></div>
+</section>
+<section id="principle-2-build-verify-loops" class="level3">
+<h3 class="anchored" data-anchor-id="principle-2-build-verify-loops">Principle 2: Build-Verify Loops</h3>
+<p>The most common failure pattern: the agent writes a solution, re-reads its own code, confirms it looks okay, and stops. <strong>Self-verification using external signals</strong> (running tests, checking outputs against the spec) dramatically improves outcomes.</p>
+<p>The recommended problem-solving flow:</p>
+<ol type="1">
+<li><strong>Plan &amp; Discover</strong>: Read the task, scan the codebase, build an initial plan including how to verify</li>
+<li><strong>Build</strong>: Implement with verification in mind — write tests for both happy paths and edge cases</li>
+<li><strong>Verify</strong>: Run tests, read full output, compare against what was asked (not against your own code)</li>
+<li><strong>Fix</strong>: Analyze errors, revisit the original spec, fix issues</li>
+</ol>
+</section>
+<section id="principle-3-design-around-model-weaknesses" class="level3">
+<h3 class="anchored" data-anchor-id="principle-3-design-around-model-weaknesses">Principle 3: Design Around Model Weaknesses</h3>
+<p>Today’s models have known weaknesses that the harness should engineer around:</p>
+<ul>
+<li><strong>Early stopping</strong>: Models declare “done” at the first plausible solution → Add <code>PreCompletionChecklistMiddleware</code></li>
+<li><strong>Doom loops</strong>: Models make small variations to the same broken approach → Add <code>LoopDetectionMiddleware</code></li>
+<li><strong>Poor time estimation</strong>: Models don’t know how long they’ve been working → Inject time budget warnings</li>
+<li><strong>Context rot</strong>: Performance degrades as context fills → Add <code>SummarizationMiddleware</code></li>
+</ul>
+<p>These are design heuristics that work around today’s model limitations. As models improve, some of these guardrails will become unnecessary — but the harness pattern of wrapping deterministic checks around model calls will remain.</p>
+</section>
+<section id="principle-4-tailor-harnesses-to-models" class="level3">
+<h3 class="anchored" data-anchor-id="principle-4-tailor-harnesses-to-models">Principle 4: Tailor Harnesses to Models</h3>
+<p>Models are post-trained with harnesses in the loop, creating coupling between model and harness design. The <a href="https://developers.openai.com/cookbook/examples/gpt-5/codex_prompting_guide/">Codex prompting guide</a> and <a href="https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices">Claude prompting guide</a> show that models require different prompting and tool formats.</p>
+<p>A harness optimized for one model may underperform with another. The TerminalBench 2.0 leaderboard shows this clearly: Opus 4.6 in Claude Code scores far below Opus 4.6 in other harnesses. Running a few rounds of harness iterations for your specific model and task helps maximize performance.</p>
+</section>
+<section id="principle-5-open-harness-open-memory" class="level3">
+<h3 class="anchored" data-anchor-id="principle-5-open-harness-open-memory">Principle 5: Open Harness, Open Memory</h3>
+<p>If you use a closed harness — especially one behind a proprietary API — you yield control of your agent’s memory to a third party. Model providers are incentivized to create lock-in via memory:</p>
+<ul>
+<li><strong>Mildly bad</strong>: Stateful APIs (OpenAI’s Responses API, Anthropic’s server-side compaction) store state on their servers. Switching models means losing conversation threads</li>
+<li><strong>Bad</strong>: Closed harnesses (Claude Agent SDK) interact with memory in unknown ways. Memory artifacts are non-transferable</li>
+<li><strong>Worst</strong>: Everything behind an API — zero ownership or visibility into memory, including long-term memory</li>
+</ul>
+<p>This is why open harnesses like <a href="https://github.com/langchain-ai/deepagents">Deep Agents</a> matter — they are model-agnostic, use open standards like <code>AGENTS.md</code> and the <a href="https://agentskills.io/home">Agent Skills standard</a>, and support pluggable memory backends (Mongo, Postgres, Redis).</p>
+</section>
+</section>
+<section id="building-a-harness-with-langgraph" class="level2">
+<h2 class="anchored" data-anchor-id="building-a-harness-with-langgraph">Building a Harness with LangGraph</h2>
+<p>Here is a minimal but complete harness that demonstrates core primitives — filesystem access, code execution, self-verification, and context management:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> typing <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> TypedDict, Annotated</span>
+<span id="cb9-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langgraph.graph <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> StateGraph, END, START</span>
+<span id="cb9-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langgraph.graph.message <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> add_messages</span>
+<span id="cb9-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langchain_openai <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> ChatOpenAI</span>
+<span id="cb9-5"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> langchain_core.tools <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> tool</span>
+<span id="cb9-6"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> subprocess</span>
+<span id="cb9-7"></span>
+<span id="cb9-8"></span>
+<span id="cb9-9">llm <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> ChatOpenAI(model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"gpt-4o"</span>, temperature<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>)</span>
+<span id="cb9-10"></span>
+<span id="cb9-11"></span>
+<span id="cb9-12"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- Core harness tools ---</span></span>
+<span id="cb9-13"></span>
+<span id="cb9-14"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb9-15"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> bash(command: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb9-16">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Execute a bash command in the agent's workspace.</span></span>
+<span id="cb9-17"></span>
+<span id="cb9-18"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Use this for installing packages, running tests, checking files,</span></span>
+<span id="cb9-19"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    and any command-line operation. Always use absolute paths.</span></span>
+<span id="cb9-20"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    """</span></span>
+<span id="cb9-21">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">try</span>:</span>
+<span id="cb9-22">        result <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> subprocess.run(</span>
+<span id="cb9-23">            command, shell<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, capture_output<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb9-24">            text<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>, timeout<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">30</span>, cwd<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/workspace"</span></span>
+<span id="cb9-25">        )</span>
+<span id="cb9-26">        output <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> result.stdout <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> result.stderr</span>
+<span id="cb9-27">        <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Offload large outputs (context management)</span></span>
+<span id="cb9-28">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(output) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5000</span>:</span>
+<span id="cb9-29">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/workspace/.tool_output.txt"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"w"</span>) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> f:</span>
+<span id="cb9-30">                f.write(output)</span>
+<span id="cb9-31">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> (output[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2000</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">... [truncated, full output saved to "</span></span>
+<span id="cb9-32">                    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/workspace/.tool_output.txt] ...</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> output[<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span>:])</span>
+<span id="cb9-33">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> output <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">or</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"(no output)"</span></span>
+<span id="cb9-34">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">except</span> subprocess.TimeoutExpired:</span>
+<span id="cb9-35">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Error: command timed out after 30s. Try a simpler command."</span></span>
+<span id="cb9-36"></span>
+<span id="cb9-37"></span>
+<span id="cb9-38"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb9-39"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> read_file(absolute_path: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb9-40">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Read a file from the workspace. Path MUST be absolute.</span></span>
+<span id="cb9-41"></span>
+<span id="cb9-42"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Example: /workspace/src/main.py</span></span>
+<span id="cb9-43"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    """</span></span>
+<span id="cb9-44">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> absolute_path.startswith(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/"</span>):</span>
+<span id="cb9-45">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Error: path must be absolute. Got: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>absolute_path<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb9-46">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">try</span>:</span>
+<span id="cb9-47">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(absolute_path) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> f:</span>
+<span id="cb9-48">            content <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> f.read()</span>
+<span id="cb9-49">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(content) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">&gt;</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10000</span>:</span>
+<span id="cb9-50">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> content[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">5000</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">... [</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(content)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> chars total] ..."</span></span>
+<span id="cb9-51">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> content</span>
+<span id="cb9-52">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">except</span> <span class="pp" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">FileNotFoundError</span>:</span>
+<span id="cb9-53">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Error: file not found: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>absolute_path<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">. Check the path."</span></span>
+<span id="cb9-54"></span>
+<span id="cb9-55"></span>
+<span id="cb9-56"><span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">@tool</span></span>
+<span id="cb9-57"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> write_file(absolute_path: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, content: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb9-58">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Write content to a file. Creates parent directories if needed.</span></span>
+<span id="cb9-59"></span>
+<span id="cb9-60"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    Path MUST be absolute. Example: /workspace/src/solution.py</span></span>
+<span id="cb9-61"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    """</span></span>
+<span id="cb9-62">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> absolute_path.startswith(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/"</span>):</span>
+<span id="cb9-63">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Error: path must be absolute. Got: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>absolute_path<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb9-64">    <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> os</span>
+<span id="cb9-65">    os.makedirs(os.path.dirname(absolute_path), exist_ok<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb9-66">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(absolute_path, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"w"</span>) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> f:</span>
+<span id="cb9-67">        f.write(content)</span>
+<span id="cb9-68">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Wrote </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(content)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> chars to </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>absolute_path<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb9-69"></span>
+<span id="cb9-70"></span>
+<span id="cb9-71"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- Harness state ---</span></span>
+<span id="cb9-72"></span>
+<span id="cb9-73"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">class</span> HarnessState(TypedDict):</span>
+<span id="cb9-74">    messages: Annotated[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>, add_messages]</span>
+<span id="cb9-75">    plan: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span></span>
+<span id="cb9-76">    verification_passed: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">bool</span></span>
+<span id="cb9-77">    iteration: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span></span>
+<span id="cb9-78"></span>
+<span id="cb9-79"></span>
+<span id="cb9-80"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- Harness nodes ---</span></span>
+<span id="cb9-81"></span>
+<span id="cb9-82">SYSTEM_PROMPT <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"""You are an autonomous coding agent with access to a workspace.</span></span>
+<span id="cb9-83"></span>
+<span id="cb9-84"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">Problem-solving approach:</span></span>
+<span id="cb9-85"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">1. PLAN: Read the task, explore the workspace, create a plan</span></span>
+<span id="cb9-86"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">2. BUILD: Implement your plan, writing tests alongside code</span></span>
+<span id="cb9-87"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">3. VERIFY: Run tests, compare output against the original task (not your code)</span></span>
+<span id="cb9-88"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">4. FIX: If tests fail, analyze errors and fix</span></span>
+<span id="cb9-89"></span>
+<span id="cb9-90"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">Always use absolute paths starting with /workspace/.</span></span>
+<span id="cb9-91"><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">Always run tests before declaring your work complete."""</span></span>
+<span id="cb9-92"></span>
+<span id="cb9-93"></span>
+<span id="cb9-94">tools <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [bash, read_file, write_file]</span>
+<span id="cb9-95">llm_with_tools <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> llm.bind_tools(tools)</span>
+<span id="cb9-96"></span>
+<span id="cb9-97"></span>
+<span id="cb9-98"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> agent_step(state: HarnessState) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>:</span>
+<span id="cb9-99">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Core agent reasoning step."""</span></span>
+<span id="cb9-100">    messages <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [{<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"system"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: SYSTEM_PROMPT}] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> state[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"messages"</span>]</span>
+<span id="cb9-101">    response <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> llm_with_tools.invoke(messages)</span>
+<span id="cb9-102">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"messages"</span>: [response], <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"iteration"</span>: state.get(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"iteration"</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>}</span>
+<span id="cb9-103"></span>
+<span id="cb9-104"></span>
+<span id="cb9-105"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> should_continue(state: HarnessState) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb9-106">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Route: continue with tools, verify, or finish."""</span></span>
+<span id="cb9-107">    last <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> state[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"messages"</span>][<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]</span>
+<span id="cb9-108"></span>
+<span id="cb9-109">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># If the model made tool calls, execute them</span></span>
+<span id="cb9-110">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">hasattr</span>(last, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"tool_calls"</span>) <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">and</span> last.tool_calls:</span>
+<span id="cb9-111">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"tools"</span></span>
+<span id="cb9-112"></span>
+<span id="cb9-113">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># If we haven't verified yet, force verification</span></span>
+<span id="cb9-114">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> state.get(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"verification_passed"</span>):</span>
+<span id="cb9-115">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"verify"</span></span>
+<span id="cb9-116"></span>
+<span id="cb9-117">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"finish"</span></span>
+<span id="cb9-118"></span>
+<span id="cb9-119"></span>
+<span id="cb9-120"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> execute_tools(state: HarnessState) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>:</span>
+<span id="cb9-121">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Execute tool calls and return results."""</span></span>
+<span id="cb9-122">    last <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> state[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"messages"</span>][<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>]</span>
+<span id="cb9-123">    results <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb9-124">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> tc <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> last.tool_calls:</span>
+<span id="cb9-125">        tool_fn <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {t.name: t <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> t <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> tools}[tc[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"name"</span>]]</span>
+<span id="cb9-126">        result <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> tool_fn.invoke(tc[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"args"</span>])</span>
+<span id="cb9-127">        results.append({</span>
+<span id="cb9-128">            <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"tool"</span>,</span>
+<span id="cb9-129">            <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: result,</span>
+<span id="cb9-130">            <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"tool_call_id"</span>: tc[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"id"</span>],</span>
+<span id="cb9-131">        })</span>
+<span id="cb9-132">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"messages"</span>: results}</span>
+<span id="cb9-133"></span>
+<span id="cb9-134"></span>
+<span id="cb9-135"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> verification_check(state: HarnessState) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>:</span>
+<span id="cb9-136">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Pre-completion checklist — force the agent to verify."""</span></span>
+<span id="cb9-137">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> {</span>
+<span id="cb9-138">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"messages"</span>: [{</span>
+<span id="cb9-139">            <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"system"</span>,</span>
+<span id="cb9-140">            <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: (</span>
+<span id="cb9-141">                <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"⚠️ VERIFICATION REQUIRED before completing:</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb9-142">                <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"1. Re-read the original task</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb9-143">                <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"2. Run all tests: bash('pytest /workspace/ -v')</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb9-144">                <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"3. Compare output against what was asked</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb9-145">                <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"4. Only complete if ALL requirements are met"</span></span>
+<span id="cb9-146">            ),</span>
+<span id="cb9-147">        }],</span>
+<span id="cb9-148">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"verification_passed"</span>: <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb9-149">    }</span>
+<span id="cb9-150"></span>
+<span id="cb9-151"></span>
+<span id="cb9-152"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- Build the harness graph ---</span></span>
+<span id="cb9-153"></span>
+<span id="cb9-154">graph <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> StateGraph(HarnessState)</span>
+<span id="cb9-155">graph.add_node(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"agent"</span>, agent_step)</span>
+<span id="cb9-156">graph.add_node(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"tools"</span>, execute_tools)</span>
+<span id="cb9-157">graph.add_node(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"verify"</span>, verification_check)</span>
+<span id="cb9-158"></span>
+<span id="cb9-159">graph.add_edge(START, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"agent"</span>)</span>
+<span id="cb9-160">graph.add_conditional_edges(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"agent"</span>, should_continue, {</span>
+<span id="cb9-161">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"tools"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"tools"</span>,</span>
+<span id="cb9-162">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"verify"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"verify"</span>,</span>
+<span id="cb9-163">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"finish"</span>: END,</span>
+<span id="cb9-164">})</span>
+<span id="cb9-165">graph.add_edge(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"tools"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"agent"</span>)</span>
+<span id="cb9-166">graph.add_edge(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"verify"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"agent"</span>)</span>
+<span id="cb9-167"></span>
+<span id="cb9-168">harness <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> graph.<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">compile</span>()</span></code></pre></div></div>
+<p>This harness implements several core primitives:</p>
+<ul>
+<li><strong>Filesystem tools</strong> with poka-yoke (absolute paths required, actionable errors)</li>
+<li><strong>Code execution</strong> via bash with output offloading for context management</li>
+<li><strong>Self-verification</strong> via a pre-completion checklist middleware pattern</li>
+<li><strong>Iteration tracking</strong> for potential loop detection</li>
+</ul>
+</section>
+<section id="the-future-of-harnesses" class="level2">
+<h2 class="anchored" data-anchor-id="the-future-of-harnesses">The Future of Harnesses</h2>
+<section id="model-harness-co-evolution" class="level3">
+<h3 class="anchored" data-anchor-id="model-harness-co-evolution">Model-Harness Co-Evolution</h3>
+<p>Today’s agent products are post-trained with models and harnesses in the loop. This creates a feedback cycle: useful primitives are discovered, added to the harness, and used when training the next generation of models. Models become more capable within the harness they were trained in.</p>
+<p>But this co-evolution creates coupling. Changing tool logic can lead to worse model performance — as seen with the <code>apply_patch</code> tool format in the Codex prompting guide. A truly intelligent model should have little trouble switching between patch methods, but training with a specific harness creates this overfitting.</p>
+</section>
+<section id="harnesses-are-not-going-away" class="level3">
+<h3 class="anchored" data-anchor-id="harnesses-are-not-going-away">Harnesses Are Not Going Away</h3>
+<p>There is sometimes sentiment that models will absorb more and more of the harness. This is partially true — some scaffolding from 2023 is no longer needed. But it has been replaced by other types of scaffolding. An agent, by definition, is an LLM interacting with tools and other sources of data. There will always be a system around the LLM to facilitate that interaction.</p>
+<p>As models get better at planning, self-verification, and long-horizon coherence natively, some of what lives in the harness today will move into the model. But the harness will continue to provide:</p>
+<ul>
+<li><strong>Deterministic policy enforcement</strong> — PII redaction, compliance checks, safety guardrails</li>
+<li><strong>Environment configuration</strong> — where the agent runs, what tools are available</li>
+<li><strong>Production readiness</strong> — retries, fallbacks, human-in-the-loop</li>
+<li><strong>Business-specific logic</strong> — domain constraints, workflow rules</li>
+<li><strong>Memory ownership</strong> — state that you control, independent of model provider</li>
+</ul>
+</section>
+</section>
+<section id="conclusion" class="level2">
+<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
+<p>Harness engineering is the discipline that turns raw LLM intelligence into production agents. It is not a single technique but a systems practice that integrates design patterns, tools, memory, guardrails, and evaluation into a coherent runtime.</p>
+<p><strong>Key takeaways:</strong></p>
+<ul>
+<li><strong>Agent = Model + Harness.</strong> The model contains the intelligence; the harness makes it useful. Even the most capable models need systems around them to do real work.</li>
+<li><strong>Core primitives are well-established.</strong> Filesystem for durable state, bash for general-purpose execution, sandboxes for safe isolation, context management for fighting context rot.</li>
+<li><strong>Middleware is the customization layer.</strong> Composable hooks around model and tool calls let you enforce policies, manage context, detect failures, and add business logic without modifying the core agent loop.</li>
+<li><strong>Traces drive improvement.</strong> The harness improvement loop — run, trace, analyze, fix, repeat — is the most practical way to improve agent performance without training a new model. LangChain achieved +13.7 points on TerminalBench 2.0 by only changing the harness.</li>
+<li><strong>Harness improvements transfer across models.</strong> Meta-Harness showed that good harness engineering captures domain knowledge that benefits any sufficiently capable model.</li>
+<li><strong>Memory is tied to the harness.</strong> If you don’t own your harness, you don’t own your memory. Use open harnesses to maintain model optionality and data ownership.</li>
+<li><strong>Harnesses are not going away.</strong> Models will absorb some capabilities, but deterministic policies, environment configuration, production readiness, and business logic will always live in the harness.</li>
+</ul>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li>Trivedy, Vivek, <a href="https://www.langchain.com/blog/the-anatomy-of-an-agent-harness">The Anatomy of an Agent Harness</a> — LangChain’s definitive walkthrough of harness components and design principles.</li>
+<li>Trivedy, Vivek, <a href="https://www.langchain.com/blog/improving-deep-agents-with-harness-engineering">Improving Deep Agents with Harness Engineering</a> — Case study: +13.7 points on TerminalBench 2.0 by only changing the harness.</li>
+<li>Chase, Harrison, <a href="https://www.langchain.com/blog/your-harness-your-memory">Your Harness, Your Memory</a> — Why harnesses are tied to memory and why open harnesses matter for data ownership.</li>
+<li>Chase, Harrison, <a href="https://www.langchain.com/blog/continual-learning-for-ai-agents">Continual Learning for AI Agents</a> — Learning at three layers: model, harness, and context.</li>
+<li>Runkle, Sydney, <a href="https://www.langchain.com/blog/how-middleware-lets-you-customize-your-agent-harness">How Middleware Lets You Customize Your Agent Harness</a> — Agent middleware hooks and composable customization patterns.</li>
+<li>Lee et al., <a href="https://arxiv.org/abs/2603.28052">Meta-Harness: End-to-End Optimization of Model Harnesses</a> — Automated harness search using full execution traces, with results on TerminalBench-2 and text classification.</li>
+<li>Anthropic, <a href="https://www.anthropic.com/engineering/building-effective-agents">Building Effective Agents</a> — ACI design principles and the insight that tool optimization matters more than prompt optimization.</li>
+<li>Weng, Lilian, <a href="https://lilianweng.github.io/posts/2023-06-23-agent/">LLM Powered Autonomous Agents</a> — Foundational survey of Planning, Memory, and Tool Use components.</li>
+<li>Ng, Andrew, <a href="https://www.deeplearning.ai/the-batch/how-agents-can-improve-llm-performance/">Agentic Design Patterns</a> — Reflection, Tool Use, Planning, Multi-Agent Collaboration.</li>
+<li>Wooders, Sarah, <a href="https://x.com/sarahwooders/status/2040121230473457921">Memory Isn’t a Plugin — It’s the Harness</a> — Why memory management is a core harness responsibility.</li>
+<li>Huntley, Geoffrey, <a href="https://ghuntley.com/loop/">The Ralph Loop</a> — Harness pattern for continuing agent work across context windows.</li>
+<li>LangChain, <a href="https://github.com/langchain-ai/deepagents">Deep Agents (open source)</a> — Open-source, model-agnostic agent harness with middleware and memory plugins.</li>
+<li>Agent Skills Standard, <a href="https://agentskills.io/home">agentskills.io</a> — Open specification for portable, interoperable skill bundles.</li>
+</ul>
+</section>
+<section id="read-more" class="level2">
+<h2 class="anchored" data-anchor-id="read-more">Read More</h2>
+<ul>
+<li>Learn the foundational reasoning loop that every harness wraps: <a href="../../posts/agent/Building-a-ReAct-Agent-from-Scratch.html">Building a ReAct Agent from Scratch</a> covers the Thought-Action-Observation cycle.</li>
+<li>Understand the architectural patterns that harnesses implement: <a href="../../posts/agent/Design-Patterns-for-AI-Agents.html">Design Patterns for AI Agents</a> covers reflection, planning, routing, and multi-agent collaboration.</li>
+<li>See how tools and skills — the capabilities a harness loads — are designed and packaged: <a href="../../posts/agent/Building-Skills-for-AI-Agents.html">Building Skills for AI Agents</a> covers ACI design, SKILL.md, and skill bundles.</li>
+<li>Dive deeper into memory architectures that harnesses manage: <a href="../../posts/agent/Memory-Systems-for-Long-Running-Retrieval-Agents.html">Memory Systems for Long-Running Retrieval Agents</a> covers buffers, scratchpads, episodic recall, and cross-agent memory.</li>
+<li>Add safety boundaries to your harness middleware stack: <a href="../../posts/agent/Guardrails-and-Safety-for-Autonomous-Retrieval-Agents.html">Guardrails and Safety for Autonomous Retrieval Agents</a> covers input/output validation and human-in-the-loop.</li>
+<li>Measure harness quality through agent evaluation: <a href="../../posts/agent/Evaluating-and-Debugging-AI-Agents.html">Evaluating and Debugging AI Agents</a> covers trace inspection, tool selection accuracy, and cost analysis.</li>
+<li>Expose harness tools over a standard protocol: <a href="../../posts/agent/Build-and-Deploy-MCP-Server-from-Scratch.html">Build and Deploy MCP Server from Scratch</a> shows how to serve tools via the Model Context Protocol.</li>
+<li>Orchestrate multiple harness-wrapped agents: <a href="../../posts/agent/Multi-Agent-RAG-Orchestration-Patterns.html">Multi-Agent RAG Orchestration Patterns</a> shows supervisor, swarm, and hierarchical topologies.</li>
+</ul>
+<!-- nav-buttons -->
+<p><a href="../../pages/agent.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-robot" aria-label="robot"></i> Explore Agents</a> <a href="../../index.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-house" aria-label="house"></i> Home</a></p>
+
+
+</section>
+
+ ]]></description>
+  <guid>https://vectoringai.com/posts/agent/Harness-Engineering-for-AI-Agents.html</guid>
+  <pubDate>Thu, 23 Apr 2026 00:00:00 GMT</pubDate>
+  <media:content url="https://vectoringai.com/images/agent/harness-engineering-ai-agents-300px.png" medium="image" type="image/png" height="96" width="144"/>
+</item>
 <item>
   <title>Build and Deploy MCP Server from Scratch</title>
   <dc:creator>Vectoring AI</dc:creator>
@@ -2588,7 +4565,7 @@ font-style: inherit;">"stdio"</span>)</span></code></pre></div></div>
 
  ]]></description>
   <guid>https://vectoringai.com/posts/agent/Build-and-Deploy-MCP-Server-from-Scratch.html</guid>
-  <pubDate>Thu, 23 Apr 2026 12:33:16 GMT</pubDate>
+  <pubDate>Thu, 23 Apr 2026 21:17:51 GMT</pubDate>
   <media:content url="https://vectoringai.com/images/agent/build-deploy-mcp-server-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
@@ -6065,7 +8042,7 @@ font-style: inherit;">"agent_graph.png"</span>)</span></code></pre></div></div>
 
  ]]></description>
   <guid>https://vectoringai.com/posts/agent/Building-Agents-with-LangGraph.html</guid>
-  <pubDate>Thu, 23 Apr 2026 12:33:16 GMT</pubDate>
+  <pubDate>Thu, 23 Apr 2026 21:17:51 GMT</pubDate>
   <media:content url="https://vectoringai.com/images/agent/building-agents-langgraph-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
@@ -9214,7 +11191,7 @@ font-style: inherit;">"skill_outputs"</span>, {})</span></code></pre></div></div
 
  ]]></description>
   <guid>https://vectoringai.com/posts/agent/Building-Skills-for-AI-Agents.html</guid>
-  <pubDate>Thu, 23 Apr 2026 12:33:16 GMT</pubDate>
+  <pubDate>Thu, 23 Apr 2026 21:17:51 GMT</pubDate>
   <media:content url="https://vectoringai.com/images/agent/building-skills-ai-agents-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
@@ -13069,7 +15046,7 @@ font-style: inherit;">"gpt-4o-mini"</span>),</span>
 
  ]]></description>
   <guid>https://vectoringai.com/posts/agent/Building-a-ReAct-Agent-from-Scratch.html</guid>
-  <pubDate>Thu, 23 Apr 2026 12:33:16 GMT</pubDate>
+  <pubDate>Thu, 23 Apr 2026 21:17:51 GMT</pubDate>
   <media:content url="https://vectoringai.com/images/agent/react-agent-from-scratch-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
@@ -16701,7 +18678,7 @@ font-style: inherit;">0</span>].message.content)</span></code></pre></div></div>
 
  ]]></description>
   <guid>https://vectoringai.com/posts/agent/Deep-Research-Agents-from-RAG-to-Autonomous-Investigation.html</guid>
-  <pubDate>Thu, 23 Apr 2026 12:33:16 GMT</pubDate>
+  <pubDate>Thu, 23 Apr 2026 21:17:51 GMT</pubDate>
   <media:content url="https://vectoringai.com/images/agent/deep-research-agents-autonomous-investigation-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
@@ -20888,7 +22865,7 @@ font-style: inherit;">await</span> worker.run()</span></code></pre></div></div>
 
  ]]></description>
   <guid>https://vectoringai.com/posts/agent/Deploying-Retrieval-Agents-in-Production.html</guid>
-  <pubDate>Thu, 23 Apr 2026 12:33:16 GMT</pubDate>
+  <pubDate>Thu, 23 Apr 2026 21:17:51 GMT</pubDate>
   <media:content url="https://vectoringai.com/images/agent/deploying-retrieval-agents-production-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
@@ -24315,7 +26292,7 @@ font-style: inherit;">"Verify all claims. Suggest specific improvements."</span>
 
  ]]></description>
   <guid>https://vectoringai.com/posts/agent/Design-Patterns-for-AI-Agents.html</guid>
-  <pubDate>Thu, 23 Apr 2026 12:33:16 GMT</pubDate>
+  <pubDate>Thu, 23 Apr 2026 21:17:51 GMT</pubDate>
   <media:content url="https://vectoringai.com/images/agent/design-patterns-ai-agents-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
@@ -28048,7 +30025,7 @@ font-style: inherit;">"</span>)</span></code></pre></div></div>
 
  ]]></description>
   <guid>https://vectoringai.com/posts/agent/Evaluating-and-Debugging-AI-Agents.html</guid>
-  <pubDate>Thu, 23 Apr 2026 12:33:16 GMT</pubDate>
+  <pubDate>Thu, 23 Apr 2026 21:17:51 GMT</pubDate>
   <media:content url="https://vectoringai.com/images/agent/evaluating-debugging-ai-agents-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
@@ -31458,7 +33435,7 @@ font-style: inherit;">str</span>(log_entry))</span></code></pre></div></div>
 
  ]]></description>
   <guid>https://vectoringai.com/posts/agent/Guardrails-and-Safety-for-Autonomous-Retrieval-Agents.html</guid>
-  <pubDate>Thu, 23 Apr 2026 12:33:16 GMT</pubDate>
+  <pubDate>Thu, 23 Apr 2026 21:17:51 GMT</pubDate>
   <media:content url="https://vectoringai.com/images/agent/guardrails-safety-autonomous-retrieval-agents-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
@@ -34557,7 +36534,7 @@ font-style: inherit;">"hotl"</span>)</span></code></pre></div></div>
 
  ]]></description>
   <guid>https://vectoringai.com/posts/agent/Human-Agent-Interaction-Patterns.html</guid>
-  <pubDate>Thu, 23 Apr 2026 12:33:16 GMT</pubDate>
+  <pubDate>Thu, 23 Apr 2026 21:17:51 GMT</pubDate>
   <media:content url="https://vectoringai.com/images/agent/human-agent-interaction-patterns-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
@@ -39133,7 +41110,7 @@ font-style: inherit;">=</span>store)</span></code></pre></div></div>
 
  ]]></description>
   <guid>https://vectoringai.com/posts/agent/Memory-Systems-for-Long-Running-Retrieval-Agents.html</guid>
-  <pubDate>Thu, 23 Apr 2026 12:33:16 GMT</pubDate>
+  <pubDate>Thu, 23 Apr 2026 21:17:51 GMT</pubDate>
   <media:content url="https://vectoringai.com/images/agent/memory-systems-retrieval-agents-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
@@ -43261,7 +45238,7 @@ font-style: inherit;">"user growth"</span>})</span></code></pre></div></div>
 
  ]]></description>
   <guid>https://vectoringai.com/posts/agent/Multi-Agent-RAG-Orchestration-Patterns.html</guid>
-  <pubDate>Thu, 23 Apr 2026 12:33:16 GMT</pubDate>
+  <pubDate>Thu, 23 Apr 2026 21:17:51 GMT</pubDate>
   <media:content url="https://vectoringai.com/images/agent/multi-agent-rag-orchestration-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
@@ -48463,7 +50440,7 @@ font-style: inherit;">compile</span>()</span></code></pre></div></div>
 
  ]]></description>
   <guid>https://vectoringai.com/posts/agent/Planning-and-Query-Decomposition-for-Complex-Retrieval.html</guid>
-  <pubDate>Thu, 23 Apr 2026 12:33:16 GMT</pubDate>
+  <pubDate>Thu, 23 Apr 2026 21:17:51 GMT</pubDate>
   <media:content url="https://vectoringai.com/images/agent/planning-query-decomposition-retrieval-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
@@ -52967,7 +54944,7 @@ font-style: inherit;">=</span>llm,</span>
 
  ]]></description>
   <guid>https://vectoringai.com/posts/agent/Tool-Use-and-Function-Calling-for-Retrieval-Agents.html</guid>
-  <pubDate>Thu, 23 Apr 2026 12:33:16 GMT</pubDate>
+  <pubDate>Thu, 23 Apr 2026 21:17:51 GMT</pubDate>
   <media:content url="https://vectoringai.com/images/agent/tool-use-function-calling-retrieval-agents-300px.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 </channel>
