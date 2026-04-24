@@ -81,7 +81,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dbc92dda8186f57fa2e333fbb71d6a9d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-b981e3f33a8ad6ba97cc0b6118e04959.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-23f3439e4bd86aeeff5ff0174c43dd13.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/all.css" rel="stylesheet">
 <link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/latex-fontsize.css" rel="stylesheet">
 <script id="quarto-search-options" type="application/json">{
@@ -385,53 +385,101 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 </script>
 <script>
+
   var link = document.createElement('link');
+
   link.rel = 'canonical';
+
   var path = window.location.pathname.replace(/index\.html$/, '');
+
   link.href = 'https://vectoringai.com' + path;
+
   document.head.appendChild(link);
+
 </script>
+
 <script>
+
 document.addEventListener('DOMContentLoaded', function() {
+
   var ogTitle = document.querySelector('meta[property="og:title"]');
+
   var ogDesc = document.querySelector('meta[property="og:description"]');
+
   var ogImage = document.querySelector('meta[property="og:image"]');
+
   var dcDate = document.querySelector('meta[name="dcterms.date"]');
+
+
 
   if (!ogTitle) return;
 
+
+
   var isArticle = !!dcDate;
+
   var jsonld = {
+
     "@context": "https://schema.org",
+
     "@type": isArticle ? "Article" : "WebPage",
+
     "headline": ogTitle.content.replace(/ – Vectoring AI$/, ''),
+
     "description": ogDesc ? ogDesc.content : "",
+
     "url": window.location.href,
+
     "author": {
+
       "@type": "Organization",
+
       "name": "Vectoring AI",
+
       "url": "https://vectoringai.com/pages/about.html"
+
     },
+
     "publisher": {
+
       "@type": "Organization",
+
       "name": "Vectoring AI",
+
       "url": "https://vectoringai.com",
+
       "logo": {
+
         "@type": "ImageObject",
+
         "url": "https://vectoringai.com/images/favicon_io/android-chrome-512x512.png"
+
       }
+
     }
+
   };
 
+
+
   if (ogImage) jsonld.image = ogImage.content;
+
   if (dcDate) jsonld.datePublished = dcDate.content;
 
+
+
   var el = document.createElement('script');
+
   el.type = 'application/ld+json';
+
   el.textContent = JSON.stringify(jsonld);
+
   document.head.appendChild(el);
+
 });
+
 </script>
+
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   var title = document.querySelector(".sidebar-title");
@@ -619,13 +667,13 @@ document.addEventListener("DOMContentLoaded", function () {
 </div>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="../../images/agent/guardrails-safety-autonomous-retrieval-agents-300px.png" class="img-fluid figure-img" width="300"></p>
+<p><img src="../..\images/agent/guardrails-safety-autonomous-retrieval-agents-300px.png" class="img-fluid figure-img" width="300"></p>
 <figcaption>Five-layer guardrail architecture for autonomous retrieval agents</figcaption>
 </figure>
 </div>
 <section id="introduction" class="level2">
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
-<p>Autonomous retrieval agents are powerful — they can <a href="../../posts/agent/Planning-and-Query-Decomposition-for-Complex-Retrieval.html">plan multi-step queries</a>, <a href="../../posts/agent/Tool-Use-and-Function-Calling-for-Retrieval-Agents.html">call tools</a>, <a href="../../posts/agent/Multi-Agent-RAG-Orchestration-Patterns.html">orchestrate sub-agents</a>, and <a href="../../posts/agent/Deep-Research-Agents-from-RAG-to-Autonomous-Investigation.html">conduct deep research</a>. But every capability you grant an agent is a capability an attacker can exploit.</p>
+<p>Autonomous retrieval agents are powerful — they can <a href="../..\posts/agent/Planning-and-Query-Decomposition-for-Complex-Retrieval.html">plan multi-step queries</a>, <a href="../..\posts/agent/Tool-Use-and-Function-Calling-for-Retrieval-Agents.html">call tools</a>, <a href="../..\posts/agent/Multi-Agent-RAG-Orchestration-Patterns.html">orchestrate sub-agents</a>, and <a href="../..\posts/agent/Deep-Research-Agents-from-RAG-to-Autonomous-Investigation.html">conduct deep research</a>. But every capability you grant an agent is a capability an attacker can exploit.</p>
 <p>The <strong>OWASP Top 10 for LLM Applications 2025</strong> identifies <em>Prompt Injection</em> (LLM01), <em>Excessive Agency</em> (LLM06), and <em>Unbounded Consumption</em> (LLM10) as critical risks. An unguarded retrieval agent can be tricked into querying unauthorized data sources, exfiltrating private information through crafted tool calls, or consuming unlimited tokens in runaway loops.</p>
 <p>This article builds a <strong>defense-in-depth architecture</strong> for retrieval agents. We cover five layers of protection — input validation, tool-call authorization gates, sandboxed execution, budget limits, and prompt injection defense — with working code in <strong>LangGraph</strong> and <strong>NeMo Guardrails</strong>. The goal is not to eliminate every possible attack (no single defense can), but to make exploitation expensive, detectable, and recoverable.</p>
 </section>
@@ -948,7 +996,7 @@ document.addEventListener("DOMContentLoaded", function () {
 </section>
 <section id="layer-3-tool-call-authorization-gates" class="level2">
 <h2 class="anchored" data-anchor-id="layer-3-tool-call-authorization-gates">Layer 3: Tool-Call Authorization Gates</h2>
-<p>The <a href="../../posts/agent/Building-a-ReAct-Agent-from-Scratch.html">ReAct loop</a> gives agents the power to call tools — and that is exactly where <strong>excessive agency</strong> (OWASP LLM06) manifests. Authorization gates ensure the agent can only call approved tools with approved arguments.</p>
+<p>The <a href="../..\posts/agent/Building-a-ReAct-Agent-from-Scratch.html">ReAct loop</a> gives agents the power to call tools — and that is exactly where <strong>excessive agency</strong> (OWASP LLM06) manifests. Authorization gates ensure the agent can only call approved tools with approved arguments.</p>
 <section id="permission-model" class="level3">
 <h3 class="anchored" data-anchor-id="permission-model">Permission Model</h3>
 <p>Define a permission layer that maps users, tools, and argument constraints:</p>
@@ -1015,7 +1063,7 @@ document.addEventListener("DOMContentLoaded", function () {
 </section>
 <section id="authorization-gate-in-langgraph" class="level3">
 <h3 class="anchored" data-anchor-id="authorization-gate-in-langgraph">Authorization Gate in LangGraph</h3>
-<p>Integrate the authorization gate into a <a href="../../posts/agent/Building-Agents-with-LangGraph.html">LangGraph</a> state graph using the <code>interrupt</code> pattern for human-in-the-loop confirmation on sensitive actions:</p>
+<p>Integrate the authorization gate into a <a href="../..\posts/agent/Building-Agents-with-LangGraph.html">LangGraph</a> state graph using the <code>interrupt</code> pattern for human-in-the-loop confirmation on sensitive actions:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> TypedDict, Annotated</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.graph <span class="im">import</span> StateGraph, START, END</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.checkpoint.memory <span class="im">import</span> MemorySaver</span>
@@ -1233,7 +1281,7 @@ document.addEventListener("DOMContentLoaded", function () {
 </section>
 <section id="layer-5-budget-limits" class="level2">
 <h2 class="anchored" data-anchor-id="layer-5-budget-limits">Layer 5: Budget Limits</h2>
-<p><strong>Unbounded consumption</strong> (OWASP LLM10) is a real production risk. A <a href="../../posts/agent/Deep-Research-Agents-from-RAG-to-Autonomous-Investigation.html">deep research agent</a> might legitimately need dozens of tool calls — but an exploited agent could make thousands.</p>
+<p><strong>Unbounded consumption</strong> (OWASP LLM10) is a real production risk. A <a href="../..\posts/agent/Deep-Research-Agents-from-RAG-to-Autonomous-Investigation.html">deep research agent</a> might legitimately need dozens of tool calls — but an exploited agent could make thousands.</p>
 <section id="token-and-cost-budget" class="level3">
 <h3 class="anchored" data-anchor-id="token-and-cost-budget">Token and Cost Budget</h3>
 <p>Track cumulative costs and halt execution when limits are reached:</p>
@@ -1729,7 +1777,7 @@ document.addEventListener("DOMContentLoaded", function () {
 <section id="conclusion" class="level2">
 <h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
 <p>Building autonomous retrieval agents without guardrails is like deploying a web application without authentication — it works until someone notices. The five-layer defense architecture presented here — <strong>input validation</strong>, <strong>prompt injection detection</strong>, <strong>tool-call authorization</strong>, <strong>sandboxed execution</strong>, and <strong>budget limits</strong> — transforms an open attack surface into a controlled, auditable system.</p>
-<p>No single guardrail stops every attack. Prompt injection in particular remains an open research problem. The key insight is <strong>defense-in-depth</strong>: each layer independently limits damage, and together they make exploitation dramatically harder. Combined with <a href="../../posts/agent/Building-Agents-with-LangGraph.html">human-in-the-loop checkpoints</a>, <a href="../../posts/llm/Observability-for-Multi-Turn-LLM-Conversations.html">observability</a>, and structured monitoring, you get a production agent system that is both capable and trustworthy.</p>
+<p>No single guardrail stops every attack. Prompt injection in particular remains an open research problem. The key insight is <strong>defense-in-depth</strong>: each layer independently limits damage, and together they make exploitation dramatically harder. Combined with <a href="../..\posts/agent/Building-Agents-with-LangGraph.html">human-in-the-loop checkpoints</a>, <a href="../..\posts/llm/Observability-for-Multi-Turn-LLM-Conversations.html">observability</a>, and structured monitoring, you get a production agent system that is both capable and trustworthy.</p>
 </section>
 <section id="references" class="level2">
 <h2 class="anchored" data-anchor-id="references">References</h2>
@@ -1747,15 +1795,15 @@ document.addEventListener("DOMContentLoaded", function () {
 <section id="read-more" class="level2">
 <h2 class="anchored" data-anchor-id="read-more">Read More</h2>
 <ul>
-<li>Lock down the <a href="../../posts/agent/Building-a-ReAct-Agent-from-Scratch.html">ReAct agent loop</a> that these guardrails protect — understand the Thought-Action-Observation cycle before adding safety layers.</li>
-<li>Apply authorization gates to <a href="../../posts/agent/Tool-Use-and-Function-Calling-for-Retrieval-Agents.html">tool calls and function calling</a> — see how agents select and invoke tools in practice.</li>
-<li>Integrate guardrails into <a href="../../posts/agent/Building-Agents-with-LangGraph.html">LangGraph state machines</a> — use <code>interrupt</code>, checkpointers, and conditional routing for human-in-the-loop approval.</li>
-<li>Add policy enforcement across <a href="../../posts/agent/Multi-Agent-RAG-Orchestration-Patterns.html">multi-agent orchestration patterns</a> — supervisor agents can enforce global budgets and tool permissions.</li>
-<li>Protect <a href="../../posts/agent/Memory-Systems-for-Long-Running-Retrieval-Agents.html">long-running agent memory</a> from poisoning — memory injection is an emerging attack vector for persistent agents.</li>
-<li>Apply budget limits to <a href="../../posts/agent/Planning-and-Query-Decomposition-for-Complex-Retrieval.html">planning and query decomposition</a> — multi-step plans can amplify token consumption.</li>
-<li>Secure <a href="../../posts/agent/Deep-Research-Agents-from-RAG-to-Autonomous-Investigation.html">deep research agents</a> that make dozens of web searches — budget and sandbox controls are critical for open-ended investigation.</li>
-<li>Explore <a href="../../posts/llm/Guardrails-for-LLM-Applications-with-Giskard.html">Guardrails for LLM Applications with Giskard</a> — a complementary approach using Giskard for vulnerability scanning and model testing.</li>
-<li>Track agent behavior across sessions with <a href="../../posts/llm/Observability-for-Multi-Turn-LLM-Conversations.html">Observability for Multi-Turn LLM Conversations</a>.</li>
+<li>Lock down the <a href="../..\posts/agent/Building-a-ReAct-Agent-from-Scratch.html">ReAct agent loop</a> that these guardrails protect — understand the Thought-Action-Observation cycle before adding safety layers.</li>
+<li>Apply authorization gates to <a href="../..\posts/agent/Tool-Use-and-Function-Calling-for-Retrieval-Agents.html">tool calls and function calling</a> — see how agents select and invoke tools in practice.</li>
+<li>Integrate guardrails into <a href="../..\posts/agent/Building-Agents-with-LangGraph.html">LangGraph state machines</a> — use <code>interrupt</code>, checkpointers, and conditional routing for human-in-the-loop approval.</li>
+<li>Add policy enforcement across <a href="../..\posts/agent/Multi-Agent-RAG-Orchestration-Patterns.html">multi-agent orchestration patterns</a> — supervisor agents can enforce global budgets and tool permissions.</li>
+<li>Protect <a href="../..\posts/agent/Memory-Systems-for-Long-Running-Retrieval-Agents.html">long-running agent memory</a> from poisoning — memory injection is an emerging attack vector for persistent agents.</li>
+<li>Apply budget limits to <a href="../..\posts/agent/Planning-and-Query-Decomposition-for-Complex-Retrieval.html">planning and query decomposition</a> — multi-step plans can amplify token consumption.</li>
+<li>Secure <a href="../..\posts/agent/Deep-Research-Agents-from-RAG-to-Autonomous-Investigation.html">deep research agents</a> that make dozens of web searches — budget and sandbox controls are critical for open-ended investigation.</li>
+<li>Explore <a href="../..\posts/llm/Guardrails-for-LLM-Applications-with-Giskard.html">Guardrails for LLM Applications with Giskard</a> — a complementary approach using Giskard for vulnerability scanning and model testing.</li>
+<li>Track agent behavior across sessions with <a href="../..\posts/llm/Observability-for-Multi-Turn-LLM-Conversations.html">Observability for Multi-Turn LLM Conversations</a>.</li>
 </ul>
 <!-- nav-buttons -->
 <p><a href="../../pages/agent.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-robot" aria-label="robot"></i> Explore Agents</a> <a href="../../index.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-house" aria-label="house"></i> Home</a></p>
@@ -2176,7 +2224,7 @@ document.addEventListener("DOMContentLoaded", function () {
       &nbsp;
     </div>   
     <div class="nav-footer-center">
-<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> 2025-2026 Vectoring AI. All rights reserved. | <a href="../../pages/privacy.html">Privacy Policy</a></p>
+<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> 2025-2026 Vectoring AI. All rights reserved. | <a href="../..\pages/privacy.html">Privacy Policy</a></p>
 </div>
     <div class="nav-footer-right">
       &nbsp;
