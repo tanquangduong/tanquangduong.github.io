@@ -560,12 +560,16 @@ document.getElementById('mobile-menu-fab').addEventListener('click', function() 
 </script>
 <!-- Animated neural network background for title block header -->
 <style>
+/* Background gradient for all title headers */
 #title-block-header, .quarto-title-banner {
-  position: relative;
-  overflow: hidden;
   background: linear-gradient(135deg, #0a0e27 0%, #1a1a3e 40%, #2d1b4e 70%, #0a0e27 100%) !important;
 }
-/* No animation on mobile — just the gradient background with fixed padding */
+/* Animation container styles — only on .quarto-title-banner (listing pages) */
+.quarto-title-banner {
+  position: relative;
+  overflow: hidden;
+}
+/* No animation on mobile */
 @media (max-width: 767px) {
   #title-block-canvas {
     display: none !important;
@@ -573,11 +577,6 @@ document.getElementById('mobile-menu-fab').addEventListener('click', function() 
   #title-block-header, .quarto-title-banner {
     padding: 1rem 0.5rem !important;
   }
-}
-/* Wrapper for animation area — only around content, not top padding */
-.title-animation-wrapper {
-  position: relative;
-  overflow: hidden;
 }
 #title-block-canvas {
   position: absolute;
@@ -588,36 +587,25 @@ document.getElementById('mobile-menu-fab').addEventListener('click', function() 
   z-index: 0;
   pointer-events: none;
 }
-.title-animation-wrapper > * {
+.quarto-title-banner > * {
   position: relative;
   z-index: 1;
-}
-/* Description padding */
-#title-block-header .description {
-  padding: 0.3rem 0.5rem !important;
 }
 </style>
 
 <script>
 (function() {
   function initTitleAnimation() {
-    var header = document.getElementById('title-block-header') || document.querySelector('.quarto-title-banner');
-    if (!header) return;
+    // Only animate on pages with .quarto-title-banner (listing pages)
+    var target = document.querySelector('.quarto-title-banner');
+    if (!target) return;
 
     // Skip animation entirely on mobile
     if (window.innerWidth < 768) return;
 
-    // Wrap all header children in a wrapper div so animation only covers content, not top padding
-    var wrapper = document.createElement('div');
-    wrapper.className = 'title-animation-wrapper';
-    while (header.firstChild) {
-      wrapper.appendChild(header.firstChild);
-    }
-    header.appendChild(wrapper);
-
     var canvas = document.createElement('canvas');
     canvas.id = 'title-block-canvas';
-    wrapper.insertBefore(canvas, wrapper.firstChild);
+    target.insertBefore(canvas, target.firstChild);
 
     var ctx = canvas.getContext('2d');
     var particles = [];
@@ -625,8 +613,8 @@ document.getElementById('mobile-menu-fab').addEventListener('click', function() 
     var connectionDist = 120;
 
     function resize() {
-      canvas.width = wrapper.offsetWidth;
-      canvas.height = wrapper.offsetHeight;
+      canvas.width = target.offsetWidth;
+      canvas.height = target.offsetHeight;
     }
 
     function Particle() {
