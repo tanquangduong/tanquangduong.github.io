@@ -574,6 +574,11 @@ document.getElementById('mobile-menu-fab').addEventListener('click', function() 
     padding: 1rem 0.5rem !important;
   }
 }
+/* Wrapper for animation area — only around content, not top padding */
+.title-animation-wrapper {
+  position: relative;
+  overflow: hidden;
+}
 #title-block-canvas {
   position: absolute;
   top: 0;
@@ -583,9 +588,13 @@ document.getElementById('mobile-menu-fab').addEventListener('click', function() 
   z-index: 0;
   pointer-events: none;
 }
-#title-block-header > *, .quarto-title-banner > * {
+.title-animation-wrapper > * {
   position: relative;
   z-index: 1;
+}
+/* Description padding */
+#title-block-header .description {
+  padding: 0.3rem 0.5rem !important;
 }
 </style>
 
@@ -595,21 +604,29 @@ document.getElementById('mobile-menu-fab').addEventListener('click', function() 
     var header = document.getElementById('title-block-header') || document.querySelector('.quarto-title-banner');
     if (!header) return;
 
-    var canvas = document.createElement('canvas');
-    canvas.id = 'title-block-canvas';
-    header.insertBefore(canvas, header.firstChild);
-
-    var ctx = canvas.getContext('2d');
     // Skip animation entirely on mobile
     if (window.innerWidth < 768) return;
 
+    // Wrap all header children in a wrapper div so animation only covers content, not top padding
+    var wrapper = document.createElement('div');
+    wrapper.className = 'title-animation-wrapper';
+    while (header.firstChild) {
+      wrapper.appendChild(header.firstChild);
+    }
+    header.appendChild(wrapper);
+
+    var canvas = document.createElement('canvas');
+    canvas.id = 'title-block-canvas';
+    wrapper.insertBefore(canvas, wrapper.firstChild);
+
+    var ctx = canvas.getContext('2d');
     var particles = [];
     var particleCount = 60;
     var connectionDist = 120;
 
     function resize() {
-      canvas.width = header.offsetWidth;
-      canvas.height = header.offsetHeight;
+      canvas.width = wrapper.offsetWidth;
+      canvas.height = wrapper.offsetHeight;
     }
 
     function Particle() {
