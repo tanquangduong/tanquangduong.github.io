@@ -1,0 +1,4568 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss  xmlns:atom="http://www.w3.org/2005/Atom" 
+      xmlns:media="http://search.yahoo.com/mrss/" 
+      xmlns:content="http://purl.org/rss/1.0/modules/content/" 
+      xmlns:dc="http://purl.org/dc/elements/1.1/" 
+      version="2.0">
+<channel>
+<title>Vectoring AI</title>
+<link>https://vectoringai.com/pages/llm-interview.html</link>
+<atom:link href="https://vectoringai.com/pages/llm-interview.xml" rel="self" type="application/rss+xml"/>
+<description>LLM interview questions, concepts, and preparation guides covering transformers, fine-tuning, RAG, agents, and practical LLM engineering.</description>
+<generator>quarto-1.9.36</generator>
+<lastBuildDate>Wed, 20 May 2026 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>LLM Interview QA - 1</title>
+  <dc:creator>Vectoring AI</dc:creator>
+  <link>https://vectoringai.com/posts/llm-interview/LLM-Interview-QA-1.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>This is <strong>Part 1</strong> of our LLM Interview QA series. It covers 10 foundational questions that appear in nearly every LLM Engineer, AI Engineer, and Applied ML interview — from startups to FAANG. Each answer goes beyond surface-level definitions with diagrams, concrete examples, and real-world applications.</p>
+<blockquote class="blockquote">
+<p>This series complements our ML Interview series. For foundational machine learning concepts, see <a href="../../posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a>. For evaluation metrics and feature engineering, see <a href="../../posts/ml-interview/ML-Interview-QA-2.html">ML Interview QA - 2</a>.</p>
+</blockquote>
+<hr>
+</section>
+<section id="q1-what-is-the-transformer-architecture-and-why-did-it-replace-rnnslstms" class="level2">
+<h2 class="anchored" data-anchor-id="q1-what-is-the-transformer-architecture-and-why-did-it-replace-rnnslstms">Q1: What is the Transformer architecture and why did it replace RNNs/LSTMs?</h2>
+<p><strong>Answer:</strong></p>
+<p>The Transformer is a neural network architecture introduced in the 2017 paper <em>“Attention Is All You Need”</em>. It relies entirely on <strong>self-attention mechanisms</strong> instead of recurrence or convolution to model dependencies in sequences.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph Transformer["Transformer Architecture"]
+        direction TB
+        INPUT["Input Embeddings &lt;br/&gt;+ Positional Encoding"]
+        ENC["Encoder Stack (N layers)"]
+        DEC["Decoder Stack (N layers)"]
+        OUTPUT["Output Probabilities"]
+
+        INPUT --&gt; ENC
+        ENC --&gt; DEC
+        DEC --&gt; OUTPUT
+    end
+
+    subgraph Encoder_Layer["Each Encoder Layer"]
+        SA["Multi-Head Self-Attention"]
+        FFN["Feed-Forward Network"]
+        LN1["Layer Norm + Residual"]
+        LN2["Layer Norm + Residual"]
+
+        SA --&gt; LN1 --&gt; FFN --&gt; LN2
+    end
+
+    subgraph Decoder_Layer["Each Decoder Layer"]
+        MSA["Masked Multi-Head Self-Attention"]
+        CA["Cross-Attention (to Encoder)"]
+        FFN2["Feed-Forward Network"]
+
+        MSA --&gt; CA --&gt; FFN2
+    end
+
+    style Transformer fill:#56cc9d,stroke:#333,color:#fff
+    style Encoder_Layer fill:#6cc3d5,stroke:#333,color:#fff
+    style Decoder_Layer fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="why-transformers-replaced-rnnslstms" class="level3">
+<h3 class="anchored" data-anchor-id="why-transformers-replaced-rnnslstms">Why Transformers replaced RNNs/LSTMs</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 32%">
+<col style="width: 41%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Aspect</th>
+<th>RNN/LSTM</th>
+<th>Transformer</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Parallelization</td>
+<td>Sequential (word by word)</td>
+<td>Fully parallel</td>
+</tr>
+<tr class="even">
+<td>Long-range dependencies</td>
+<td>Struggles (vanishing gradient)</td>
+<td>Handles via attention</td>
+</tr>
+<tr class="odd">
+<td>Training speed</td>
+<td>Slow</td>
+<td>Much faster on GPUs</td>
+</tr>
+<tr class="even">
+<td>Context window</td>
+<td>Limited by hidden state</td>
+<td>Limited by memory (can be very large)</td>
+</tr>
+<tr class="odd">
+<td>Positional info</td>
+<td>Implicit in sequence order</td>
+<td>Explicit positional encoding</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="key-insight" class="level3">
+<h3 class="anchored" data-anchor-id="key-insight">Key Insight</h3>
+<p>RNNs process tokens sequentially — to understand the relationship between the first and last word in a sentence, information must pass through every intermediate hidden state. Transformers compute attention scores between <strong>all pairs of tokens simultaneously</strong>, making them vastly more efficient and effective at capturing long-range dependencies.</p>
+<hr>
+</section>
+</section>
+<section id="q2-how-does-the-self-attention-mechanism-work" class="level2">
+<h2 class="anchored" data-anchor-id="q2-how-does-the-self-attention-mechanism-work">Q2: How does the Self-Attention mechanism work?</h2>
+<p><strong>Answer:</strong></p>
+<p>Self-attention allows each token in a sequence to attend to every other token, computing a weighted sum of their representations based on relevance.</p>
+<section id="the-qkv-framework" class="level3">
+<h3 class="anchored" data-anchor-id="the-qkv-framework">The QKV Framework</h3>
+<p>For each input token, three vectors are computed:</p>
+<ul>
+<li><strong>Query (Q):</strong> “What am I looking for?”</li>
+<li><strong>Key (K):</strong> “What do I contain?”</li>
+<li><strong>Value (V):</strong> “What information do I provide?”</li>
+</ul>
+<p>The attention score is computed as:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%5Ctext%7BAttention%7D(Q,%20K,%20V)%20=%20%5Ctext%7Bsoftmax%7D%5Cleft(%5Cfrac%7BQK%5ET%7D%7B%5Csqrt%7Bd_k%7D%7D%5Cright)%20V"></p>
+<p>where <img src="https://latex.codecogs.com/png.latex?d_k"> is the dimension of the key vectors (the scaling factor prevents dot products from growing too large).</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph Self_Attention["Self-Attention Computation"]
+        I["Input Embeddings"] --&gt; Q["Q = X · W_Q"]
+        I --&gt; K["K = X · W_K"]
+        I --&gt; V["V = X · W_V"]
+        Q --&gt; DOT["Q · K^T"]
+        K --&gt; DOT
+        DOT --&gt; SCALE["÷ √d_k"]
+        SCALE --&gt; SOFT["Softmax"]
+        SOFT --&gt; MUL["× V"]
+        V --&gt; MUL
+        MUL --&gt; OUT["Output"]
+    end
+
+    style Self_Attention fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="multi-head-attention" class="level3">
+<h3 class="anchored" data-anchor-id="multi-head-attention">Multi-Head Attention</h3>
+<p>Instead of one attention function, Transformers run <strong>multiple attention heads in parallel</strong> (e.g., 8 or 16 heads). Each head learns different relationships:</p>
+<ul>
+<li>One head might learn syntactic relationships (subject-verb)</li>
+<li>Another might learn coreference (pronouns to their antecedents)</li>
+<li>Another might learn positional proximity</li>
+</ul>
+<p>The outputs of all heads are concatenated and linearly projected.</p>
+</section>
+<section id="example" class="level3">
+<h3 class="anchored" data-anchor-id="example">Example</h3>
+<p>For the sentence: <em>“The cat sat on the mat because it was tired”</em></p>
+<p>The self-attention mechanism helps the model understand that “it” refers to “the cat” — the attention weight between “it” and “cat” will be high, while the weight between “it” and “mat” will be lower.</p>
+<hr>
+</section>
+</section>
+<section id="q3-what-is-tokenization-and-what-are-the-main-tokenization-strategies-used-in-llms" class="level2">
+<h2 class="anchored" data-anchor-id="q3-what-is-tokenization-and-what-are-the-main-tokenization-strategies-used-in-llms">Q3: What is tokenization and what are the main tokenization strategies used in LLMs?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>Tokenization</strong> is the process of splitting text into smaller units (tokens) that the model can process. Tokens are the fundamental input units for LLMs.</p>
+<section id="main-tokenization-strategies" class="level3">
+<h3 class="anchored" data-anchor-id="main-tokenization-strategies">Main Tokenization Strategies</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 17%">
+<col style="width: 23%">
+<col style="width: 42%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Strategy</th>
+<th>Description</th>
+<th>Example (“unhappiness”)</th>
+<th>Used By</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Word-level</strong></td>
+<td>Split by spaces/punctuation</td>
+<td>[“unhappiness”]</td>
+<td>Early models</td>
+</tr>
+<tr class="even">
+<td><strong>Character-level</strong></td>
+<td>Each character is a token</td>
+<td>[“u”,“n”,“h”,“a”,“p”,“p”,“i”,“n”,“e”,“s”,“s”]</td>
+<td>Some small models</td>
+</tr>
+<tr class="odd">
+<td><strong>BPE</strong> (Byte Pair Encoding)</td>
+<td>Iteratively merge frequent character pairs</td>
+<td>[“un”, “happiness”]</td>
+<td>GPT-2, GPT-3, GPT-4</td>
+</tr>
+<tr class="even">
+<td><strong>WordPiece</strong></td>
+<td>Like BPE but maximizes likelihood</td>
+<td>[“un”, “##happiness”]</td>
+<td>BERT</td>
+</tr>
+<tr class="odd">
+<td><strong>SentencePiece/Unigram</strong></td>
+<td>Probabilistic subword model</td>
+<td>[“▁un”, “happi”, “ness”]</td>
+<td>T5, LLaMA</td>
+</tr>
+</tbody>
+</table>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    TEXT["Raw Text: 'The cats are playing'"]
+    TEXT --&gt; WL["Word-level: ['The', 'cats', 'are', 'playing']"]
+    TEXT --&gt; BPE["BPE: ['The', ' c', 'ats', ' are', ' play', 'ing']"]
+    TEXT --&gt; WP["WordPiece: ['The', 'cats', 'are', 'play', '##ing']"]
+
+    style TEXT fill:#56cc9d,stroke:#333,color:#fff
+    style BPE fill:#6cc3d5,stroke:#333,color:#fff
+    style WP fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="why-subword-tokenization" class="level3">
+<h3 class="anchored" data-anchor-id="why-subword-tokenization">Why Subword Tokenization?</h3>
+<ul>
+<li><strong>Handles unknown words:</strong> Can represent any word by breaking it into known subwords</li>
+<li><strong>Efficient vocabulary:</strong> Balances vocabulary size with sequence length</li>
+<li><strong>Morphological awareness:</strong> Captures meaningful parts (prefixes, suffixes, roots)</li>
+</ul>
+</section>
+<section id="practical-considerations" class="level3">
+<h3 class="anchored" data-anchor-id="practical-considerations">Practical Considerations</h3>
+<ul>
+<li><strong>1 token ≈ 4 characters</strong> (English) or <strong>≈ 0.75 words</strong></li>
+<li>Vocabulary sizes: GPT-4 uses ~100k tokens, LLaMA uses ~32k tokens</li>
+<li>Non-English languages and code often require more tokens per word</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q4-what-is-the-difference-between-encoder-only-decoder-only-and-encoder-decoder-models" class="level2">
+<h2 class="anchored" data-anchor-id="q4-what-is-the-difference-between-encoder-only-decoder-only-and-encoder-decoder-models">Q4: What is the difference between Encoder-only, Decoder-only, and Encoder-Decoder models?</h2>
+<p><strong>Answer:</strong></p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph EO["Encoder-Only"]
+        EO1["Bidirectional attention"]
+        EO2["Sees all tokens at once"]
+        EO3["Best for: Understanding"]
+        EO4["Examples: BERT, RoBERTa"]
+    end
+
+    subgraph DO["Decoder-Only"]
+        DO1["Causal (left-to-right) attention"]
+        DO2["Each token sees only prior tokens"]
+        DO3["Best for: Generation"]
+        DO4["Examples: GPT-4, LLaMA, Claude"]
+    end
+
+    subgraph ED["Encoder-Decoder"]
+        ED1["Encoder: bidirectional"]
+        ED2["Decoder: causal + cross-attention"]
+        ED3["Best for: Seq-to-Seq tasks"]
+        ED4["Examples: T5, BART, Flan-T5"]
+    end
+
+    style EO fill:#56cc9d,stroke:#333,color:#fff
+    style DO fill:#6cc3d5,stroke:#333,color:#fff
+    style ED fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="detailed-comparison" class="level3">
+<h3 class="anchored" data-anchor-id="detailed-comparison">Detailed Comparison</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 15%">
+<col style="width: 25%">
+<col style="width: 26%">
+<col style="width: 32%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Aspect</th>
+<th>Encoder-Only</th>
+<th>Decoder-Only</th>
+<th>Encoder-Decoder</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Attention</td>
+<td>Bidirectional</td>
+<td>Causal (masked)</td>
+<td>Both</td>
+</tr>
+<tr class="even">
+<td>Pre-training</td>
+<td>Masked Language Modeling</td>
+<td>Next Token Prediction</td>
+<td>Span corruption / denoising</td>
+</tr>
+<tr class="odd">
+<td>Strengths</td>
+<td>Classification, NER, embeddings</td>
+<td>Text generation, reasoning</td>
+<td>Translation, summarization</td>
+</tr>
+<tr class="even">
+<td>Context</td>
+<td>Full input visibility</td>
+<td>Only left context</td>
+<td>Full input → sequential output</td>
+</tr>
+<tr class="odd">
+<td>Scaling trend</td>
+<td>Less common at scale</td>
+<td>Dominant paradigm (GPT-4, Claude)</td>
+<td>Used for specific tasks (T5)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="why-decoder-only-dominates-today" class="level3">
+<h3 class="anchored" data-anchor-id="why-decoder-only-dominates-today">Why Decoder-Only Dominates Today</h3>
+<p>Most modern LLMs (GPT-4, Claude, LLaMA, Gemini) are decoder-only because:</p>
+<ol type="1">
+<li><strong>Simplicity:</strong> One unified architecture for all tasks</li>
+<li><strong>Scalability:</strong> Easier to scale with more parameters</li>
+<li><strong>Generality:</strong> Can handle classification, generation, and reasoning via prompting</li>
+<li><strong>Emergent abilities:</strong> Larger decoder-only models exhibit chain-of-thought reasoning</li>
+</ol>
+<hr>
+</section>
+</section>
+<section id="q5-what-is-fine-tuning-and-what-are-the-main-approaches-for-adapting-llms" class="level2">
+<h2 class="anchored" data-anchor-id="q5-what-is-fine-tuning-and-what-are-the-main-approaches-for-adapting-llms">Q5: What is fine-tuning and what are the main approaches for adapting LLMs?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>Fine-tuning</strong> is the process of further training a pre-trained LLM on a specific dataset or task to customize its behavior.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    PT["Pre-trained LLM&lt;br/&gt;(trained on internet-scale data)"]
+    PT --&gt; FFT["Full Fine-Tuning&lt;br/&gt;Update ALL parameters"]
+    PT --&gt; PEFT["Parameter-Efficient Fine-Tuning&lt;br/&gt;Update FEW parameters"]
+    PT --&gt; RLHF_node["RLHF / Alignment&lt;br/&gt;Human preference training"]
+
+    PEFT --&gt; LORA["LoRA"]
+    PEFT --&gt; PREFIX["Prefix Tuning"]
+    PEFT --&gt; ADAPTER["Adapters"]
+    PEFT --&gt; QLORA["QLoRA"]
+
+    style PT fill:#56cc9d,stroke:#333,color:#fff
+    style FFT fill:#ff7851,stroke:#333,color:#fff
+    style PEFT fill:#6cc3d5,stroke:#333,color:#fff
+    style RLHF_node fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="fine-tuning-approaches" class="level3">
+<h3 class="anchored" data-anchor-id="fine-tuning-approaches">Fine-Tuning Approaches</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 27%">
+<col style="width: 39%">
+<col style="width: 12%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Approach</th>
+<th>What it does</th>
+<th>Parameters Updated</th>
+<th>Cost</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Full Fine-Tuning</strong></td>
+<td>Updates all model weights</td>
+<td>100%</td>
+<td>Very high (multiple GPUs)</td>
+</tr>
+<tr class="even">
+<td><strong>LoRA</strong></td>
+<td>Adds low-rank matrices to attention layers</td>
+<td>~0.1-1%</td>
+<td>Low</td>
+</tr>
+<tr class="odd">
+<td><strong>QLoRA</strong></td>
+<td>LoRA + 4-bit quantization</td>
+<td>~0.1-1%</td>
+<td>Very low</td>
+</tr>
+<tr class="even">
+<td><strong>Prefix Tuning</strong></td>
+<td>Prepends trainable vectors to inputs</td>
+<td>&lt;1%</td>
+<td>Low</td>
+</tr>
+<tr class="odd">
+<td><strong>Adapters</strong></td>
+<td>Inserts small trainable layers</td>
+<td>~1-5%</td>
+<td>Low</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="lora-low-rank-adaptation-most-popular" class="level3">
+<h3 class="anchored" data-anchor-id="lora-low-rank-adaptation-most-popular">LoRA (Low-Rank Adaptation) — Most Popular</h3>
+<p>LoRA freezes the pre-trained weights and injects trainable low-rank decomposition matrices:</p>
+<p><img src="https://latex.codecogs.com/png.latex?W'%20=%20W%20+%20%5CDelta%20W%20=%20W%20+%20BA"></p>
+<p>where <img src="https://latex.codecogs.com/png.latex?B%20%5Cin%20%5Cmathbb%7BR%7D%5E%7Bd%20%5Ctimes%20r%7D"> and <img src="https://latex.codecogs.com/png.latex?A%20%5Cin%20%5Cmathbb%7BR%7D%5E%7Br%20%5Ctimes%20d%7D">, with rank <img src="https://latex.codecogs.com/png.latex?r%20%5Cll%20d">.</p>
+</section>
+<section id="when-to-use-what" class="level3">
+<h3 class="anchored" data-anchor-id="when-to-use-what">When to Use What</h3>
+<ul>
+<li><strong>Prompt engineering first</strong> — no training needed, quick iteration</li>
+<li><strong>LoRA/QLoRA</strong> — when you need task-specific behavior with limited compute</li>
+<li><strong>Full fine-tuning</strong> — when you have large datasets and significant compute budget</li>
+<li><strong>RLHF</strong> — when aligning model outputs with human preferences</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q6-what-is-rlhf-reinforcement-learning-from-human-feedback-and-how-does-it-work" class="level2">
+<h2 class="anchored" data-anchor-id="q6-what-is-rlhf-reinforcement-learning-from-human-feedback-and-how-does-it-work">Q6: What is RLHF (Reinforcement Learning from Human Feedback) and how does it work?</h2>
+<p><strong>Answer:</strong></p>
+<p>RLHF is a training technique that aligns LLM outputs with human preferences. It’s the key process that makes models like ChatGPT helpful, harmless, and honest.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph Step1["Step 1: Supervised Fine-Tuning (SFT)"]
+        SFT1["Pre-trained LLM"]
+        SFT2["Human-written demonstrations"]
+        SFT3["Fine-tuned model (SFT model)"]
+        SFT1 --&gt; SFT2 --&gt; SFT3
+    end
+
+    subgraph Step2["Step 2: Reward Model Training"]
+        RM1["SFT model generates multiple responses"]
+        RM2["Humans rank responses by quality"]
+        RM3["Train reward model on rankings"]
+        RM1 --&gt; RM2 --&gt; RM3
+    end
+
+    subgraph Step3["Step 3: PPO Optimization"]
+        PPO1["SFT model generates response"]
+        PPO2["Reward model scores it"]
+        PPO3["PPO updates policy to maximize reward"]
+        PPO4["KL penalty prevents drift from SFT"]
+        PPO1 --&gt; PPO2 --&gt; PPO3
+        PPO3 --&gt; PPO4
+    end
+
+    Step1 --&gt; Step2 --&gt; Step3
+
+    style Step1 fill:#56cc9d,stroke:#333,color:#fff
+    style Step2 fill:#6cc3d5,stroke:#333,color:#fff
+    style Step3 fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="the-three-steps" class="level3">
+<h3 class="anchored" data-anchor-id="the-three-steps">The Three Steps</h3>
+<ol type="1">
+<li><strong>SFT (Supervised Fine-Tuning):</strong> Train the base model on high-quality human-written responses</li>
+<li><strong>Reward Model:</strong> Train a separate model to score responses based on human preference rankings</li>
+<li><strong>RL Optimization (PPO):</strong> Use the reward model as a signal to optimize the LLM’s outputs</li>
+</ol>
+</section>
+<section id="alternatives-to-rlhf" class="level3">
+<h3 class="anchored" data-anchor-id="alternatives-to-rlhf">Alternatives to RLHF</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 27%">
+<col style="width: 34%">
+<col style="width: 37%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Approach</th>
+<th>Advantage</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>DPO</strong> (Direct Preference Optimization)</td>
+<td>Directly optimize from preferences without a reward model</td>
+<td>Simpler, more stable training</td>
+</tr>
+<tr class="even">
+<td><strong>RLAIF</strong></td>
+<td>Use AI feedback instead of human feedback</td>
+<td>Cheaper, more scalable</td>
+</tr>
+<tr class="odd">
+<td><strong>Constitutional AI</strong></td>
+<td>Self-critique against a set of principles</td>
+<td>Less human annotation needed</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="why-rlhf-matters" class="level3">
+<h3 class="anchored" data-anchor-id="why-rlhf-matters">Why RLHF Matters</h3>
+<p>Without RLHF, base LLMs tend to:</p>
+<ul>
+<li>Continue text rather than answer questions</li>
+<li>Generate toxic, biased, or harmful content</li>
+<li>Hallucinate confidently</li>
+<li>Ignore user instructions</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q7-what-are-hallucinations-in-llms-and-how-can-they-be-mitigated" class="level2">
+<h2 class="anchored" data-anchor-id="q7-what-are-hallucinations-in-llms-and-how-can-they-be-mitigated">Q7: What are hallucinations in LLMs and how can they be mitigated?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>Hallucinations</strong> are confident-sounding outputs that are factually incorrect, nonsensical, or unfaithful to the provided context. They are one of the biggest challenges in deploying LLMs.</p>
+<section id="types-of-hallucinations" class="level3">
+<h3 class="anchored" data-anchor-id="types-of-hallucinations">Types of Hallucinations</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    H["LLM Hallucinations"]
+    H --&gt; INT["Intrinsic Hallucination&lt;br/&gt;Contradicts the source input"]
+    H --&gt; EXT["Extrinsic Hallucination&lt;br/&gt;Cannot be verified from source"]
+
+    INT --&gt; INT_EX["Example: Summary says 'John went to Paris'&lt;br/&gt;when source says 'John went to London'"]
+    EXT --&gt; EXT_EX["Example: Model adds details&lt;br/&gt;not present in any source"]
+
+    style H fill:#ff7851,stroke:#333,color:#fff
+    style INT fill:#ffce67,stroke:#333
+    style EXT fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="causes" class="level3">
+<h3 class="anchored" data-anchor-id="causes">Causes</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 35%">
+<col style="width: 65%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Cause</th>
+<th>Explanation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Training data noise</td>
+<td>Incorrect or contradictory information in pre-training corpus</td>
+</tr>
+<tr class="even">
+<td>Knowledge cutoff</td>
+<td>Model generates outdated information</td>
+</tr>
+<tr class="odd">
+<td>Pattern completion</td>
+<td>Model prioritizes fluency over accuracy</td>
+</tr>
+<tr class="even">
+<td>Exposure bias</td>
+<td>Errors compound during autoregressive generation</td>
+</tr>
+<tr class="odd">
+<td>Lack of grounding</td>
+<td>No mechanism to verify claims against facts</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="mitigation-strategies" class="level3">
+<h3 class="anchored" data-anchor-id="mitigation-strategies">Mitigation Strategies</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 43%">
+<col style="width: 56%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Strategy</th>
+<th>How it helps</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>RAG</strong> (Retrieval-Augmented Generation)</td>
+<td>Grounds responses in retrieved documents</td>
+</tr>
+<tr class="even">
+<td><strong>Chain-of-thought prompting</strong></td>
+<td>Forces step-by-step reasoning, reduces logical errors</td>
+</tr>
+<tr class="odd">
+<td><strong>Temperature reduction</strong></td>
+<td>Lowers randomness, picks more likely tokens</td>
+</tr>
+<tr class="even">
+<td><strong>Self-consistency</strong></td>
+<td>Generate multiple answers, pick the most common</td>
+</tr>
+<tr class="odd">
+<td><strong>Constrained decoding</strong></td>
+<td>Restrict outputs to valid formats</td>
+</tr>
+<tr class="even">
+<td><strong>Citation requirements</strong></td>
+<td>Force model to cite sources</td>
+</tr>
+<tr class="odd">
+<td><strong>Fine-tuning on verified data</strong></td>
+<td>Teach the model to say “I don’t know”</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="real-world-impact" class="level3">
+<h3 class="anchored" data-anchor-id="real-world-impact">Real-World Impact</h3>
+<p>Hallucinations are critical in high-stakes applications (legal, medical, financial). Production LLM systems almost always use RAG or other grounding techniques to minimize hallucinations.</p>
+<hr>
+</section>
+</section>
+<section id="q8-what-is-retrieval-augmented-generation-rag-and-why-is-it-important" class="level2">
+<h2 class="anchored" data-anchor-id="q8-what-is-retrieval-augmented-generation-rag-and-why-is-it-important">Q8: What is Retrieval-Augmented Generation (RAG) and why is it important?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>RAG</strong> combines a retrieval system with a generative LLM to ground responses in external knowledge, reducing hallucinations and enabling access to up-to-date or domain-specific information.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    Q["User Query"]
+    Q --&gt; EMB["Embed Query"]
+    EMB --&gt; SEARCH["Vector Search&lt;br/&gt;(retrieve top-k documents)"]
+    DB["Document Store&lt;br/&gt;(vector database)"] --&gt; SEARCH
+    SEARCH --&gt; CONTEXT["Retrieved Context"]
+    CONTEXT --&gt; PROMPT["Augmented Prompt&lt;br/&gt;(query + context)"]
+    Q --&gt; PROMPT
+    PROMPT --&gt; LLM["LLM generates answer"]
+    LLM --&gt; ANS["Grounded Response"]
+
+    style Q fill:#56cc9d,stroke:#333,color:#fff
+    style SEARCH fill:#6cc3d5,stroke:#333,color:#fff
+    style LLM fill:#ffce67,stroke:#333
+    style ANS fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="rag-pipeline-components" class="level3">
+<h3 class="anchored" data-anchor-id="rag-pipeline-components">RAG Pipeline Components</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 32%">
+<col style="width: 26%">
+<col style="width: 41%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Component</th>
+<th>Purpose</th>
+<th>Common Tools</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Document Loader</strong></td>
+<td>Ingest documents (PDF, web, DB)</td>
+<td>LangChain, LlamaIndex</td>
+</tr>
+<tr class="even">
+<td><strong>Chunking</strong></td>
+<td>Split documents into manageable pieces</td>
+<td>Recursive, semantic splitting</td>
+</tr>
+<tr class="odd">
+<td><strong>Embedding Model</strong></td>
+<td>Convert text to dense vectors</td>
+<td>OpenAI ada-002, BGE, E5</td>
+</tr>
+<tr class="even">
+<td><strong>Vector Store</strong></td>
+<td>Store and search embeddings</td>
+<td>Pinecone, Weaviate, ChromaDB, FAISS</td>
+</tr>
+<tr class="odd">
+<td><strong>Retriever</strong></td>
+<td>Find relevant chunks for a query</td>
+<td>Similarity search, hybrid search</td>
+</tr>
+<tr class="even">
+<td><strong>Generator (LLM)</strong></td>
+<td>Produce final answer from context</td>
+<td>GPT-4, Claude, LLaMA</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="rag-vs.-fine-tuning" class="level3">
+<h3 class="anchored" data-anchor-id="rag-vs.-fine-tuning">RAG vs.&nbsp;Fine-Tuning</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 30%">
+<col style="width: 19%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Aspect</th>
+<th>RAG</th>
+<th>Fine-Tuning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Knowledge update</td>
+<td>Instant (update document store)</td>
+<td>Requires retraining</td>
+</tr>
+<tr class="even">
+<td>Cost</td>
+<td>Lower (no GPU training)</td>
+<td>Higher (compute for training)</td>
+</tr>
+<tr class="odd">
+<td>Hallucination</td>
+<td>Reduced (grounded in docs)</td>
+<td>Can still hallucinate</td>
+</tr>
+<tr class="even">
+<td>Use case</td>
+<td>Dynamic knowledge, Q&amp;A</td>
+<td>Style/behavior change</td>
+</tr>
+<tr class="odd">
+<td>Transparency</td>
+<td>Can cite sources</td>
+<td>Black-box</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="when-to-use-rag" class="level3">
+<h3 class="anchored" data-anchor-id="when-to-use-rag">When to Use RAG</h3>
+<ul>
+<li>Knowledge changes frequently (news, documentation)</li>
+<li>Need verifiable, source-cited answers</li>
+<li>Domain-specific knowledge not in pre-training data</li>
+<li>Legal/compliance requirements for traceability</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q9-what-is-prompt-engineering-and-what-are-the-key-techniques" class="level2">
+<h2 class="anchored" data-anchor-id="q9-what-is-prompt-engineering-and-what-are-the-key-techniques">Q9: What is prompt engineering and what are the key techniques?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>Prompt engineering</strong> is the practice of designing inputs to LLMs to elicit desired outputs without modifying model weights. It’s the most accessible and cost-effective way to control LLM behavior.</p>
+<section id="key-prompting-techniques" class="level3">
+<h3 class="anchored" data-anchor-id="key-prompting-techniques">Key Prompting Techniques</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    PE["Prompt Engineering Techniques"]
+    PE --&gt; ZS["Zero-Shot&lt;br/&gt;'Classify this review as positive/negative'"]
+    PE --&gt; FS["Few-Shot&lt;br/&gt;'Here are 3 examples, now do this one'"]
+    PE --&gt; COT["Chain-of-Thought&lt;br/&gt;'Think step by step'"]
+    PE --&gt; SC["Self-Consistency&lt;br/&gt;Sample multiple CoT paths, majority vote"]
+    PE --&gt; TOT["Tree-of-Thought&lt;br/&gt;Explore multiple reasoning branches"]
+    PE --&gt; ROLE["Role Prompting&lt;br/&gt;'You are an expert data scientist...'"]
+
+    style PE fill:#56cc9d,stroke:#333,color:#fff
+    style COT fill:#6cc3d5,stroke:#333,color:#fff
+    style SC fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="comparison-of-techniques" class="level3">
+<h3 class="anchored" data-anchor-id="comparison-of-techniques">Comparison of Techniques</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 30%">
+<col style="width: 44%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Technique</th>
+<th>When to Use</th>
+<th>Performance Boost</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Zero-shot</strong></td>
+<td>Simple tasks, large models</td>
+<td>Baseline</td>
+</tr>
+<tr class="even">
+<td><strong>Few-shot</strong></td>
+<td>Need format guidance, smaller models</td>
+<td>+10-30% on structured tasks</td>
+</tr>
+<tr class="odd">
+<td><strong>Chain-of-thought</strong></td>
+<td>Reasoning, math, logic</td>
+<td>+20-50% on reasoning tasks</td>
+</tr>
+<tr class="even">
+<td><strong>Self-consistency</strong></td>
+<td>High-accuracy requirements</td>
+<td>+5-15% over single CoT</td>
+</tr>
+<tr class="odd">
+<td><strong>Tree-of-thought</strong></td>
+<td>Complex multi-step problems</td>
+<td>Best for planning/search</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="system-prompt-best-practices" class="level3">
+<h3 class="anchored" data-anchor-id="system-prompt-best-practices">System Prompt Best Practices</h3>
+<ol type="1">
+<li><strong>Be specific:</strong> “Extract the person’s name, company, and role” &gt; “Extract information”</li>
+<li><strong>Define format:</strong> Specify JSON, markdown, or other output structures</li>
+<li><strong>Set constraints:</strong> “Answer only based on the provided context”</li>
+<li><strong>Provide examples:</strong> Show input-output pairs for complex tasks</li>
+<li><strong>Assign a role:</strong> “You are a senior Python developer reviewing code”</li>
+</ol>
+</section>
+<section id="temperature-and-sampling-parameters" class="level3">
+<h3 class="anchored" data-anchor-id="temperature-and-sampling-parameters">Temperature and Sampling Parameters</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 37%">
+<col style="width: 27%">
+<col style="width: 34%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Parameter</th>
+<th>Effect</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Temperature</strong> (0-2)</td>
+<td>Controls randomness. Lower = deterministic</td>
+<td>0 for factual, 0.7-1.0 for creative</td>
+</tr>
+<tr class="even">
+<td><strong>Top-p</strong> (nucleus sampling)</td>
+<td>Considers tokens within cumulative probability p</td>
+<td>0.9 for balanced generation</td>
+</tr>
+<tr class="odd">
+<td><strong>Top-k</strong></td>
+<td>Considers only top k most likely tokens</td>
+<td>Limits vocabulary for generation</td>
+</tr>
+<tr class="even">
+<td><strong>Frequency penalty</strong></td>
+<td>Reduces repetition</td>
+<td>Longer outputs without loops</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+</section>
+<section id="q10-what-are-the-key-challenges-and-considerations-when-deploying-llms-in-production" class="level2">
+<h2 class="anchored" data-anchor-id="q10-what-are-the-key-challenges-and-considerations-when-deploying-llms-in-production">Q10: What are the key challenges and considerations when deploying LLMs in production?</h2>
+<p><strong>Answer:</strong></p>
+<p>Deploying LLMs in production involves challenges beyond model accuracy — including latency, cost, safety, and reliability.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    PROD["LLM Production Challenges"]
+    PROD --&gt; PERF["Performance"]
+    PROD --&gt; COST["Cost"]
+    PROD --&gt; SAFETY["Safety &amp; Guardrails"]
+    PROD --&gt; EVAL["Evaluation"]
+    PROD --&gt; OPS["Operations"]
+
+    PERF --&gt; P1["Latency (TTFT, TPS)"]
+    PERF --&gt; P2["Throughput"]
+    PERF --&gt; P3["Context window limits"]
+
+    COST --&gt; C1["Token costs"]
+    COST --&gt; C2["Infrastructure"]
+    COST --&gt; C3["Caching strategies"]
+
+    SAFETY --&gt; S1["Content filtering"]
+    SAFETY --&gt; S2["PII detection"]
+    SAFETY --&gt; S3["Prompt injection defense"]
+
+    EVAL --&gt; E1["Automated metrics"]
+    EVAL --&gt; E2["Human evaluation"]
+    EVAL --&gt; E3["A/B testing"]
+
+    OPS --&gt; O1["Monitoring &amp; observability"]
+    OPS --&gt; O2["Version management"]
+    OPS --&gt; O3["Fallback strategies"]
+
+    style PROD fill:#56cc9d,stroke:#333,color:#fff
+    style PERF fill:#6cc3d5,stroke:#333,color:#fff
+    style SAFETY fill:#ff7851,stroke:#333,color:#fff
+    style COST fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="key-production-patterns" class="level3">
+<h3 class="anchored" data-anchor-id="key-production-patterns">Key Production Patterns</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 26%">
+<col style="width: 26%">
+<col style="width: 47%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Pattern</th>
+<th>Purpose</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Caching</strong></td>
+<td>Reduce cost &amp; latency</td>
+<td>Semantic cache (similar queries), exact cache</td>
+</tr>
+<tr class="even">
+<td><strong>Streaming</strong></td>
+<td>Improve perceived latency</td>
+<td>Server-sent events, token-by-token delivery</td>
+</tr>
+<tr class="odd">
+<td><strong>Guardrails</strong></td>
+<td>Prevent harmful outputs</td>
+<td>Input/output validators, content filters</td>
+</tr>
+<tr class="even">
+<td><strong>Fallbacks</strong></td>
+<td>Handle failures gracefully</td>
+<td>Model cascading, rule-based backup</td>
+</tr>
+<tr class="odd">
+<td><strong>Rate limiting</strong></td>
+<td>Manage costs and abuse</td>
+<td>Token budgets, per-user limits</td>
+</tr>
+<tr class="even">
+<td><strong>Observability</strong></td>
+<td>Monitor quality over time</td>
+<td>Log prompts/responses, track metrics</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="optimization-techniques" class="level3">
+<h3 class="anchored" data-anchor-id="optimization-techniques">Optimization Techniques</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 55%">
+<col style="width: 45%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Technique</th>
+<th>Benefit</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Quantization</strong> (4-bit, 8-bit)</td>
+<td>2-4x memory reduction with minimal quality loss</td>
+</tr>
+<tr class="even">
+<td><strong>KV-cache optimization</strong></td>
+<td>Faster inference for long contexts</td>
+</tr>
+<tr class="odd">
+<td><strong>Speculative decoding</strong></td>
+<td>2-3x speed improvement</td>
+</tr>
+<tr class="even">
+<td><strong>Model distillation</strong></td>
+<td>Smaller, faster models that mimic larger ones</td>
+</tr>
+<tr class="odd">
+<td><strong>Prompt compression</strong></td>
+<td>Reduce token count while preserving meaning</td>
+</tr>
+<tr class="even">
+<td><strong>Batching</strong></td>
+<td>Higher throughput for concurrent requests</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="evaluation-in-production" class="level3">
+<h3 class="anchored" data-anchor-id="evaluation-in-production">Evaluation in Production</h3>
+<ul>
+<li><strong>Automated:</strong> BLEU, ROUGE, BERTScore for generation quality</li>
+<li><strong>LLM-as-Judge:</strong> Use a stronger model to evaluate outputs</li>
+<li><strong>Human feedback:</strong> Thumbs up/down, preference ratings</li>
+<li><strong>Task-specific:</strong> Accuracy, F1, faithfulness scores</li>
+<li><strong>Safety:</strong> Toxicity rates, refusal rates, PII leakage</li>
+</ul>
+</section>
+<section id="security-considerations" class="level3">
+<h3 class="anchored" data-anchor-id="security-considerations">Security Considerations</h3>
+<ul>
+<li><strong>Prompt injection:</strong> Adversarial inputs that override system instructions</li>
+<li><strong>Data leakage:</strong> Model revealing training data or system prompts</li>
+<li><strong>PII exposure:</strong> Generating or storing personally identifiable information</li>
+<li><strong>Jailbreaking:</strong> Users bypassing safety guardrails</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="summary-table" class="level2">
+<h2 class="anchored" data-anchor-id="summary-table">Summary Table</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 13%">
+<col style="width: 30%">
+<col style="width: 56%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Topic</th>
+<th>Key Concept</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>Transformer Architecture</td>
+<td>Self-attention replaces recurrence for parallel, long-range processing</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Self-Attention</td>
+<td>QKV mechanism computes token relevance scores</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>Tokenization</td>
+<td>Subword strategies (BPE, WordPiece) balance vocabulary and sequence length</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td>Model Types</td>
+<td>Encoder-only, decoder-only, encoder-decoder serve different tasks</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td>Fine-Tuning</td>
+<td>LoRA/QLoRA enable efficient adaptation with minimal parameters</td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td>RLHF</td>
+<td>Three-step alignment: SFT → Reward Model → PPO</td>
+</tr>
+<tr class="odd">
+<td>7</td>
+<td>Hallucinations</td>
+<td>Confident wrong outputs; mitigated by RAG, CoT, temperature</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td>RAG</td>
+<td>Retrieval + generation for grounded, up-to-date responses</td>
+</tr>
+<tr class="odd">
+<td>9</td>
+<td>Prompt Engineering</td>
+<td>Zero-shot, few-shot, CoT, and sampling parameters</td>
+</tr>
+<tr class="even">
+<td>10</td>
+<td>Production Deployment</td>
+<td>Latency, cost, safety, evaluation, and operational concerns</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="whats-next" class="level2">
+<h2 class="anchored" data-anchor-id="whats-next">What’s Next?</h2>
+<p>This article covered the foundational LLM concepts most commonly tested in interviews. For deeper dives into specific topics:</p>
+<ul>
+<li><strong>ML fundamentals</strong> that underpin LLMs: <a href="../../posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a></li>
+<li><strong>Evaluation metrics and data handling:</strong> <a href="../../posts/ml-interview/ML-Interview-QA-2.html">ML Interview QA - 2</a></li>
+</ul>
+
+
+</section>
+
+ ]]></description>
+  <guid>https://vectoringai.com/posts/llm-interview/LLM-Interview-QA-1.html</guid>
+  <pubDate>Wed, 20 May 2026 00:00:00 GMT</pubDate>
+  <media:content url="https://vectoringai.com/images/llm-interview/thumb_LLM_interview_qa_300.png" medium="image" type="image/png" height="96" width="144"/>
+</item>
+<item>
+  <title>LLM Interview QA - 2</title>
+  <dc:creator>Vectoring AI</dc:creator>
+  <link>https://vectoringai.com/posts/llm-interview/LLM-Interview-QA-2.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>This is <strong>Part 2</strong> of our LLM Interview QA series. It covers 10 advanced questions on scaling, optimization, agents, and evaluation — the practical knowledge that separates candidates who use LLMs from those who <strong>engineer production LLM systems</strong>.</p>
+<blockquote class="blockquote">
+<p>For foundational LLM concepts (transformers, attention, tokenization, RAG, RLHF), see <a href="../../posts/llm-interview/LLM-Interview-QA-1.html">LLM Interview QA - 1</a>. For ML fundamentals, see <a href="../../posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a> and <a href="../../posts/ml-interview/ML-Interview-QA-2.html">ML Interview QA - 2</a>.</p>
+</blockquote>
+<hr>
+</section>
+<section id="q1-what-are-scaling-laws-in-llms-and-why-do-they-matter" class="level2">
+<h2 class="anchored" data-anchor-id="q1-what-are-scaling-laws-in-llms-and-why-do-they-matter">Q1: What are scaling laws in LLMs and why do they matter?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>Scaling laws</strong> are empirical relationships describing how LLM performance improves predictably as you increase model size, dataset size, and compute budget.</p>
+<section id="the-chinchilla-scaling-law" class="level3">
+<h3 class="anchored" data-anchor-id="the-chinchilla-scaling-law">The Chinchilla Scaling Law</h3>
+<p>The key finding (Hoffmann et al., 2022): for a given compute budget, <strong>model size and training tokens should be scaled equally</strong>.</p>
+<p><img src="https://latex.codecogs.com/png.latex?L(N,%20D)%20%5Capprox%20%5Cfrac%7BA%7D%7BN%5E%5Calpha%7D%20+%20%5Cfrac%7BB%7D%7BD%5E%5Cbeta%7D%20+%20E"></p>
+<p>where:</p>
+<ul>
+<li><img src="https://latex.codecogs.com/png.latex?N"> = number of parameters</li>
+<li><img src="https://latex.codecogs.com/png.latex?D"> = number of training tokens</li>
+<li><img src="https://latex.codecogs.com/png.latex?L"> = loss (lower is better)</li>
+<li><img src="https://latex.codecogs.com/png.latex?E"> = irreducible loss (entropy of natural language)</li>
+</ul>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph Scaling["Scaling Laws: Three Axes"]
+        PARAMS["Model Parameters (N)&lt;br/&gt;More params → lower loss"]
+        DATA["Training Data (D)&lt;br/&gt;More tokens → lower loss"]
+        COMPUTE["Compute (C ≈ 6ND)&lt;br/&gt;More FLOPs → lower loss"]
+    end
+
+    subgraph Tradeoff["Chinchilla Optimal"]
+        OPT["For budget C:&lt;br/&gt;Scale N and D equally&lt;br/&gt;D ≈ 20 × N tokens"]
+    end
+
+    Scaling --&gt; Tradeoff
+
+    style Scaling fill:#56cc9d,stroke:#333,color:#fff
+    style Tradeoff fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="practical-implications" class="level3">
+<h3 class="anchored" data-anchor-id="practical-implications">Practical Implications</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 40%">
+<col style="width: 59%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Insight</th>
+<th>Implication</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Loss decreases as a power law</td>
+<td>Returns diminish but never plateau (with enough data)</td>
+</tr>
+<tr class="even">
+<td>Chinchilla-optimal training</td>
+<td>Many early LLMs were undertrained (GPT-3: 300B tokens for 175B params)</td>
+</tr>
+<tr class="odd">
+<td>Compute-optimal models</td>
+<td>LLaMA-70B outperforms GPT-3-175B by training on more tokens</td>
+</tr>
+<tr class="even">
+<td>Emergent abilities</td>
+<td>Some capabilities appear only above certain scale thresholds</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="emergent-abilities" class="level3">
+<h3 class="anchored" data-anchor-id="emergent-abilities">Emergent Abilities</h3>
+<p>Certain capabilities appear suddenly at scale rather than improving gradually:</p>
+<ul>
+<li><strong>Chain-of-thought reasoning</strong> — emerges around 60-100B parameters</li>
+<li><strong>In-context learning</strong> — improves dramatically with scale</li>
+<li><strong>Multi-step math</strong> — requires large models to perform reliably</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q2-how-do-llms-handle-long-context-windows-and-what-are-the-key-challenges" class="level2">
+<h2 class="anchored" data-anchor-id="q2-how-do-llms-handle-long-context-windows-and-what-are-the-key-challenges">Q2: How do LLMs handle long context windows and what are the key challenges?</h2>
+<p><strong>Answer:</strong></p>
+<p>The <strong>context window</strong> is the maximum number of tokens an LLM can process in a single forward pass. Modern models range from 4K to 1M+ tokens.</p>
+<section id="the-challenge-quadratic-attention" class="level3">
+<h3 class="anchored" data-anchor-id="the-challenge-quadratic-attention">The Challenge: Quadratic Attention</h3>
+<p>Standard self-attention has <img src="https://latex.codecogs.com/png.latex?O(n%5E2)"> complexity in both time and memory with respect to sequence length <img src="https://latex.codecogs.com/png.latex?n">:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%5Ctext%7BMemory%7D%20%5Cpropto%20n%5E2,%20%5Cquad%20%5Ctext%7BCompute%7D%20%5Cpropto%20n%5E2%20%5Ccdot%20d"></p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph Problem["The Quadratic Problem"]
+        S1["4K tokens → 16M attention entries"]
+        S2["32K tokens → 1B attention entries"]
+        S3["128K tokens → 16B attention entries"]
+        S4["1M tokens → 1T attention entries"]
+    end
+
+    subgraph Solutions["Solutions"]
+        SOL1["Efficient Attention&lt;br/&gt;Flash Attention, Ring Attention"]
+        SOL2["Position Extrapolation&lt;br/&gt;RoPE, ALiBi, YaRN"]
+        SOL3["Sparse Attention&lt;br/&gt;Sliding window, dilated"]
+        SOL4["Memory/Retrieval&lt;br/&gt;Compress old context"]
+    end
+
+    Problem --&gt; Solutions
+
+    style Problem fill:#ff7851,stroke:#333,color:#fff
+    style Solutions fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="key-techniques-for-long-context" class="level3">
+<h3 class="anchored" data-anchor-id="key-techniques-for-long-context">Key Techniques for Long Context</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 39%">
+<col style="width: 27%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Technique</th>
+<th>How it works</th>
+<th>Used by</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Flash Attention</strong></td>
+<td>Fused GPU kernels, tiled computation to reduce memory I/O</td>
+<td>Most modern LLMs</td>
+</tr>
+<tr class="even">
+<td><strong>RoPE</strong> (Rotary Position Embedding)</td>
+<td>Encodes relative positions via rotation matrices</td>
+<td>LLaMA, Mistral</td>
+</tr>
+<tr class="odd">
+<td><strong>ALiBi</strong></td>
+<td>Linear bias based on distance (no positional embedding)</td>
+<td>BLOOM</td>
+</tr>
+<tr class="even">
+<td><strong>Sliding Window Attention</strong></td>
+<td>Each token attends only to nearby tokens</td>
+<td>Mistral</td>
+</tr>
+<tr class="odd">
+<td><strong>Ring Attention</strong></td>
+<td>Distributes sequence across multiple GPUs</td>
+<td>Long-context training</td>
+</tr>
+<tr class="even">
+<td><strong>YaRN</strong></td>
+<td>Extends RoPE to longer contexts via interpolation</td>
+<td>Extended LLaMA</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="the-lost-in-the-middle-problem" class="level3">
+<h3 class="anchored" data-anchor-id="the-lost-in-the-middle-problem">The “Lost in the Middle” Problem</h3>
+<p>Research shows LLMs tend to:</p>
+<ul>
+<li>Remember information at the <strong>beginning</strong> and <strong>end</strong> of context well</li>
+<li>Struggle with information in the <strong>middle</strong> of long contexts</li>
+<li>Performance degrades as relevant information is placed further from query</li>
+</ul>
+</section>
+<section id="practical-considerations" class="level3">
+<h3 class="anchored" data-anchor-id="practical-considerations">Practical Considerations</h3>
+<ul>
+<li>Longer context ≠ better retrieval (RAG often outperforms naive long context)</li>
+<li>KV cache memory grows linearly with sequence length</li>
+<li>Inference cost increases with context length even if most tokens are irrelevant</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q3-what-is-model-quantization-and-how-does-it-enable-llm-deployment" class="level2">
+<h2 class="anchored" data-anchor-id="q3-what-is-model-quantization-and-how-does-it-enable-llm-deployment">Q3: What is model quantization and how does it enable LLM deployment?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>Quantization</strong> reduces the numerical precision of model weights (and sometimes activations) from high-precision formats (FP32/FP16) to lower-precision formats (INT8/INT4), dramatically reducing memory and improving inference speed.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph Precision["Precision Formats"]
+        FP32["FP32 (32-bit)&lt;br/&gt;Full precision&lt;br/&gt;4 bytes per param"]
+        FP16["FP16/BF16 (16-bit)&lt;br/&gt;Half precision&lt;br/&gt;2 bytes per param"]
+        INT8["INT8 (8-bit)&lt;br/&gt;Quarter precision&lt;br/&gt;1 byte per param"]
+        INT4["INT4 (4-bit)&lt;br/&gt;Eighth precision&lt;br/&gt;0.5 bytes per param"]
+    end
+
+    FP32 --&gt;|"2x compression"| FP16
+    FP16 --&gt;|"2x compression"| INT8
+    INT8 --&gt;|"2x compression"| INT4
+
+    style FP32 fill:#ff7851,stroke:#333,color:#fff
+    style FP16 fill:#ffce67,stroke:#333
+    style INT8 fill:#6cc3d5,stroke:#333,color:#fff
+    style INT4 fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="memory-requirements-example-llama-70b" class="level3">
+<h3 class="anchored" data-anchor-id="memory-requirements-example-llama-70b">Memory Requirements Example (LLaMA-70B)</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Precision</th>
+<th>Memory Required</th>
+<th>Hardware Needed</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>FP32</td>
+<td>~280 GB</td>
+<td>4× A100 80GB</td>
+</tr>
+<tr class="even">
+<td>FP16</td>
+<td>~140 GB</td>
+<td>2× A100 80GB</td>
+</tr>
+<tr class="odd">
+<td>INT8</td>
+<td>~70 GB</td>
+<td>1× A100 80GB</td>
+</tr>
+<tr class="even">
+<td>INT4</td>
+<td>~35 GB</td>
+<td>1× A6000 48GB or consumer GPU</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="quantization-approaches" class="level3">
+<h3 class="anchored" data-anchor-id="quantization-approaches">Quantization Approaches</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 29%">
+<col style="width: 22%">
+<col style="width: 48%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>PTQ</strong> (Post-Training Quantization)</td>
+<td>After training</td>
+<td>Quantize a trained model without retraining</td>
+</tr>
+<tr class="even">
+<td><strong>QAT</strong> (Quantization-Aware Training)</td>
+<td>During training</td>
+<td>Simulate quantization during training for better accuracy</td>
+</tr>
+<tr class="odd">
+<td><strong>GPTQ</strong></td>
+<td>PTQ, weight-only</td>
+<td>Layer-wise quantization using calibration data</td>
+</tr>
+<tr class="even">
+<td><strong>AWQ</strong> (Activation-Aware)</td>
+<td>PTQ, weight-only</td>
+<td>Protects salient weights based on activation magnitude</td>
+</tr>
+<tr class="odd">
+<td><strong>GGUF</strong> (llama.cpp format)</td>
+<td>PTQ, various bits</td>
+<td>CPU-friendly format with mixed precision</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="quality-vs.-compression-tradeoff" class="level3">
+<h3 class="anchored" data-anchor-id="quality-vs.-compression-tradeoff">Quality vs.&nbsp;Compression Tradeoff</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Quantization</th>
+<th>Perplexity Impact</th>
+<th>Speed Gain</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>FP16 → INT8</td>
+<td>Negligible (&lt;0.1%)</td>
+<td>1.5-2x</td>
+<td>Production serving</td>
+</tr>
+<tr class="even">
+<td>FP16 → INT4</td>
+<td>Small (1-3%)</td>
+<td>2-3x</td>
+<td>Edge deployment, personal use</td>
+</tr>
+<tr class="odd">
+<td>FP16 → INT2</td>
+<td>Significant (5-15%)</td>
+<td>3-4x</td>
+<td>Experimental only</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="key-insight" class="level3">
+<h3 class="anchored" data-anchor-id="key-insight">Key Insight</h3>
+<p>4-bit quantization (GPTQ, AWQ) has become the standard for local LLM deployment because it offers <strong>near-lossless quality</strong> with 4x memory reduction — enabling 70B models to run on consumer hardware.</p>
+<hr>
+</section>
+</section>
+<section id="q4-what-are-llm-agents-and-how-do-they-extend-llm-capabilities" class="level2">
+<h2 class="anchored" data-anchor-id="q4-what-are-llm-agents-and-how-do-they-extend-llm-capabilities">Q4: What are LLM Agents and how do they extend LLM capabilities?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>LLM Agents</strong> are systems where an LLM acts as a reasoning engine that can plan, use tools, and take actions to accomplish goals — going beyond simple text generation.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph Agent["LLM Agent Architecture"]
+        LLM_CORE["LLM (Brain)&lt;br/&gt;Reasoning &amp; Planning"]
+        MEMORY["Memory&lt;br/&gt;Short-term: conversation&lt;br/&gt;Long-term: vector store"]
+        TOOLS["Tools&lt;br/&gt;Code execution, APIs,&lt;br/&gt;Search, Databases"]
+        PLANNING["Planning&lt;br/&gt;Task decomposition,&lt;br/&gt;Reflection, Replanning"]
+    end
+
+    USER["User Goal"] --&gt; LLM_CORE
+    LLM_CORE --&gt; PLANNING
+    PLANNING --&gt; TOOLS
+    TOOLS --&gt; |"Observation"| LLM_CORE
+    LLM_CORE --&gt; MEMORY
+    MEMORY --&gt; LLM_CORE
+    LLM_CORE --&gt; RESULT["Final Result"]
+
+    style Agent fill:#56cc9d,stroke:#333,color:#fff
+    style USER fill:#6cc3d5,stroke:#333,color:#fff
+    style RESULT fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="core-agent-patterns" class="level3">
+<h3 class="anchored" data-anchor-id="core-agent-patterns">Core Agent Patterns</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 29%">
+<col style="width: 41%">
+<col style="width: 29%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Pattern</th>
+<th>How it works</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>ReAct</strong></td>
+<td>Reason → Act → Observe loop</td>
+<td>“I need to search for X” → search → “I found Y, now I’ll…”</td>
+</tr>
+<tr class="even">
+<td><strong>Plan-and-Execute</strong></td>
+<td>Create full plan first, then execute steps</td>
+<td>Break complex task into subtasks</td>
+</tr>
+<tr class="odd">
+<td><strong>Reflection</strong></td>
+<td>Agent critiques its own output and improves</td>
+<td>Self-check for errors before responding</td>
+</tr>
+<tr class="even">
+<td><strong>Multi-Agent</strong></td>
+<td>Multiple specialized agents collaborate</td>
+<td>Researcher + Coder + Reviewer</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="tool-use" class="level3">
+<h3 class="anchored" data-anchor-id="tool-use">Tool Use</h3>
+<p>Tools transform LLMs from text generators into <strong>action-taking systems</strong>:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 40%">
+<col style="width: 27%">
+<col style="width: 32%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tool Category</th>
+<th>Examples</th>
+<th>Why Needed</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Code Execution</strong></td>
+<td>Python REPL, sandboxed environments</td>
+<td>Precise computation, data analysis</td>
+</tr>
+<tr class="even">
+<td><strong>Search</strong></td>
+<td>Web search, document retrieval</td>
+<td>Access to current information</td>
+</tr>
+<tr class="odd">
+<td><strong>APIs</strong></td>
+<td>Weather, calendar, databases</td>
+<td>Real-world interactions</td>
+</tr>
+<tr class="even">
+<td><strong>File I/O</strong></td>
+<td>Read/write files, parse documents</td>
+<td>Persistent data manipulation</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="agent-frameworks" class="level3">
+<h3 class="anchored" data-anchor-id="agent-frameworks">Agent Frameworks</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 35%">
+<col style="width: 32%">
+<col style="width: 32%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Framework</th>
+<th>Approach</th>
+<th>Strength</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>LangGraph</strong></td>
+<td>Graph-based state machines</td>
+<td>Complex workflows, cycles</td>
+</tr>
+<tr class="even">
+<td><strong>CrewAI</strong></td>
+<td>Role-based multi-agent</td>
+<td>Team collaboration metaphor</td>
+</tr>
+<tr class="odd">
+<td><strong>AutoGen</strong></td>
+<td>Conversational agents</td>
+<td>Multi-agent conversation</td>
+</tr>
+<tr class="even">
+<td><strong>OpenAI Assistants</strong></td>
+<td>Managed agent platform</td>
+<td>Easy deployment</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="challenges" class="level3">
+<h3 class="anchored" data-anchor-id="challenges">Challenges</h3>
+<ul>
+<li><strong>Reliability:</strong> Agents can go off-track or loop infinitely</li>
+<li><strong>Cost:</strong> Multiple LLM calls per task (tool reasoning is expensive)</li>
+<li><strong>Safety:</strong> Autonomous actions need guardrails</li>
+<li><strong>Evaluation:</strong> Hard to benchmark open-ended agent behavior</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q5-how-do-you-evaluate-llm-performance-and-what-metrics-are-used" class="level2">
+<h2 class="anchored" data-anchor-id="q5-how-do-you-evaluate-llm-performance-and-what-metrics-are-used">Q5: How do you evaluate LLM performance and what metrics are used?</h2>
+<p><strong>Answer:</strong></p>
+<p>LLM evaluation is uniquely challenging because outputs are open-ended text. Different tasks require different evaluation approaches.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    EVAL["LLM Evaluation"]
+    EVAL --&gt; AUTO["Automated Metrics"]
+    EVAL --&gt; HUMAN["Human Evaluation"]
+    EVAL --&gt; LLM_JUDGE["LLM-as-Judge"]
+    EVAL --&gt; BENCH["Benchmarks"]
+
+    AUTO --&gt; A1["Perplexity"]
+    AUTO --&gt; A2["BLEU / ROUGE"]
+    AUTO --&gt; A3["BERTScore"]
+    AUTO --&gt; A4["Exact Match / F1"]
+
+    HUMAN --&gt; H1["Preference ranking"]
+    HUMAN --&gt; H2["Likert scale ratings"]
+    HUMAN --&gt; H3["Task completion rate"]
+
+    LLM_JUDGE --&gt; L1["Pairwise comparison"]
+    LLM_JUDGE --&gt; L2["Rubric-based scoring"]
+    LLM_JUDGE --&gt; L3["Reference-free evaluation"]
+
+    BENCH --&gt; B1["MMLU (knowledge)"]
+    BENCH --&gt; B2["HumanEval (coding)"]
+    BENCH --&gt; B3["GSM8K (math)"]
+    BENCH --&gt; B4["TruthfulQA (honesty)"]
+
+    style EVAL fill:#56cc9d,stroke:#333,color:#fff
+    style AUTO fill:#6cc3d5,stroke:#333,color:#fff
+    style LLM_JUDGE fill:#ffce67,stroke:#333
+    style BENCH fill:#ff7851,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="metric-selection-by-task" class="level3">
+<h3 class="anchored" data-anchor-id="metric-selection-by-task">Metric Selection by Task</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 22%">
+<col style="width: 59%">
+<col style="width: 18%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Task</th>
+<th>Primary Metrics</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Summarization</strong></td>
+<td>ROUGE-L, faithfulness, BERTScore</td>
+<td>Overlap + semantic similarity</td>
+</tr>
+<tr class="even">
+<td><strong>Translation</strong></td>
+<td>BLEU, chrF, COMET</td>
+<td>N-gram overlap + learned metrics</td>
+</tr>
+<tr class="odd">
+<td><strong>Code Generation</strong></td>
+<td>pass@k, HumanEval</td>
+<td>Functional correctness</td>
+</tr>
+<tr class="even">
+<td><strong>Question Answering</strong></td>
+<td>Exact Match, F1, faithfulness</td>
+<td>Factual accuracy</td>
+</tr>
+<tr class="odd">
+<td><strong>Chat/Dialog</strong></td>
+<td>Human preference, LLM-judge</td>
+<td>No single ground truth</td>
+</tr>
+<tr class="even">
+<td><strong>Reasoning</strong></td>
+<td>Accuracy on benchmarks (GSM8K, MATH)</td>
+<td>Verifiable correct answers</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="llm-as-judge" class="level3">
+<h3 class="anchored" data-anchor-id="llm-as-judge">LLM-as-Judge</h3>
+<p>Using a stronger LLM to evaluate outputs has become standard:</p>
+<pre><code>System: You are an expert evaluator. Rate the following response on:
+1. Helpfulness (1-5)
+2. Accuracy (1-5)
+3. Harmlessness (1-5)
+
+Provide scores and brief justification.</code></pre>
+<p><strong>Advantages:</strong> Scalable, consistent, correlates well with human judgment<br>
+<strong>Limitations:</strong> Biases (position bias, verbosity bias, self-preference)</p>
+</section>
+<section id="key-benchmarks-2024-2026" class="level3">
+<h3 class="anchored" data-anchor-id="key-benchmarks-2024-2026">Key Benchmarks (2024-2026)</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Benchmark</th>
+<th>What it tests</th>
+<th>Top performers</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>MMLU</strong></td>
+<td>57 subjects, world knowledge</td>
+<td>GPT-4, Claude 3.5</td>
+</tr>
+<tr class="even">
+<td><strong>HumanEval / MBPP</strong></td>
+<td>Code generation</td>
+<td>GPT-4, Claude 3.5, DeepSeek</td>
+</tr>
+<tr class="odd">
+<td><strong>GSM8K / MATH</strong></td>
+<td>Mathematical reasoning</td>
+<td>O1, Claude 3.5</td>
+</tr>
+<tr class="even">
+<td><strong>MT-Bench</strong></td>
+<td>Multi-turn conversation</td>
+<td>GPT-4, Claude</td>
+</tr>
+<tr class="odd">
+<td><strong>GPQA</strong></td>
+<td>PhD-level science questions</td>
+<td>O1, Gemini Ultra</td>
+</tr>
+<tr class="even">
+<td><strong>SWE-Bench</strong></td>
+<td>Real-world software engineering</td>
+<td>Claude 3.5, Devin</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="evaluation-anti-patterns" class="level3">
+<h3 class="anchored" data-anchor-id="evaluation-anti-patterns">Evaluation Anti-Patterns</h3>
+<ul>
+<li><strong>Benchmark contamination:</strong> Test data leaks into training</li>
+<li><strong>Over-optimizing for benchmarks:</strong> Gaming metrics without real improvement</li>
+<li><strong>Single metric reliance:</strong> Missing failure modes</li>
+<li><strong>Static evaluation:</strong> Not tracking performance over time in production</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q6-what-are-embeddings-and-how-are-they-used-in-llm-applications" class="level2">
+<h2 class="anchored" data-anchor-id="q6-what-are-embeddings-and-how-are-they-used-in-llm-applications">Q6: What are embeddings and how are they used in LLM applications?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>Embeddings</strong> are dense vector representations that capture semantic meaning. They convert text (words, sentences, documents) into numerical vectors where similar meanings are geometrically close.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph Embedding_Space["Embedding Space"]
+        direction TB
+        K["'king' [0.2, 0.8, ...]"]
+        Q["'queen' [0.3, 0.8, ...]"]
+        M["'man' [0.2, 0.1, ...]"]
+        W["'woman' [0.3, 0.1, ...]"]
+    end
+
+    subgraph Applications["Applications"]
+        SEM["Semantic Search"]
+        CLUST["Clustering"]
+        CLASS["Classification"]
+        RAG_APP["RAG Retrieval"]
+        REC["Recommendations"]
+    end
+
+    Embedding_Space --&gt; Applications
+
+    style Embedding_Space fill:#6cc3d5,stroke:#333,color:#fff
+    style Applications fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="types-of-embeddings" class="level3">
+<h3 class="anchored" data-anchor-id="types-of-embeddings">Types of Embeddings</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 35%">
+<col style="width: 21%">
+<col style="width: 27%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Type</th>
+<th>Granularity</th>
+<th>Models</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Word embeddings</strong></td>
+<td>Single words</td>
+<td>Word2Vec, GloVe</td>
+<td>Legacy, fast lookup</td>
+</tr>
+<tr class="even">
+<td><strong>Contextual embeddings</strong></td>
+<td>Words in context</td>
+<td>BERT, GPT hidden states</td>
+<td>NER, classification</td>
+</tr>
+<tr class="odd">
+<td><strong>Sentence embeddings</strong></td>
+<td>Full sentences</td>
+<td>E5, BGE, all-MiniLM</td>
+<td>Semantic search, RAG</td>
+</tr>
+<tr class="even">
+<td><strong>Document embeddings</strong></td>
+<td>Paragraphs/pages</td>
+<td>Voyage, Cohere Embed</td>
+<td>Document retrieval</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="similarity-metrics" class="level3">
+<h3 class="anchored" data-anchor-id="similarity-metrics">Similarity Metrics</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 23%">
+<col style="width: 26%">
+<col style="width: 20%">
+<col style="width: 29%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>Formula</th>
+<th>Range</th>
+<th>Best for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Cosine similarity</strong></td>
+<td><img src="https://latex.codecogs.com/png.latex?%5Cfrac%7BA%20%5Ccdot%20B%7D%7B%5C%7CA%5C%7C%20%5C%7CB%5C%7C%7D"></td>
+<td>[-1, 1]</td>
+<td>Most NLP tasks</td>
+</tr>
+<tr class="even">
+<td><strong>Euclidean distance</strong></td>
+<td><img src="https://latex.codecogs.com/png.latex?%5C%7CA%20-%20B%5C%7C_2"></td>
+<td>[0, ∞)</td>
+<td>Clustering</td>
+</tr>
+<tr class="odd">
+<td><strong>Dot product</strong></td>
+<td><img src="https://latex.codecogs.com/png.latex?A%20%5Ccdot%20B"></td>
+<td>(-∞, ∞)</td>
+<td>When magnitude matters</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="modern-embedding-models-2024-2026" class="level3">
+<h3 class="anchored" data-anchor-id="modern-embedding-models-2024-2026">Modern Embedding Models (2024-2026)</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Model</th>
+<th>Dimensions</th>
+<th>Context</th>
+<th>Strength</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>OpenAI text-embedding-3-large</strong></td>
+<td>3072</td>
+<td>8K</td>
+<td>General purpose</td>
+</tr>
+<tr class="even">
+<td><strong>BGE-M3</strong></td>
+<td>1024</td>
+<td>8K</td>
+<td>Multilingual, multi-granularity</td>
+</tr>
+<tr class="odd">
+<td><strong>E5-Mistral-7B</strong></td>
+<td>4096</td>
+<td>32K</td>
+<td>Long documents</td>
+</tr>
+<tr class="even">
+<td><strong>Cohere Embed v3</strong></td>
+<td>1024</td>
+<td>512</td>
+<td>Multi-language, classification</td>
+</tr>
+<tr class="odd">
+<td><strong>Voyage-3</strong></td>
+<td>1024</td>
+<td>32K</td>
+<td>Code + text</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="practical-embedding-pipeline" class="level3">
+<h3 class="anchored" data-anchor-id="practical-embedding-pipeline">Practical Embedding Pipeline</h3>
+<ol type="1">
+<li><strong>Chunk documents</strong> into semantically meaningful segments</li>
+<li><strong>Embed chunks</strong> using a sentence embedding model</li>
+<li><strong>Store vectors</strong> in a vector database (Pinecone, Weaviate, pgvector)</li>
+<li><strong>Query-time:</strong> embed the user query with the same model</li>
+<li><strong>Retrieve:</strong> find top-k nearest neighbors via ANN (approximate nearest neighbor)</li>
+</ol>
+</section>
+<section id="common-pitfalls" class="level3">
+<h3 class="anchored" data-anchor-id="common-pitfalls">Common Pitfalls</h3>
+<ul>
+<li>Using different embedding models for indexing vs.&nbsp;querying</li>
+<li>Chunks too large (loses specificity) or too small (loses context)</li>
+<li>Not normalizing vectors when using cosine similarity</li>
+<li>Ignoring embedding model’s max token limit</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q7-what-is-mixture-of-experts-moe-and-how-does-it-enable-efficient-scaling" class="level2">
+<h2 class="anchored" data-anchor-id="q7-what-is-mixture-of-experts-moe-and-how-does-it-enable-efficient-scaling">Q7: What is Mixture of Experts (MoE) and how does it enable efficient scaling?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>Mixture of Experts (MoE)</strong> is an architecture where only a subset of the model’s parameters are activated for each input token, enabling much larger models without proportional compute increase.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    INPUT["Input Token"]
+    INPUT --&gt; ROUTER["Router/Gating Network&lt;br/&gt;Learns which experts to activate"]
+    ROUTER --&gt;|"Top-k selection"| E1["Expert 1&lt;br/&gt;(FFN)"]
+    ROUTER --&gt;|"Top-k selection"| E2["Expert 2&lt;br/&gt;(FFN)"]
+    ROUTER -.-&gt;|"Not selected"| E3["Expert 3&lt;br/&gt;(FFN)"]
+    ROUTER -.-&gt;|"Not selected"| E4["Expert 4&lt;br/&gt;(FFN)"]
+    ROUTER -.-&gt;|"Not selected"| EN["Expert N&lt;br/&gt;(FFN)"]
+
+    E1 --&gt; COMBINE["Weighted Combination"]
+    E2 --&gt; COMBINE
+    COMBINE --&gt; OUTPUT["Output"]
+
+    style INPUT fill:#56cc9d,stroke:#333,color:#fff
+    style ROUTER fill:#ffce67,stroke:#333
+    style E1 fill:#6cc3d5,stroke:#333,color:#fff
+    style E2 fill:#6cc3d5,stroke:#333,color:#fff
+    style COMBINE fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="dense-vs.-moe-comparison" class="level3">
+<h3 class="anchored" data-anchor-id="dense-vs.-moe-comparison">Dense vs.&nbsp;MoE Comparison</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 40%">
+<col style="width: 34%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Aspect</th>
+<th>Dense Model</th>
+<th>MoE Model</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Parameters activated per token</td>
+<td>100%</td>
+<td>~12-25% (top-k experts)</td>
+</tr>
+<tr class="even">
+<td>Total parameters</td>
+<td>e.g., 70B</td>
+<td>e.g., 8×7B = 56B total, ~13B active</td>
+</tr>
+<tr class="odd">
+<td>Inference compute</td>
+<td>Proportional to total params</td>
+<td>Proportional to active params</td>
+</tr>
+<tr class="even">
+<td>Memory</td>
+<td>Moderate</td>
+<td>High (all experts in memory)</td>
+</tr>
+<tr class="odd">
+<td>Training efficiency</td>
+<td>Lower</td>
+<td>Higher (more params per FLOP)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="notable-moe-models" class="level3">
+<h3 class="anchored" data-anchor-id="notable-moe-models">Notable MoE Models</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Model</th>
+<th>Architecture</th>
+<th>Active Params</th>
+<th>Total Params</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Mixtral 8×7B</strong></td>
+<td>8 experts, top-2 routing</td>
+<td>~13B</td>
+<td>~47B</td>
+</tr>
+<tr class="even">
+<td><strong>GPT-4</strong> (rumored)</td>
+<td>MoE architecture</td>
+<td>Unknown</td>
+<td>~1.8T</td>
+</tr>
+<tr class="odd">
+<td><strong>DeepSeek-V2</strong></td>
+<td>160 experts, top-6</td>
+<td>~21B</td>
+<td>~236B</td>
+</tr>
+<tr class="even">
+<td><strong>Switch Transformer</strong></td>
+<td>Top-1 routing</td>
+<td>Variable</td>
+<td>Up to 1.6T</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="challenges-with-moe" class="level3">
+<h3 class="anchored" data-anchor-id="challenges-with-moe">Challenges with MoE</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 30%">
+<col style="width: 36%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Challenge</th>
+<th>Description</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Load balancing</strong></td>
+<td>Some experts get used more than others</td>
+<td>Auxiliary loss, expert capacity limits</td>
+</tr>
+<tr class="even">
+<td><strong>Memory</strong></td>
+<td>All experts must be in memory</td>
+<td>Expert parallelism, offloading</td>
+</tr>
+<tr class="odd">
+<td><strong>Training instability</strong></td>
+<td>Routing can collapse to few experts</td>
+<td>Noisy top-k, load balancing loss</td>
+</tr>
+<tr class="even">
+<td><strong>Communication overhead</strong></td>
+<td>Experts on different GPUs need data transfer</td>
+<td>Efficient all-to-all communication</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="why-moe-matters" class="level3">
+<h3 class="anchored" data-anchor-id="why-moe-matters">Why MoE Matters</h3>
+<p>MoE allows training models with <strong>trillions of parameters</strong> while keeping inference costs manageable — it’s likely the architecture behind the largest frontier models.</p>
+<hr>
+</section>
+</section>
+<section id="q8-what-is-the-kv-cache-and-how-does-it-affect-llm-inference" class="level2">
+<h2 class="anchored" data-anchor-id="q8-what-is-the-kv-cache-and-how-does-it-affect-llm-inference">Q8: What is the KV Cache and how does it affect LLM inference?</h2>
+<p><strong>Answer:</strong></p>
+<p>The <strong>KV (Key-Value) Cache</strong> stores previously computed key and value vectors from the attention mechanism, avoiding redundant computation during autoregressive generation.</p>
+<section id="why-kv-cache-is-necessary" class="level3">
+<h3 class="anchored" data-anchor-id="why-kv-cache-is-necessary">Why KV Cache is Necessary</h3>
+<p>During generation, the LLM produces one token at a time. Without caching, generating token <img src="https://latex.codecogs.com/png.latex?t"> requires recomputing attention over all previous <img src="https://latex.codecogs.com/png.latex?t-1"> tokens from scratch.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph Without_Cache["Without KV Cache"]
+        W1["Token 1: compute K,V for [1]"]
+        W2["Token 2: compute K,V for [1,2]"]
+        W3["Token 3: compute K,V for [1,2,3]"]
+        W4["Token N: compute K,V for [1,...,N]"]
+        W1 --&gt; W2 --&gt; W3 --&gt; W4
+    end
+
+    subgraph With_Cache["With KV Cache"]
+        C1["Token 1: compute &amp; store K₁,V₁"]
+        C2["Token 2: compute K₂,V₂, reuse K₁,V₁"]
+        C3["Token 3: compute K₃,V₃, reuse K₁,V₁,K₂,V₂"]
+        C1 --&gt; C2 --&gt; C3
+    end
+
+    style Without_Cache fill:#ff7851,stroke:#333,color:#fff
+    style With_Cache fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="complexity-comparison" class="level3">
+<h3 class="anchored" data-anchor-id="complexity-comparison">Complexity Comparison</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 19%">
+<col style="width: 43%">
+<col style="width: 36%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>Without KV Cache</th>
+<th>With KV Cache</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Compute per token</td>
+<td><img src="https://latex.codecogs.com/png.latex?O(n%20%5Ccdot%20d%5E2)"> (recompute all)</td>
+<td><img src="https://latex.codecogs.com/png.latex?O(d%5E2)"> (new token only)</td>
+</tr>
+<tr class="even">
+<td>Total generation</td>
+<td><img src="https://latex.codecogs.com/png.latex?O(n%5E2%20%5Ccdot%20d%5E2)"></td>
+<td><img src="https://latex.codecogs.com/png.latex?O(n%20%5Ccdot%20d%5E2)"></td>
+</tr>
+<tr class="odd">
+<td>Memory</td>
+<td><img src="https://latex.codecogs.com/png.latex?O(d)"></td>
+<td><img src="https://latex.codecogs.com/png.latex?O(n%20%5Ccdot%20d)"> grows with sequence</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="kv-cache-memory-problem" class="level3">
+<h3 class="anchored" data-anchor-id="kv-cache-memory-problem">KV Cache Memory Problem</h3>
+<p>For a model with <img src="https://latex.codecogs.com/png.latex?L"> layers, <img src="https://latex.codecogs.com/png.latex?H"> heads, <img src="https://latex.codecogs.com/png.latex?d_h"> head dimension, sequence length <img src="https://latex.codecogs.com/png.latex?n">:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%5Ctext%7BKV%20Cache%20Size%7D%20=%202%20%5Ctimes%20L%20%5Ctimes%20H%20%5Ctimes%20d_h%20%5Ctimes%20n%20%5Ctimes%20%5Ctext%7Bbytes%20per%20element%7D"></p>
+<p><strong>Example:</strong> LLaMA-70B with 128K context in FP16: <img src="https://latex.codecogs.com/png.latex?2%20%5Ctimes%2080%20%5Ctimes%2064%20%5Ctimes%20128%20%5Ctimes%20128000%20%5Ctimes%202%20%5Capprox%20167"> GB — just for the cache!</p>
+</section>
+<section id="kv-cache-optimization-techniques" class="level3">
+<h3 class="anchored" data-anchor-id="kv-cache-optimization-techniques">KV Cache Optimization Techniques</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 29%">
+<col style="width: 35%">
+<col style="width: 35%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Technique</th>
+<th>How it helps</th>
+<th>Compression</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Multi-Query Attention (MQA)</strong></td>
+<td>Share K,V across all heads</td>
+<td>~8-16x reduction</td>
+</tr>
+<tr class="even">
+<td><strong>Grouped-Query Attention (GQA)</strong></td>
+<td>Share K,V across groups of heads</td>
+<td>~4-8x reduction</td>
+</tr>
+<tr class="odd">
+<td><strong>KV Cache Quantization</strong></td>
+<td>Store K,V in INT8/INT4</td>
+<td>2-4x reduction</td>
+</tr>
+<tr class="even">
+<td><strong>Paged Attention (vLLM)</strong></td>
+<td>Virtual memory for KV cache</td>
+<td>Better memory utilization</td>
+</tr>
+<tr class="odd">
+<td><strong>Sliding Window</strong></td>
+<td>Only cache recent tokens</td>
+<td>Bounded cache size</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="prefill-vs.-decode-phases" class="level3">
+<h3 class="anchored" data-anchor-id="prefill-vs.-decode-phases">Prefill vs.&nbsp;Decode Phases</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 21%">
+<col style="width: 40%">
+<col style="width: 37%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Phase</th>
+<th>What happens</th>
+<th>Bottleneck</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Prefill</strong></td>
+<td>Process all input tokens in parallel, fill KV cache</td>
+<td>Compute-bound</td>
+</tr>
+<tr class="even">
+<td><strong>Decode</strong></td>
+<td>Generate one token at a time using cached KV</td>
+<td>Memory-bandwidth-bound</td>
+</tr>
+</tbody>
+</table>
+<p>The decode phase is typically <strong>memory-bandwidth-bound</strong> because each new token requires reading the entire KV cache from memory.</p>
+<hr>
+</section>
+</section>
+<section id="q9-what-is-instruction-tuning-and-how-does-it-differ-from-pre-training-and-rlhf" class="level2">
+<h2 class="anchored" data-anchor-id="q9-what-is-instruction-tuning-and-how-does-it-differ-from-pre-training-and-rlhf">Q9: What is instruction tuning and how does it differ from pre-training and RLHF?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>Instruction tuning</strong> (also called supervised fine-tuning or SFT) trains a base LLM on (instruction, response) pairs to follow human instructions — it’s the critical bridge between a next-token predictor and a useful assistant.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph Pipeline["LLM Training Pipeline"]
+        direction LR
+        PT["Pre-training&lt;br/&gt;Next-token prediction&lt;br/&gt;on internet text&lt;br/&gt;(Trillions of tokens)"]
+        IT["Instruction Tuning (SFT)&lt;br/&gt;Train on (instruction, response)&lt;br/&gt;pairs from humans&lt;br/&gt;(10K-1M examples)"]
+        RLHF_step["RLHF / DPO&lt;br/&gt;Align with human preferences&lt;br/&gt;via reward signals&lt;br/&gt;(Preference pairs)"]
+    end
+
+    PT --&gt;|"Base model"| IT
+    IT --&gt;|"SFT model"| RLHF_step
+    RLHF_step --&gt;|"Aligned model"| FINAL["Production Model"]
+
+    style PT fill:#6cc3d5,stroke:#333,color:#fff
+    style IT fill:#56cc9d,stroke:#333,color:#fff
+    style RLHF_step fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="comparison-of-training-stages" class="level3">
+<h3 class="anchored" data-anchor-id="comparison-of-training-stages">Comparison of Training Stages</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 15%">
+<col style="width: 25%">
+<col style="width: 37%">
+<col style="width: 21%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Aspect</th>
+<th>Pre-training</th>
+<th>Instruction Tuning</th>
+<th>RLHF/DPO</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Objective</strong></td>
+<td>Predict next token</td>
+<td>Follow instructions</td>
+<td>Align with preferences</td>
+</tr>
+<tr class="even">
+<td><strong>Data</strong></td>
+<td>Raw text (web crawl)</td>
+<td>(Instruction, Response) pairs</td>
+<td>Ranked response pairs</td>
+</tr>
+<tr class="odd">
+<td><strong>Data size</strong></td>
+<td>Trillions of tokens</td>
+<td>10K–1M examples</td>
+<td>10K–100K comparisons</td>
+</tr>
+<tr class="even">
+<td><strong>Compute</strong></td>
+<td>Massive (months on clusters)</td>
+<td>Moderate (hours–days)</td>
+<td>Moderate</td>
+</tr>
+<tr class="odd">
+<td><strong>Effect</strong></td>
+<td>General language understanding</td>
+<td>Task following, formatting</td>
+<td>Helpfulness, safety, style</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="what-makes-good-instruction-tuning-data" class="level3">
+<h3 class="anchored" data-anchor-id="what-makes-good-instruction-tuning-data">What Makes Good Instruction Tuning Data?</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 53%">
+<col style="width: 46%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Quality Factor</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Diversity</strong></td>
+<td>Cover many task types (QA, coding, math, writing, analysis)</td>
+</tr>
+<tr class="even">
+<td><strong>Complexity</strong></td>
+<td>Include both simple and multi-step instructions</td>
+</tr>
+<tr class="odd">
+<td><strong>Format variety</strong></td>
+<td>JSON, markdown, code, natural language responses</td>
+</tr>
+<tr class="even">
+<td><strong>Correctness</strong></td>
+<td>Responses must be accurate and complete</td>
+</tr>
+<tr class="odd">
+<td><strong>Safety</strong></td>
+<td>Include refusal examples for harmful requests</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="notable-instruction-datasets" class="level3">
+<h3 class="anchored" data-anchor-id="notable-instruction-datasets">Notable Instruction Datasets</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 28%">
+<col style="width: 18%">
+<col style="width: 25%">
+<col style="width: 28%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Dataset</th>
+<th>Size</th>
+<th>Source</th>
+<th>Used By</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>FLAN</strong></td>
+<td>1.8M</td>
+<td>Converted NLP tasks into instructions</td>
+<td>Flan-T5, Flan-PaLM</td>
+</tr>
+<tr class="even">
+<td><strong>Alpaca</strong></td>
+<td>52K</td>
+<td>GPT-4 generated</td>
+<td>Stanford Alpaca</td>
+</tr>
+<tr class="odd">
+<td><strong>ShareGPT</strong></td>
+<td>90K+</td>
+<td>User conversations with ChatGPT</td>
+<td>Vicuna</td>
+</tr>
+<tr class="even">
+<td><strong>OpenHermes</strong></td>
+<td>1M+</td>
+<td>Curated multi-source</td>
+<td>Many open models</td>
+</tr>
+<tr class="odd">
+<td><strong>UltraChat</strong></td>
+<td>1.5M</td>
+<td>Multi-turn synthetic dialogues</td>
+<td>Zephyr</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="base-model-vs.-instruction-tuned-behavior" class="level3">
+<h3 class="anchored" data-anchor-id="base-model-vs.-instruction-tuned-behavior">Base Model vs.&nbsp;Instruction-Tuned Behavior</h3>
+<p><strong>Prompt:</strong> “What is the capital of France?”</p>
+<ul>
+<li><strong>Base model:</strong> “What is the capital of Germany? What is the capital of Spain?…” (continues the pattern)</li>
+<li><strong>Instruction-tuned:</strong> “The capital of France is Paris.” (answers directly)</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q10-what-are-the-key-inference-optimization-techniques-for-serving-llms-at-scale" class="level2">
+<h2 class="anchored" data-anchor-id="q10-what-are-the-key-inference-optimization-techniques-for-serving-llms-at-scale">Q10: What are the key inference optimization techniques for serving LLMs at scale?</h2>
+<p><strong>Answer:</strong></p>
+<p>Serving LLMs in production requires optimizing for <strong>latency</strong> (time to first token, tokens per second), <strong>throughput</strong> (requests per second), and <strong>cost</strong> (dollars per token).</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    OPT["LLM Inference Optimization"]
+    OPT --&gt; MODEL["Model-Level"]
+    OPT --&gt; SYSTEM["System-Level"]
+    OPT --&gt; SERVE["Serving-Level"]
+
+    MODEL --&gt; M1["Quantization (INT4/INT8)"]
+    MODEL --&gt; M2["Distillation"]
+    MODEL --&gt; M3["Pruning"]
+    MODEL --&gt; M4["Speculative Decoding"]
+
+    SYSTEM --&gt; S1["Flash Attention"]
+    SYSTEM --&gt; S2["Continuous Batching"]
+    SYSTEM --&gt; S3["Paged Attention (vLLM)"]
+    SYSTEM --&gt; S4["Tensor Parallelism"]
+
+    SERVE --&gt; SV1["KV Cache Management"]
+    SERVE --&gt; SV2["Request Scheduling"]
+    SERVE --&gt; SV3["Prefix Caching"]
+    SERVE --&gt; SV4["Model Routing"]
+
+    style OPT fill:#56cc9d,stroke:#333,color:#fff
+    style MODEL fill:#6cc3d5,stroke:#333,color:#fff
+    style SYSTEM fill:#ffce67,stroke:#333
+    style SERVE fill:#ff7851,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="speculative-decoding" class="level3">
+<h3 class="anchored" data-anchor-id="speculative-decoding">Speculative Decoding</h3>
+<p>Uses a small, fast <strong>draft model</strong> to predict multiple tokens, then the large model <strong>verifies</strong> them in parallel:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Step</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>Draft model generates k candidate tokens quickly</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Large model verifies all k tokens in one forward pass</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>Accept correct tokens, reject and regenerate from first mismatch</td>
+</tr>
+<tr class="even">
+<td><strong>Result</strong></td>
+<td>2-3x faster generation with identical output quality</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="continuous-batching-vs.-static-batching" class="level3">
+<h3 class="anchored" data-anchor-id="continuous-batching-vs.-static-batching">Continuous Batching vs.&nbsp;Static Batching</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 28%">
+<col style="width: 37%">
+<col style="width: 34%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Approach</th>
+<th>Description</th>
+<th>Efficiency</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Static batching</strong></td>
+<td>Wait for all sequences to finish</td>
+<td>Low (short sequences wait for long ones)</td>
+</tr>
+<tr class="even">
+<td><strong>Continuous batching</strong></td>
+<td>Insert new requests as old ones finish</td>
+<td>High (no idle GPU cycles)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="parallelism-strategies" class="level3">
+<h3 class="anchored" data-anchor-id="parallelism-strategies">Parallelism Strategies</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 26%">
+<col style="width: 39%">
+<col style="width: 34%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Strategy</th>
+<th>What it splits</th>
+<th>When to use</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Tensor Parallelism</strong></td>
+<td>Individual layers across GPUs</td>
+<td>Single node, low latency</td>
+</tr>
+<tr class="even">
+<td><strong>Pipeline Parallelism</strong></td>
+<td>Different layers on different GPUs</td>
+<td>Multi-node, high throughput</td>
+</tr>
+<tr class="odd">
+<td><strong>Data Parallelism</strong></td>
+<td>Same model, different batches</td>
+<td>Scaling throughput</td>
+</tr>
+<tr class="even">
+<td><strong>Expert Parallelism</strong></td>
+<td>MoE experts across GPUs</td>
+<td>MoE models</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="llm-serving-frameworks" class="level3">
+<h3 class="anchored" data-anchor-id="llm-serving-frameworks">LLM Serving Frameworks</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 32%">
+<col style="width: 38%">
+<col style="width: 29%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Framework</th>
+<th>Key Feature</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>vLLM</strong></td>
+<td>Paged Attention, continuous batching</td>
+<td>High-throughput serving</td>
+</tr>
+<tr class="even">
+<td><strong>TensorRT-LLM</strong></td>
+<td>NVIDIA-optimized kernels</td>
+<td>NVIDIA GPUs, lowest latency</td>
+</tr>
+<tr class="odd">
+<td><strong>llama.cpp</strong></td>
+<td>CPU/Metal inference, GGUF format</td>
+<td>Edge/local deployment</td>
+</tr>
+<tr class="even">
+<td><strong>TGI</strong> (Text Generation Inference)</td>
+<td>Hugging Face integration</td>
+<td>Quick deployment</td>
+</tr>
+<tr class="odd">
+<td><strong>SGLang</strong></td>
+<td>RadixAttention, structured generation</td>
+<td>Complex prompting workflows</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="key-metrics-for-production-serving" class="level3">
+<h3 class="anchored" data-anchor-id="key-metrics-for-production-serving">Key Metrics for Production Serving</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 29%">
+<col style="width: 40%">
+<col style="width: 29%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>Definition</th>
+<th>Target</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>TTFT</strong> (Time to First Token)</td>
+<td>Latency before generation starts</td>
+<td>&lt;500ms</td>
+</tr>
+<tr class="even">
+<td><strong>TPS</strong> (Tokens Per Second)</td>
+<td>Generation speed per request</td>
+<td>30-100 TPS</td>
+</tr>
+<tr class="odd">
+<td><strong>Throughput</strong></td>
+<td>Total tokens/sec across all requests</td>
+<td>Maximize</td>
+</tr>
+<tr class="even">
+<td><strong>P99 latency</strong></td>
+<td>Worst-case latency</td>
+<td>&lt;2s TTFT</td>
+</tr>
+<tr class="odd">
+<td><strong>Cost per 1M tokens</strong></td>
+<td>Dollar efficiency</td>
+<td>Minimize</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+</section>
+<section id="summary-table" class="level2">
+<h2 class="anchored" data-anchor-id="summary-table">Summary Table</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 13%">
+<col style="width: 30%">
+<col style="width: 56%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Topic</th>
+<th>Key Concept</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>Scaling Laws</td>
+<td>Performance improves predictably as power law with model/data/compute</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Long Context</td>
+<td>Quadratic attention problem; solved by Flash Attention, RoPE, sparse methods</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>Quantization</td>
+<td>4-bit weights enable 70B models on consumer GPUs with minimal quality loss</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td>LLM Agents</td>
+<td>LLMs + tools + memory + planning = autonomous task completion</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td>Evaluation</td>
+<td>Benchmarks, LLM-as-Judge, and task-specific metrics</td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td>Embeddings</td>
+<td>Dense vectors for semantic search, RAG retrieval, clustering</td>
+</tr>
+<tr class="odd">
+<td>7</td>
+<td>Mixture of Experts</td>
+<td>Activate subset of parameters per token for efficient scaling</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td>KV Cache</td>
+<td>Store computed keys/values to avoid redundant attention computation</td>
+</tr>
+<tr class="odd">
+<td>9</td>
+<td>Instruction Tuning</td>
+<td>Transform base models into instruction-following assistants</td>
+</tr>
+<tr class="even">
+<td>10</td>
+<td>Inference Optimization</td>
+<td>Speculative decoding, continuous batching, parallelism for production</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="whats-next" class="level2">
+<h2 class="anchored" data-anchor-id="whats-next">What’s Next?</h2>
+<p>This article covered advanced LLM engineering topics for interview preparation. For related content:</p>
+<ul>
+<li><strong>Foundational LLM concepts:</strong> <a href="../../posts/llm-interview/LLM-Interview-QA-1.html">LLM Interview QA - 1</a></li>
+<li><strong>ML fundamentals:</strong> <a href="../../posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a></li>
+<li><strong>Metrics and feature engineering:</strong> <a href="../../posts/ml-interview/ML-Interview-QA-2.html">ML Interview QA - 2</a></li>
+</ul>
+
+
+</section>
+
+ ]]></description>
+  <guid>https://vectoringai.com/posts/llm-interview/LLM-Interview-QA-2.html</guid>
+  <pubDate>Wed, 20 May 2026 00:00:00 GMT</pubDate>
+  <media:content url="https://vectoringai.com/images/llm-interview/thumb_LLM_interview_qa_300.png" medium="image" type="image/png" height="96" width="144"/>
+</item>
+<item>
+  <title>LLM Interview QA - 3</title>
+  <dc:creator>Vectoring AI</dc:creator>
+  <link>https://vectoringai.com/posts/llm-interview/LLM-Interview-QA-3.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>This is <strong>Part 3</strong> of our LLM Interview QA series, focused on <strong>LLM configuration and generation control</strong>. Understanding how to configure LLM parameters — temperature, sampling strategies, context windows, and decoding methods — is essential for building reliable AI systems.</p>
+<blockquote class="blockquote">
+<p>For foundational LLM concepts (transformers, attention, RAG, RLHF), see <a href="../../posts/llm-interview/LLM-Interview-QA-1.html">LLM Interview QA - 1</a>. For advanced topics (scaling, quantization, agents), see <a href="../../posts/llm-interview/LLM-Interview-QA-2.html">LLM Interview QA - 2</a>. For ML fundamentals, see <a href="../../posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a>.</p>
+</blockquote>
+<hr>
+</section>
+<section id="q1-what-are-the-main-configurable-parameters-when-calling-an-llm-api" class="level2">
+<h2 class="anchored" data-anchor-id="q1-what-are-the-main-configurable-parameters-when-calling-an-llm-api">Q1: What are the main configurable parameters when calling an LLM API?</h2>
+<p><strong>Answer:</strong></p>
+<p>When making an LLM API call, several parameters control the behavior, quality, and cost of the generated output.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    CONFIG["LLM Configuration Parameters"]
+    CONFIG --&gt; GEN["Generation Control"]
+    CONFIG --&gt; SAMP["Sampling Parameters"]
+    CONFIG --&gt; OUT["Output Control"]
+    CONFIG --&gt; SYS["System Parameters"]
+
+    GEN --&gt; G1["temperature"]
+    GEN --&gt; G2["top_p (nucleus)"]
+    GEN --&gt; G3["top_k"]
+    GEN --&gt; G4["seed"]
+
+    SAMP --&gt; S1["frequency_penalty"]
+    SAMP --&gt; S2["presence_penalty"]
+    SAMP --&gt; S3["repetition_penalty"]
+    SAMP --&gt; S4["logit_bias"]
+
+    OUT --&gt; O1["max_tokens / max_new_tokens"]
+    OUT --&gt; O2["stop sequences"]
+    OUT --&gt; O3["n (num_return_sequences)"]
+    OUT --&gt; O4["stream"]
+
+    SYS --&gt; SY1["model"]
+    SYS --&gt; SY2["system prompt"]
+    SYS --&gt; SY3["response_format"]
+    SYS --&gt; SY4["tools / functions"]
+
+    style CONFIG fill:#56cc9d,stroke:#333,color:#fff
+    style GEN fill:#6cc3d5,stroke:#333,color:#fff
+    style SAMP fill:#ffce67,stroke:#333
+    style OUT fill:#ff7851,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="parameter-overview" class="level3">
+<h3 class="anchored" data-anchor-id="parameter-overview">Parameter Overview</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 30%">
+<col style="width: 19%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Parameter</th>
+<th>Range</th>
+<th>Default</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>temperature</code></td>
+<td>0.0 – 2.0</td>
+<td>1.0</td>
+<td>Controls randomness of output</td>
+</tr>
+<tr class="even">
+<td><code>top_p</code></td>
+<td>0.0 – 1.0</td>
+<td>1.0</td>
+<td>Nucleus sampling threshold</td>
+</tr>
+<tr class="odd">
+<td><code>top_k</code></td>
+<td>1 – vocab_size</td>
+<td>50 (varies)</td>
+<td>Limits token candidates</td>
+</tr>
+<tr class="even">
+<td><code>max_tokens</code></td>
+<td>1 – context_limit</td>
+<td>Model-specific</td>
+<td>Maximum output length</td>
+</tr>
+<tr class="odd">
+<td><code>frequency_penalty</code></td>
+<td>-2.0 – 2.0</td>
+<td>0.0</td>
+<td>Penalizes repeated tokens</td>
+</tr>
+<tr class="even">
+<td><code>presence_penalty</code></td>
+<td>-2.0 – 2.0</td>
+<td>0.0</td>
+<td>Encourages topic diversity</td>
+</tr>
+<tr class="odd">
+<td><code>seed</code></td>
+<td>Any integer</td>
+<td>None</td>
+<td>Enables deterministic output</td>
+</tr>
+<tr class="even">
+<td><code>stop</code></td>
+<td>List of strings</td>
+<td>None</td>
+<td>Stops generation at specific tokens</td>
+</tr>
+<tr class="odd">
+<td><code>n</code></td>
+<td>1+</td>
+<td>1</td>
+<td>Number of completions to generate</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="practical-configuration-examples" class="level3">
+<h3 class="anchored" data-anchor-id="practical-configuration-examples">Practical Configuration Examples</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Use Case</th>
+<th>temperature</th>
+<th>top_p</th>
+<th>max_tokens</th>
+<th>Other</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Code generation</td>
+<td>0.0 – 0.2</td>
+<td>1.0</td>
+<td>2048</td>
+<td><code>stop=["\n\n"]</code></td>
+</tr>
+<tr class="even">
+<td>Creative writing</td>
+<td>0.8 – 1.2</td>
+<td>0.95</td>
+<td>4096</td>
+<td><code>frequency_penalty=0.5</code></td>
+</tr>
+<tr class="odd">
+<td>Data extraction</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>512</td>
+<td><code>response_format=json</code></td>
+</tr>
+<tr class="even">
+<td>Chat conversation</td>
+<td>0.7</td>
+<td>0.9</td>
+<td>1024</td>
+<td><code>presence_penalty=0.3</code></td>
+</tr>
+<tr class="odd">
+<td>Factual Q&amp;A</td>
+<td>0.0 – 0.3</td>
+<td>1.0</td>
+<td>256</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+</section>
+<section id="q2-what-is-temperature-and-how-does-it-affect-llm-output" class="level2">
+<h2 class="anchored" data-anchor-id="q2-what-is-temperature-and-how-does-it-affect-llm-output">Q2: What is temperature and how does it affect LLM output?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>Temperature</strong> controls the randomness of the probability distribution over the vocabulary at each generation step. It’s applied to the logits before the softmax function.</p>
+<section id="mathematical-definition" class="level3">
+<h3 class="anchored" data-anchor-id="mathematical-definition">Mathematical Definition</h3>
+<p>Given logits <img src="https://latex.codecogs.com/png.latex?z_i"> for each token <img src="https://latex.codecogs.com/png.latex?i"> in the vocabulary:</p>
+<p><img src="https://latex.codecogs.com/png.latex?P(w_i)%20=%20%5Cfrac%7Be%5E%7Bz_i%20/%20T%7D%7D%7B%5Csum_j%20e%5E%7Bz_j%20/%20T%7D%7D"></p>
+<p>where <img src="https://latex.codecogs.com/png.latex?T"> is the temperature.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph T0["Temperature = 0 (Greedy)"]
+        T0_1["Token A: 99.9%"]
+        T0_2["Token B: 0.1%"]
+        T0_3["Token C: ~0%"]
+    end
+
+    subgraph T07["Temperature = 0.7"]
+        T07_1["Token A: 75%"]
+        T07_2["Token B: 20%"]
+        T07_3["Token C: 5%"]
+    end
+
+    subgraph T1["Temperature = 1.0 (Default)"]
+        T1_1["Token A: 60%"]
+        T1_2["Token B: 25%"]
+        T1_3["Token C: 15%"]
+    end
+
+    subgraph T2["Temperature = 2.0"]
+        T2_1["Token A: 40%"]
+        T2_2["Token B: 32%"]
+        T2_3["Token C: 28%"]
+    end
+
+    style T0 fill:#56cc9d,stroke:#333,color:#fff
+    style T07 fill:#6cc3d5,stroke:#333,color:#fff
+    style T1 fill:#ffce67,stroke:#333
+    style T2 fill:#ff7851,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="effect-of-temperature" class="level3">
+<h3 class="anchored" data-anchor-id="effect-of-temperature">Effect of Temperature</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 24%">
+<col style="width: 24%">
+<col style="width: 18%">
+<col style="width: 32%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Temperature</th>
+<th>Distribution</th>
+<th>Behavior</th>
+<th>Output Character</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>T → 0</strong></td>
+<td>Extremely peaked</td>
+<td>Always picks highest-probability token</td>
+<td>Deterministic, repetitive, safe</td>
+</tr>
+<tr class="even">
+<td><strong>T = 0.3</strong></td>
+<td>Slightly softened</td>
+<td>Mostly picks top tokens, rare surprises</td>
+<td>Conservative, coherent</td>
+</tr>
+<tr class="odd">
+<td><strong>T = 0.7</strong></td>
+<td>Moderately spread</td>
+<td>Balanced between likely and creative</td>
+<td>Good default for most tasks</td>
+</tr>
+<tr class="even">
+<td><strong>T = 1.0</strong></td>
+<td>Original distribution</td>
+<td>Model’s “natural” uncertainty</td>
+<td>Raw model behavior</td>
+</tr>
+<tr class="odd">
+<td><strong>T &gt; 1.0</strong></td>
+<td>Flattened</td>
+<td>Low-probability tokens become likely</td>
+<td>Creative but potentially incoherent</td>
+</tr>
+<tr class="even">
+<td><strong>T = 2.0</strong></td>
+<td>Nearly uniform</td>
+<td>Almost random selection</td>
+<td>Chaotic, nonsensical</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="intuition" class="level3">
+<h3 class="anchored" data-anchor-id="intuition">Intuition</h3>
+<p>Think of temperature as a “creativity knob”:</p>
+<ul>
+<li><strong>Low temperature (0–0.3):</strong> The model is <strong>confident and focused</strong> — it picks the most obvious next word. Great for factual tasks, code, structured extraction.</li>
+<li><strong>Medium temperature (0.5–0.8):</strong> The model is <strong>balanced</strong> — it explores alternatives while staying coherent. Best for general chat and writing.</li>
+<li><strong>High temperature (1.0+):</strong> The model is <strong>adventurous</strong> — it considers unlikely words, producing surprising or creative outputs.</li>
+</ul>
+</section>
+<section id="common-interview-follow-up-what-does-temperature0-actually-mean" class="level3">
+<h3 class="anchored" data-anchor-id="common-interview-follow-up-what-does-temperature0-actually-mean">Common Interview Follow-Up: “What does temperature=0 actually mean?”</h3>
+<p>Setting <code>temperature=0</code> is a shortcut for <strong>greedy decoding</strong> — the model always selects the single highest-probability token. However:</p>
+<ul>
+<li>It’s still based on floating-point arithmetic, so minor non-determinism can occur across hardware</li>
+<li>Most APIs interpret <code>temperature=0</code> as “return the argmax token” deterministically</li>
+<li>Some providers require setting a <code>seed</code> parameter for guaranteed reproducibility</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q3-what-is-the-difference-between-top-p-nucleus-sampling-and-top-k-sampling" class="level2">
+<h2 class="anchored" data-anchor-id="q3-what-is-the-difference-between-top-p-nucleus-sampling-and-top-k-sampling">Q3: What is the difference between Top-p (nucleus) sampling and Top-k sampling?</h2>
+<p><strong>Answer:</strong></p>
+<p>Both <strong>Top-p</strong> and <strong>Top-k</strong> are token filtering strategies that limit which tokens are considered during generation, but they differ in <strong>how</strong> they determine the candidate set.</p>
+<section id="top-k-sampling" class="level3">
+<h3 class="anchored" data-anchor-id="top-k-sampling">Top-k Sampling</h3>
+<p>Select the <strong>k most probable tokens</strong> and redistribute probability among them:</p>
+<p><img src="https://latex.codecogs.com/png.latex?V_%7B%5Ctext%7Btop-k%7D%7D%20=%20%5C%7Bw_1,%20w_2,%20%5Cldots,%20w_k%5C%7D%20%5Cquad%20%5Ctext%7B(ordered%20by%20probability)%7D"></p>
+</section>
+<section id="top-p-nucleus-sampling" class="level3">
+<h3 class="anchored" data-anchor-id="top-p-nucleus-sampling">Top-p (Nucleus) Sampling</h3>
+<p>Select the <strong>smallest set of tokens</strong> whose cumulative probability exceeds <img src="https://latex.codecogs.com/png.latex?p">:</p>
+<p><img src="https://latex.codecogs.com/png.latex?V_%7B%5Ctext%7Btop-p%7D%7D%20=%20%5Ctext%7Bsmallest%20%7D%20V'%20%5Ctext%7B%20such%20that%20%7D%20%5Csum_%7Bw%20%5Cin%20V'%7D%20P(w)%20%5Cgeq%20p"></p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph TopK["Top-k = 3 (Fixed Size)"]
+        direction LR
+        K1["'the' (0.40) ✓"]
+        K2["'a' (0.25) ✓"]
+        K3["'my' (0.15) ✓"]
+        K4["'his' (0.10) ✗"]
+        K5["'our' (0.05) ✗"]
+        K6["'their' (0.03) ✗"]
+    end
+
+    subgraph TopP["Top-p = 0.9 (Dynamic Size)"]
+        direction LR
+        P1["'the' (0.40) ✓ → cumulative: 0.40"]
+        P2["'a' (0.25) ✓ → cumulative: 0.65"]
+        P3["'my' (0.15) ✓ → cumulative: 0.80"]
+        P4["'his' (0.10) ✓ → cumulative: 0.90 ≥ p"]
+        P5["'our' (0.05) ✗"]
+        P6["'their' (0.03) ✗"]
+    end
+
+    style TopK fill:#6cc3d5,stroke:#333,color:#fff
+    style TopP fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="key-differences" class="level3">
+<h3 class="anchored" data-anchor-id="key-differences">Key Differences</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 36%">
+<col style="width: 31%">
+<col style="width: 31%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Aspect</th>
+<th>Top-k</th>
+<th>Top-p</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Candidate set size</td>
+<td><strong>Fixed</strong> (always k tokens)</td>
+<td><strong>Dynamic</strong> (varies per step)</td>
+</tr>
+<tr class="even">
+<td>Adapts to distribution shape</td>
+<td>No — same k regardless of certainty</td>
+<td>Yes — fewer tokens when confident</td>
+</tr>
+<tr class="odd">
+<td>Risk when distribution is peaked</td>
+<td>Includes unlikely tokens unnecessarily</td>
+<td>Naturally narrows to top few</td>
+</tr>
+<tr class="even">
+<td>Risk when distribution is flat</td>
+<td>May exclude reasonable tokens</td>
+<td>Naturally includes more candidates</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="why-top-p-is-generally-preferred" class="level3">
+<h3 class="anchored" data-anchor-id="why-top-p-is-generally-preferred">Why Top-p is Generally Preferred</h3>
+<p>Consider two scenarios at different generation steps:</p>
+<p><strong>Step A (peaked distribution):</strong> Model is 95% sure the next word is “Paris”</p>
+<ul>
+<li>Top-k=50: Considers 50 tokens (49 are noise)</li>
+<li>Top-p=0.95: Considers only 1-2 tokens (adaptive!)</li>
+</ul>
+<p><strong>Step B (flat distribution):</strong> Model is uncertain, many tokens are equally likely</p>
+<ul>
+<li>Top-k=50: Might miss some reasonable candidates if vocabulary is large</li>
+<li>Top-p=0.95: Includes all tokens until 95% mass is covered (could be 100+ tokens)</li>
+</ul>
+</section>
+<section id="combining-top-k-and-top-p" class="level3">
+<h3 class="anchored" data-anchor-id="combining-top-k-and-top-p">Combining Top-k and Top-p</h3>
+<p>In practice, many systems use <strong>both</strong> simultaneously:</p>
+<ol type="1">
+<li>First apply Top-k to limit to k candidates</li>
+<li>Then apply Top-p within those k candidates</li>
+</ol>
+<p>This provides both an upper bound (Top-k) and adaptive filtering (Top-p).</p>
+</section>
+<section id="recommended-settings" class="level3">
+<h3 class="anchored" data-anchor-id="recommended-settings">Recommended Settings</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Task</th>
+<th>top_k</th>
+<th>top_p</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Deterministic (code, facts)</td>
+<td>1</td>
+<td>1.0</td>
+<td>Equivalent to greedy</td>
+</tr>
+<tr class="even">
+<td>Balanced (chat)</td>
+<td>40-50</td>
+<td>0.9</td>
+<td>Diverse but coherent</td>
+</tr>
+<tr class="odd">
+<td>Creative (stories)</td>
+<td>100+</td>
+<td>0.95</td>
+<td>Wide exploration</td>
+</tr>
+<tr class="even">
+<td>Structured output (JSON)</td>
+<td>5-10</td>
+<td>0.8</td>
+<td>Limited, safe choices</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+</section>
+<section id="q4-what-is-the-context-window-and-how-does-it-constrain-llm-behavior" class="level2">
+<h2 class="anchored" data-anchor-id="q4-what-is-the-context-window-and-how-does-it-constrain-llm-behavior">Q4: What is the context window and how does it constrain LLM behavior?</h2>
+<p><strong>Answer:</strong></p>
+<p>The <strong>context window</strong> (also called context length or maximum sequence length) is the total number of tokens an LLM can process in a single inference call — this includes <strong>both input tokens and output tokens</strong>.</p>
+<p><img src="https://latex.codecogs.com/png.latex?%5Ctext%7BContext%20Window%7D%20=%20%5Ctext%7BInput%20Tokens%20(prompt)%7D%20+%20%5Ctext%7BOutput%20Tokens%20(completion)%7D"></p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph CW["Context Window (e.g., 128K tokens)"]
+        direction LR
+        SYS["System Prompt&lt;br/&gt;(500 tokens)"]
+        CTX["Retrieved Context / RAG&lt;br/&gt;(10,000 tokens)"]
+        HIST["Conversation History&lt;br/&gt;(5,000 tokens)"]
+        USER["User Message&lt;br/&gt;(200 tokens)"]
+        RESP["Model Response&lt;br/&gt;(max_tokens: 4,096)"]
+    end
+
+    style CW fill:#56cc9d,stroke:#333,color:#fff
+    style RESP fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="context-window-sizes-20242026" class="level3">
+<h3 class="anchored" data-anchor-id="context-window-sizes-20242026">Context Window Sizes (2024–2026)</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Model</th>
+<th>Context Window</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>GPT-3.5 Turbo</td>
+<td>16K tokens</td>
+<td>~12K words</td>
+</tr>
+<tr class="even">
+<td>GPT-4</td>
+<td>128K tokens</td>
+<td>~96K words</td>
+</tr>
+<tr class="odd">
+<td>GPT-4o</td>
+<td>128K tokens</td>
+<td>~96K words</td>
+</tr>
+<tr class="even">
+<td>Claude 3.5 Sonnet</td>
+<td>200K tokens</td>
+<td>~150K words</td>
+</tr>
+<tr class="odd">
+<td>Gemini 1.5 Pro</td>
+<td>1M–2M tokens</td>
+<td>Longest available</td>
+</tr>
+<tr class="even">
+<td>LLaMA 3.1</td>
+<td>128K tokens</td>
+<td>Open-source</td>
+</tr>
+<tr class="odd">
+<td>Mistral Large</td>
+<td>128K tokens</td>
+<td></td>
+</tr>
+<tr class="even">
+<td>DeepSeek-V3</td>
+<td>128K tokens</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="what-happens-when-you-exceed-the-context-window" class="level3">
+<h3 class="anchored" data-anchor-id="what-happens-when-you-exceed-the-context-window">What Happens When You Exceed the Context Window?</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 43%">
+<col style="width: 56%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Behavior</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Truncation</strong></td>
+<td>Oldest tokens are dropped (APIs return error or truncate)</td>
+</tr>
+<tr class="even">
+<td><strong>Error</strong></td>
+<td>API rejects the request if input exceeds limit</td>
+</tr>
+<tr class="odd">
+<td><strong>Degraded performance</strong></td>
+<td>Even within limits, performance drops in the “middle”</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="context-window-vs.-effective-context" class="level3">
+<h3 class="anchored" data-anchor-id="context-window-vs.-effective-context">Context Window vs.&nbsp;Effective Context</h3>
+<p><strong>Key insight for interviews:</strong> The <em>advertised</em> context window is not the same as <em>effective</em> context:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Concept</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Maximum context</strong></td>
+<td>Technical limit the model supports</td>
+</tr>
+<tr class="even">
+<td><strong>Effective context</strong></td>
+<td>Length at which performance remains high</td>
+</tr>
+<tr class="odd">
+<td><strong>“Lost in the middle”</strong></td>
+<td>Information in the center of long contexts is often missed</td>
+</tr>
+<tr class="even">
+<td><strong>Needle-in-a-haystack</strong></td>
+<td>Benchmark: can the model find a fact placed at position X?</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="strategies-for-context-window-management" class="level3">
+<h3 class="anchored" data-anchor-id="strategies-for-context-window-management">Strategies for Context Window Management</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 43%">
+<col style="width: 56%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Strategy</th>
+<th>How it works</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Chunking + RAG</strong></td>
+<td>Only retrieve relevant chunks, don’t stuff everything</td>
+</tr>
+<tr class="even">
+<td><strong>Summarization</strong></td>
+<td>Compress conversation history into summaries</td>
+</tr>
+<tr class="odd">
+<td><strong>Sliding window</strong></td>
+<td>Keep recent messages + system prompt, drop old middle</td>
+</tr>
+<tr class="even">
+<td><strong>Hierarchical context</strong></td>
+<td>Summary of old messages + full recent messages</td>
+</tr>
+<tr class="odd">
+<td><strong>Prompt compression</strong></td>
+<td>Use tools like LLMLingua to compress prompts</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="cost-implications" class="level3">
+<h3 class="anchored" data-anchor-id="cost-implications">Cost Implications</h3>
+<p>Context window directly affects cost:</p>
+<p><img src="https://latex.codecogs.com/png.latex?%5Ctext%7BCost%7D%20=%20(%5Ctext%7BInput%20tokens%7D%20%5Ctimes%20%5Ctext%7Bprice/input%20token%7D)%20+%20(%5Ctext%7BOutput%20tokens%7D%20%5Ctimes%20%5Ctext%7Bprice/output%20token%7D)"></p>
+<p>Longer contexts mean higher costs, higher latency, and more KV-cache memory usage.</p>
+<hr>
+</section>
+</section>
+<section id="q5-is-llm-generation-deterministic-how-do-you-achieve-reproducible-outputs" class="level2">
+<h2 class="anchored" data-anchor-id="q5-is-llm-generation-deterministic-how-do-you-achieve-reproducible-outputs">Q5: Is LLM generation deterministic? How do you achieve reproducible outputs?</h2>
+<p><strong>Answer:</strong></p>
+<p>By default, LLM generation is <strong>non-deterministic</strong> — the same prompt can produce different outputs across calls. This is intentional but can be controlled.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph NonDet["Non-Deterministic (Default)"]
+        ND1["Same prompt"]
+        ND2["Run 1: 'The capital is Paris.'"]
+        ND3["Run 2: 'Paris is the capital of France.'"]
+        ND4["Run 3: 'France's capital city is Paris.'"]
+        ND1 --&gt; ND2
+        ND1 --&gt; ND3
+        ND1 --&gt; ND4
+    end
+
+    subgraph Det["Deterministic (Configured)"]
+        D1["Same prompt + seed + temp=0"]
+        D2["Run 1: 'The capital is Paris.'"]
+        D3["Run 2: 'The capital is Paris.'"]
+        D4["Run 3: 'The capital is Paris.'"]
+        D1 --&gt; D2
+        D1 --&gt; D3
+        D1 --&gt; D4
+    end
+
+    style NonDet fill:#ffce67,stroke:#333
+    style Det fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="sources-of-non-determinism" class="level3">
+<h3 class="anchored" data-anchor-id="sources-of-non-determinism">Sources of Non-Determinism</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 22%">
+<col style="width: 36%">
+<col style="width: 41%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Source</th>
+<th>Explanation</th>
+<th>Controllable?</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Sampling</strong> (temperature &gt; 0)</td>
+<td>Random token selection from distribution</td>
+<td>Yes — set temperature=0</td>
+</tr>
+<tr class="even">
+<td><strong>Top-p / Top-k filtering</strong></td>
+<td>Random selection within candidate set</td>
+<td>Yes — set top_p=1, top_k=1</td>
+</tr>
+<tr class="odd">
+<td><strong>Floating-point non-determinism</strong></td>
+<td>GPU parallel operations not strictly ordered</td>
+<td>Partially — depends on hardware</td>
+</tr>
+<tr class="even">
+<td><strong>Batching effects</strong></td>
+<td>Different batch compositions may affect computation</td>
+<td>No (server-side)</td>
+</tr>
+<tr class="odd">
+<td><strong>Model updates</strong></td>
+<td>Provider may update model without notice</td>
+<td>No (use versioned models)</td>
+</tr>
+<tr class="even">
+<td><strong>System prompt caching</strong></td>
+<td>Some providers cache and may route differently</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="how-to-achieve-deterministic-output" class="level3">
+<h3 class="anchored" data-anchor-id="how-to-achieve-deterministic-output">How to Achieve Deterministic Output</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 21%">
+<col style="width: 34%">
+<col style="width: 44%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>What it does</th>
+<th>Guarantee Level</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>temperature=0</code></td>
+<td>Greedy decoding (argmax)</td>
+<td>High — nearly deterministic</td>
+</tr>
+<tr class="even">
+<td><code>seed</code> parameter</td>
+<td>Fixes random state for sampling</td>
+<td>High (API-dependent)</td>
+</tr>
+<tr class="odd">
+<td><code>temperature=0</code> + <code>seed</code></td>
+<td>Both greedy and fixed state</td>
+<td>Highest available</td>
+</tr>
+<tr class="even">
+<td>Self-hosted + fixed seed + deterministic CUDA</td>
+<td>Full control over hardware</td>
+<td>True determinism</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="when-determinism-matters" class="level3">
+<h3 class="anchored" data-anchor-id="when-determinism-matters">When Determinism Matters</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Use Case</th>
+<th>Need Deterministic?</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Unit testing</strong></td>
+<td>Yes</td>
+<td>Reproducible test assertions</td>
+</tr>
+<tr class="even">
+<td><strong>Evaluation/benchmarks</strong></td>
+<td>Yes</td>
+<td>Fair comparison across models</td>
+</tr>
+<tr class="odd">
+<td><strong>Caching</strong></td>
+<td>Yes</td>
+<td>Same input → cache hit</td>
+</tr>
+<tr class="even">
+<td><strong>Audit/compliance</strong></td>
+<td>Yes</td>
+<td>Reproducible decisions</td>
+</tr>
+<tr class="odd">
+<td><strong>Creative writing</strong></td>
+<td>No</td>
+<td>Variety is desired</td>
+</tr>
+<tr class="even">
+<td><strong>Chat conversations</strong></td>
+<td>No</td>
+<td>Natural variation is expected</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="important-caveat" class="level3">
+<h3 class="anchored" data-anchor-id="important-caveat">Important Caveat</h3>
+<p>Even with <code>temperature=0</code> and a <code>seed</code>, <strong>exact determinism is not always guaranteed</strong>:</p>
+<ul>
+<li>GPU floating-point operations may vary across hardware versions</li>
+<li>API providers may route requests to different hardware</li>
+<li>Model quantization can introduce slight variations</li>
+<li>OpenAI states: “deterministic outputs are not guaranteed” even with seed (but are “mostly deterministic”)</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q6-what-are-the-main-decoding-strategies-and-when-should-you-use-each" class="level2">
+<h2 class="anchored" data-anchor-id="q6-what-are-the-main-decoding-strategies-and-when-should-you-use-each">Q6: What are the main decoding strategies and when should you use each?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>Decoding</strong> is the process of selecting which token to generate next given the probability distribution from the model. The choice of decoding strategy dramatically affects output quality.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    DECODE["Decoding Strategies"]
+    DECODE --&gt; DETERM["Deterministic"]
+    DECODE --&gt; STOCH["Stochastic (Sampling)"]
+    DECODE --&gt; HYBRID["Hybrid / Advanced"]
+
+    DETERM --&gt; GREEDY["Greedy Search&lt;br/&gt;Pick argmax at each step"]
+    DETERM --&gt; BEAM["Beam Search&lt;br/&gt;Track top-n hypotheses"]
+
+    STOCH --&gt; PURE["Pure Sampling&lt;br/&gt;Sample from full distribution"]
+    STOCH --&gt; TOPK["Top-k Sampling&lt;br/&gt;Sample from top k tokens"]
+    STOCH --&gt; TOPP["Top-p Sampling&lt;br/&gt;Sample from nucleus"]
+    STOCH --&gt; TEMP_SAMP["Temperature Sampling&lt;br/&gt;Reshape distribution then sample"]
+
+    HYBRID --&gt; SPEC["Speculative Decoding&lt;br/&gt;Draft + verify"]
+    HYBRID --&gt; CONTRAST["Contrastive Decoding&lt;br/&gt;Subtract weak model's distribution"]
+    HYBRID --&gt; GUIDED["Guided/Constrained&lt;br/&gt;Enforce output structure"]
+
+    style DECODE fill:#56cc9d,stroke:#333,color:#fff
+    style DETERM fill:#6cc3d5,stroke:#333,color:#fff
+    style STOCH fill:#ffce67,stroke:#333
+    style HYBRID fill:#ff7851,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="detailed-comparison" class="level3">
+<h3 class="anchored" data-anchor-id="detailed-comparison">Detailed Comparison</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 28%">
+<col style="width: 37%">
+<col style="width: 17%">
+<col style="width: 17%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Strategy</th>
+<th>How it works</th>
+<th>Pros</th>
+<th>Cons</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Greedy</strong></td>
+<td>Always pick highest probability token</td>
+<td>Fast, deterministic, simple</td>
+<td>Repetitive, misses better sequences</td>
+</tr>
+<tr class="even">
+<td><strong>Beam Search</strong></td>
+<td>Track top-n partial sequences</td>
+<td>Finds higher-probability sequences</td>
+<td>Still repetitive, expensive, poor for open-ended</td>
+</tr>
+<tr class="odd">
+<td><strong>Top-k Sampling</strong></td>
+<td>Sample from top k tokens</td>
+<td>Reduces nonsense, some diversity</td>
+<td>Fixed k not adaptive to distribution</td>
+</tr>
+<tr class="even">
+<td><strong>Top-p Sampling</strong></td>
+<td>Sample from smallest set covering p mass</td>
+<td>Adaptive to uncertainty, natural</td>
+<td>Slightly less predictable</td>
+</tr>
+<tr class="odd">
+<td><strong>Temperature + Sampling</strong></td>
+<td>Reshape distribution then sample</td>
+<td>Fine-grained control</td>
+<td>Need to tune parameter</td>
+</tr>
+<tr class="even">
+<td><strong>Speculative Decoding</strong></td>
+<td>Small model drafts, large model verifies</td>
+<td>2-3x faster, same quality</td>
+<td>Needs draft model</td>
+</tr>
+<tr class="odd">
+<td><strong>Contrastive Decoding</strong></td>
+<td>Subtract amateur model’s preferences</td>
+<td>Reduces repetition, more coherent</td>
+<td>Complex setup</td>
+</tr>
+<tr class="even">
+<td><strong>Constrained Decoding</strong></td>
+<td>Force output to follow grammar/schema</td>
+<td>Guarantees valid structure</td>
+<td>Limits expressiveness</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="greedy-search-the-simplest-strategy" class="level3">
+<h3 class="anchored" data-anchor-id="greedy-search-the-simplest-strategy">Greedy Search: The Simplest Strategy</h3>
+<p>At each step, pick the token with the highest probability:</p>
+<p><img src="https://latex.codecogs.com/png.latex?w_t%20=%20%5Carg%5Cmax_%7Bw%7D%20P(w%20%7C%20w_%7B1:t-1%7D)"></p>
+<p><strong>Problem:</strong> Greedy search is <strong>locally optimal</strong> but not <strong>globally optimal</strong>. A low-probability token now might lead to a much better overall sequence.</p>
+<p><strong>Example:</strong> “The dog” (0.4) → “has” (0.9) gives sequence probability 0.36, while “The nice” (0.5) → “woman” (0.4) gives 0.20. Greedy picks “nice” first but misses the better path.</p>
+</section>
+<section id="beam-search-exploring-multiple-paths" class="level3">
+<h3 class="anchored" data-anchor-id="beam-search-exploring-multiple-paths">Beam Search: Exploring Multiple Paths</h3>
+<p>Maintains <code>num_beams</code> parallel hypotheses:</p>
+<pre><code>Beam 1: "The" → "dog" → "has" → "a"      (prob: 0.36 × ...)
+Beam 2: "The" → "nice" → "woman" → "is"   (prob: 0.20 × ...)
+Beam 3: "The" → "cat" → "sat" → "on"      (prob: 0.15 × ...)</code></pre>
+<p><strong>When to use beam search:</strong></p>
+<ul>
+<li>Translation (known output length)</li>
+<li>Summarization (structured output)</li>
+<li>NOT for open-ended generation (causes repetition)</li>
+</ul>
+</section>
+<section id="when-to-use-which-strategy" class="level3">
+<h3 class="anchored" data-anchor-id="when-to-use-which-strategy">When to Use Which Strategy</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Task</th>
+<th>Recommended Strategy</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Code generation</td>
+<td>Greedy (temp=0)</td>
+<td>Correctness over creativity</td>
+</tr>
+<tr class="even">
+<td>Translation</td>
+<td>Beam search (beams=4-5)</td>
+<td>Quality over diversity</td>
+</tr>
+<tr class="odd">
+<td>Creative writing</td>
+<td>Top-p=0.95, temp=0.8</td>
+<td>Diversity and surprise</td>
+</tr>
+<tr class="even">
+<td>Chat/conversation</td>
+<td>Top-p=0.9, temp=0.7</td>
+<td>Natural but coherent</td>
+</tr>
+<tr class="odd">
+<td>Structured extraction</td>
+<td>Constrained decoding</td>
+<td>Must follow schema</td>
+</tr>
+<tr class="even">
+<td>JSON output</td>
+<td>Greedy + grammar constraints</td>
+<td>Validity guaranteed</td>
+</tr>
+<tr class="odd">
+<td>Fast inference</td>
+<td>Speculative decoding</td>
+<td>Speed with no quality loss</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+</section>
+<section id="q7-what-are-frequency-penalty-and-presence-penalty-and-how-do-they-reduce-repetition" class="level2">
+<h2 class="anchored" data-anchor-id="q7-what-are-frequency-penalty-and-presence-penalty-and-how-do-they-reduce-repetition">Q7: What are frequency penalty and presence penalty, and how do they reduce repetition?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>Frequency penalty</strong> and <strong>presence penalty</strong> are post-processing adjustments to token logits that discourage the model from repeating itself.</p>
+<section id="mathematical-definitions" class="level3">
+<h3 class="anchored" data-anchor-id="mathematical-definitions">Mathematical Definitions</h3>
+<p>The logit for token <img src="https://latex.codecogs.com/png.latex?i"> is adjusted before sampling:</p>
+<p><img src="https://latex.codecogs.com/png.latex?z_i'%20=%20z_i%20-%20(%5Ctext%7Bfrequency%5C_penalty%7D%20%5Ctimes%20%5Ctext%7Bcount%7D(i))%20-%20(%5Ctext%7Bpresence%5C_penalty%7D%20%5Ctimes%20%5Cmathbb%7B1%7D%5B%5Ctext%7Bcount%7D(i)%20%3E%200%5D)"></p>
+<p>where <img src="https://latex.codecogs.com/png.latex?%5Ctext%7Bcount%7D(i)"> is how many times token <img src="https://latex.codecogs.com/png.latex?i"> has appeared in the output so far.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph FP["Frequency Penalty"]
+        FP1["Penalizes proportionally to&lt;br/&gt;how MANY times token appeared"]
+        FP2["Token appeared 5× → big penalty"]
+        FP3["Token appeared 1× → small penalty"]
+        FP4["Effect: Reduces repetitive words"]
+    end
+
+    subgraph PP["Presence Penalty"]
+        PP1["Penalizes equally if token&lt;br/&gt;appeared AT ALL (binary)"]
+        PP2["Token appeared 5× → same penalty as 1×"]
+        PP3["Token never appeared → no penalty"]
+        PP4["Effect: Encourages new topics"]
+    end
+
+    style FP fill:#6cc3d5,stroke:#333,color:#fff
+    style PP fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="comparison" class="level3">
+<h3 class="anchored" data-anchor-id="comparison">Comparison</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 17%">
+<col style="width: 42%">
+<col style="width: 40%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Aspect</th>
+<th>Frequency Penalty</th>
+<th>Presence Penalty</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Scales with count?</td>
+<td>Yes (proportional)</td>
+<td>No (binary: appeared or not)</td>
+</tr>
+<tr class="even">
+<td>Range (OpenAI)</td>
+<td>-2.0 to 2.0</td>
+<td>-2.0 to 2.0</td>
+</tr>
+<tr class="odd">
+<td>Primary effect</td>
+<td>Reduces word-level repetition</td>
+<td>Encourages topic diversity</td>
+</tr>
+<tr class="even">
+<td>Use case</td>
+<td>Avoid saying “very very very…”</td>
+<td>Avoid staying on same topic</td>
+</tr>
+<tr class="odd">
+<td>Analogy</td>
+<td>“Don’t repeat words”</td>
+<td>“Talk about new things”</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="practical-examples" class="level3">
+<h3 class="anchored" data-anchor-id="practical-examples">Practical Examples</h3>
+<p><strong>Without penalties (both = 0):</strong> &gt; “The weather is nice. The weather is really nice. The weather makes me happy. The weather…”</p>
+<p><strong>With frequency_penalty = 0.8:</strong> &gt; “The weather is nice. It’s a beautiful day. The sunshine makes me happy. I think I’ll go outside…”</p>
+<p><strong>With presence_penalty = 1.0:</strong> &gt; “The weather is nice. I’ve been reading a great book lately. My garden is blooming. Tomorrow I plan to cook…”</p>
+</section>
+<section id="repetition-penalty-hugging-face" class="level3">
+<h3 class="anchored" data-anchor-id="repetition-penalty-hugging-face">Repetition Penalty (Hugging Face)</h3>
+<p>Hugging Face uses a multiplicative <code>repetition_penalty</code> instead:</p>
+<p><img src="https://latex.codecogs.com/png.latex?z_i'%20=%20%5Cbegin%7Bcases%7D%20z_i%20/%20%5Ctext%7Brepetition%5C_penalty%7D%20&amp;%20%5Ctext%7Bif%20%7D%20z_i%20%3E%200%20%5Ctext%7B%20and%20token%20appeared%7D%20%5C%5C%20z_i%20%5Ctimes%20%5Ctext%7Brepetition%5C_penalty%7D%20&amp;%20%5Ctext%7Bif%20%7D%20z_i%20%3C%200%20%5Ctext%7B%20and%20token%20appeared%7D%20%5Cend%7Bcases%7D"></p>
+<ul>
+<li><code>repetition_penalty = 1.0</code>: No effect</li>
+<li><code>repetition_penalty = 1.2</code>: Moderate de-repetition (common default)</li>
+<li><code>repetition_penalty &gt; 1.5</code>: Strong — may cause incoherence</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q8-what-is-max_tokens-and-how-does-it-interact-with-the-context-window" class="level2">
+<h2 class="anchored" data-anchor-id="q8-what-is-max_tokens-and-how-does-it-interact-with-the-context-window">Q8: What is <code>max_tokens</code> and how does it interact with the context window?</h2>
+<p><strong>Answer:</strong></p>
+<p><code>max_tokens</code> (or <code>max_new_tokens</code>) sets the <strong>maximum number of tokens</strong> the model will generate in its response. It’s a hard cap — generation stops even if the response is incomplete.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph Budget["Token Budget Allocation"]
+        direction LR
+        CW["Context Window: 128K"]
+        INPUT["Input tokens used: 50K"]
+        AVAILABLE["Available for output: 78K"]
+        MAX["max_tokens set: 4096"]
+        ACTUAL["Actual output: min(4096, until EOS)"]
+    end
+
+    CW --&gt; INPUT --&gt; AVAILABLE --&gt; MAX --&gt; ACTUAL
+
+    style Budget fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="key-relationships" class="level3">
+<h3 class="anchored" data-anchor-id="key-relationships">Key Relationships</h3>
+<p><img src="https://latex.codecogs.com/png.latex?%5Ctext%7Bmax%5C_tokens%7D%20%5Cleq%20%5Ctext%7Bcontext%5C_window%7D%20-%20%5Ctext%7Binput%5C_tokens%7D"></p>
+<p>If you set <code>max_tokens</code> higher than available space, the API will either:</p>
+<ul>
+<li>Silently cap it at the available space</li>
+<li>Return an error</li>
+</ul>
+</section>
+<section id="max_tokens-vs.-max_new_tokens" class="level3">
+<h3 class="anchored" data-anchor-id="max_tokens-vs.-max_new_tokens"><code>max_tokens</code> vs.&nbsp;<code>max_new_tokens</code></h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 29%">
+<col style="width: 29%">
+<col style="width: 40%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Parameter</th>
+<th>Framework</th>
+<th>What it means</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>max_tokens</code></td>
+<td>OpenAI, Anthropic APIs</td>
+<td>Max tokens in the completion</td>
+</tr>
+<tr class="even">
+<td><code>max_new_tokens</code></td>
+<td>Hugging Face Transformers</td>
+<td>Max new tokens to generate (same concept)</td>
+</tr>
+<tr class="odd">
+<td><code>max_length</code></td>
+<td>Hugging Face (older)</td>
+<td>Max total length (input + output)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="why-generation-stops" class="level3">
+<h3 class="anchored" data-anchor-id="why-generation-stops">Why Generation Stops</h3>
+<p>Generation terminates when <strong>any</strong> of these conditions is met:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Condition</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>max_tokens</code> reached</td>
+<td>Hard output length limit</td>
+</tr>
+<tr class="even">
+<td>EOS token generated</td>
+<td>Model naturally finishes its response</td>
+</tr>
+<tr class="odd">
+<td>Stop sequence matched</td>
+<td>A specified string pattern is found</td>
+</tr>
+<tr class="even">
+<td>Context window full</td>
+<td>Input + output fills the entire window</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="practical-implications" class="level3">
+<h3 class="anchored" data-anchor-id="practical-implications">Practical Implications</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 39%">
+<col style="width: 34%">
+<col style="width: 26%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Setting</th>
+<th>Effect</th>
+<th>Risk</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Too low (e.g., 50)</td>
+<td>Responses get cut off mid-sentence</td>
+<td>Incomplete, incoherent outputs</td>
+</tr>
+<tr class="even">
+<td>Too high (e.g., 16384)</td>
+<td>Model can write as much as it wants</td>
+<td>Higher cost, potential rambling</td>
+</tr>
+<tr class="odd">
+<td>Right-sized</td>
+<td>Complete responses without waste</td>
+<td>Requires knowing task needs</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="cost-optimization" class="level3">
+<h3 class="anchored" data-anchor-id="cost-optimization">Cost Optimization</h3>
+<p>Since APIs charge per token:</p>
+<ul>
+<li>Set <code>max_tokens</code> appropriate to the task (not arbitrarily high)</li>
+<li>Use <code>stop</code> sequences to terminate early</li>
+<li>Monitor actual token usage vs.&nbsp;max_tokens budget</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q9-what-are-stop-sequences-and-how-do-they-control-generation" class="level2">
+<h2 class="anchored" data-anchor-id="q9-what-are-stop-sequences-and-how-do-they-control-generation">Q9: What are stop sequences and how do they control generation?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>Stop sequences</strong> are strings that, when generated by the model, immediately terminate generation. They’re a powerful mechanism for controlling output format and length.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    GEN["Model Generating..."]
+    GEN --&gt; CHECK{"Generated text&lt;br/&gt;contains stop sequence?"}
+    CHECK --&gt;|"No"| CONT["Continue generating"]
+    CONT --&gt; GEN
+    CHECK --&gt;|"Yes"| STOP["Stop immediately&lt;br/&gt;Return output (stop seq excluded)"]
+
+    style GEN fill:#6cc3d5,stroke:#333,color:#fff
+    style STOP fill:#56cc9d,stroke:#333,color:#fff
+    style CHECK fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="common-stop-sequence-use-cases" class="level3">
+<h3 class="anchored" data-anchor-id="common-stop-sequence-use-cases">Common Stop Sequence Use Cases</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 29%">
+<col style="width: 44%">
+<col style="width: 26%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Use Case</th>
+<th>Stop Sequences</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Single-line answer</td>
+<td><code>["\n"]</code></td>
+<td>Prevent multi-line responses</td>
+</tr>
+<tr class="even">
+<td>Code function</td>
+<td><code>["\n\n", "def ", "class "]</code></td>
+<td>Stop after one function</td>
+</tr>
+<tr class="odd">
+<td>Structured QA</td>
+<td><code>["Q:", "Question:"]</code></td>
+<td>Stop before generating next question</td>
+</tr>
+<tr class="even">
+<td>Chat role-play</td>
+<td><code>["User:", "Human:"]</code></td>
+<td>Prevent model from simulating user</td>
+</tr>
+<tr class="odd">
+<td>JSON extraction</td>
+<td><code>["}"]</code> or <code>["}\n"]</code></td>
+<td>Stop after closing brace</td>
+</tr>
+<tr class="even">
+<td>Numbered list</td>
+<td><code>["11."]</code></td>
+<td>Limit to 10 items</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="example-controlling-multi-turn-chat" class="level3">
+<h3 class="anchored" data-anchor-id="example-controlling-multi-turn-chat">Example: Controlling Multi-Turn Chat</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1">response <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> client.chat.completions.create(</span>
+<span id="cb2-2">    model<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"gpt-4"</span>,</span>
+<span id="cb2-3">    messages<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[{<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"role"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"user"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"content"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"List 3 fruits"</span>}],</span>
+<span id="cb2-4">    stop<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n\n</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"4."</span>],  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Stop after 3 items</span></span>
+<span id="cb2-5">    max_tokens<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span></span>
+<span id="cb2-6">)</span></code></pre></div></div>
+<p><strong>Without stop sequences:</strong> Model might continue listing dozens of fruits or add commentary.</p>
+<p><strong>With stop sequences:</strong> Generation stops cleanly after the third item.</p>
+</section>
+<section id="stop-sequences-vs.-other-stopping-mechanisms" class="level3">
+<h3 class="anchored" data-anchor-id="stop-sequences-vs.-other-stopping-mechanisms">Stop Sequences vs.&nbsp;Other Stopping Mechanisms</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 29%">
+<col style="width: 35%">
+<col style="width: 35%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Mechanism</th>
+<th>How it works</th>
+<th>Granularity</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Stop sequences</strong></td>
+<td>Match specific text strings</td>
+<td>Fine (exact strings)</td>
+</tr>
+<tr class="even">
+<td><strong>max_tokens</strong></td>
+<td>Hard token count limit</td>
+<td>Coarse (may cut mid-word)</td>
+</tr>
+<tr class="odd">
+<td><strong>EOS token</strong></td>
+<td>Model decides it’s done</td>
+<td>Model-controlled</td>
+</tr>
+<tr class="even">
+<td><strong>Constrained decoding</strong></td>
+<td>Grammar forces valid endings</td>
+<td>Structural</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="best-practices" class="level3">
+<h3 class="anchored" data-anchor-id="best-practices">Best Practices</h3>
+<ol type="1">
+<li><strong>Include the delimiter</strong> that separates outputs (e.g., <code>"\n\n"</code> between paragraphs)</li>
+<li><strong>Test with variations</strong> — models might generate <code>"\n "</code> instead of <code>"\n\n"</code></li>
+<li><strong>Combine with max_tokens</strong> as a safety net</li>
+<li><strong>Don’t over-specify</strong> — too many stop sequences can cause premature truncation</li>
+</ol>
+<hr>
+</section>
+</section>
+<section id="q10-how-do-you-choose-the-right-configuration-for-different-llm-tasks" class="level2">
+<h2 class="anchored" data-anchor-id="q10-how-do-you-choose-the-right-configuration-for-different-llm-tasks">Q10: How do you choose the right configuration for different LLM tasks?</h2>
+<p><strong>Answer:</strong></p>
+<p>Choosing the right parameters is about matching the <strong>creativity-accuracy tradeoff</strong> to your specific task requirements.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph Spectrum["Creativity ↔ Accuracy Spectrum"]
+        direction LR
+        DET["🎯 Deterministic&lt;br/&gt;temp=0, top_p=1"]
+        CON["🔒 Conservative&lt;br/&gt;temp=0.2, top_p=0.9"]
+        BAL["⚖️ Balanced&lt;br/&gt;temp=0.7, top_p=0.9"]
+        CRE["🎨 Creative&lt;br/&gt;temp=1.0, top_p=0.95"]
+        WILD["🌀 Wild&lt;br/&gt;temp=1.5, top_p=1.0"]
+    end
+
+    DET --&gt; CON --&gt; BAL --&gt; CRE --&gt; WILD
+
+    style DET fill:#56cc9d,stroke:#333,color:#fff
+    style CON fill:#6cc3d5,stroke:#333,color:#fff
+    style BAL fill:#ffce67,stroke:#333
+    style CRE fill:#ff7851,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="decision-framework" class="level3">
+<h3 class="anchored" data-anchor-id="decision-framework">Decision Framework</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 34%">
+<col style="width: 34%">
+<col style="width: 31%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Question</th>
+<th>If Yes →</th>
+<th>If No →</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Does output need to be exactly correct?</td>
+<td>temp=0, greedy</td>
+<td>Consider sampling</td>
+</tr>
+<tr class="even">
+<td>Is creativity/variety valued?</td>
+<td>temp=0.7-1.0</td>
+<td>temp=0-0.3</td>
+</tr>
+<tr class="odd">
+<td>Must output follow strict format?</td>
+<td>Constrained decoding, low temp</td>
+<td>Higher freedom</td>
+</tr>
+<tr class="even">
+<td>Running evaluations/benchmarks?</td>
+<td>temp=0, seed set</td>
+<td>Doesn’t matter</td>
+</tr>
+<tr class="odd">
+<td>Is this user-facing chat?</td>
+<td>temp=0.7, penalties for variety</td>
+<td>Task-dependent</td>
+</tr>
+<tr class="even">
+<td>Generating multiple candidates?</td>
+<td>Higher temp, n&gt;1</td>
+<td>Standard settings</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="complete-configuration-recipes" class="level3">
+<h3 class="anchored" data-anchor-id="complete-configuration-recipes">Complete Configuration Recipes</h3>
+<section id="recipe-1-code-generation" class="level4">
+<h4 class="anchored" data-anchor-id="recipe-1-code-generation">Recipe 1: Code Generation</h4>
+<pre><code>temperature: 0.0
+top_p: 1.0
+max_tokens: 2048
+stop: ["\n\n\n", "```"]
+frequency_penalty: 0.0</code></pre>
+<p><strong>Why:</strong> Code requires precision. Any “creativity” means bugs.</p>
+</section>
+<section id="recipe-2-customer-support-bot" class="level4">
+<h4 class="anchored" data-anchor-id="recipe-2-customer-support-bot">Recipe 2: Customer Support Bot</h4>
+<pre><code>temperature: 0.3
+top_p: 0.9
+max_tokens: 512
+presence_penalty: 0.2
+stop: ["Human:", "Customer:"]</code></pre>
+<p><strong>Why:</strong> Slightly varied but consistent, professional responses.</p>
+</section>
+<section id="recipe-3-creative-story-writing" class="level4">
+<h4 class="anchored" data-anchor-id="recipe-3-creative-story-writing">Recipe 3: Creative Story Writing</h4>
+<pre><code>temperature: 0.9
+top_p: 0.95
+max_tokens: 4096
+frequency_penalty: 0.7
+presence_penalty: 0.5</code></pre>
+<p><strong>Why:</strong> Maximum variety, avoids repetition, explores narrative directions.</p>
+</section>
+<section id="recipe-4-data-extraction-json" class="level4">
+<h4 class="anchored" data-anchor-id="recipe-4-data-extraction-json">Recipe 4: Data Extraction (JSON)</h4>
+<pre><code>temperature: 0.0
+top_p: 1.0
+max_tokens: 256
+response_format: {"type": "json_object"}
+stop: ["}\n"]</code></pre>
+<p><strong>Why:</strong> Must produce valid, consistent structured output.</p>
+</section>
+<section id="recipe-5-brainstorming-ideation" class="level4">
+<h4 class="anchored" data-anchor-id="recipe-5-brainstorming-ideation">Recipe 5: Brainstorming / Ideation</h4>
+<pre><code>temperature: 1.2
+top_p: 0.95
+max_tokens: 1024
+frequency_penalty: 1.0
+presence_penalty: 1.5
+n: 5</code></pre>
+<p><strong>Why:</strong> Generate diverse ideas; high penalties force exploration of new territory.</p>
+</section>
+</section>
+<section id="common-mistakes" class="level3">
+<h3 class="anchored" data-anchor-id="common-mistakes">Common Mistakes</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 39%">
+<col style="width: 39%">
+<col style="width: 21%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Mistake</th>
+<th>Problem</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>temperature=0</code> for creative tasks</td>
+<td>Bland, repetitive output</td>
+<td>Increase to 0.7-1.0</td>
+</tr>
+<tr class="even">
+<td><code>temperature=1.0</code> for factual tasks</td>
+<td>Hallucinations, wrong facts</td>
+<td>Decrease to 0-0.3</td>
+</tr>
+<tr class="odd">
+<td>Ignoring <code>max_tokens</code></td>
+<td>Unexpected costs, truncation</td>
+<td>Always set appropriate limit</td>
+</tr>
+<tr class="even">
+<td>Setting both <code>temperature</code> and <code>top_p</code> low</td>
+<td>Over-constrained, degenerate</td>
+<td>Usually modify one, keep other default</td>
+</tr>
+<tr class="odd">
+<td>No stop sequences in agentic loops</td>
+<td>Model generates beyond intended boundary</td>
+<td>Add role/delimiter stops</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+</section>
+<section id="summary-table" class="level2">
+<h2 class="anchored" data-anchor-id="summary-table">Summary Table</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 13%">
+<col style="width: 30%">
+<col style="width: 56%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Topic</th>
+<th>Key Concept</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>API Parameters</td>
+<td>temperature, top_p, max_tokens, penalties, stop sequences</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Temperature</td>
+<td>Controls distribution sharpness: 0=greedy, 1=natural, &gt;1=chaotic</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>Top-p vs.&nbsp;Top-k</td>
+<td>Fixed-size (k) vs.&nbsp;adaptive probability mass (p) filtering</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td>Context Window</td>
+<td>Total input+output token budget; affects cost, latency, quality</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td>Determinism</td>
+<td>temp=0 + seed for reproducibility; true determinism is hard</td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td>Decoding Strategies</td>
+<td>Greedy, beam search, sampling, speculative, constrained</td>
+</tr>
+<tr class="odd">
+<td>7</td>
+<td>Penalties</td>
+<td>frequency_penalty (proportional) vs.&nbsp;presence_penalty (binary)</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td>max_tokens</td>
+<td>Hard output cap; interacts with context window budget</td>
+</tr>
+<tr class="odd">
+<td>9</td>
+<td>Stop Sequences</td>
+<td>String patterns that terminate generation cleanly</td>
+</tr>
+<tr class="even">
+<td>10</td>
+<td>Configuration Recipes</td>
+<td>Match creativity-accuracy tradeoff to task requirements</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="whats-next" class="level2">
+<h2 class="anchored" data-anchor-id="whats-next">What’s Next?</h2>
+<p>This article covered the practical configuration knowledge tested in LLM engineering interviews. For related content:</p>
+<ul>
+<li><strong>Core LLM concepts (transformers, RAG, RLHF):</strong> <a href="../../posts/llm-interview/LLM-Interview-QA-1.html">LLM Interview QA - 1</a></li>
+<li><strong>Advanced topics (scaling, agents, inference):</strong> <a href="../../posts/llm-interview/LLM-Interview-QA-2.html">LLM Interview QA - 2</a></li>
+<li><strong>ML fundamentals:</strong> <a href="../../posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a> and <a href="../../posts/ml-interview/ML-Interview-QA-2.html">ML Interview QA - 2</a></li>
+</ul>
+
+
+</section>
+
+ ]]></description>
+  <guid>https://vectoringai.com/posts/llm-interview/LLM-Interview-QA-3.html</guid>
+  <pubDate>Wed, 20 May 2026 00:00:00 GMT</pubDate>
+  <media:content url="https://vectoringai.com/images/llm-interview/thumb_LLM_interview_qa_300.png" medium="image" type="image/png" height="96" width="144"/>
+</item>
+</channel>
+</rss>

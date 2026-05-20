@@ -1,0 +1,2979 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.36">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Vectoring AI">
+<meta name="dcterms.date" content="2026-05-20">
+<meta name="keywords" content="LLM interview, scaling laws, context window, quantization, LLM agents, LLM evaluation, embeddings, mixture of experts, KV cache, instruction tuning, LLM inference optimization, agentic AI">
+<meta name="description" content="10 advanced LLM interview questions on scaling laws, context windows, quantization, agents, evaluation, embeddings, and emerging architectures — with diagrams and examples.">
+
+<title>LLM Interview QA - 2 – Vectoring AI</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../..//images/favicon.ico" rel="icon">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dbc92dda8186f57fa2e333fbb71d6a9d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-b981e3f33a8ad6ba97cc0b6118e04959.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/all.css" rel="stylesheet">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/latex-fontsize.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-Q4RQ337R0F"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-Q4RQ337R0F', { 'anonymize_ip': true});
+</script>
+<script async="" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9738638303661485" crossorigin="anonymous"></script>
+<!-- Cookie Consent Banner (GDPR compliant) -->
+<style>
+#cookie-consent-banner {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #1d1d1d !important;
+  color: #ffffff !important;
+  padding: 16px 24px;
+  z-index: 9999;
+  font-size: 14px;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+}
+#cookie-consent-banner p {
+  margin: 0 0 12px 0;
+  line-height: 1.5;
+  color: #ffffff !important;
+}
+#cookie-consent-banner a {
+  color: #78b9ff;
+  text-decoration: underline;
+}
+#cookie-consent-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+#cookie-consent-buttons button {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+#btn-accept-all {
+  background: #3B70FE;
+  color: #fff;
+}
+#btn-accept-essential {
+  background: #555;
+  color: #fff;
+}
+#btn-deny {
+  background: transparent;
+  color: #ccc;
+  border: 1px solid #666 !important;
+}
+</style>
+
+<meta property="og:title" content="LLM Interview QA - 2 – Vectoring AI">
+<meta property="og:description" content="10 advanced LLM interview questions on scaling laws, context windows, quantization, agents, evaluation, embeddings, and emerging architectures — with diagrams and examples.">
+<meta property="og:image" content="https://vectoringai.com/images/llm-interview/thumb_LLM_interview_qa_300.png">
+<meta property="og:site_name" content="Vectoring AI">
+<meta property="og:image:height" content="200">
+<meta property="og:image:width" content="300">
+<meta name="twitter:title" content="LLM Interview QA - 2 – Vectoring AI">
+<meta name="twitter:description" content="10 advanced LLM interview questions on scaling laws, context windows, quantization, agents, evaluation, embeddings, and emerging architectures — with diagrams and examples.">
+<meta name="twitter:image" content="https://vectoringai.com/images/llm-interview/thumb_LLM_interview_qa_300.png">
+<meta name="twitter:image-height" content="200">
+<meta name="twitter:image-width" content="300">
+<meta name="twitter:card" content="summary_large_image">
+</head><body class="nav-sidebar docked quarto-light"><div id="cookie-consent-banner">
+  <p>We use cookies to improve your browsing experience, support the operation of this site, and understand how visitors use our content.
+    You can accept all cookies, accept only essential cookies, or deny non-essential cookies.
+    <a href="../../pages/privacy.html">Privacy Policy</a>
+  </p>
+  <div id="cookie-consent-buttons">
+    <button id="btn-accept-all">Accept All</button>
+    <button id="btn-accept-essential">Essential Only</button>
+    <button id="btn-deny">Deny</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  var consent = localStorage.getItem("cookie_consent");
+
+  function loadAdSense() {
+    if (document.querySelector('script[src*="adsbygoogle"]')) return;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9738638303661485";
+    s.crossOrigin = "anonymous";
+    document.head.appendChild(s);
+  }
+
+  function showBanner() {
+    document.getElementById("cookie-consent-banner").style.display = "block";
+  }
+
+  function hideBanner() {
+    document.getElementById("cookie-consent-banner").style.display = "none";
+  }
+
+  if (consent === "all") {
+    loadAdSense();
+  } else if (consent === "essential" || consent === "denied") {
+    // Do not load AdSense
+  } else {
+    // No choice made yet — show banner, do not load AdSense
+    window.addEventListener("DOMContentLoaded", showBanner);
+  }
+
+  window.addEventListener("DOMContentLoaded", function() {
+    document.getElementById("btn-accept-all").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "all");
+      hideBanner();
+      loadAdSense();
+    });
+    document.getElementById("btn-accept-essential").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "essential");
+      hideBanner();
+    });
+    document.getElementById("btn-deny").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "denied");
+      hideBanner();
+    });
+  });
+})();
+</script>
+<script>
+// Inject missing Open Graph tags that Facebook requires for proper link sharing
+(function () {
+  if (!document.querySelector('meta[property="og:url"]')) {
+    var m = document.createElement("meta");
+    m.setAttribute("property", "og:url");
+    m.setAttribute("content", window.location.href);
+    document.head.appendChild(m);
+  }
+  if (!document.querySelector('meta[property="og:type"]')) {
+    var t = document.createElement("meta");
+    t.setAttribute("property", "og:type");
+    t.setAttribute("content", "article");
+    document.head.appendChild(t);
+  }
+  // Fix double-slash in og:image (site-url trailing slash + /images/...)
+  var ogImg = document.querySelector('meta[property="og:image"]');
+  if (ogImg) {
+    ogImg.setAttribute("content", ogImg.getAttribute("content").replace(/([^:])\/\//g, "$1/"));
+  }
+  var twImg = document.querySelector('meta[name="twitter:image"]');
+  if (twImg) {
+    twImg.setAttribute("content", twImg.getAttribute("content").replace(/([^:])\/\//g, "$1/"));
+  }
+})();
+</script>
+<style>
+.share-widget {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0.8rem 0 1.2rem 0;
+  padding: 0.5rem 0;
+}
+.share-widget .share-icon {
+  width: 20px;
+  height: 20px;
+  fill: #555;
+}
+.share-widget .share-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #555;
+}
+.share-widget .share-divider {
+  width: 1px;
+  height: 22px;
+  background: #ddd;
+}
+.share-widget a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  transition: transform 0.2s, box-shadow 0.2s;
+  text-decoration: none !important;
+}
+.share-widget a:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.share-widget a svg {
+  width: 20px;
+  height: 20px;
+}
+.notebook-widget {
+  margin: 0 0 1rem 0;
+}
+.notebook-widget a {
+  display: inline-block;
+  transition: transform 0.2s;
+}
+.notebook-widget a:hover {
+  transform: scale(1.05);
+}
+</style>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  if (!window.location.pathname.includes("/posts/")) return;
+
+  var rawTitle = document.title;
+  var rawUrl = window.location.href;
+  var title = encodeURIComponent(rawTitle);
+  var url = encodeURIComponent(rawUrl);
+
+  var widget = document.createElement("div");
+  widget.className = "share-widget";
+  widget.innerHTML =
+    '<svg class="share-icon" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>' +
+    '<span class="share-label">Share</span>' +
+    '<div class="share-divider"></div>' +
+    '<a href="https://twitter.com/intent/tweet?text=' + title + '&url=' + url + '" target="_blank" rel="noopener" title="Share on X"><svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>' +
+    '<a href="https://www.facebook.com/sharer/sharer.php?u=' + url + '" target="_blank" rel="noopener" title="Share on Facebook"><svg viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>' +
+    '<a href="https://www.linkedin.com/shareArticle?mini=true&url=' + url + '&title=' + title + '" target="_blank" rel="noopener" title="Share on LinkedIn"><svg viewBox="0 0 24 24" fill="#0A66C2"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>';
+
+  // Desktop: open a centered popup (standard share UX).
+  // Mobile: let the default target="_blank" navigate so the OS can
+  //         route to the native app (Facebook, LinkedIn, etc.).
+  var isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+  if (!isMobile) {
+    widget.querySelectorAll("a").forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        var w = 600, h = 500;
+        var left = (screen.width - w) / 2;
+        var top = (screen.height - h) / 2;
+        window.open(
+          this.href, "share",
+          "width=" + w + ",height=" + h + ",left=" + left + ",top=" + top + ",noopener,noreferrer"
+        );
+      });
+    });
+  }
+
+  // Insert right after the title-block header, before Keywords
+  var header = document.querySelector("header#title-block-header");
+  if (header && header.nextSibling) {
+    header.parentNode.insertBefore(widget, header.nextSibling);
+  }
+
+  // Add Colab / notebook button if the page has a notebook-link element
+  var nbEl = document.getElementById("notebook-link");
+  if (nbEl && nbEl.dataset.url) {
+    var nbWidget = document.createElement("div");
+    nbWidget.className = "notebook-widget";
+    nbWidget.innerHTML =
+      '<a href="' + nbEl.dataset.url + '" target="_blank" rel="noopener" title="Open notebook in Google Colab">' +
+      '<img src="/images/colab.png" alt="Open in Colab" style="height:28px">' +
+      '</a>';
+    // Insert right after the share widget
+    if (widget.nextSibling) {
+      widget.parentNode.insertBefore(nbWidget, widget.nextSibling);
+    } else if (widget.parentNode) {
+      widget.parentNode.appendChild(nbWidget);
+    }
+  }
+});
+</script>
+<script>
+  var link = document.createElement('link');
+  link.rel = 'canonical';
+  var path = window.location.pathname.replace(/index\.html$/, '');
+  link.href = 'https://vectoringai.com' + path;
+  document.head.appendChild(link);
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var ogTitle = document.querySelector('meta[property="og:title"]');
+  var ogDesc = document.querySelector('meta[property="og:description"]');
+  var ogImage = document.querySelector('meta[property="og:image"]');
+  var dcDate = document.querySelector('meta[name="dcterms.date"]');
+
+  if (!ogTitle) return;
+
+  var isArticle = !!dcDate;
+  var jsonld = {
+    "@context": "https://schema.org",
+    "@type": isArticle ? "Article" : "WebPage",
+    "headline": ogTitle.content.replace(/ – Vectoring AI$/, ''),
+    "description": ogDesc ? ogDesc.content : "",
+    "url": window.location.href,
+    "author": {
+      "@type": "Organization",
+      "name": "Vectoring AI",
+      "url": "https://vectoringai.com/pages/about.html"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Vectoring AI",
+      "url": "https://vectoringai.com",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://vectoringai.com/images/favicon_io/android-chrome-512x512.png"
+      }
+    }
+  };
+
+  if (ogImage) jsonld.image = ogImage.content;
+  if (dcDate) jsonld.datePublished = dcDate.content;
+
+  var el = document.createElement('script');
+  el.type = 'application/ld+json';
+  el.textContent = JSON.stringify(jsonld);
+  document.head.appendChild(el);
+});
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var title = document.querySelector(".sidebar-title");
+  if (title && !title.querySelector(".sidebar-logo-link")) {
+    var a = document.createElement("a");
+    a.href = "/";
+    a.className = "sidebar-logo-link";
+    var img = document.createElement("img");
+    img.src = "/images/logo_vectoringai_180.png";
+    img.alt = "Vectoring AI Home";
+    a.appendChild(img);
+    title.prepend(a);
+  }
+});
+</script>
+<!-- <script src="https://quge5.com/88/tag.min.js" data-zone="238344" async data-cfasync="false"></script> -->
+
+<!-- Reserve space at top of TOC so ad tag doesn't cover it -->
+<style>
+nav[role="doc-toc"] {
+  padding-top: 150px !important;
+}
+@media (min-width: 992px) {
+  nav[role="doc-toc"] {
+    padding-top: 180px !important;
+  }
+}
+</style>
+
+<script>
+(function(s){s.dataset.zone='10992645';s.src='https://nap5k.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')));
+</script>
+
+<!-- <script>(function(s){s.dataset.zone='10992714',s.src='https://n6wxm.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script> -->
+<script src="../../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script><script src="https://cdn.jsdelivr.net/npm/katex@latest/dist/katex.min.js"></script>
+  <script>document.addEventListener("DOMContentLoaded", function () {
+ var mathElements = document.getElementsByClassName("math");
+ var macros = [];
+ for (var i = 0; i < mathElements.length; i++) {
+  var texText = mathElements[i].firstChild;
+  if (mathElements[i].tagName == "SPAN") {
+   katex.render(texText.data, mathElements[i], {
+    displayMode: mathElements[i].classList.contains('display'),
+    throwOnError: false,
+    macros: macros,
+    fleqn: false
+   });
+}}});
+  </script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@latest/dist/katex.min.css">
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../../styles.css">
+
+
+
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">
+      Vectoring AI
+      </li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../../">Vectoring AI</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://github.com/VectoringAI" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+    <a href="https://www.youtube.com/@vectoringai" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-youtube"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><strong>Home</strong></span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>AI Engineering</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/llm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">LLMs</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/agent.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Agents</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/rag.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">RAG</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/benchmark.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Benchmarks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/milestone.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Milestones</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>AI Interview</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/ml-interview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ML Interview</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/llm-interview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">LLM Interview</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/python-swe-interview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Python SWE Interview</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>Made by VAI</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/vaitalk.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">VaiTalk</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/about.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><strong>About</strong></span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title"><strong>Sections</strong></h2>
+   
+  <ul class="collapse">
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#q1-what-are-scaling-laws-in-llms-and-why-do-they-matter" id="toc-q1-what-are-scaling-laws-in-llms-and-why-do-they-matter" class="nav-link" data-scroll-target="#q1-what-are-scaling-laws-in-llms-and-why-do-they-matter">Q1: What are scaling laws in LLMs and why do they matter?</a></li>
+  <li><a href="#q2-how-do-llms-handle-long-context-windows-and-what-are-the-key-challenges" id="toc-q2-how-do-llms-handle-long-context-windows-and-what-are-the-key-challenges" class="nav-link" data-scroll-target="#q2-how-do-llms-handle-long-context-windows-and-what-are-the-key-challenges">Q2: How do LLMs handle long context windows and what are the key challenges?</a></li>
+  <li><a href="#q3-what-is-model-quantization-and-how-does-it-enable-llm-deployment" id="toc-q3-what-is-model-quantization-and-how-does-it-enable-llm-deployment" class="nav-link" data-scroll-target="#q3-what-is-model-quantization-and-how-does-it-enable-llm-deployment">Q3: What is model quantization and how does it enable LLM deployment?</a></li>
+  <li><a href="#q4-what-are-llm-agents-and-how-do-they-extend-llm-capabilities" id="toc-q4-what-are-llm-agents-and-how-do-they-extend-llm-capabilities" class="nav-link" data-scroll-target="#q4-what-are-llm-agents-and-how-do-they-extend-llm-capabilities">Q4: What are LLM Agents and how do they extend LLM capabilities?</a></li>
+  <li><a href="#q5-how-do-you-evaluate-llm-performance-and-what-metrics-are-used" id="toc-q5-how-do-you-evaluate-llm-performance-and-what-metrics-are-used" class="nav-link" data-scroll-target="#q5-how-do-you-evaluate-llm-performance-and-what-metrics-are-used">Q5: How do you evaluate LLM performance and what metrics are used?</a></li>
+  <li><a href="#q6-what-are-embeddings-and-how-are-they-used-in-llm-applications" id="toc-q6-what-are-embeddings-and-how-are-they-used-in-llm-applications" class="nav-link" data-scroll-target="#q6-what-are-embeddings-and-how-are-they-used-in-llm-applications">Q6: What are embeddings and how are they used in LLM applications?</a></li>
+  <li><a href="#q7-what-is-mixture-of-experts-moe-and-how-does-it-enable-efficient-scaling" id="toc-q7-what-is-mixture-of-experts-moe-and-how-does-it-enable-efficient-scaling" class="nav-link" data-scroll-target="#q7-what-is-mixture-of-experts-moe-and-how-does-it-enable-efficient-scaling">Q7: What is Mixture of Experts (MoE) and how does it enable efficient scaling?</a></li>
+  <li><a href="#q8-what-is-the-kv-cache-and-how-does-it-affect-llm-inference" id="toc-q8-what-is-the-kv-cache-and-how-does-it-affect-llm-inference" class="nav-link" data-scroll-target="#q8-what-is-the-kv-cache-and-how-does-it-affect-llm-inference">Q8: What is the KV Cache and how does it affect LLM inference?</a></li>
+  <li><a href="#q9-what-is-instruction-tuning-and-how-does-it-differ-from-pre-training-and-rlhf" id="toc-q9-what-is-instruction-tuning-and-how-does-it-differ-from-pre-training-and-rlhf" class="nav-link" data-scroll-target="#q9-what-is-instruction-tuning-and-how-does-it-differ-from-pre-training-and-rlhf">Q9: What is instruction tuning and how does it differ from pre-training and RLHF?</a></li>
+  <li><a href="#q10-what-are-the-key-inference-optimization-techniques-for-serving-llms-at-scale" id="toc-q10-what-are-the-key-inference-optimization-techniques-for-serving-llms-at-scale" class="nav-link" data-scroll-target="#q10-what-are-the-key-inference-optimization-techniques-for-serving-llms-at-scale">Q10: What are the key inference optimization techniques for serving LLMs at scale?</a></li>
+  <li><a href="#summary-table" id="toc-summary-table" class="nav-link" data-scroll-target="#summary-table">Summary Table</a></li>
+  <li><a href="#whats-next" id="toc-whats-next" class="nav-link" data-scroll-target="#whats-next">What’s Next?</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">LLM Interview QA - 2</h1>
+</div>
+
+<div>
+  <div class="description">
+    10 advanced LLM interview questions on scaling laws, context windows, quantization, agents, evaluation, embeddings, and emerging architectures — with diagrams and examples.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://vectoringai.com/pages/about.html">Vectoring AI</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">20 May 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+<div>
+  <div class="keywords">
+    <div class="block-title">Keywords</div>
+    <p>LLM interview, scaling laws, context window, quantization, LLM agents, LLM evaluation, embeddings, mixture of experts, KV cache, instruction tuning, LLM inference optimization, agentic AI</p>
+  </div>
+</div>
+
+</header>
+
+
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>This is <strong>Part 2</strong> of our LLM Interview QA series. It covers 10 advanced questions on scaling, optimization, agents, and evaluation — the practical knowledge that separates candidates who use LLMs from those who <strong>engineer production LLM systems</strong>.</p>
+<blockquote class="blockquote">
+<p>For foundational LLM concepts (transformers, attention, tokenization, RAG, RLHF), see <a href="../../posts/llm-interview/LLM-Interview-QA-1.html">LLM Interview QA - 1</a>. For ML fundamentals, see <a href="../../posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a> and <a href="../../posts/ml-interview/ML-Interview-QA-2.html">ML Interview QA - 2</a>.</p>
+</blockquote>
+<hr>
+</section>
+<section id="q1-what-are-scaling-laws-in-llms-and-why-do-they-matter" class="level2">
+<h2 class="anchored" data-anchor-id="q1-what-are-scaling-laws-in-llms-and-why-do-they-matter">Q1: What are scaling laws in LLMs and why do they matter?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>Scaling laws</strong> are empirical relationships describing how LLM performance improves predictably as you increase model size, dataset size, and compute budget.</p>
+<section id="the-chinchilla-scaling-law" class="level3">
+<h3 class="anchored" data-anchor-id="the-chinchilla-scaling-law">The Chinchilla Scaling Law</h3>
+<p>The key finding (Hoffmann et al., 2022): for a given compute budget, <strong>model size and training tokens should be scaled equally</strong>.</p>
+<p><span class="math display">L(N, D) \approx \frac{A}{N^\alpha} + \frac{B}{D^\beta} + E</span></p>
+<p>where:</p>
+<ul>
+<li><span class="math inline">N</span> = number of parameters</li>
+<li><span class="math inline">D</span> = number of training tokens</li>
+<li><span class="math inline">L</span> = loss (lower is better)</li>
+<li><span class="math inline">E</span> = irreducible loss (entropy of natural language)</li>
+</ul>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph Scaling["Scaling Laws: Three Axes"]
+        PARAMS["Model Parameters (N)&lt;br/&gt;More params → lower loss"]
+        DATA["Training Data (D)&lt;br/&gt;More tokens → lower loss"]
+        COMPUTE["Compute (C ≈ 6ND)&lt;br/&gt;More FLOPs → lower loss"]
+    end
+
+    subgraph Tradeoff["Chinchilla Optimal"]
+        OPT["For budget C:&lt;br/&gt;Scale N and D equally&lt;br/&gt;D ≈ 20 × N tokens"]
+    end
+
+    Scaling --&gt; Tradeoff
+
+    style Scaling fill:#56cc9d,stroke:#333,color:#fff
+    style Tradeoff fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="practical-implications" class="level3">
+<h3 class="anchored" data-anchor-id="practical-implications">Practical Implications</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 40%">
+<col style="width: 59%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Insight</th>
+<th>Implication</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Loss decreases as a power law</td>
+<td>Returns diminish but never plateau (with enough data)</td>
+</tr>
+<tr class="even">
+<td>Chinchilla-optimal training</td>
+<td>Many early LLMs were undertrained (GPT-3: 300B tokens for 175B params)</td>
+</tr>
+<tr class="odd">
+<td>Compute-optimal models</td>
+<td>LLaMA-70B outperforms GPT-3-175B by training on more tokens</td>
+</tr>
+<tr class="even">
+<td>Emergent abilities</td>
+<td>Some capabilities appear only above certain scale thresholds</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="emergent-abilities" class="level3">
+<h3 class="anchored" data-anchor-id="emergent-abilities">Emergent Abilities</h3>
+<p>Certain capabilities appear suddenly at scale rather than improving gradually:</p>
+<ul>
+<li><strong>Chain-of-thought reasoning</strong> — emerges around 60-100B parameters</li>
+<li><strong>In-context learning</strong> — improves dramatically with scale</li>
+<li><strong>Multi-step math</strong> — requires large models to perform reliably</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q2-how-do-llms-handle-long-context-windows-and-what-are-the-key-challenges" class="level2">
+<h2 class="anchored" data-anchor-id="q2-how-do-llms-handle-long-context-windows-and-what-are-the-key-challenges">Q2: How do LLMs handle long context windows and what are the key challenges?</h2>
+<p><strong>Answer:</strong></p>
+<p>The <strong>context window</strong> is the maximum number of tokens an LLM can process in a single forward pass. Modern models range from 4K to 1M+ tokens.</p>
+<section id="the-challenge-quadratic-attention" class="level3">
+<h3 class="anchored" data-anchor-id="the-challenge-quadratic-attention">The Challenge: Quadratic Attention</h3>
+<p>Standard self-attention has <span class="math inline">O(n^2)</span> complexity in both time and memory with respect to sequence length <span class="math inline">n</span>:</p>
+<p><span class="math display">\text{Memory} \propto n^2, \quad \text{Compute} \propto n^2 \cdot d</span></p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph Problem["The Quadratic Problem"]
+        S1["4K tokens → 16M attention entries"]
+        S2["32K tokens → 1B attention entries"]
+        S3["128K tokens → 16B attention entries"]
+        S4["1M tokens → 1T attention entries"]
+    end
+
+    subgraph Solutions["Solutions"]
+        SOL1["Efficient Attention&lt;br/&gt;Flash Attention, Ring Attention"]
+        SOL2["Position Extrapolation&lt;br/&gt;RoPE, ALiBi, YaRN"]
+        SOL3["Sparse Attention&lt;br/&gt;Sliding window, dilated"]
+        SOL4["Memory/Retrieval&lt;br/&gt;Compress old context"]
+    end
+
+    Problem --&gt; Solutions
+
+    style Problem fill:#ff7851,stroke:#333,color:#fff
+    style Solutions fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="key-techniques-for-long-context" class="level3">
+<h3 class="anchored" data-anchor-id="key-techniques-for-long-context">Key Techniques for Long Context</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 39%">
+<col style="width: 27%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Technique</th>
+<th>How it works</th>
+<th>Used by</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Flash Attention</strong></td>
+<td>Fused GPU kernels, tiled computation to reduce memory I/O</td>
+<td>Most modern LLMs</td>
+</tr>
+<tr class="even">
+<td><strong>RoPE</strong> (Rotary Position Embedding)</td>
+<td>Encodes relative positions via rotation matrices</td>
+<td>LLaMA, Mistral</td>
+</tr>
+<tr class="odd">
+<td><strong>ALiBi</strong></td>
+<td>Linear bias based on distance (no positional embedding)</td>
+<td>BLOOM</td>
+</tr>
+<tr class="even">
+<td><strong>Sliding Window Attention</strong></td>
+<td>Each token attends only to nearby tokens</td>
+<td>Mistral</td>
+</tr>
+<tr class="odd">
+<td><strong>Ring Attention</strong></td>
+<td>Distributes sequence across multiple GPUs</td>
+<td>Long-context training</td>
+</tr>
+<tr class="even">
+<td><strong>YaRN</strong></td>
+<td>Extends RoPE to longer contexts via interpolation</td>
+<td>Extended LLaMA</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="the-lost-in-the-middle-problem" class="level3">
+<h3 class="anchored" data-anchor-id="the-lost-in-the-middle-problem">The “Lost in the Middle” Problem</h3>
+<p>Research shows LLMs tend to:</p>
+<ul>
+<li>Remember information at the <strong>beginning</strong> and <strong>end</strong> of context well</li>
+<li>Struggle with information in the <strong>middle</strong> of long contexts</li>
+<li>Performance degrades as relevant information is placed further from query</li>
+</ul>
+</section>
+<section id="practical-considerations" class="level3">
+<h3 class="anchored" data-anchor-id="practical-considerations">Practical Considerations</h3>
+<ul>
+<li>Longer context ≠ better retrieval (RAG often outperforms naive long context)</li>
+<li>KV cache memory grows linearly with sequence length</li>
+<li>Inference cost increases with context length even if most tokens are irrelevant</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q3-what-is-model-quantization-and-how-does-it-enable-llm-deployment" class="level2">
+<h2 class="anchored" data-anchor-id="q3-what-is-model-quantization-and-how-does-it-enable-llm-deployment">Q3: What is model quantization and how does it enable LLM deployment?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>Quantization</strong> reduces the numerical precision of model weights (and sometimes activations) from high-precision formats (FP32/FP16) to lower-precision formats (INT8/INT4), dramatically reducing memory and improving inference speed.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph Precision["Precision Formats"]
+        FP32["FP32 (32-bit)&lt;br/&gt;Full precision&lt;br/&gt;4 bytes per param"]
+        FP16["FP16/BF16 (16-bit)&lt;br/&gt;Half precision&lt;br/&gt;2 bytes per param"]
+        INT8["INT8 (8-bit)&lt;br/&gt;Quarter precision&lt;br/&gt;1 byte per param"]
+        INT4["INT4 (4-bit)&lt;br/&gt;Eighth precision&lt;br/&gt;0.5 bytes per param"]
+    end
+
+    FP32 --&gt;|"2x compression"| FP16
+    FP16 --&gt;|"2x compression"| INT8
+    INT8 --&gt;|"2x compression"| INT4
+
+    style FP32 fill:#ff7851,stroke:#333,color:#fff
+    style FP16 fill:#ffce67,stroke:#333
+    style INT8 fill:#6cc3d5,stroke:#333,color:#fff
+    style INT4 fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="memory-requirements-example-llama-70b" class="level3">
+<h3 class="anchored" data-anchor-id="memory-requirements-example-llama-70b">Memory Requirements Example (LLaMA-70B)</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Precision</th>
+<th>Memory Required</th>
+<th>Hardware Needed</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>FP32</td>
+<td>~280 GB</td>
+<td>4× A100 80GB</td>
+</tr>
+<tr class="even">
+<td>FP16</td>
+<td>~140 GB</td>
+<td>2× A100 80GB</td>
+</tr>
+<tr class="odd">
+<td>INT8</td>
+<td>~70 GB</td>
+<td>1× A100 80GB</td>
+</tr>
+<tr class="even">
+<td>INT4</td>
+<td>~35 GB</td>
+<td>1× A6000 48GB or consumer GPU</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="quantization-approaches" class="level3">
+<h3 class="anchored" data-anchor-id="quantization-approaches">Quantization Approaches</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 29%">
+<col style="width: 22%">
+<col style="width: 48%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>PTQ</strong> (Post-Training Quantization)</td>
+<td>After training</td>
+<td>Quantize a trained model without retraining</td>
+</tr>
+<tr class="even">
+<td><strong>QAT</strong> (Quantization-Aware Training)</td>
+<td>During training</td>
+<td>Simulate quantization during training for better accuracy</td>
+</tr>
+<tr class="odd">
+<td><strong>GPTQ</strong></td>
+<td>PTQ, weight-only</td>
+<td>Layer-wise quantization using calibration data</td>
+</tr>
+<tr class="even">
+<td><strong>AWQ</strong> (Activation-Aware)</td>
+<td>PTQ, weight-only</td>
+<td>Protects salient weights based on activation magnitude</td>
+</tr>
+<tr class="odd">
+<td><strong>GGUF</strong> (llama.cpp format)</td>
+<td>PTQ, various bits</td>
+<td>CPU-friendly format with mixed precision</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="quality-vs.-compression-tradeoff" class="level3">
+<h3 class="anchored" data-anchor-id="quality-vs.-compression-tradeoff">Quality vs.&nbsp;Compression Tradeoff</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Quantization</th>
+<th>Perplexity Impact</th>
+<th>Speed Gain</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>FP16 → INT8</td>
+<td>Negligible (&lt;0.1%)</td>
+<td>1.5-2x</td>
+<td>Production serving</td>
+</tr>
+<tr class="even">
+<td>FP16 → INT4</td>
+<td>Small (1-3%)</td>
+<td>2-3x</td>
+<td>Edge deployment, personal use</td>
+</tr>
+<tr class="odd">
+<td>FP16 → INT2</td>
+<td>Significant (5-15%)</td>
+<td>3-4x</td>
+<td>Experimental only</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="key-insight" class="level3">
+<h3 class="anchored" data-anchor-id="key-insight">Key Insight</h3>
+<p>4-bit quantization (GPTQ, AWQ) has become the standard for local LLM deployment because it offers <strong>near-lossless quality</strong> with 4x memory reduction — enabling 70B models to run on consumer hardware.</p>
+<hr>
+</section>
+</section>
+<section id="q4-what-are-llm-agents-and-how-do-they-extend-llm-capabilities" class="level2">
+<h2 class="anchored" data-anchor-id="q4-what-are-llm-agents-and-how-do-they-extend-llm-capabilities">Q4: What are LLM Agents and how do they extend LLM capabilities?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>LLM Agents</strong> are systems where an LLM acts as a reasoning engine that can plan, use tools, and take actions to accomplish goals — going beyond simple text generation.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph Agent["LLM Agent Architecture"]
+        LLM_CORE["LLM (Brain)&lt;br/&gt;Reasoning &amp; Planning"]
+        MEMORY["Memory&lt;br/&gt;Short-term: conversation&lt;br/&gt;Long-term: vector store"]
+        TOOLS["Tools&lt;br/&gt;Code execution, APIs,&lt;br/&gt;Search, Databases"]
+        PLANNING["Planning&lt;br/&gt;Task decomposition,&lt;br/&gt;Reflection, Replanning"]
+    end
+
+    USER["User Goal"] --&gt; LLM_CORE
+    LLM_CORE --&gt; PLANNING
+    PLANNING --&gt; TOOLS
+    TOOLS --&gt; |"Observation"| LLM_CORE
+    LLM_CORE --&gt; MEMORY
+    MEMORY --&gt; LLM_CORE
+    LLM_CORE --&gt; RESULT["Final Result"]
+
+    style Agent fill:#56cc9d,stroke:#333,color:#fff
+    style USER fill:#6cc3d5,stroke:#333,color:#fff
+    style RESULT fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="core-agent-patterns" class="level3">
+<h3 class="anchored" data-anchor-id="core-agent-patterns">Core Agent Patterns</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 29%">
+<col style="width: 41%">
+<col style="width: 29%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Pattern</th>
+<th>How it works</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>ReAct</strong></td>
+<td>Reason → Act → Observe loop</td>
+<td>“I need to search for X” → search → “I found Y, now I’ll…”</td>
+</tr>
+<tr class="even">
+<td><strong>Plan-and-Execute</strong></td>
+<td>Create full plan first, then execute steps</td>
+<td>Break complex task into subtasks</td>
+</tr>
+<tr class="odd">
+<td><strong>Reflection</strong></td>
+<td>Agent critiques its own output and improves</td>
+<td>Self-check for errors before responding</td>
+</tr>
+<tr class="even">
+<td><strong>Multi-Agent</strong></td>
+<td>Multiple specialized agents collaborate</td>
+<td>Researcher + Coder + Reviewer</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="tool-use" class="level3">
+<h3 class="anchored" data-anchor-id="tool-use">Tool Use</h3>
+<p>Tools transform LLMs from text generators into <strong>action-taking systems</strong>:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 40%">
+<col style="width: 27%">
+<col style="width: 32%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tool Category</th>
+<th>Examples</th>
+<th>Why Needed</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Code Execution</strong></td>
+<td>Python REPL, sandboxed environments</td>
+<td>Precise computation, data analysis</td>
+</tr>
+<tr class="even">
+<td><strong>Search</strong></td>
+<td>Web search, document retrieval</td>
+<td>Access to current information</td>
+</tr>
+<tr class="odd">
+<td><strong>APIs</strong></td>
+<td>Weather, calendar, databases</td>
+<td>Real-world interactions</td>
+</tr>
+<tr class="even">
+<td><strong>File I/O</strong></td>
+<td>Read/write files, parse documents</td>
+<td>Persistent data manipulation</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="agent-frameworks" class="level3">
+<h3 class="anchored" data-anchor-id="agent-frameworks">Agent Frameworks</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 35%">
+<col style="width: 32%">
+<col style="width: 32%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Framework</th>
+<th>Approach</th>
+<th>Strength</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>LangGraph</strong></td>
+<td>Graph-based state machines</td>
+<td>Complex workflows, cycles</td>
+</tr>
+<tr class="even">
+<td><strong>CrewAI</strong></td>
+<td>Role-based multi-agent</td>
+<td>Team collaboration metaphor</td>
+</tr>
+<tr class="odd">
+<td><strong>AutoGen</strong></td>
+<td>Conversational agents</td>
+<td>Multi-agent conversation</td>
+</tr>
+<tr class="even">
+<td><strong>OpenAI Assistants</strong></td>
+<td>Managed agent platform</td>
+<td>Easy deployment</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="challenges" class="level3">
+<h3 class="anchored" data-anchor-id="challenges">Challenges</h3>
+<ul>
+<li><strong>Reliability:</strong> Agents can go off-track or loop infinitely</li>
+<li><strong>Cost:</strong> Multiple LLM calls per task (tool reasoning is expensive)</li>
+<li><strong>Safety:</strong> Autonomous actions need guardrails</li>
+<li><strong>Evaluation:</strong> Hard to benchmark open-ended agent behavior</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q5-how-do-you-evaluate-llm-performance-and-what-metrics-are-used" class="level2">
+<h2 class="anchored" data-anchor-id="q5-how-do-you-evaluate-llm-performance-and-what-metrics-are-used">Q5: How do you evaluate LLM performance and what metrics are used?</h2>
+<p><strong>Answer:</strong></p>
+<p>LLM evaluation is uniquely challenging because outputs are open-ended text. Different tasks require different evaluation approaches.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    EVAL["LLM Evaluation"]
+    EVAL --&gt; AUTO["Automated Metrics"]
+    EVAL --&gt; HUMAN["Human Evaluation"]
+    EVAL --&gt; LLM_JUDGE["LLM-as-Judge"]
+    EVAL --&gt; BENCH["Benchmarks"]
+
+    AUTO --&gt; A1["Perplexity"]
+    AUTO --&gt; A2["BLEU / ROUGE"]
+    AUTO --&gt; A3["BERTScore"]
+    AUTO --&gt; A4["Exact Match / F1"]
+
+    HUMAN --&gt; H1["Preference ranking"]
+    HUMAN --&gt; H2["Likert scale ratings"]
+    HUMAN --&gt; H3["Task completion rate"]
+
+    LLM_JUDGE --&gt; L1["Pairwise comparison"]
+    LLM_JUDGE --&gt; L2["Rubric-based scoring"]
+    LLM_JUDGE --&gt; L3["Reference-free evaluation"]
+
+    BENCH --&gt; B1["MMLU (knowledge)"]
+    BENCH --&gt; B2["HumanEval (coding)"]
+    BENCH --&gt; B3["GSM8K (math)"]
+    BENCH --&gt; B4["TruthfulQA (honesty)"]
+
+    style EVAL fill:#56cc9d,stroke:#333,color:#fff
+    style AUTO fill:#6cc3d5,stroke:#333,color:#fff
+    style LLM_JUDGE fill:#ffce67,stroke:#333
+    style BENCH fill:#ff7851,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="metric-selection-by-task" class="level3">
+<h3 class="anchored" data-anchor-id="metric-selection-by-task">Metric Selection by Task</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 22%">
+<col style="width: 59%">
+<col style="width: 18%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Task</th>
+<th>Primary Metrics</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Summarization</strong></td>
+<td>ROUGE-L, faithfulness, BERTScore</td>
+<td>Overlap + semantic similarity</td>
+</tr>
+<tr class="even">
+<td><strong>Translation</strong></td>
+<td>BLEU, chrF, COMET</td>
+<td>N-gram overlap + learned metrics</td>
+</tr>
+<tr class="odd">
+<td><strong>Code Generation</strong></td>
+<td>pass@k, HumanEval</td>
+<td>Functional correctness</td>
+</tr>
+<tr class="even">
+<td><strong>Question Answering</strong></td>
+<td>Exact Match, F1, faithfulness</td>
+<td>Factual accuracy</td>
+</tr>
+<tr class="odd">
+<td><strong>Chat/Dialog</strong></td>
+<td>Human preference, LLM-judge</td>
+<td>No single ground truth</td>
+</tr>
+<tr class="even">
+<td><strong>Reasoning</strong></td>
+<td>Accuracy on benchmarks (GSM8K, MATH)</td>
+<td>Verifiable correct answers</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="llm-as-judge" class="level3">
+<h3 class="anchored" data-anchor-id="llm-as-judge">LLM-as-Judge</h3>
+<p>Using a stronger LLM to evaluate outputs has become standard:</p>
+<pre><code>System: You are an expert evaluator. Rate the following response on:
+1. Helpfulness (1-5)
+2. Accuracy (1-5)
+3. Harmlessness (1-5)
+
+Provide scores and brief justification.</code></pre>
+<p><strong>Advantages:</strong> Scalable, consistent, correlates well with human judgment<br>
+<strong>Limitations:</strong> Biases (position bias, verbosity bias, self-preference)</p>
+</section>
+<section id="key-benchmarks-2024-2026" class="level3">
+<h3 class="anchored" data-anchor-id="key-benchmarks-2024-2026">Key Benchmarks (2024-2026)</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Benchmark</th>
+<th>What it tests</th>
+<th>Top performers</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>MMLU</strong></td>
+<td>57 subjects, world knowledge</td>
+<td>GPT-4, Claude 3.5</td>
+</tr>
+<tr class="even">
+<td><strong>HumanEval / MBPP</strong></td>
+<td>Code generation</td>
+<td>GPT-4, Claude 3.5, DeepSeek</td>
+</tr>
+<tr class="odd">
+<td><strong>GSM8K / MATH</strong></td>
+<td>Mathematical reasoning</td>
+<td>O1, Claude 3.5</td>
+</tr>
+<tr class="even">
+<td><strong>MT-Bench</strong></td>
+<td>Multi-turn conversation</td>
+<td>GPT-4, Claude</td>
+</tr>
+<tr class="odd">
+<td><strong>GPQA</strong></td>
+<td>PhD-level science questions</td>
+<td>O1, Gemini Ultra</td>
+</tr>
+<tr class="even">
+<td><strong>SWE-Bench</strong></td>
+<td>Real-world software engineering</td>
+<td>Claude 3.5, Devin</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="evaluation-anti-patterns" class="level3">
+<h3 class="anchored" data-anchor-id="evaluation-anti-patterns">Evaluation Anti-Patterns</h3>
+<ul>
+<li><strong>Benchmark contamination:</strong> Test data leaks into training</li>
+<li><strong>Over-optimizing for benchmarks:</strong> Gaming metrics without real improvement</li>
+<li><strong>Single metric reliance:</strong> Missing failure modes</li>
+<li><strong>Static evaluation:</strong> Not tracking performance over time in production</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q6-what-are-embeddings-and-how-are-they-used-in-llm-applications" class="level2">
+<h2 class="anchored" data-anchor-id="q6-what-are-embeddings-and-how-are-they-used-in-llm-applications">Q6: What are embeddings and how are they used in LLM applications?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>Embeddings</strong> are dense vector representations that capture semantic meaning. They convert text (words, sentences, documents) into numerical vectors where similar meanings are geometrically close.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph Embedding_Space["Embedding Space"]
+        direction TB
+        K["'king' [0.2, 0.8, ...]"]
+        Q["'queen' [0.3, 0.8, ...]"]
+        M["'man' [0.2, 0.1, ...]"]
+        W["'woman' [0.3, 0.1, ...]"]
+    end
+
+    subgraph Applications["Applications"]
+        SEM["Semantic Search"]
+        CLUST["Clustering"]
+        CLASS["Classification"]
+        RAG_APP["RAG Retrieval"]
+        REC["Recommendations"]
+    end
+
+    Embedding_Space --&gt; Applications
+
+    style Embedding_Space fill:#6cc3d5,stroke:#333,color:#fff
+    style Applications fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="types-of-embeddings" class="level3">
+<h3 class="anchored" data-anchor-id="types-of-embeddings">Types of Embeddings</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 35%">
+<col style="width: 21%">
+<col style="width: 27%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Type</th>
+<th>Granularity</th>
+<th>Models</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Word embeddings</strong></td>
+<td>Single words</td>
+<td>Word2Vec, GloVe</td>
+<td>Legacy, fast lookup</td>
+</tr>
+<tr class="even">
+<td><strong>Contextual embeddings</strong></td>
+<td>Words in context</td>
+<td>BERT, GPT hidden states</td>
+<td>NER, classification</td>
+</tr>
+<tr class="odd">
+<td><strong>Sentence embeddings</strong></td>
+<td>Full sentences</td>
+<td>E5, BGE, all-MiniLM</td>
+<td>Semantic search, RAG</td>
+</tr>
+<tr class="even">
+<td><strong>Document embeddings</strong></td>
+<td>Paragraphs/pages</td>
+<td>Voyage, Cohere Embed</td>
+<td>Document retrieval</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="similarity-metrics" class="level3">
+<h3 class="anchored" data-anchor-id="similarity-metrics">Similarity Metrics</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 23%">
+<col style="width: 26%">
+<col style="width: 20%">
+<col style="width: 29%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>Formula</th>
+<th>Range</th>
+<th>Best for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Cosine similarity</strong></td>
+<td><span class="math inline">\frac{A \cdot B}{\|A\| \|B\|}</span></td>
+<td>[-1, 1]</td>
+<td>Most NLP tasks</td>
+</tr>
+<tr class="even">
+<td><strong>Euclidean distance</strong></td>
+<td><span class="math inline">\|A - B\|_2</span></td>
+<td>[0, ∞)</td>
+<td>Clustering</td>
+</tr>
+<tr class="odd">
+<td><strong>Dot product</strong></td>
+<td><span class="math inline">A \cdot B</span></td>
+<td>(-∞, ∞)</td>
+<td>When magnitude matters</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="modern-embedding-models-2024-2026" class="level3">
+<h3 class="anchored" data-anchor-id="modern-embedding-models-2024-2026">Modern Embedding Models (2024-2026)</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Model</th>
+<th>Dimensions</th>
+<th>Context</th>
+<th>Strength</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>OpenAI text-embedding-3-large</strong></td>
+<td>3072</td>
+<td>8K</td>
+<td>General purpose</td>
+</tr>
+<tr class="even">
+<td><strong>BGE-M3</strong></td>
+<td>1024</td>
+<td>8K</td>
+<td>Multilingual, multi-granularity</td>
+</tr>
+<tr class="odd">
+<td><strong>E5-Mistral-7B</strong></td>
+<td>4096</td>
+<td>32K</td>
+<td>Long documents</td>
+</tr>
+<tr class="even">
+<td><strong>Cohere Embed v3</strong></td>
+<td>1024</td>
+<td>512</td>
+<td>Multi-language, classification</td>
+</tr>
+<tr class="odd">
+<td><strong>Voyage-3</strong></td>
+<td>1024</td>
+<td>32K</td>
+<td>Code + text</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="practical-embedding-pipeline" class="level3">
+<h3 class="anchored" data-anchor-id="practical-embedding-pipeline">Practical Embedding Pipeline</h3>
+<ol type="1">
+<li><strong>Chunk documents</strong> into semantically meaningful segments</li>
+<li><strong>Embed chunks</strong> using a sentence embedding model</li>
+<li><strong>Store vectors</strong> in a vector database (Pinecone, Weaviate, pgvector)</li>
+<li><strong>Query-time:</strong> embed the user query with the same model</li>
+<li><strong>Retrieve:</strong> find top-k nearest neighbors via ANN (approximate nearest neighbor)</li>
+</ol>
+</section>
+<section id="common-pitfalls" class="level3">
+<h3 class="anchored" data-anchor-id="common-pitfalls">Common Pitfalls</h3>
+<ul>
+<li>Using different embedding models for indexing vs.&nbsp;querying</li>
+<li>Chunks too large (loses specificity) or too small (loses context)</li>
+<li>Not normalizing vectors when using cosine similarity</li>
+<li>Ignoring embedding model’s max token limit</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q7-what-is-mixture-of-experts-moe-and-how-does-it-enable-efficient-scaling" class="level2">
+<h2 class="anchored" data-anchor-id="q7-what-is-mixture-of-experts-moe-and-how-does-it-enable-efficient-scaling">Q7: What is Mixture of Experts (MoE) and how does it enable efficient scaling?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>Mixture of Experts (MoE)</strong> is an architecture where only a subset of the model’s parameters are activated for each input token, enabling much larger models without proportional compute increase.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    INPUT["Input Token"]
+    INPUT --&gt; ROUTER["Router/Gating Network&lt;br/&gt;Learns which experts to activate"]
+    ROUTER --&gt;|"Top-k selection"| E1["Expert 1&lt;br/&gt;(FFN)"]
+    ROUTER --&gt;|"Top-k selection"| E2["Expert 2&lt;br/&gt;(FFN)"]
+    ROUTER -.-&gt;|"Not selected"| E3["Expert 3&lt;br/&gt;(FFN)"]
+    ROUTER -.-&gt;|"Not selected"| E4["Expert 4&lt;br/&gt;(FFN)"]
+    ROUTER -.-&gt;|"Not selected"| EN["Expert N&lt;br/&gt;(FFN)"]
+
+    E1 --&gt; COMBINE["Weighted Combination"]
+    E2 --&gt; COMBINE
+    COMBINE --&gt; OUTPUT["Output"]
+
+    style INPUT fill:#56cc9d,stroke:#333,color:#fff
+    style ROUTER fill:#ffce67,stroke:#333
+    style E1 fill:#6cc3d5,stroke:#333,color:#fff
+    style E2 fill:#6cc3d5,stroke:#333,color:#fff
+    style COMBINE fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="dense-vs.-moe-comparison" class="level3">
+<h3 class="anchored" data-anchor-id="dense-vs.-moe-comparison">Dense vs.&nbsp;MoE Comparison</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 40%">
+<col style="width: 34%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Aspect</th>
+<th>Dense Model</th>
+<th>MoE Model</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Parameters activated per token</td>
+<td>100%</td>
+<td>~12-25% (top-k experts)</td>
+</tr>
+<tr class="even">
+<td>Total parameters</td>
+<td>e.g., 70B</td>
+<td>e.g., 8×7B = 56B total, ~13B active</td>
+</tr>
+<tr class="odd">
+<td>Inference compute</td>
+<td>Proportional to total params</td>
+<td>Proportional to active params</td>
+</tr>
+<tr class="even">
+<td>Memory</td>
+<td>Moderate</td>
+<td>High (all experts in memory)</td>
+</tr>
+<tr class="odd">
+<td>Training efficiency</td>
+<td>Lower</td>
+<td>Higher (more params per FLOP)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="notable-moe-models" class="level3">
+<h3 class="anchored" data-anchor-id="notable-moe-models">Notable MoE Models</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Model</th>
+<th>Architecture</th>
+<th>Active Params</th>
+<th>Total Params</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Mixtral 8×7B</strong></td>
+<td>8 experts, top-2 routing</td>
+<td>~13B</td>
+<td>~47B</td>
+</tr>
+<tr class="even">
+<td><strong>GPT-4</strong> (rumored)</td>
+<td>MoE architecture</td>
+<td>Unknown</td>
+<td>~1.8T</td>
+</tr>
+<tr class="odd">
+<td><strong>DeepSeek-V2</strong></td>
+<td>160 experts, top-6</td>
+<td>~21B</td>
+<td>~236B</td>
+</tr>
+<tr class="even">
+<td><strong>Switch Transformer</strong></td>
+<td>Top-1 routing</td>
+<td>Variable</td>
+<td>Up to 1.6T</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="challenges-with-moe" class="level3">
+<h3 class="anchored" data-anchor-id="challenges-with-moe">Challenges with MoE</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 30%">
+<col style="width: 36%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Challenge</th>
+<th>Description</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Load balancing</strong></td>
+<td>Some experts get used more than others</td>
+<td>Auxiliary loss, expert capacity limits</td>
+</tr>
+<tr class="even">
+<td><strong>Memory</strong></td>
+<td>All experts must be in memory</td>
+<td>Expert parallelism, offloading</td>
+</tr>
+<tr class="odd">
+<td><strong>Training instability</strong></td>
+<td>Routing can collapse to few experts</td>
+<td>Noisy top-k, load balancing loss</td>
+</tr>
+<tr class="even">
+<td><strong>Communication overhead</strong></td>
+<td>Experts on different GPUs need data transfer</td>
+<td>Efficient all-to-all communication</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="why-moe-matters" class="level3">
+<h3 class="anchored" data-anchor-id="why-moe-matters">Why MoE Matters</h3>
+<p>MoE allows training models with <strong>trillions of parameters</strong> while keeping inference costs manageable — it’s likely the architecture behind the largest frontier models.</p>
+<hr>
+</section>
+</section>
+<section id="q8-what-is-the-kv-cache-and-how-does-it-affect-llm-inference" class="level2">
+<h2 class="anchored" data-anchor-id="q8-what-is-the-kv-cache-and-how-does-it-affect-llm-inference">Q8: What is the KV Cache and how does it affect LLM inference?</h2>
+<p><strong>Answer:</strong></p>
+<p>The <strong>KV (Key-Value) Cache</strong> stores previously computed key and value vectors from the attention mechanism, avoiding redundant computation during autoregressive generation.</p>
+<section id="why-kv-cache-is-necessary" class="level3">
+<h3 class="anchored" data-anchor-id="why-kv-cache-is-necessary">Why KV Cache is Necessary</h3>
+<p>During generation, the LLM produces one token at a time. Without caching, generating token <span class="math inline">t</span> requires recomputing attention over all previous <span class="math inline">t-1</span> tokens from scratch.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph Without_Cache["Without KV Cache"]
+        W1["Token 1: compute K,V for [1]"]
+        W2["Token 2: compute K,V for [1,2]"]
+        W3["Token 3: compute K,V for [1,2,3]"]
+        W4["Token N: compute K,V for [1,...,N]"]
+        W1 --&gt; W2 --&gt; W3 --&gt; W4
+    end
+
+    subgraph With_Cache["With KV Cache"]
+        C1["Token 1: compute &amp; store K₁,V₁"]
+        C2["Token 2: compute K₂,V₂, reuse K₁,V₁"]
+        C3["Token 3: compute K₃,V₃, reuse K₁,V₁,K₂,V₂"]
+        C1 --&gt; C2 --&gt; C3
+    end
+
+    style Without_Cache fill:#ff7851,stroke:#333,color:#fff
+    style With_Cache fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="complexity-comparison" class="level3">
+<h3 class="anchored" data-anchor-id="complexity-comparison">Complexity Comparison</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 19%">
+<col style="width: 43%">
+<col style="width: 36%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>Without KV Cache</th>
+<th>With KV Cache</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Compute per token</td>
+<td><span class="math inline">O(n \cdot d^2)</span> (recompute all)</td>
+<td><span class="math inline">O(d^2)</span> (new token only)</td>
+</tr>
+<tr class="even">
+<td>Total generation</td>
+<td><span class="math inline">O(n^2 \cdot d^2)</span></td>
+<td><span class="math inline">O(n \cdot d^2)</span></td>
+</tr>
+<tr class="odd">
+<td>Memory</td>
+<td><span class="math inline">O(d)</span></td>
+<td><span class="math inline">O(n \cdot d)</span> grows with sequence</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="kv-cache-memory-problem" class="level3">
+<h3 class="anchored" data-anchor-id="kv-cache-memory-problem">KV Cache Memory Problem</h3>
+<p>For a model with <span class="math inline">L</span> layers, <span class="math inline">H</span> heads, <span class="math inline">d_h</span> head dimension, sequence length <span class="math inline">n</span>:</p>
+<p><span class="math display">\text{KV Cache Size} = 2 \times L \times H \times d_h \times n \times \text{bytes per element}</span></p>
+<p><strong>Example:</strong> LLaMA-70B with 128K context in FP16: <span class="math inline">2 \times 80 \times 64 \times 128 \times 128000 \times 2 \approx 167</span> GB — just for the cache!</p>
+</section>
+<section id="kv-cache-optimization-techniques" class="level3">
+<h3 class="anchored" data-anchor-id="kv-cache-optimization-techniques">KV Cache Optimization Techniques</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 29%">
+<col style="width: 35%">
+<col style="width: 35%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Technique</th>
+<th>How it helps</th>
+<th>Compression</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Multi-Query Attention (MQA)</strong></td>
+<td>Share K,V across all heads</td>
+<td>~8-16x reduction</td>
+</tr>
+<tr class="even">
+<td><strong>Grouped-Query Attention (GQA)</strong></td>
+<td>Share K,V across groups of heads</td>
+<td>~4-8x reduction</td>
+</tr>
+<tr class="odd">
+<td><strong>KV Cache Quantization</strong></td>
+<td>Store K,V in INT8/INT4</td>
+<td>2-4x reduction</td>
+</tr>
+<tr class="even">
+<td><strong>Paged Attention (vLLM)</strong></td>
+<td>Virtual memory for KV cache</td>
+<td>Better memory utilization</td>
+</tr>
+<tr class="odd">
+<td><strong>Sliding Window</strong></td>
+<td>Only cache recent tokens</td>
+<td>Bounded cache size</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="prefill-vs.-decode-phases" class="level3">
+<h3 class="anchored" data-anchor-id="prefill-vs.-decode-phases">Prefill vs.&nbsp;Decode Phases</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 21%">
+<col style="width: 40%">
+<col style="width: 37%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Phase</th>
+<th>What happens</th>
+<th>Bottleneck</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Prefill</strong></td>
+<td>Process all input tokens in parallel, fill KV cache</td>
+<td>Compute-bound</td>
+</tr>
+<tr class="even">
+<td><strong>Decode</strong></td>
+<td>Generate one token at a time using cached KV</td>
+<td>Memory-bandwidth-bound</td>
+</tr>
+</tbody>
+</table>
+<p>The decode phase is typically <strong>memory-bandwidth-bound</strong> because each new token requires reading the entire KV cache from memory.</p>
+<hr>
+</section>
+</section>
+<section id="q9-what-is-instruction-tuning-and-how-does-it-differ-from-pre-training-and-rlhf" class="level2">
+<h2 class="anchored" data-anchor-id="q9-what-is-instruction-tuning-and-how-does-it-differ-from-pre-training-and-rlhf">Q9: What is instruction tuning and how does it differ from pre-training and RLHF?</h2>
+<p><strong>Answer:</strong></p>
+<p><strong>Instruction tuning</strong> (also called supervised fine-tuning or SFT) trains a base LLM on (instruction, response) pairs to follow human instructions — it’s the critical bridge between a next-token predictor and a useful assistant.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph Pipeline["LLM Training Pipeline"]
+        direction LR
+        PT["Pre-training&lt;br/&gt;Next-token prediction&lt;br/&gt;on internet text&lt;br/&gt;(Trillions of tokens)"]
+        IT["Instruction Tuning (SFT)&lt;br/&gt;Train on (instruction, response)&lt;br/&gt;pairs from humans&lt;br/&gt;(10K-1M examples)"]
+        RLHF_step["RLHF / DPO&lt;br/&gt;Align with human preferences&lt;br/&gt;via reward signals&lt;br/&gt;(Preference pairs)"]
+    end
+
+    PT --&gt;|"Base model"| IT
+    IT --&gt;|"SFT model"| RLHF_step
+    RLHF_step --&gt;|"Aligned model"| FINAL["Production Model"]
+
+    style PT fill:#6cc3d5,stroke:#333,color:#fff
+    style IT fill:#56cc9d,stroke:#333,color:#fff
+    style RLHF_step fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="comparison-of-training-stages" class="level3">
+<h3 class="anchored" data-anchor-id="comparison-of-training-stages">Comparison of Training Stages</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 15%">
+<col style="width: 25%">
+<col style="width: 37%">
+<col style="width: 21%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Aspect</th>
+<th>Pre-training</th>
+<th>Instruction Tuning</th>
+<th>RLHF/DPO</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Objective</strong></td>
+<td>Predict next token</td>
+<td>Follow instructions</td>
+<td>Align with preferences</td>
+</tr>
+<tr class="even">
+<td><strong>Data</strong></td>
+<td>Raw text (web crawl)</td>
+<td>(Instruction, Response) pairs</td>
+<td>Ranked response pairs</td>
+</tr>
+<tr class="odd">
+<td><strong>Data size</strong></td>
+<td>Trillions of tokens</td>
+<td>10K–1M examples</td>
+<td>10K–100K comparisons</td>
+</tr>
+<tr class="even">
+<td><strong>Compute</strong></td>
+<td>Massive (months on clusters)</td>
+<td>Moderate (hours–days)</td>
+<td>Moderate</td>
+</tr>
+<tr class="odd">
+<td><strong>Effect</strong></td>
+<td>General language understanding</td>
+<td>Task following, formatting</td>
+<td>Helpfulness, safety, style</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="what-makes-good-instruction-tuning-data" class="level3">
+<h3 class="anchored" data-anchor-id="what-makes-good-instruction-tuning-data">What Makes Good Instruction Tuning Data?</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 53%">
+<col style="width: 46%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Quality Factor</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Diversity</strong></td>
+<td>Cover many task types (QA, coding, math, writing, analysis)</td>
+</tr>
+<tr class="even">
+<td><strong>Complexity</strong></td>
+<td>Include both simple and multi-step instructions</td>
+</tr>
+<tr class="odd">
+<td><strong>Format variety</strong></td>
+<td>JSON, markdown, code, natural language responses</td>
+</tr>
+<tr class="even">
+<td><strong>Correctness</strong></td>
+<td>Responses must be accurate and complete</td>
+</tr>
+<tr class="odd">
+<td><strong>Safety</strong></td>
+<td>Include refusal examples for harmful requests</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="notable-instruction-datasets" class="level3">
+<h3 class="anchored" data-anchor-id="notable-instruction-datasets">Notable Instruction Datasets</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 28%">
+<col style="width: 18%">
+<col style="width: 25%">
+<col style="width: 28%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Dataset</th>
+<th>Size</th>
+<th>Source</th>
+<th>Used By</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>FLAN</strong></td>
+<td>1.8M</td>
+<td>Converted NLP tasks into instructions</td>
+<td>Flan-T5, Flan-PaLM</td>
+</tr>
+<tr class="even">
+<td><strong>Alpaca</strong></td>
+<td>52K</td>
+<td>GPT-4 generated</td>
+<td>Stanford Alpaca</td>
+</tr>
+<tr class="odd">
+<td><strong>ShareGPT</strong></td>
+<td>90K+</td>
+<td>User conversations with ChatGPT</td>
+<td>Vicuna</td>
+</tr>
+<tr class="even">
+<td><strong>OpenHermes</strong></td>
+<td>1M+</td>
+<td>Curated multi-source</td>
+<td>Many open models</td>
+</tr>
+<tr class="odd">
+<td><strong>UltraChat</strong></td>
+<td>1.5M</td>
+<td>Multi-turn synthetic dialogues</td>
+<td>Zephyr</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="base-model-vs.-instruction-tuned-behavior" class="level3">
+<h3 class="anchored" data-anchor-id="base-model-vs.-instruction-tuned-behavior">Base Model vs.&nbsp;Instruction-Tuned Behavior</h3>
+<p><strong>Prompt:</strong> “What is the capital of France?”</p>
+<ul>
+<li><strong>Base model:</strong> “What is the capital of Germany? What is the capital of Spain?…” (continues the pattern)</li>
+<li><strong>Instruction-tuned:</strong> “The capital of France is Paris.” (answers directly)</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="q10-what-are-the-key-inference-optimization-techniques-for-serving-llms-at-scale" class="level2">
+<h2 class="anchored" data-anchor-id="q10-what-are-the-key-inference-optimization-techniques-for-serving-llms-at-scale">Q10: What are the key inference optimization techniques for serving LLMs at scale?</h2>
+<p><strong>Answer:</strong></p>
+<p>Serving LLMs in production requires optimizing for <strong>latency</strong> (time to first token, tokens per second), <strong>throughput</strong> (requests per second), and <strong>cost</strong> (dollars per token).</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    OPT["LLM Inference Optimization"]
+    OPT --&gt; MODEL["Model-Level"]
+    OPT --&gt; SYSTEM["System-Level"]
+    OPT --&gt; SERVE["Serving-Level"]
+
+    MODEL --&gt; M1["Quantization (INT4/INT8)"]
+    MODEL --&gt; M2["Distillation"]
+    MODEL --&gt; M3["Pruning"]
+    MODEL --&gt; M4["Speculative Decoding"]
+
+    SYSTEM --&gt; S1["Flash Attention"]
+    SYSTEM --&gt; S2["Continuous Batching"]
+    SYSTEM --&gt; S3["Paged Attention (vLLM)"]
+    SYSTEM --&gt; S4["Tensor Parallelism"]
+
+    SERVE --&gt; SV1["KV Cache Management"]
+    SERVE --&gt; SV2["Request Scheduling"]
+    SERVE --&gt; SV3["Prefix Caching"]
+    SERVE --&gt; SV4["Model Routing"]
+
+    style OPT fill:#56cc9d,stroke:#333,color:#fff
+    style MODEL fill:#6cc3d5,stroke:#333,color:#fff
+    style SYSTEM fill:#ffce67,stroke:#333
+    style SERVE fill:#ff7851,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="speculative-decoding" class="level3">
+<h3 class="anchored" data-anchor-id="speculative-decoding">Speculative Decoding</h3>
+<p>Uses a small, fast <strong>draft model</strong> to predict multiple tokens, then the large model <strong>verifies</strong> them in parallel:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Step</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>Draft model generates k candidate tokens quickly</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Large model verifies all k tokens in one forward pass</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>Accept correct tokens, reject and regenerate from first mismatch</td>
+</tr>
+<tr class="even">
+<td><strong>Result</strong></td>
+<td>2-3x faster generation with identical output quality</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="continuous-batching-vs.-static-batching" class="level3">
+<h3 class="anchored" data-anchor-id="continuous-batching-vs.-static-batching">Continuous Batching vs.&nbsp;Static Batching</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 28%">
+<col style="width: 37%">
+<col style="width: 34%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Approach</th>
+<th>Description</th>
+<th>Efficiency</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Static batching</strong></td>
+<td>Wait for all sequences to finish</td>
+<td>Low (short sequences wait for long ones)</td>
+</tr>
+<tr class="even">
+<td><strong>Continuous batching</strong></td>
+<td>Insert new requests as old ones finish</td>
+<td>High (no idle GPU cycles)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="parallelism-strategies" class="level3">
+<h3 class="anchored" data-anchor-id="parallelism-strategies">Parallelism Strategies</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 26%">
+<col style="width: 39%">
+<col style="width: 34%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Strategy</th>
+<th>What it splits</th>
+<th>When to use</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Tensor Parallelism</strong></td>
+<td>Individual layers across GPUs</td>
+<td>Single node, low latency</td>
+</tr>
+<tr class="even">
+<td><strong>Pipeline Parallelism</strong></td>
+<td>Different layers on different GPUs</td>
+<td>Multi-node, high throughput</td>
+</tr>
+<tr class="odd">
+<td><strong>Data Parallelism</strong></td>
+<td>Same model, different batches</td>
+<td>Scaling throughput</td>
+</tr>
+<tr class="even">
+<td><strong>Expert Parallelism</strong></td>
+<td>MoE experts across GPUs</td>
+<td>MoE models</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="llm-serving-frameworks" class="level3">
+<h3 class="anchored" data-anchor-id="llm-serving-frameworks">LLM Serving Frameworks</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 32%">
+<col style="width: 38%">
+<col style="width: 29%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Framework</th>
+<th>Key Feature</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>vLLM</strong></td>
+<td>Paged Attention, continuous batching</td>
+<td>High-throughput serving</td>
+</tr>
+<tr class="even">
+<td><strong>TensorRT-LLM</strong></td>
+<td>NVIDIA-optimized kernels</td>
+<td>NVIDIA GPUs, lowest latency</td>
+</tr>
+<tr class="odd">
+<td><strong>llama.cpp</strong></td>
+<td>CPU/Metal inference, GGUF format</td>
+<td>Edge/local deployment</td>
+</tr>
+<tr class="even">
+<td><strong>TGI</strong> (Text Generation Inference)</td>
+<td>Hugging Face integration</td>
+<td>Quick deployment</td>
+</tr>
+<tr class="odd">
+<td><strong>SGLang</strong></td>
+<td>RadixAttention, structured generation</td>
+<td>Complex prompting workflows</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="key-metrics-for-production-serving" class="level3">
+<h3 class="anchored" data-anchor-id="key-metrics-for-production-serving">Key Metrics for Production Serving</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 29%">
+<col style="width: 40%">
+<col style="width: 29%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>Definition</th>
+<th>Target</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>TTFT</strong> (Time to First Token)</td>
+<td>Latency before generation starts</td>
+<td>&lt;500ms</td>
+</tr>
+<tr class="even">
+<td><strong>TPS</strong> (Tokens Per Second)</td>
+<td>Generation speed per request</td>
+<td>30-100 TPS</td>
+</tr>
+<tr class="odd">
+<td><strong>Throughput</strong></td>
+<td>Total tokens/sec across all requests</td>
+<td>Maximize</td>
+</tr>
+<tr class="even">
+<td><strong>P99 latency</strong></td>
+<td>Worst-case latency</td>
+<td>&lt;2s TTFT</td>
+</tr>
+<tr class="odd">
+<td><strong>Cost per 1M tokens</strong></td>
+<td>Dollar efficiency</td>
+<td>Minimize</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+</section>
+<section id="summary-table" class="level2">
+<h2 class="anchored" data-anchor-id="summary-table">Summary Table</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 13%">
+<col style="width: 30%">
+<col style="width: 56%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Topic</th>
+<th>Key Concept</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>Scaling Laws</td>
+<td>Performance improves predictably as power law with model/data/compute</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Long Context</td>
+<td>Quadratic attention problem; solved by Flash Attention, RoPE, sparse methods</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>Quantization</td>
+<td>4-bit weights enable 70B models on consumer GPUs with minimal quality loss</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td>LLM Agents</td>
+<td>LLMs + tools + memory + planning = autonomous task completion</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td>Evaluation</td>
+<td>Benchmarks, LLM-as-Judge, and task-specific metrics</td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td>Embeddings</td>
+<td>Dense vectors for semantic search, RAG retrieval, clustering</td>
+</tr>
+<tr class="odd">
+<td>7</td>
+<td>Mixture of Experts</td>
+<td>Activate subset of parameters per token for efficient scaling</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td>KV Cache</td>
+<td>Store computed keys/values to avoid redundant attention computation</td>
+</tr>
+<tr class="odd">
+<td>9</td>
+<td>Instruction Tuning</td>
+<td>Transform base models into instruction-following assistants</td>
+</tr>
+<tr class="even">
+<td>10</td>
+<td>Inference Optimization</td>
+<td>Speculative decoding, continuous batching, parallelism for production</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="whats-next" class="level2">
+<h2 class="anchored" data-anchor-id="whats-next">What’s Next?</h2>
+<p>This article covered advanced LLM engineering topics for interview preparation. For related content:</p>
+<ul>
+<li><strong>Foundational LLM concepts:</strong> <a href="../../posts/llm-interview/LLM-Interview-QA-1.html">LLM Interview QA - 1</a></li>
+<li><strong>ML fundamentals:</strong> <a href="../../posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a></li>
+<li><strong>Metrics and feature engineering:</strong> <a href="../../posts/ml-interview/ML-Interview-QA-2.html">ML Interview QA - 2</a></li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script type="text/javascript">
+var infolinks_pid = 3445432;
+var infolinks_wsid = 0;
+</script>
+<script type="text/javascript" src="https://resources.infolinks.com/js/infolinks_main.js"></script>
+<!-- Floating menu button for mobile -->
+<style>
+#mobile-menu-fab {
+  display: none;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: #4A90D9;
+  color: #fff;
+  border: none;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+  font-size: 22px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+@media (max-width: 767.98px) {
+  #mobile-menu-fab {
+    display: flex;
+  }
+}
+</style>
+<button id="mobile-menu-fab" aria-label="Open menu">☰</button>
+<script>
+document.getElementById('mobile-menu-fab').addEventListener('click', function() {
+  var toggler = document.querySelector('.quarto-btn-toggle[data-bs-target=".quarto-sidebar-collapse-item"]');
+  if (toggler) toggler.click();
+});
+</script>
+<!-- Animated neural network background for title block header -->
+<style>
+/* Background gradient for all title headers */
+#title-block-header, .quarto-title-banner {
+  background: linear-gradient(135deg, #0a0e27 0%, #1a1a3e 40%, #2d1b4e 70%, #0a0e27 100%) !important;
+}
+/* Animation container styles — only on .quarto-title-banner (listing pages) */
+.quarto-title-banner {
+  position: relative;
+  overflow: hidden;
+}
+/* Post pages: clip animation to header bounds without breaking grid */
+#title-block-header:not(:has(.quarto-title-banner)) {
+  clip-path: inset(0);
+}
+/* Mobile: keep animation, fixed top padding, no right padding */
+@media (max-width: 767px) {
+  #title-block-header, .quarto-title-banner {
+    padding-top: 150px !important;
+  }
+  #title-block-header .title,
+  .quarto-title .title {
+    padding-right: 0 !important;
+  }
+  #title-block-header .description,
+  #title-block-header .description p,
+  .quarto-title-banner .quarto-title .description,
+  .quarto-title-banner .quarto-title .description p {
+    padding-right: 0 !important;
+    max-width: 100% !important;
+  }
+  .keywords, .keywords .block-title, .keywords p {
+    padding-right: 0 !important;
+  }
+}
+#title-block-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+.quarto-title-banner > * {
+  position: relative;
+  z-index: 1;
+}
+</style>
+
+<script>
+(function() {
+  function initTitleAnimation() {
+    var target = document.querySelector('.quarto-title-banner') || document.getElementById('title-block-header');
+    if (!target) return;
+
+    var canvas = document.createElement('canvas');
+    canvas.id = 'title-block-canvas';
+    target.insertBefore(canvas, target.firstChild);
+
+    var ctx = canvas.getContext('2d');
+    var particles = [];
+    var particleCount = 60;
+    var connectionDist = 120;
+
+    function resize() {
+      canvas.width = target.offsetWidth;
+      canvas.height = target.offsetHeight;
+    }
+
+    function Particle() {
+      this.x = Math.random() * canvas.width;
+      this.y = Math.random() * canvas.height;
+      this.vx = (Math.random() - 0.5) * 0.4;
+      this.vy = (Math.random() - 0.5) * 0.3;
+      this.r = Math.random() * 2 + 1;
+      this.pulse = Math.random() * Math.PI * 2;
+      this.pulseSpeed = 0.01 + Math.random() * 0.02;
+      var colors = [
+        [120, 194, 173],
+        [130, 170, 255],
+        [180, 140, 255],
+        [255, 180, 200],
+        [100, 220, 220],
+      ];
+      this.color = colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    function init() {
+      particles = [];
+      for (var i = 0; i < particleCount; i++) {
+        particles.push(new Particle());
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (var i = 0; i < particles.length; i++) {
+        for (var j = i + 1; j < particles.length; j++) {
+          var dx = particles[i].x - particles[j].x;
+          var dy = particles[i].y - particles[j].y;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < connectionDist) {
+            var alpha = (1 - dist / connectionDist) * 0.3;
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.strokeStyle = 'rgba(120, 194, 173, ' + alpha + ')';
+            ctx.lineWidth = 0.6;
+            ctx.stroke();
+          }
+        }
+      }
+
+      for (var i = 0; i < particles.length; i++) {
+        var p = particles[i];
+        p.pulse += p.pulseSpeed;
+        var glow = 0.5 + 0.5 * Math.sin(p.pulse);
+        var r = p.r * (0.8 + 0.4 * glow);
+
+        var grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 4);
+        grad.addColorStop(0, 'rgba(' + p.color[0] + ',' + p.color[1] + ',' + p.color[2] + ',' + (0.3 * glow) + ')');
+        grad.addColorStop(1, 'rgba(' + p.color[0] + ',' + p.color[1] + ',' + p.color[2] + ', 0)');
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r * 4, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(' + p.color[0] + ',' + p.color[1] + ',' + p.color[2] + ',' + (0.7 + 0.3 * glow) + ')';
+        ctx.fill();
+
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+        if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    resize();
+    init();
+    draw();
+
+    window.addEventListener('resize', function() {
+      resize();
+      init();
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTitleAnimation);
+  } else {
+    initTitleAnimation();
+  }
+})();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/vectoringai\.com");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> 2025-2026 Vectoring AI. All rights reserved. | <a href="../../pages/privacy.html">Privacy Policy</a></p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

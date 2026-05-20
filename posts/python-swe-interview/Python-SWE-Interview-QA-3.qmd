@@ -1,0 +1,1119 @@
+---
+title: "Python SWE Interview QA - 3"
+description: "10 Python software engineering interview questions on best practices, design patterns, code structure, SOLID principles, packaging, and production-quality code."
+image: /images/python-swe-interview/thumb_python_swe_interview_qa_300.png
+date: "2026-05-20"
+keywords:
+  - "Python best practices"
+  - "Python design patterns"
+  - "SOLID principles Python"
+  - "Python project structure"
+  - "dependency injection Python"
+  - "Python packaging"
+  - "clean code Python"
+  - "Python modules packages"
+  - "factory pattern Python"
+  - "Python code organization"
+  - "Python linting formatting"
+  - "Python abstract base class"
+---
+
+## Introduction
+
+This is **Part 3** of our Python SWE Interview QA series, focused on **best practices, design patterns, and source code structure** — the topics that distinguish engineers who write production-quality code from those who just make things work.
+
+> For foundational Python topics, see [Python SWE Interview QA - 1](/posts/python-swe-interview/Python-SWE-Interview-QA-1.html). For advanced internals (async, metaclasses, descriptors), see [Python SWE Interview QA - 2](/posts/python-swe-interview/Python-SWE-Interview-QA-2.html).
+
+---
+
+## Q1: How should a production Python project be structured?
+
+**Answer:**
+
+A well-structured project separates concerns, makes navigation intuitive, and supports testing, packaging, and deployment without friction.
+
+```{mermaid}
+graph TD
+    ROOT["project-root/"]
+    ROOT --> SRC["src/mypackage/<br/>Application code"]
+    ROOT --> TESTS["tests/<br/>Test mirror of src"]
+    ROOT --> CONF["Config files<br/>pyproject.toml, Makefile"]
+    ROOT --> DOCS["docs/<br/>Documentation"]
+    ROOT --> SCRIPTS["scripts/<br/>One-off utilities"]
+
+    SRC --> CORE["core/<br/>Business logic"]
+    SRC --> API["api/<br/>HTTP/CLI interface"]
+    SRC --> INFRA["infra/<br/>DB, cache, external services"]
+    SRC --> MODELS["models/<br/>Data structures"]
+
+    style ROOT fill:#56cc9d,stroke:#333,color:#fff
+    style SRC fill:#6cc3d5,stroke:#333,color:#fff
+    style TESTS fill:#ffce67,stroke:#333
+```
+
+### Recommended Layout (src-layout)
+
+```
+my-project/
+├── pyproject.toml          # Build config, dependencies, tool settings
+├── README.md
+├── Makefile                # Common commands (test, lint, format)
+├── .env.example            # Environment variable template
+├── src/
+│   └── mypackage/
+│       ├── __init__.py     # Package marker + public API exports
+│       ├── main.py         # Entry point (CLI or app startup)
+│       ├── config.py       # Settings (from env vars / config files)
+│       ├── models/         # Data models (dataclasses, Pydantic)
+│       │   ├── __init__.py
+│       │   ├── user.py
+│       │   └── order.py
+│       ├── services/       # Business logic
+│       │   ├── __init__.py
+│       │   ├── user_service.py
+│       │   └── order_service.py
+│       ├── repositories/   # Data access layer
+│       │   ├── __init__.py
+│       │   └── user_repo.py
+│       ├── api/            # HTTP routes / CLI commands
+│       │   ├── __init__.py
+│       │   └── routes.py
+│       └── utils/          # Shared utilities
+│           ├── __init__.py
+│           └── validation.py
+├── tests/
+│   ├── conftest.py         # Shared fixtures
+│   ├── unit/
+│   │   └── test_user_service.py
+│   └── integration/
+│       └── test_user_repo.py
+├── scripts/
+│   └── seed_database.py
+└── docs/
+    └── architecture.md
+```
+
+### Why src-layout?
+
+| Aspect | src-layout | flat-layout |
+|--------|-----------|-------------|
+| Import safety | Forces install before import — catches packaging bugs | Can accidentally import unpackaged code |
+| Namespace clarity | `from mypackage.services import UserService` | Same, but risk of path conflicts |
+| CI/CD | Tests always run against installed package | May test unpackaged source |
+| Industry standard | Used by pip, setuptools, pytest, black | Legacy projects |
+
+### Key Principles
+
+| Principle | Implementation |
+|-----------|---------------|
+| **Separate concerns** | Models, services, repos, API in different directories |
+| **Dependency direction** | `api → services → repositories → models` (never reverse) |
+| **One `__init__.py` export** | Define the public API per package explicitly |
+| **Config from environment** | `config.py` reads from env vars, not hardcoded values |
+| **Tests mirror source** | `tests/unit/test_user_service.py` tests `src/mypackage/services/user_service.py` |
+
+---
+
+## Q2: What are the SOLID principles and how do they apply in Python?
+
+**Answer:**
+
+SOLID is a set of five design principles that produce maintainable, extensible, and testable code. While originating in Java/C#, they apply powerfully in Python.
+
+```{mermaid}
+graph TD
+    SOLID["SOLID Principles"]
+    SOLID --> S["S: Single Responsibility<br/>One reason to change"]
+    SOLID --> O["O: Open/Closed<br/>Open for extension, closed for modification"]
+    SOLID --> L["L: Liskov Substitution<br/>Subtypes must be substitutable"]
+    SOLID --> I["I: Interface Segregation<br/>Small, focused interfaces"]
+    SOLID --> D["D: Dependency Inversion<br/>Depend on abstractions, not concretions"]
+
+    style SOLID fill:#56cc9d,stroke:#333,color:#fff
+    style S fill:#6cc3d5,stroke:#333,color:#fff
+    style O fill:#ffce67,stroke:#333
+    style D fill:#ff7851,stroke:#333,color:#fff
+```
+
+### S — Single Responsibility Principle
+
+```python
+# VIOLATION: One class does too many things
+class UserManager:
+    def create_user(self, data): ...
+    def send_welcome_email(self, user): ...
+    def generate_report(self, users): ...
+    def export_to_csv(self, users): ...
+
+# FIXED: Each class has one responsibility
+class UserService:
+    def create_user(self, data): ...
+
+class EmailService:
+    def send_welcome_email(self, user): ...
+
+class UserReporter:
+    def generate_report(self, users): ...
+    def export_to_csv(self, users): ...
+```
+
+### O — Open/Closed Principle
+
+```python
+from abc import ABC, abstractmethod
+
+# VIOLATION: Adding a new payment method requires modifying existing code
+def process_payment(method, amount):
+    if method == "credit_card":
+        ...
+    elif method == "paypal":
+        ...
+    elif method == "crypto":  # Must modify this function!
+        ...
+
+# FIXED: Open for extension (new classes), closed for modification
+class PaymentProcessor(ABC):
+    @abstractmethod
+    def process(self, amount: float) -> bool: ...
+
+class CreditCardProcessor(PaymentProcessor):
+    def process(self, amount: float) -> bool: ...
+
+class PayPalProcessor(PaymentProcessor):
+    def process(self, amount: float) -> bool: ...
+
+class CryptoProcessor(PaymentProcessor):  # Just add new class!
+    def process(self, amount: float) -> bool: ...
+```
+
+### D — Dependency Inversion Principle
+
+```python
+from typing import Protocol
+
+# Abstraction (Protocol = duck-typed interface)
+class UserRepository(Protocol):
+    def get_by_id(self, user_id: int) -> dict: ...
+    def save(self, user: dict) -> None: ...
+
+# High-level module depends on abstraction, not concrete DB
+class UserService:
+    def __init__(self, repo: UserRepository):
+        self.repo = repo  # Injected — can be any implementation
+
+    def get_user(self, user_id: int) -> dict:
+        return self.repo.get_by_id(user_id)
+
+# Concrete implementations
+class PostgresUserRepo:
+    def get_by_id(self, user_id: int) -> dict: ...
+    def save(self, user: dict) -> None: ...
+
+class InMemoryUserRepo:  # For testing!
+    def __init__(self):
+        self._store = {}
+    def get_by_id(self, user_id: int) -> dict:
+        return self._store[user_id]
+    def save(self, user: dict) -> None:
+        self._store[user["id"]] = user
+
+# Production
+service = UserService(PostgresUserRepo())
+# Testing
+service = UserService(InMemoryUserRepo())
+```
+
+---
+
+## Q3: What is Dependency Injection and how do you implement it in Python?
+
+**Answer:**
+
+**Dependency Injection (DI)** means providing a component's dependencies from the outside rather than having it create them internally. This makes code testable, flexible, and decoupled.
+
+```{mermaid}
+graph LR
+    subgraph Without["Without DI (Tight Coupling)"]
+        A1["UserService"] -->|"creates"| B1["PostgresDB()"]
+    end
+
+    subgraph With["With DI (Loose Coupling)"]
+        A2["UserService"] -->|"receives"| B2["db: Database (any impl)"]
+        C2["PostgresDB"] -.->|"implements"| B2
+        D2["MockDB"] -.->|"implements"| B2
+    end
+
+    style Without fill:#ff7851,stroke:#333,color:#fff
+    style With fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Three DI Patterns in Python
+
+```python
+from typing import Protocol
+
+class EmailSender(Protocol):
+    def send(self, to: str, subject: str, body: str) -> None: ...
+
+# 1. CONSTRUCTOR INJECTION (most common, recommended)
+class NotificationService:
+    def __init__(self, email_sender: EmailSender):
+        self._sender = email_sender
+
+    def notify_user(self, user_email: str, message: str):
+        self._sender.send(user_email, "Notification", message)
+
+# 2. METHOD INJECTION (for one-off dependencies)
+class ReportGenerator:
+    def generate(self, data: list, formatter: Formatter) -> str:
+        return formatter.format(data)
+
+# 3. MODULE-LEVEL INJECTION (simple cases)
+# config.py
+def get_database():
+    if os.environ.get("TESTING"):
+        return InMemoryDB()
+    return PostgresDB(os.environ["DATABASE_URL"])
+```
+
+### Wiring Dependencies (Composition Root)
+
+```python
+# app.py — the "composition root" wires everything together
+def create_app():
+    """Build the dependency graph at application startup."""
+    # Infrastructure
+    db = PostgresDatabase(settings.DATABASE_URL)
+    cache = RedisCache(settings.REDIS_URL)
+    email = SMTPEmailSender(settings.SMTP_HOST)
+
+    # Repositories
+    user_repo = PostgresUserRepo(db)
+    order_repo = PostgresOrderRepo(db)
+
+    # Services (injected with repos)
+    user_service = UserService(user_repo, cache)
+    order_service = OrderService(order_repo, user_service)
+    notification_service = NotificationService(email)
+
+    # API layer (injected with services)
+    app = FastAPI()
+    app.include_router(create_user_router(user_service))
+    app.include_router(create_order_router(order_service))
+
+    return app
+```
+
+### Testing with DI
+
+```python
+# Tests inject fakes/mocks — no real DB or email!
+def test_notify_user():
+    fake_sender = FakeEmailSender()
+    service = NotificationService(fake_sender)
+
+    service.notify_user("alice@test.com", "Hello!")
+
+    assert fake_sender.sent_emails == [
+        ("alice@test.com", "Notification", "Hello!")
+    ]
+```
+
+### When to Use DI
+
+| Use DI | Don't Bother |
+|--------|--------------|
+| External services (DB, cache, APIs) | Pure utility functions |
+| Components you want to test in isolation | Simple scripts |
+| Multiple implementations needed | Tight internal helpers |
+| Cross-cutting concerns (logging, metrics) | Leaf functions with no dependencies |
+
+---
+
+## Q4: What are the most useful design patterns in Python?
+
+**Answer:**
+
+Python's dynamic nature and first-class functions mean many "classical" patterns (from Java/C++) are simpler or unnecessary. Here are the patterns that remain highly useful.
+
+```{mermaid}
+graph TD
+    DP["Useful Design Patterns in Python"]
+    DP --> CREAT["Creational"]
+    DP --> STRUCT["Structural"]
+    DP --> BEHAV["Behavioral"]
+
+    CREAT --> F["Factory Method"]
+    CREAT --> B["Builder"]
+    CREAT --> S["Singleton (module-level)"]
+
+    STRUCT --> A["Adapter"]
+    STRUCT --> D["Decorator (native!)"]
+    STRUCT --> FA["Facade"]
+
+    BEHAV --> ST["Strategy (functions!)"]
+    BEHAV --> OB["Observer"]
+    BEHAV --> IT["Iterator (native!)"]
+
+    style DP fill:#56cc9d,stroke:#333,color:#fff
+    style CREAT fill:#6cc3d5,stroke:#333,color:#fff
+    style BEHAV fill:#ffce67,stroke:#333
+```
+
+### Factory Pattern
+
+```python
+from dataclasses import dataclass
+from typing import Literal
+
+@dataclass
+class Notification:
+    message: str
+    recipient: str
+
+class EmailNotification(Notification):
+    def send(self): print(f"Email to {self.recipient}: {self.message}")
+
+class SMSNotification(Notification):
+    def send(self): print(f"SMS to {self.recipient}: {self.message}")
+
+class SlackNotification(Notification):
+    def send(self): print(f"Slack to {self.recipient}: {self.message}")
+
+# Factory function (Pythonic — no need for a class!)
+def create_notification(
+    channel: Literal["email", "sms", "slack"],
+    message: str,
+    recipient: str,
+) -> Notification:
+    factories = {
+        "email": EmailNotification,
+        "sms": SMSNotification,
+        "slack": SlackNotification,
+    }
+    if channel not in factories:
+        raise ValueError(f"Unknown channel: {channel}")
+    return factories[channel](message=message, recipient=recipient)
+```
+
+### Strategy Pattern (Just Use Functions!)
+
+```python
+from typing import Callable
+
+# In Java you'd create a Strategy interface + concrete classes
+# In Python: just pass a function!
+
+def process_data(
+    data: list[float],
+    strategy: Callable[[list[float]], float],
+) -> float:
+    return strategy(data)
+
+# Strategies are just functions
+def mean_strategy(data: list[float]) -> float:
+    return sum(data) / len(data)
+
+def median_strategy(data: list[float]) -> float:
+    sorted_data = sorted(data)
+    n = len(sorted_data)
+    mid = n // 2
+    return sorted_data[mid] if n % 2 else (sorted_data[mid-1] + sorted_data[mid]) / 2
+
+# Usage
+result = process_data([1, 2, 3, 4, 5], strategy=mean_strategy)
+result = process_data([1, 2, 3, 4, 5], strategy=median_strategy)
+```
+
+### Observer Pattern
+
+```python
+from typing import Callable
+
+class EventBus:
+    """Simple publish-subscribe event system."""
+
+    def __init__(self):
+        self._subscribers: dict[str, list[Callable]] = {}
+
+    def subscribe(self, event: str, callback: Callable) -> None:
+        self._subscribers.setdefault(event, []).append(callback)
+
+    def publish(self, event: str, **data) -> None:
+        for callback in self._subscribers.get(event, []):
+            callback(**data)
+
+# Usage
+bus = EventBus()
+bus.subscribe("user_created", lambda **d: send_welcome_email(d["email"]))
+bus.subscribe("user_created", lambda **d: log_event("signup", d))
+bus.publish("user_created", email="alice@example.com", name="Alice")
+```
+
+### Singleton (Python Way: Module-Level Instance)
+
+```python
+# DON'T use metaclass singleton in Python. Use module-level instance:
+
+# database.py
+class _Database:
+    def __init__(self):
+        self._connection = None
+
+    def connect(self, url: str):
+        self._connection = create_connection(url)
+
+    def query(self, sql: str):
+        return self._connection.execute(sql)
+
+# Module-level singleton — imported by other modules
+db = _Database()
+
+# Other files:
+# from mypackage.database import db
+# db.query("SELECT * FROM users")
+```
+
+### Patterns Comparison
+
+| Pattern | Java/C++ Way | Pythonic Way |
+|---------|-------------|-------------|
+| Singleton | Metaclass / `__new__` | Module-level instance |
+| Strategy | Interface + classes | Pass a function |
+| Iterator | Iterator class | Generator function (`yield`) |
+| Decorator | Wrapper class | `@decorator` function |
+| Observer | Interface + registration | Callbacks / signals |
+| Builder | Builder class | `@dataclass` + defaults or `**kwargs` |
+
+---
+
+## Q5: How do you manage configuration and environment variables properly?
+
+**Answer:**
+
+Production Python applications separate configuration from code, support multiple environments, validate settings at startup, and never commit secrets.
+
+```{mermaid}
+graph TD
+    ENV[".env file (local only)"]
+    ENVVAR["OS Environment Variables<br/>(production)"]
+    DEFAULT["Defaults in code<br/>(non-sensitive only)"]
+
+    ENV --> CONFIG["config.py / Settings class"]
+    ENVVAR --> CONFIG
+    DEFAULT --> CONFIG
+
+    CONFIG --> APP["Application Code"]
+
+    style CONFIG fill:#56cc9d,stroke:#333,color:#fff
+    style ENV fill:#ffce67,stroke:#333
+    style ENVVAR fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Pydantic Settings (Recommended)
+
+```python
+# config.py
+from pydantic_settings import BaseSettings
+from pydantic import Field
+
+class Settings(BaseSettings):
+    """Application settings — loaded from environment variables."""
+
+    # Required (no default = must be in env)
+    database_url: str
+    secret_key: str
+
+    # Optional with defaults
+    debug: bool = False
+    log_level: str = "INFO"
+    max_connections: int = Field(default=10, ge=1, le=100)
+    allowed_hosts: list[str] = ["localhost"]
+
+    # Nested prefix
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+
+    model_config = {
+        "env_file": ".env",           # Load from .env in development
+        "env_file_encoding": "utf-8",
+        "case_sensitive": False,
+    }
+
+# Instantiate once at startup — validates all values
+settings = Settings()
+
+# Usage elsewhere:
+# from mypackage.config import settings
+# db = connect(settings.database_url)
+```
+
+### Environment File Structure
+
+```bash
+# .env (local development — NEVER commit this!)
+DATABASE_URL=postgresql://user:pass@localhost/mydb
+SECRET_KEY=dev-secret-key-change-in-prod
+DEBUG=true
+LOG_LEVEL=DEBUG
+
+# .env.example (committed — template for developers)
+DATABASE_URL=postgresql://user:password@localhost/dbname
+SECRET_KEY=change-me
+DEBUG=false
+LOG_LEVEL=INFO
+```
+
+### Best Practices
+
+| Practice | Why |
+|----------|-----|
+| Use `.env` for local dev only | Secrets stay out of code and git |
+| Validate at startup (Pydantic) | Fail fast with clear error messages |
+| Never use `os.getenv()` scattered everywhere | Centralize in one `config.py` module |
+| Add `.env` to `.gitignore` | Prevent accidental secret commits |
+| Commit `.env.example` | Onboarding documentation |
+| Use different env files per environment | `.env.test`, `.env.staging` |
+| Type all settings | Catch `"true"` vs `True` issues early |
+
+---
+
+## Q6: How should you handle imports and module organization?
+
+**Answer:**
+
+Clean import organization makes code navigable, prevents circular dependencies, and establishes clear module boundaries.
+
+```{mermaid}
+graph TD
+    subgraph ImportOrder["Import Order (PEP 8 + isort)"]
+        direction TB
+        I1["1. Standard library<br/>import os, sys, json"]
+        I2["2. Third-party packages<br/>import fastapi, pydantic"]
+        I3["3. Local application<br/>from mypackage.services import UserService"]
+    end
+
+    subgraph Avoid["Common Anti-Patterns"]
+        A1["from module import *"]
+        A2["Circular imports"]
+        A3["Import inside function (usually)"]
+    end
+
+    style ImportOrder fill:#56cc9d,stroke:#333,color:#fff
+    style Avoid fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Import Best Practices
+
+```python
+# GOOD: Clear, explicit imports in standard order
+import os
+import sys
+from pathlib import Path
+from typing import Protocol
+
+import httpx
+from fastapi import FastAPI, Depends
+from pydantic import BaseModel
+
+from mypackage.config import settings
+from mypackage.models.user import User
+from mypackage.services.user_service import UserService
+```
+
+### Controlling Public API with `__init__.py`
+
+```python
+# mypackage/models/__init__.py
+"""Expose only the public API of this subpackage."""
+from mypackage.models.user import User, UserCreate, UserUpdate
+from mypackage.models.order import Order, OrderStatus
+
+__all__ = ["User", "UserCreate", "UserUpdate", "Order", "OrderStatus"]
+
+# Now consumers use clean imports:
+# from mypackage.models import User, Order
+# (not: from mypackage.models.user import User)
+```
+
+### Solving Circular Imports
+
+```python
+# PROBLEM: A imports B, B imports A
+# services/user_service.py
+from mypackage.services.order_service import OrderService  # Circular!
+
+# SOLUTION 1: Import inside method (deferred import)
+class UserService:
+    def get_user_orders(self, user_id: int):
+        from mypackage.services.order_service import OrderService
+        return OrderService().get_orders_for(user_id)
+
+# SOLUTION 2: Use TYPE_CHECKING for type hints only
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from mypackage.services.order_service import OrderService
+
+class UserService:
+    def get_user_orders(self, order_service: "OrderService") -> list: ...
+
+# SOLUTION 3 (best): Restructure to eliminate the cycle
+# Extract shared interface into a separate module
+```
+
+### Module Organization Rules
+
+| Rule | Example |
+|------|---------|
+| One class per file (for major classes) | `user_service.py` contains `UserService` |
+| Related small classes can share a file | `exceptions.py` with all custom exceptions |
+| `__init__.py` defines public API | Import and re-export key names |
+| Private helpers prefixed with `_` | `_validate_email()` not exported |
+| Constants in dedicated module | `constants.py` or `enums.py` |
+
+---
+
+## Q7: What are Abstract Base Classes (ABCs) and Protocols, and when do you use each?
+
+**Answer:**
+
+Both ABCs and Protocols define **interfaces** (expected method signatures), but they differ in how they enforce compliance.
+
+```{mermaid}
+graph LR
+    subgraph ABC_Side["ABC (Nominal Typing)"]
+        ABC1["Must explicitly inherit"]
+        ABC2["Fails at instantiation<br/>if method missing"]
+        ABC3["isinstance() works"]
+    end
+
+    subgraph Protocol_Side["Protocol (Structural Typing)"]
+        P1["No inheritance needed"]
+        P2["Fails at type-check time<br/>(mypy/pyright)"]
+        P3["Duck typing with safety"]
+    end
+
+    style ABC_Side fill:#6cc3d5,stroke:#333,color:#fff
+    style Protocol_Side fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### ABC: Explicit Contract
+
+```python
+from abc import ABC, abstractmethod
+
+class Repository(ABC):
+    """All repositories MUST implement these methods."""
+
+    @abstractmethod
+    def get(self, id: int) -> dict:
+        """Retrieve an entity by ID."""
+        ...
+
+    @abstractmethod
+    def save(self, entity: dict) -> None:
+        """Persist an entity."""
+        ...
+
+    @abstractmethod
+    def delete(self, id: int) -> None:
+        """Remove an entity."""
+        ...
+
+# Must inherit AND implement all abstract methods
+class UserRepository(Repository):
+    def get(self, id: int) -> dict:
+        return self._db.fetch_one(id)
+
+    def save(self, entity: dict) -> None:
+        self._db.upsert(entity)
+
+    def delete(self, id: int) -> None:
+        self._db.remove(id)
+
+# This would raise TypeError at instantiation:
+# class BadRepo(Repository):
+#     def get(self, id): ...
+#     # Missing save() and delete()!
+# BadRepo()  # TypeError!
+```
+
+### Protocol: Structural (Duck) Typing
+
+```python
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable  # Optional: enables isinstance() checks
+class Serializable(Protocol):
+    def to_dict(self) -> dict: ...
+    def from_dict(cls, data: dict) -> "Serializable": ...
+
+# No inheritance needed — just implement the methods!
+class User:
+    def to_dict(self) -> dict:
+        return {"name": self.name, "email": self.email}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "User":
+        return cls(name=data["name"], email=data["email"])
+
+# User satisfies the Serializable protocol without inheriting it
+def serialize(obj: Serializable) -> dict:
+    return obj.to_dict()
+
+serialize(User(...))  # Works! mypy verifies User has to_dict()
+```
+
+### When to Use Each
+
+| Use ABC | Use Protocol |
+|---------|-------------|
+| Framework/library defining a plugin interface | Type hints for duck-typed code |
+| Need runtime `isinstance()` checks | Third-party classes you can't modify |
+| Want immediate error on missing methods | Simpler, no inheritance needed |
+| Internal code with clear hierarchy | Cross-boundary interfaces |
+| Small teams where inheritance is acceptable | Large codebases valuing flexibility |
+
+---
+
+## Q8: What are Python's code quality tools and how should they be configured?
+
+**Answer:**
+
+Modern Python projects use a **layered toolchain** for formatting, linting, type checking, and security scanning — all automated in CI/CD.
+
+```{mermaid}
+graph LR
+    CODE["Source Code"]
+    CODE --> FORMAT["Formatter<br/>ruff format / black"]
+    FORMAT --> LINT["Linter<br/>ruff check"]
+    LINT --> TYPE["Type Checker<br/>mypy / pyright"]
+    TYPE --> SEC["Security<br/>bandit / safety"]
+    SEC --> TEST["Tests<br/>pytest"]
+
+    style CODE fill:#56cc9d,stroke:#333,color:#fff
+    style FORMAT fill:#6cc3d5,stroke:#333,color:#fff
+    style LINT fill:#ffce67,stroke:#333
+    style TYPE fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Recommended Toolchain (2026)
+
+| Tool | Purpose | Speed |
+|------|---------|-------|
+| **ruff** | Linting + formatting (replaces flake8, isort, black) | Extremely fast (Rust) |
+| **mypy** or **pyright** | Static type checking | mypy: thorough; pyright: fast |
+| **pytest** | Testing | — |
+| **pre-commit** | Run checks before each commit | — |
+| **bandit** | Security vulnerability scanning | — |
+
+### `pyproject.toml` Configuration
+
+```toml
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+src = ["src"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort (import sorting)
+    "N",    # pep8-naming
+    "UP",   # pyupgrade (modern syntax)
+    "B",    # bugbear (common bugs)
+    "SIM",  # simplify
+    "RUF",  # ruff-specific rules
+]
+ignore = ["E501"]  # Line length handled by formatter
+
+[tool.ruff.lint.isort]
+known-first-party = ["mypackage"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short --strict-markers"
+markers = [
+    "slow: marks tests as slow",
+    "integration: marks integration tests",
+]
+```
+
+### Makefile for Common Commands
+
+```makefile
+.PHONY: lint format type-check test all
+
+lint:
+	ruff check src/ tests/
+
+format:
+	ruff format src/ tests/
+
+type-check:
+	mypy src/
+
+test:
+	pytest tests/ -v
+
+all: format lint type-check test
+```
+
+### Pre-commit Configuration
+
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [pydantic]
+```
+
+---
+
+## Q9: How do you handle errors and logging in production Python code?
+
+**Answer:**
+
+Production code needs **structured logging** (not print statements) and **layered error handling** that provides context for debugging without exposing internals to users.
+
+```{mermaid}
+graph TD
+    subgraph Logging["Structured Logging"]
+        L1["DEBUG: Detailed diagnostic info"]
+        L2["INFO: Normal operations"]
+        L3["WARNING: Unexpected but handled"]
+        L4["ERROR: Failed operations"]
+        L5["CRITICAL: System failure"]
+    end
+
+    subgraph ErrorFlow["Error Handling Layers"]
+        E1["Repository: raise specific errors"]
+        E2["Service: catch, add context, re-raise"]
+        E3["API: catch all, return user-friendly response"]
+    end
+
+    style Logging fill:#56cc9d,stroke:#333,color:#fff
+    style ErrorFlow fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Structured Logging Setup
+
+```python
+import logging
+import structlog
+
+# Configure structlog for JSON output (production)
+structlog.configure(
+    processors=[
+        structlog.contextvars.merge_contextvars,
+        structlog.processors.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.JSONRenderer(),  # JSON in prod
+    ],
+    logger_factory=structlog.stdlib.LoggerFactory(),
+)
+
+logger = structlog.get_logger()
+
+# Usage — structured key-value pairs, not f-strings!
+logger.info("user_created", user_id=123, email="alice@example.com")
+# Output: {"event": "user_created", "user_id": 123, "email": "alice@...", "level": "info", "timestamp": "..."}
+
+logger.error("payment_failed", order_id=456, error="insufficient_funds", amount=99.99)
+```
+
+### Layered Error Handling Pattern
+
+```python
+# Layer 1: Repository — specific, technical errors
+class UserRepository:
+    def get_by_id(self, user_id: int) -> User:
+        try:
+            row = self._db.fetch_one("SELECT * FROM users WHERE id = %s", user_id)
+        except DatabaseError as e:
+            logger.error("db_query_failed", user_id=user_id, error=str(e))
+            raise RepositoryError(f"Failed to fetch user {user_id}") from e
+        if not row:
+            raise NotFoundError(f"User {user_id} not found")
+        return User.from_row(row)
+
+# Layer 2: Service — business logic errors with context
+class UserService:
+    def get_user_profile(self, user_id: int) -> UserProfile:
+        user = self._repo.get_by_id(user_id)  # May raise NotFoundError
+        orders = self._order_repo.get_by_user(user_id)
+        logger.info("profile_loaded", user_id=user_id, order_count=len(orders))
+        return UserProfile(user=user, orders=orders)
+
+# Layer 3: API — user-friendly responses, no internal details
+@app.get("/users/{user_id}")
+async def get_user(user_id: int):
+    try:
+        profile = user_service.get_user_profile(user_id)
+        return profile.to_response()
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="User not found")
+    except RepositoryError:
+        logger.exception("unexpected_error", user_id=user_id)
+        raise HTTPException(status_code=500, detail="Internal server error")
+```
+
+### Logging Best Practices
+
+| Practice | Why |
+|----------|-----|
+| Use structured logging (key-value), not f-strings | Machine-parseable, searchable |
+| Log at boundaries (API entry, DB calls, external APIs) | Trace request flow |
+| Include request/correlation IDs | Connect logs across services |
+| Never log secrets (passwords, tokens, PII) | Security compliance |
+| Use `logger.exception()` for unexpected errors | Includes full traceback |
+| Set log level via config (not code changes) | Adjust verbosity without deploy |
+
+---
+
+## Q10: How do you package and distribute a Python project?
+
+**Answer:**
+
+Modern Python packaging uses `pyproject.toml` as the single source of truth for metadata, dependencies, build configuration, and tool settings.
+
+```{mermaid}
+graph TD
+    PYPROJ["pyproject.toml<br/>Single config file"]
+    PYPROJ --> META["Metadata<br/>name, version, description"]
+    PYPROJ --> DEPS["Dependencies<br/>runtime + dev groups"]
+    PYPROJ --> BUILD["Build System<br/>hatchling, setuptools, flit"]
+    PYPROJ --> TOOLS["Tool Config<br/>ruff, mypy, pytest"]
+
+    BUILD --> DIST["Distribution"]
+    DIST --> WHEEL["wheel (.whl)<br/>Binary, fast install"]
+    DIST --> SDIST["sdist (.tar.gz)<br/>Source archive"]
+
+    style PYPROJ fill:#56cc9d,stroke:#333,color:#fff
+    style BUILD fill:#6cc3d5,stroke:#333,color:#fff
+    style DIST fill:#ffce67,stroke:#333
+```
+
+### Complete `pyproject.toml`
+
+```toml
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mypackage"
+version = "1.2.0"
+description = "A well-structured Python application"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "Alice Smith", email = "alice@example.com" },
+]
+dependencies = [
+    "fastapi>=0.100",
+    "pydantic>=2.0",
+    "httpx>=0.25",
+    "structlog>=23.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "pre-commit>=3.0",
+]
+
+[project.scripts]
+mypackage = "mypackage.main:cli"  # CLI entry point
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mypackage"]
+```
+
+### Dependency Management with `uv`
+
+```bash
+# Modern Python package manager (replaces pip + venv + pip-tools)
+uv init myproject           # Create new project
+uv add fastapi pydantic     # Add dependencies
+uv add --dev pytest ruff    # Add dev dependencies
+uv sync                     # Install all dependencies
+uv run pytest               # Run in project environment
+uv lock                     # Generate lockfile for reproducibility
+```
+
+### Versioning and Release
+
+| Aspect | Practice |
+|--------|----------|
+| Version scheme | Semantic versioning: `MAJOR.MINOR.PATCH` |
+| Changelog | `CHANGELOG.md` with Keep a Changelog format |
+| Lockfile | `uv.lock` or `requirements.lock` for reproducible installs |
+| Publishing | `uv publish` or `twine upload` to PyPI |
+| CI/CD | Automated: lint → test → build → publish on tag |
+
+### Key Principles
+
+| Principle | Implementation |
+|-----------|---------------|
+| **Single source of truth** | All config in `pyproject.toml` (no `setup.py`, `setup.cfg`) |
+| **Pin in lockfile, range in pyproject** | `pyproject.toml`: `fastapi>=0.100`; lockfile pins exact versions |
+| **Separate dev from runtime deps** | `[project.optional-dependencies] dev = [...]` |
+| **Reproducible builds** | Lockfile + Python version constraint |
+| **Entry points** | `[project.scripts]` for CLI commands |
+
+---
+
+## Summary Table
+
+| # | Topic | Key Concept |
+|---|-------|-------------|
+| 1 | Project Structure | src-layout; separate models/services/repos/api; tests mirror source |
+| 2 | SOLID Principles | SRP, Open/Closed, Liskov, Interface Segregation, Dependency Inversion |
+| 3 | Dependency Injection | Constructor injection; composition root wires dependencies; enables testing |
+| 4 | Design Patterns | Factory, Strategy (use functions!), Observer, module-level Singleton |
+| 5 | Configuration | Pydantic Settings from env vars; `.env` for dev; validate at startup |
+| 6 | Imports & Modules | PEP 8 order; `__init__.py` for public API; avoid circular imports |
+| 7 | ABCs vs Protocols | ABC for explicit inheritance; Protocol for structural duck typing |
+| 8 | Code Quality Tools | ruff (lint+format), mypy (types), pytest (tests), pre-commit (automation) |
+| 9 | Logging & Errors | Structured logging (structlog); layered error handling; no print() |
+| 10 | Packaging | `pyproject.toml` single config; uv for deps; semantic versioning |
+
+---
+
+## What's Next?
+
+This article covered production code practices and architecture. For related content:
+
+- **Python fundamentals:** [Python SWE Interview QA - 1](/posts/python-swe-interview/Python-SWE-Interview-QA-1.html)
+- **Advanced internals:** [Python SWE Interview QA - 2](/posts/python-swe-interview/Python-SWE-Interview-QA-2.html)
+- **Machine learning concepts:** [ML Interview QA - 1](/posts/ml-interview/ML-Interview-QA-1.html) and [ML Interview QA - 2](/posts/ml-interview/ML-Interview-QA-2.html)
+- **LLM architecture:** [LLM Interview QA - 1](/posts/llm-interview/LLM-Interview-QA-1.html)
+- **LLM configuration and decoding:** [LLM Interview QA - 3](/posts/llm-interview/LLM-Interview-QA-3.html)

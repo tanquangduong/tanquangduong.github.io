@@ -1,0 +1,991 @@
+---
+title: "ML Interview QA - 1"
+description: "10 most frequently asked machine learning interview questions with in-depth answers, diagrams, examples, and real-world applications."
+image: /images/ml-interview/thumb_ML_interview_qa_300.png
+date: "2026-05-17"
+keywords:
+  - "machine learning interview"
+  - "ML interview questions"
+  - "bias variance tradeoff"
+  - "overfitting underfitting"
+  - "gradient descent"
+  - "cross validation"
+  - "regularization"
+  - "decision tree"
+  - "random forest"
+  - "logistic regression"
+  - "ensemble learning"
+  - "bagging boosting"
+---
+
+## Introduction
+
+This is **Part 1** of our ML Interview QA series. It covers 10 foundational questions that appear in nearly every ML Engineer, Data Scientist, and Applied AI interview — from startups to FAANG. Each answer goes beyond surface-level definitions with diagrams, concrete examples, and real-world applications.
+
+> For evaluation metrics, feature engineering, and data handling questions, see [ML Interview QA - 2](/posts/ml-interview/ML-Interview-QA-2.html).
+
+---
+
+## Q1: What is the difference between supervised, unsupervised, and reinforcement learning?
+
+**Answer:**
+
+```{mermaid}
+graph LR
+    ML["Machine Learning"] --> SUP["Supervised Learning"]
+    ML --> UNSUP["Unsupervised Learning"]
+    ML --> RL["Reinforcement Learning"]
+
+    SUP --> SUP_IN["Input: Labeled data<br/>(X, y) pairs"]
+    SUP --> SUP_GOAL["Goal: Learn mapping f(X) → y"]
+    SUP --> SUP_EX["Examples:<br/>• Classification<br/>• Regression"]
+
+    UNSUP --> UNSUP_IN["Input: Unlabeled data<br/>(X only)"]
+    UNSUP --> UNSUP_GOAL["Goal: Find hidden structure"]
+    UNSUP --> UNSUP_EX["Examples:<br/>• Clustering<br/>• Dimensionality Reduction"]
+
+    RL --> RL_IN["Input: Environment + Rewards"]
+    RL --> RL_GOAL["Goal: Maximize cumulative reward"]
+    RL --> RL_EX["Examples:<br/>• Game Playing<br/>• Robotics"]
+
+    style SUP fill:#56cc9d,stroke:#333,color:#fff
+    style UNSUP fill:#6cc3d5,stroke:#333,color:#fff
+    style RL fill:#ffce67,stroke:#333
+```
+
+### Detailed Breakdown
+
+| Aspect | Supervised | Unsupervised | Reinforcement |
+|--------|-----------|--------------|---------------|
+| Data | Labeled (X, y) | Unlabeled (X) | States, actions, rewards |
+| Feedback | Direct (correct answers) | None | Delayed (reward signal) |
+| Goal | Predict outcome | Discover structure | Maximize long-term reward |
+| Evaluation | Compare predictions to labels | Internal metrics (silhouette, inertia) | Cumulative reward |
+
+### Example: E-commerce Company
+
+Imagine you work at an e-commerce company:
+
+- **Supervised:** Predict whether a user will buy a product given their browsing history (you have past purchase labels).
+- **Unsupervised:** Segment customers into groups based on behavior patterns (no predefined groups).
+- **Reinforcement:** Train a recommendation agent that learns which products to show to maximize click-through rate over time.
+
+### Applications
+
+| Type | Industry Applications |
+|------|----------------------|
+| Supervised | Spam detection, credit scoring, medical diagnosis, price prediction |
+| Unsupervised | Customer segmentation, anomaly detection, topic modeling, gene clustering |
+| Reinforcement | Autonomous driving, game AI (AlphaGo), ad bidding, inventory management |
+
+### When to Choose
+
+- **Use supervised** when you have labeled data and a clear target variable.
+- **Use unsupervised** when you want to explore data structure without predefined categories.
+- **Use reinforcement** when the problem involves sequential decisions with delayed feedback.
+
+---
+
+## Q2: What is the bias-variance tradeoff?
+
+**Answer:**
+
+The total prediction error of a model decomposes into three components:
+
+$$\text{Total Error} = \text{Bias}^2 + \text{Variance} + \text{Irreducible Noise}$$
+
+### What is Bias?
+
+**Bias** measures how far off a model's average predictions are from the true values. It reflects the **systematic error** introduced by simplifying assumptions in the model.
+
+**Example:** Imagine predicting house prices in a neighborhood where prices increase exponentially with size. If you fit a straight line (linear model), your predictions will consistently miss the curve — underestimating large houses and overestimating small ones. That consistent miss is bias.
+
+- **High bias** = the model is too simple to capture the real relationship (underfitting)
+- **Low bias** = the model's average prediction is close to the true value
+
+### What is Variance?
+
+**Variance** measures how much a model's predictions **change** when trained on different subsets of data. It reflects sensitivity to the specific training data used.
+
+**Example:** Imagine training a very complex polynomial model on 100 houses. Now retrain it on a *different* random sample of 100 houses from the same city. If the two models give wildly different predictions for the same house, that's high variance — the model is memorizing quirks of each specific sample rather than learning stable patterns.
+
+- **High variance** = the model changes drastically with different training data (overfitting)
+- **Low variance** = the model produces consistent predictions regardless of which training subset is used
+
+### What is Irreducible Noise?
+
+**Irreducible noise** (also called Bayes error) is the inherent randomness in the data that **no model can eliminate**, no matter how perfect.
+
+**Example:** Two identical houses (same size, location, age, condition) sell for different prices because one buyer was emotionally attached to the neighborhood and overpaid. This randomness — caused by unmeasured factors, human behavior, or measurement error — sets a floor on prediction error.
+
+$$\text{Irreducible Noise} = \text{Var}(\epsilon)$$
+
+You cannot reduce it by improving your model. The only way to lower it is to collect better or more informative features.
+
+### The Tradeoff
+
+The **tradeoff**: as you increase model complexity, bias decreases (the model can capture more patterns) but variance increases (the model becomes more sensitive to training data). The goal is to find the sweet spot that minimizes total error.
+
+```{mermaid}
+graph TD
+    subgraph high_bias["High Bias (Underfitting)"]
+        direction TB
+        HB1["Simple model"]
+        HB2["Misses the true pattern"]
+        HB3["Both train & val error HIGH"]
+    end
+
+    subgraph sweet["Sweet Spot"]
+        direction TB
+        SS1["Right complexity"]
+        SS2["Captures pattern, ignores noise"]
+        SS3["Both errors LOW"]
+    end
+
+    subgraph high_var["High Variance (Overfitting)"]
+        direction TB
+        HV1["Complex model"]
+        HV2["Fits noise in training data"]
+        HV3["Train error LOW, val error HIGH"]
+    end
+
+    high_bias -->|"Increase complexity"| sweet
+    sweet -->|"Increase complexity"| high_var
+
+    style high_bias fill:#ff7851,stroke:#333,color:#fff
+    style sweet fill:#56cc9d,stroke:#333,color:#fff
+    style high_var fill:#ffce67,stroke:#333
+```
+
+### Intuition with a Concrete Example
+
+**Scenario:** Predict house prices from square footage.
+
+| Model | What it does | Bias | Variance | Result |
+|-------|-------------|------|----------|--------|
+| Linear (1 feature) | Fits a straight line | High — misses non-linear patterns | Low — stable across datasets | Underfits |
+| Polynomial (degree 2-3) | Fits gentle curves | Low — captures the pattern | Medium — somewhat stable | Good fit |
+| Polynomial (degree 20) | Fits every data point | Very low — passes through all points | Very high — completely different on new data | Overfits |
+
+### Visual Analogy: Dartboard
+
+```{mermaid}
+graph TD
+    subgraph low_b_low_v["Low Bias, Low Variance ✅ IDEAL"]
+        A1["🎯 Darts clustered at center"]
+    end
+    subgraph low_b_high_v["Low Bias, High Variance"]
+        A2["🎯 Darts scattered around center"]
+    end
+
+    style low_b_low_v fill:#56cc9d,stroke:#333,color:#fff
+    style low_b_high_v fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+```{mermaid}
+graph TD
+    subgraph high_b_low_v["High Bias, Low Variance"]
+        A3["🎯 Darts clustered away from center"]
+    end
+    subgraph high_b_high_v["High Bias, High Variance"]
+        A4["🎯 Darts scattered away from center"]
+    end
+
+    style high_b_low_v fill:#ffce67,stroke:#333
+    style high_b_high_v fill:#ff7851,stroke:#333,color:#fff
+```
+
+- **Bias** = how far the average prediction is from the true value (accuracy)
+- **Variance** = how much predictions scatter across different training sets (consistency)
+
+### How to Diagnose and Fix
+
+| Symptom | Diagnosis | Fixes |
+|---------|-----------|-------|
+| High train error + high val error | High bias (underfitting) | More features, more complex model, less regularization |
+| Low train error + high val error | High variance (overfitting) | More data, regularization, simpler model, dropout |
+| Low train error + low val error | Good balance | Deploy! Monitor for drift. |
+
+### Application
+
+In production ML systems, you continuously monitor this tradeoff:
+
+- **Credit scoring:** High bias means denying good borrowers; high variance means approving risky ones on certain data splits.
+- **Medical imaging:** High bias misses tumors; high variance gives false positives on certain patient populations.
+
+---
+
+## Q3: What is overfitting and how do you prevent it?
+
+**Answer:**
+
+Overfitting occurs when a model learns the **noise and specific quirks** of training data rather than the underlying pattern. It performs excellently on training data but poorly on unseen data.
+
+```{mermaid}
+graph TD
+    subgraph training["Training Phase"]
+        T1["Model sees data points"]
+        T2["Learns true pattern ✅"]
+        T3["Also memorizes noise ❌"]
+        T1 --> T2
+        T1 --> T3
+    end
+
+    subgraph result["Result"]
+        R1["Training accuracy: 99%"]
+        R2["Validation accuracy: 72%"]
+        R3["GAP = Overfitting signal"]
+        R1 --> R3
+        R2 --> R3
+    end
+
+    training --> result
+
+    style T2 fill:#56cc9d,stroke:#333,color:#fff
+    style T3 fill:#ff7851,stroke:#333,color:#fff
+    style R3 fill:#ffce67,stroke:#333
+    style training fill:#6cc3d5,stroke:#333,color:#fff
+    style result fill:#6cc3d5,stroke:#333,color:#fff
+
+```
+
+### Example: Spam Detection
+
+You train a spam classifier on 1000 emails. An overfit model might learn:
+
+- "Emails from john@company.com sent at 3:14 PM on Tuesday are spam" (memorizing specific instances)
+- Instead of: "Emails containing 'free money' + suspicious links are spam" (learning the pattern)
+
+When new spam arrives from different senders, the overfit model fails.
+
+### Prevention Techniques (ordered by priority)
+
+```{mermaid}
+graph TD
+    A["Overfitting Detected"] --> B["1. Get more data<br/>(best fix if possible)"]
+    B --> C["2. Regularization<br/>(L1/L2 penalty)"]
+    C --> D["3. Early stopping<br/>(stop before memorizing)"]
+    D --> E["4. Cross-validation<br/>(reliable evaluation)"]
+    E --> F["5. Dropout<br/>(neural networks)"]
+    F --> G["6. Feature selection<br/>(remove noise features)"]
+    G --> H["7. Ensemble methods<br/>(bagging reduces variance)"]
+
+    style A fill:#ff7851,stroke:#333,color:#fff
+    style B fill:#56cc9d,stroke:#333,color:#fff
+    style C fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Detailed Example: Early Stopping
+
+```python
+# Training a neural network with early stopping
+from sklearn.neural_network import MLPClassifier
+
+model = MLPClassifier(
+    hidden_layer_sizes=(100, 50),
+    max_iter=1000,
+    early_stopping=True,       # ← monitor validation loss
+    validation_fraction=0.1,   # ← hold out 10% for monitoring
+    n_iter_no_change=10        # ← stop if no improvement for 10 epochs
+)
+```
+
+**What happens:** Training stops at epoch 47 (where validation loss was lowest) instead of epoch 1000 (where training loss would be near zero but validation loss has increased).
+
+### When to Worry About Overfitting
+
+- Small datasets with many features (curse of dimensionality)
+- Very deep decision trees or large neural networks
+- Training for too many epochs
+- No regularization applied
+- Data leakage inflating apparent performance (e.g., using future information during training, including target-derived features, or applying preprocessing like scaling/encoding on the full dataset before splitting — this makes the model appear to perform well in development but fail in production because it had access to information it wouldn't have at inference time)
+
+---
+
+## Q4: Explain the difference between L1 and L2 regularization.
+
+**Answer:**
+
+Regularization adds a **penalty term** to the loss function to discourage overly complex models.
+
+$$\text{L1 (Lasso):} \quad \mathcal{L}_{total} = \mathcal{L}_{data} + \lambda \sum_{i} |w_i|$$
+
+$$\text{L2 (Ridge):} \quad \mathcal{L}_{total} = \mathcal{L}_{data} + \lambda \sum_{i} w_i^2$$
+
+```{mermaid}
+graph TD
+    subgraph L1["L1 Regularization (Lasso)"]
+        direction TB
+        L1A["Penalty: λΣ|w|"]
+        L1B["Diamond-shaped constraint"]
+        L1C["Pushes weights to EXACTLY zero"]
+        L1D["Result: Sparse model<br/>(automatic feature selection)"]
+        L1A --> L1B --> L1C --> L1D
+    end
+
+    subgraph L2["L2 Regularization (Ridge)"]
+        direction TB
+        L2A["Penalty: λΣw²"]
+        L2B["Circular constraint"]
+        L2C["Shrinks ALL weights toward zero"]
+        L2D["Result: Small but non-zero weights<br/>(handles multicollinearity)"]
+        L2A --> L2B --> L2C --> L2D
+    end
+
+    style L1 fill:#56cc9d,stroke:#333,color:#fff
+    style L2 fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Example: Predicting House Prices with 50 Features
+
+Suppose you have 50 features including relevant ones (sqft, bedrooms) and irrelevant ones (owner's birthday, day of listing):
+
+```python
+from sklearn.linear_model import Lasso, Ridge
+
+# L1 — Lasso: drives irrelevant feature weights to zero
+lasso = Lasso(alpha=0.1)
+lasso.fit(X_train, y_train)
+# Result: 12 features have non-zero weights, 38 are exactly zero
+# → Automatic feature selection!
+
+# L2 — Ridge: shrinks all weights but keeps them non-zero
+ridge = Ridge(alpha=0.1)
+ridge.fit(X_train, y_train)
+# Result: all 50 features have small non-zero weights
+# → Better when all features contribute a little
+```
+
+### Geometric Intuition
+
+The L1 penalty creates a diamond-shaped constraint region. The loss function's contours are more likely to intersect the diamond at a **corner** (where some weights = 0). The L2 penalty creates a circular constraint, so intersections happen away from axes (weights shrink but don't reach zero).
+
+### Elastic Net: Combining L1 and L2
+
+**Elastic Net** blends both penalties, giving you feature selection (from L1) and stability with correlated features (from L2):
+
+$$\text{Elastic Net:} \quad \mathcal{L}_{total} = \mathcal{L}_{data} + \lambda \left( \alpha \sum_{i} |w_i| + (1 - \alpha) \sum_{i} w_i^2 \right)$$
+
+Here $\lambda$ controls the overall regularization strength, and the mixing ratio $\alpha \in [0, 1]$ controls the balance between L1 and L2: $\alpha = 1$ is pure Lasso, $\alpha = 0$ is pure Ridge. In practice, Elastic Net is preferred when you have groups of correlated features — it selects or drops them together rather than picking one arbitrarily as Lasso does.
+
+### Comparison Table
+
+| Aspect | L1 (Lasso) | L2 (Ridge) | Elastic Net |
+|--------|-----------|-----------|-------------|
+| Penalty shape | Diamond | Circle | Blend |
+| Feature selection | Yes (sparse) | No | Partial |
+| Correlated features | Picks one arbitrarily | Distributes weight evenly | Handles well |
+| Computation | May need special solver | Closed-form solution | Iterative |
+| Best for | High-dimensional, many irrelevant features | Multicollinearity, all features relevant | Best of both worlds |
+
+### Applications
+
+- **L1:** Genomics (select 50 relevant genes from 20,000), text classification (select key words)
+- **L2:** Financial models (correlated market features), image processing (all pixels matter)
+- **Elastic Net:** When you want both feature selection and stability with correlated features
+
+---
+
+## Q5: What is gradient descent and what are its variants?
+
+**Answer:**
+
+Gradient descent is the fundamental optimization algorithm that iteratively adjusts model parameters to minimize a loss function by moving in the direction of steepest descent.
+
+$$w_{t+1} = w_t - \eta \cdot \nabla_w \mathcal{L}(w_t)$$
+
+where $\eta$ is the learning rate and $\nabla_w \mathcal{L}$ is the gradient of the loss with respect to weights.
+
+```{mermaid}
+graph TD
+    A["Initialize weights randomly"] --> B["Compute loss L(w)"]
+    B --> C["Compute gradient ∂L/∂w"]
+    C --> D["Update: w = w - η · ∂L/∂w"]
+    D --> E{"Converged?"}
+    E -->|No| B
+    E -->|Yes| F["Final weights"]
+
+    style A fill:#6cc3d5,stroke:#333,color:#fff
+    style D fill:#56cc9d,stroke:#333,color:#fff
+    style F fill:#ffce67,stroke:#333
+```
+
+### Concrete Example: Quadratic Loss Function
+
+Let's walk through gradient descent step-by-step on a simple quadratic loss:
+
+$$\mathcal{L}(w) = (w - 3)^2$$
+
+The minimum is at $w = 3$ where $\mathcal{L} = 0$. The gradient is:
+
+$$\frac{\partial \mathcal{L}}{\partial w} = 2(w - 3)$$
+
+**Setup:** Initial weight $w_0 = 0$, learning rate $\eta = 0.1$
+
+| Step | $w_t$ | $\mathcal{L}(w_t)$ | Gradient $2(w_t - 3)$ | Update $w_{t+1} = w_t - \eta \cdot \text{grad}$ |
+|------|--------|---------------------|------------------------|--------------------------------------------------|
+| 0 | 0.000 | 9.000 | -6.000 | $0 - 0.1 \times (-6) = 0.600$ |
+| 1 | 0.600 | 5.760 | -4.800 | $0.6 - 0.1 \times (-4.8) = 1.080$ |
+| 2 | 1.080 | 3.686 | -3.840 | $1.08 - 0.1 \times (-3.84) = 1.464$ |
+| 3 | 1.464 | 2.359 | -3.072 | $1.464 - 0.1 \times (-3.072) = 1.771$ |
+| 4 | 1.771 | 1.510 | -2.458 | $1.771 - 0.1 \times (-2.458) = 2.017$ |
+| 5 | 2.017 | 0.966 | -1.966 | $2.017 - 0.1 \times (-1.966) = 2.214$ |
+| ... | ... | ... | ... | ... |
+| 20 | 2.965 | 0.0012 | -0.069 | → converging to $w = 3$ |
+
+**Key observations:**
+
+- The loss decreases monotonically: $9.0 → 5.76 → 3.69 → 2.36 → ...→ 0$
+- The gradient magnitude shrinks as we approach the minimum (steps get smaller)
+- With $\eta = 0.1$, convergence is steady. With $\eta = 0.9$, it would oscillate; with $\eta = 1.0$, it would diverge
+
+### Variants Compared
+
+```{mermaid}
+graph TD
+    subgraph batch["Batch GD"]
+        direction TB
+        B1["Uses ALL data points"]
+        B2["1 update per epoch"]
+        B3["Smooth but slow"]
+    end
+
+    subgraph sgd["Stochastic GD"]
+        direction TB
+        S1["Uses 1 random point"]
+        S2["N updates per epoch"]
+        S3["Noisy but fast"]
+    end
+
+    subgraph mini["Mini-Batch GD"]
+        direction TB
+        M1["Uses batch of 32-256"]
+        M2["N/batch_size updates"]
+        M3["Best of both worlds"]
+    end
+
+    batch --> sgd --> mini
+
+    style batch fill:#ff7851,stroke:#333,color:#fff
+    style sgd fill:#ffce67,stroke:#333
+    style mini fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Example: Training a Linear Regression
+
+Dataset: 1 million house prices.
+
+| Variant | Computation per update | Updates per epoch | Convergence |
+|---------|----------------------|-------------------|-------------|
+| Batch GD | Processes all 1M samples | 1 | Smooth but very slow |
+| SGD | Processes 1 sample | 1,000,000 | Very noisy, may not converge |
+| Mini-batch (256) | Processes 256 samples | ~3,906 | Good balance |
+
+### Learning Rate Impact
+
+```{mermaid}
+graph TD
+    subgraph too_small["η too small"]
+        TS["Very slow convergence<br/>May get stuck in local minima<br/>Wastes compute"]
+    end
+    subgraph just_right["η just right"]
+        JR["Steady convergence<br/>Finds good minimum<br/>Efficient training"]
+    end
+    subgraph too_large["η too large"]
+        TL["Overshoots minimum<br/>Oscillates or diverges<br/>Loss increases!"]
+    end
+
+    style too_small fill:#6cc3d5,stroke:#333,color:#fff
+    style just_right fill:#56cc9d,stroke:#333,color:#fff
+    style too_large fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Modern Optimizers
+
+| Optimizer | Key Idea | When to Use |
+|-----------|----------|-------------|
+| SGD + Momentum | Accumulates velocity to accelerate through flat regions | Simple models, well-tuned settings |
+| AdaGrad | Adapts learning rate per parameter (smaller for frequent features) | Sparse data (NLP, recommenders) |
+| RMSProp | Like AdaGrad but uses moving average to avoid shrinking too fast | RNNs, non-stationary objectives |
+| **Adam** | Combines momentum + adaptive rates | **Default choice** for most deep learning |
+
+### Application
+
+- **Deep learning:** Adam with learning rate scheduling (warm-up + cosine decay)
+- **Convex problems:** Batch GD with line search guarantees convergence
+- **Large-scale production:** Mini-batch SGD with distributed training across GPUs
+
+---
+
+## Q6: What is cross-validation and why is it important?
+
+**Answer:**
+
+Cross-validation provides a **robust estimate** of model performance by training and evaluating on multiple different splits of the data.
+
+```{mermaid}
+graph LR
+    subgraph fold1["Fold 1"]
+        direction LR
+        F1_VAL["Val"] --- F1_T1["Train"] --- F1_T2["Train"] --- F1_T3["Train"] --- F1_T4["Train"]
+    end
+    subgraph fold2["Fold 2"]
+        direction LR
+        F2_T1["Train"] --- F2_VAL["Val"] --- F2_T2["Train"] --- F2_T3["Train"] --- F2_T4["Train"]
+    end
+    subgraph fold3["Fold 3"]
+        direction LR
+        F3_T1["Train"] --- F3_T2["Train"] --- F3_VAL["Val"] --- F3_T3["Train"] --- F3_T4["Train"]
+    end
+    subgraph fold4["Fold 4"]
+        direction LR
+        F4_T1["Train"] --- F4_T2["Train"] --- F4_T3["Train"] --- F4_VAL["Val"] --- F4_T4["Train"]
+    end
+    subgraph fold5["Fold 5"]
+        direction LR
+        F5_T1["Train"] --- F5_T2["Train"] --- F5_T3["Train"] --- F5_T4["Train"] --- F5_VAL["Val"]
+    end
+
+    fold1 --> R1["Score: 0.85"]
+    fold2 --> R2["Score: 0.82"]
+    fold3 --> R3["Score: 0.87"]
+    fold4 --> R4["Score: 0.83"]
+    fold5 --> R5["Score: 0.86"]
+
+    R1 --> AVG["Average: 0.846 ± 0.019"]
+    R2 --> AVG
+    R3 --> AVG
+    R4 --> AVG
+    R5 --> AVG
+
+    style F1_VAL fill:#ffce67,stroke:#333
+    style F2_VAL fill:#ffce67,stroke:#333
+    style F3_VAL fill:#ffce67,stroke:#333
+    style F4_VAL fill:#ffce67,stroke:#333
+    style F5_VAL fill:#ffce67,stroke:#333
+    style AVG fill:#56cc9d,stroke:#333,color:#fff
+    style fold1 fill:#6cc3d5,stroke:#333,color:#fff
+    style fold2 fill:#6cc3d5,stroke:#333,color:#fff
+    style fold3 fill:#6cc3d5,stroke:#333,color:#fff
+    style fold4 fill:#6cc3d5,stroke:#333,color:#fff
+    style fold5 fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Why a Single Train/Test Split is Dangerous
+
+**Example:** You have 1000 samples and split 80/20. By random chance, your test set might contain mostly "easy" examples → inflated accuracy. Or it might contain mostly "hard" examples → underestimated accuracy.
+
+With 5-fold CV: you get 5 performance estimates, their average is more reliable, and the standard deviation tells you how stable the model is.
+
+### Variants for Different Scenarios
+
+```{mermaid}
+graph TD
+    Q["What kind of data?"] --> A["Balanced classification"]
+    Q --> B["Imbalanced classification"]
+    Q --> C["User-level data"]
+    Q --> D["Time series"]
+
+    A --> A1["Standard K-Fold"]
+    B --> B1["Stratified K-Fold<br/>(preserves class ratio in each fold)"]
+    C --> C1["Group K-Fold<br/>(all data from one user stays together)"]
+    D --> D1["Time Series Split<br/>(train on past, validate on future)"]
+
+    style A1 fill:#6cc3d5,stroke:#333,color:#fff
+    style B1 fill:#56cc9d,stroke:#333,color:#fff
+    style C1 fill:#ffce67,stroke:#333
+    style D1 fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Concrete Example: Model Selection
+
+```python
+from sklearn.model_selection import cross_val_score
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
+
+models = {
+    "Logistic Regression": LogisticRegression(),
+    "Random Forest": RandomForestClassifier(n_estimators=100),
+    "Gradient Boosting": GradientBoostingClassifier(n_estimators=100)
+}
+
+for name, model in models.items():
+    scores = cross_val_score(model, X, y, cv=5, scoring='f1')
+    print(f"{name}: {scores.mean():.3f} ± {scores.std():.3f}")
+
+# Output:
+# Logistic Regression: 0.782 ± 0.015  ← stable but lower
+# Random Forest:       0.841 ± 0.022  ← good balance
+# Gradient Boosting:   0.856 ± 0.031  ← highest but more variable
+```
+
+### Application
+
+- **Hyperparameter tuning:** Use CV inside GridSearchCV/RandomizedSearchCV to select best hyperparameters without touching the test set.
+- **Model comparison:** The model with highest mean CV score AND acceptable variance wins.
+- **Small datasets:** Use Leave-One-Out CV (k = N) when data is very limited.
+
+---
+
+## Q7: How does logistic regression work?
+
+**Answer:**
+
+Logistic regression models the **probability** of a binary outcome by applying the sigmoid function to a linear combination of features:
+
+$$P(y=1|x) = \sigma(w^T x + b) = \frac{1}{1 + e^{-(w^T x + b)}}$$
+
+```{mermaid}
+graph LR
+    A["Input features<br/>x₁, x₂, ..., xₙ"] --> B["Linear combination<br/>z = w₁x₁ + w₂x₂ + ... + b"]
+    B --> C["Sigmoid function<br/>σ(z) = 1/(1+e⁻ᶻ)"]
+    C --> D["Probability<br/>P(y=1) ∈ [0, 1]"]
+    D --> E{"P > threshold?"}
+    E -->|Yes| F["Predict: Positive"]
+    E -->|No| G["Predict: Negative"]
+
+    style C fill:#56cc9d,stroke:#333,color:#fff
+    style D fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Step-by-Step Example: Loan Default Prediction
+
+**Features:** income ($50K), debt_ratio (0.4), credit_score (680)
+
+```python
+# Step 1: Linear combination
+z = 0.03×50 + (-2.5)×0.4 + 0.01×680 + (-8.0)
+z = 1.5 - 1.0 + 6.8 - 8.0 = -0.7
+
+# Step 2: Sigmoid
+P(default) = 1/(1 + e^0.7) = 1/(1 + 2.01) = 0.33
+
+# Step 3: Decision (threshold = 0.5)
+0.33 < 0.5 → Predict: No Default
+```
+
+### Interpreting Coefficients as Odds Ratios
+
+Each coefficient represents the change in **log-odds** per unit increase in the feature:
+
+$$\log\frac{P}{1-P} = w^T x + b$$
+
+- If $w_{\text{income}} = 0.03$: each $1K increase in income multiplies the odds by $e^{0.03} = 1.03$ (3% increase)
+- If $w_{\text{debt\_ratio}} = -2.5$: each 0.1 increase in debt ratio multiplies odds by $e^{-0.25} = 0.78$ (22% decrease)
+
+### When to Use Logistic Regression
+
+```{mermaid}
+graph LR
+    LR["Logistic Regression"] --> GOOD["✅ Good for"]
+    LR --> BAD["❌ Not ideal for"]
+
+    GOOD --> G1["Interpretable models (finance, healthcare)"]
+    GOOD --> G2["Baseline model (fast, reliable)"]
+    GOOD --> G3["Linearly separable problems"]
+    GOOD --> G4["Calibrated probability outputs"]
+
+    BAD --> B1["Complex non-linear boundaries"]
+    BAD --> B2["Image/text data (use deep learning)"]
+    BAD --> B3["Heavy feature interactions (use trees)"]
+
+    style GOOD fill:#56cc9d,stroke:#333,color:#fff
+    style BAD fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Application
+
+- **Credit scoring:** Banks use logistic regression because regulators require interpretable models.
+- **Medical diagnosis:** Probability output directly gives "risk score" for patients.
+- **A/B testing:** Quick baseline to measure treatment effect.
+- **Production ML:** Often the first model deployed because it's fast, stable, and explainable.
+
+---
+
+## Q8: What is a decision tree and how does it split?
+
+**Answer:**
+
+A decision tree recursively partitions the feature space by selecting the best feature and threshold at each node to maximize class separation (or minimize variance for regression).
+
+```{mermaid}
+graph TD
+    A["All data<br/>(100 samples)"] --> B{"Income > $50K?"}
+    B -->|Yes: 60 samples| C{"Credit Score > 700?"}
+    B -->|No: 40 samples| D{"Debt Ratio > 0.5?"}
+    C -->|Yes: 45 samples| E["✅ Approve Loan<br/>(90% approve rate)"]
+    C -->|No: 15 samples| F["⚠️ Review<br/>(60% approve rate)"]
+    D -->|Yes: 25 samples| G["❌ Deny Loan<br/>(85% deny rate)"]
+    D -->|No: 15 samples| H["⚠️ Review<br/>(55% approve rate)"]
+
+    style E fill:#56cc9d,stroke:#333,color:#fff
+    style G fill:#ff7851,stroke:#333,color:#fff
+    style F fill:#ffce67,stroke:#333
+    style H fill:#ffce67,stroke:#333
+```
+
+### How Splitting Works: Gini Impurity
+
+At each node, the tree evaluates every feature and every possible threshold to find the split that **minimizes impurity** in the resulting child nodes.
+
+$$\text{Gini}(node) = 1 - \sum_{i=1}^{C} p_i^2$$
+
+**Example:** A node has 100 samples: 70 Class A, 30 Class B.
+
+```text
+Gini = 1 - (0.7² + 0.3²) = 1 - (0.49 + 0.09) = 0.42
+
+After splitting on "Age > 30":
+  Left child:  50 samples (45 A, 5 B)  → Gini = 1 - (0.9² + 0.1²) = 0.18
+  Right child: 50 samples (25 A, 25 B) → Gini = 1 - (0.5² + 0.5²) = 0.50
+
+Weighted Gini = (50/100)×0.18 + (50/100)×0.50 = 0.34
+Improvement = 0.42 - 0.34 = 0.08 ← the tree selects the split that maximizes this
+```
+
+### Controlling Overfitting
+
+| Hyperparameter | Effect | Typical Values |
+|---------------|--------|----------------|
+| `max_depth` | Limits tree depth | 3-10 |
+| `min_samples_split` | Minimum samples to allow a split | 5-50 |
+| `min_samples_leaf` | Minimum samples in a leaf node | 3-20 |
+| `max_features` | Features considered per split | sqrt(n), log2(n) |
+| Post-pruning | Remove branches that don't improve validation | Cost-complexity pruning |
+
+### Advantages and Disadvantages
+
+| Advantages | Disadvantages |
+|-----------|---------------|
+| Highly interpretable (show to stakeholders) | Prone to overfitting |
+| No feature scaling needed | Unstable (small data changes → different tree) |
+| Handles non-linear relationships | Greedy algorithm (not globally optimal) |
+| Handles mixed data types | Biased toward features with many levels |
+
+### Application
+
+- **Healthcare:** Clinical decision rules ("If blood pressure > X AND cholesterol > Y → high risk")
+- **Manufacturing:** Root cause analysis (which conditions lead to defects)
+- **Customer service:** Decision flows (routing tickets based on features)
+- **As building blocks:** Foundation for Random Forest and Gradient Boosting
+
+---
+
+## Q9: How does Random Forest improve upon a single decision tree?
+
+**Answer:**
+
+Random Forest is a **bagging** ensemble that builds many decorrelated decision trees and aggregates their predictions to reduce variance while maintaining low bias.
+
+```{mermaid}
+graph TD
+    DATA["Training Data<br/>(N samples, M features)"] --> BS1["Bootstrap Sample 1<br/>(N samples with replacement)"]
+    DATA --> BS2["Bootstrap Sample 2<br/>(N samples with replacement)"]
+    DATA --> BS3["Bootstrap Sample 3<br/>(N samples with replacement)"]
+    DATA --> BSN["... Bootstrap Sample K"]
+
+    BS1 --> T1["Tree 1<br/>(random √M features per split)"]
+    BS2 --> T2["Tree 2<br/>(random √M features per split)"]
+    BS3 --> T3["Tree 3<br/>(random √M features per split)"]
+    BSN --> TN["Tree K<br/>(random √M features per split)"]
+
+    T1 --> AGG["Aggregate Predictions"]
+    T2 --> AGG
+    T3 --> AGG
+    TN --> AGG
+
+    AGG --> CLS["Classification: Majority Vote"]
+    AGG --> REG["Regression: Average"]
+
+    style DATA fill:#6cc3d5,stroke:#333,color:#fff
+    style AGG fill:#56cc9d,stroke:#333,color:#fff
+    style CLS fill:#ffce67,stroke:#333
+    style REG fill:#ffce67,stroke:#333
+```
+
+### Why It Works: Decorrelation Reduces Variance
+
+**Key insight:** If you average $n$ independent predictions each with variance $\sigma^2$, the ensemble variance is $\sigma^2/n$. But trees trained on the same data are correlated. Random Forest decorrelates them by:
+
+1. **Bootstrap sampling:** Each tree sees a different subset of data (~63% unique samples per tree)
+2. **Feature randomization:** Each split considers only $\sqrt{M}$ random features (classification) or $M/3$ (regression)
+
+### Example: Fraud Detection
+
+```python
+from sklearn.ensemble import RandomForestClassifier
+
+# Single Decision Tree: Accuracy 82%, highly variable
+# Random Forest: Accuracy 91%, stable across runs
+
+rf = RandomForestClassifier(
+    n_estimators=500,     # 500 trees
+    max_depth=15,         # limit individual tree complexity
+    max_features='sqrt',  # √M features per split
+    min_samples_leaf=5,   # prevent tiny leaves
+    oob_score=True        # free validation estimate!
+)
+rf.fit(X_train, y_train)
+
+# Out-of-Bag score (free cross-validation):
+print(f"OOB Score: {rf.oob_score_:.3f}")  # 0.908
+
+# Feature importance:
+importances = rf.feature_importances_
+# transaction_amount: 0.25, time_since_last: 0.18, ...
+```
+
+### Out-of-Bag (OOB) Estimation
+
+Each tree doesn't see ~37% of the data (not in its bootstrap sample). These "out-of-bag" samples provide a **free validation estimate** without needing a separate validation set.
+
+### Comparison: Single Tree vs. Random Forest
+
+| Aspect | Single Decision Tree | Random Forest |
+|--------|---------------------|---------------|
+| Bias | Low | Low (same) |
+| Variance | High | Low (reduced by averaging) |
+| Interpretability | High (single path) | Lower (many trees) |
+| Overfitting risk | High | Low |
+| Training speed | Fast | Slower (but parallelizable) |
+| Feature importance | Unreliable | Reliable (averaged) |
+
+### Application
+
+- **Default production model:** When you need something that works well with minimal tuning
+- **Feature selection:** Use feature importances to identify key variables
+- **Anomaly detection:** Isolation Forest (variant) for outlier detection
+- **Missing data:** Handles missing values via surrogate splits in some implementations
+
+---
+
+## Q10: What is the difference between bagging and boosting?
+
+**Answer:**
+
+Both are ensemble methods that combine multiple weak learners, but they differ fundamentally in **how** they build and combine models.
+
+```{mermaid}
+graph TD
+    subgraph bagging["BAGGING (Bootstrap Aggregating)"]
+        direction TB
+        BA["Original Data"] --> B1["Bootstrap 1"]
+        BA --> B2["Bootstrap 2"]
+        BA --> B3["Bootstrap 3"]
+        B1 --> M1["Model 1"]
+        B2 --> M2["Model 2"]
+        B3 --> M3["Model 3"]
+        M1 --> VOTE["Average / Vote"]
+        M2 --> VOTE
+        M3 --> VOTE
+    end
+
+    subgraph boosting["BOOSTING (Sequential)"]
+        direction TB
+        BO["Original Data"] --> BM1["Model 1"]
+        BM1 --> ERR1["Errors from Model 1"]
+        ERR1 --> BM2["Model 2<br/>(focuses on errors)"]
+        BM2 --> ERR2["Errors from Model 1+2"]
+        ERR2 --> BM3["Model 3<br/>(focuses on remaining errors)"]
+        BM3 --> WSUM["Weighted Sum"]
+    end
+
+    style bagging fill:#56cc9d,stroke:#333,color:#fff
+    style boosting fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Detailed Comparison
+
+| Aspect | Bagging | Boosting |
+|--------|---------|----------|
+| Training | Parallel (independent) | Sequential (each depends on previous) |
+| Focus | Random subsets of data | Misclassified / high-error samples |
+| Reduces | Variance | Bias |
+| Overfitting | Resistant | Can overfit if not regularized |
+| Speed | Parallelizable → fast | Sequential → slower |
+| Typical base learner | Deep trees (high variance) | Shallow trees (high bias) |
+| Key example | Random Forest | XGBoost, LightGBM, AdaBoost |
+
+### Example: Predicting Customer Churn
+
+```python
+# Bagging approach — Random Forest
+from sklearn.ensemble import RandomForestClassifier
+rf = RandomForestClassifier(n_estimators=200, max_depth=None)
+# Each tree is deep (low bias, high variance)
+# Averaging reduces variance → good overall
+
+# Boosting approach — XGBoost
+import xgboost as xgb
+xgb_model = xgb.XGBClassifier(
+    n_estimators=200,
+    max_depth=3,         # shallow trees (high bias)
+    learning_rate=0.1,   # shrinkage — don't trust each tree fully
+    subsample=0.8
+)
+# Each tree corrects previous errors → reduces bias iteratively
+```
+
+### When to Choose Which
+
+```{mermaid}
+graph TD
+    Q["Which ensemble?"] --> Q1{"Noisy data or<br/>risk of overfitting?"}
+    Q1 -->|Yes| BAG["Bagging<br/>(Random Forest)"]
+    Q1 -->|No| Q2{"Need maximum accuracy<br/>and can tune carefully?"}
+    Q2 -->|Yes| BOOST["Boosting<br/>(XGBoost / LightGBM)"]
+    Q2 -->|No| BAG2["Bagging<br/>(safer default)"]
+
+    style BAG fill:#56cc9d,stroke:#333,color:#fff
+    style BAG2 fill:#56cc9d,stroke:#333,color:#fff
+    style BOOST fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+**Choose Bagging when:**
+
+- Data is noisy or has many outliers
+- You want a robust model with minimal tuning
+- You need parallelized training for speed
+- Overfitting is a primary concern
+
+**Choose Boosting when:**
+
+- You need maximum predictive accuracy (Kaggle competitions, production ranking)
+- You have clean data and can invest in hyperparameter tuning
+- The problem has high bias (complex patterns to capture)
+- You have proper validation to detect overfitting
+
+### Real-World Application
+
+| Scenario | Recommended | Why |
+|----------|------------|-----|
+| First model in production | Random Forest | Robust, minimal tuning |
+| Kaggle competition | XGBoost/LightGBM | Maximum accuracy |
+| Noisy sensor data | Random Forest | Handles noise better |
+| Ranking / search | LightGBM (LambdaMART) | Industry standard for learning-to-rank |
+| Large-scale (millions of rows) | LightGBM | Faster than XGBoost on large data |
+
+---
+
+## Summary
+
+| Question | Core Concept | Key Takeaway |
+|----------|-------------|--------------|
+| Q1 | Learning paradigms | Match the paradigm to your data and feedback type |
+| Q2 | Bias-variance | Diagnose underfitting vs. overfitting from error patterns |
+| Q3 | Overfitting | Prevention is cheaper than cure — regularize early |
+| Q4 | Regularization | L1 for feature selection, L2 for stability |
+| Q5 | Gradient descent | Adam is the default; understand why |
+| Q6 | Cross-validation | Never trust a single split; CV gives confidence intervals |
+| Q7 | Logistic regression | The interpretable baseline every ML engineer should try first |
+| Q8 | Decision trees | Intuitive but overfit; control with depth and pruning |
+| Q9 | Random Forest | Decorrelation is the magic — averaging independent errors |
+| Q10 | Bagging vs. Boosting | Bagging reduces variance; boosting reduces bias |
+
+> **Next:** [ML Interview QA - 2](/posts/ml-interview/ML-Interview-QA-2.html) covers evaluation metrics (precision, recall, ROC-AUC), feature engineering, PCA, handling imbalanced data, missing values, and data leakage.
+
+<!-- nav-buttons -->
+
+[{{< fa brain >}} ML Interview QA - 2](/posts/ml-interview/ML-Interview-QA-2.html){.btn .btn-primary .btn-lg}
+[{{< fa house >}} Home](../../index.qmd){.btn .btn-primary .btn-lg}

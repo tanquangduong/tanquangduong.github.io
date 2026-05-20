@@ -1,0 +1,728 @@
+---
+title: "LLM Interview QA - 2"
+description: "10 advanced LLM interview questions on scaling laws, context windows, quantization, agents, evaluation, embeddings, and emerging architectures — with diagrams and examples."
+image: /images/llm-interview/thumb_LLM_interview_qa_300.png
+date: "2026-05-20"
+keywords:
+  - "LLM interview"
+  - "scaling laws"
+  - "context window"
+  - "quantization"
+  - "LLM agents"
+  - "LLM evaluation"
+  - "embeddings"
+  - "mixture of experts"
+  - "KV cache"
+  - "instruction tuning"
+  - "LLM inference optimization"
+  - "agentic AI"
+---
+
+## Introduction
+
+This is **Part 2** of our LLM Interview QA series. It covers 10 advanced questions on scaling, optimization, agents, and evaluation — the practical knowledge that separates candidates who use LLMs from those who **engineer production LLM systems**.
+
+> For foundational LLM concepts (transformers, attention, tokenization, RAG, RLHF), see [LLM Interview QA - 1](/posts/llm-interview/LLM-Interview-QA-1.html). For ML fundamentals, see [ML Interview QA - 1](/posts/ml-interview/ML-Interview-QA-1.html) and [ML Interview QA - 2](/posts/ml-interview/ML-Interview-QA-2.html).
+
+---
+
+## Q1: What are scaling laws in LLMs and why do they matter?
+
+**Answer:**
+
+**Scaling laws** are empirical relationships describing how LLM performance improves predictably as you increase model size, dataset size, and compute budget.
+
+### The Chinchilla Scaling Law
+
+The key finding (Hoffmann et al., 2022): for a given compute budget, **model size and training tokens should be scaled equally**.
+
+$$L(N, D) \approx \frac{A}{N^\alpha} + \frac{B}{D^\beta} + E$$
+
+where:
+
+- $N$ = number of parameters
+- $D$ = number of training tokens
+- $L$ = loss (lower is better)
+- $E$ = irreducible loss (entropy of natural language)
+
+```{mermaid}
+graph TD
+    subgraph Scaling["Scaling Laws: Three Axes"]
+        PARAMS["Model Parameters (N)<br/>More params → lower loss"]
+        DATA["Training Data (D)<br/>More tokens → lower loss"]
+        COMPUTE["Compute (C ≈ 6ND)<br/>More FLOPs → lower loss"]
+    end
+
+    subgraph Tradeoff["Chinchilla Optimal"]
+        OPT["For budget C:<br/>Scale N and D equally<br/>D ≈ 20 × N tokens"]
+    end
+
+    Scaling --> Tradeoff
+
+    style Scaling fill:#56cc9d,stroke:#333,color:#fff
+    style Tradeoff fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Practical Implications
+
+| Insight | Implication |
+|---------|-------------|
+| Loss decreases as a power law | Returns diminish but never plateau (with enough data) |
+| Chinchilla-optimal training | Many early LLMs were undertrained (GPT-3: 300B tokens for 175B params) |
+| Compute-optimal models | LLaMA-70B outperforms GPT-3-175B by training on more tokens |
+| Emergent abilities | Some capabilities appear only above certain scale thresholds |
+
+### Emergent Abilities
+
+Certain capabilities appear suddenly at scale rather than improving gradually:
+
+- **Chain-of-thought reasoning** — emerges around 60-100B parameters
+- **In-context learning** — improves dramatically with scale
+- **Multi-step math** — requires large models to perform reliably
+
+---
+
+## Q2: How do LLMs handle long context windows and what are the key challenges?
+
+**Answer:**
+
+The **context window** is the maximum number of tokens an LLM can process in a single forward pass. Modern models range from 4K to 1M+ tokens.
+
+### The Challenge: Quadratic Attention
+
+Standard self-attention has $O(n^2)$ complexity in both time and memory with respect to sequence length $n$:
+
+$$\text{Memory} \propto n^2, \quad \text{Compute} \propto n^2 \cdot d$$
+
+```{mermaid}
+graph TD
+    subgraph Problem["The Quadratic Problem"]
+        S1["4K tokens → 16M attention entries"]
+        S2["32K tokens → 1B attention entries"]
+        S3["128K tokens → 16B attention entries"]
+        S4["1M tokens → 1T attention entries"]
+    end
+
+    subgraph Solutions["Solutions"]
+        SOL1["Efficient Attention<br/>Flash Attention, Ring Attention"]
+        SOL2["Position Extrapolation<br/>RoPE, ALiBi, YaRN"]
+        SOL3["Sparse Attention<br/>Sliding window, dilated"]
+        SOL4["Memory/Retrieval<br/>Compress old context"]
+    end
+
+    Problem --> Solutions
+
+    style Problem fill:#ff7851,stroke:#333,color:#fff
+    style Solutions fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Key Techniques for Long Context
+
+| Technique | How it works | Used by |
+|-----------|-------------|---------|
+| **Flash Attention** | Fused GPU kernels, tiled computation to reduce memory I/O | Most modern LLMs |
+| **RoPE** (Rotary Position Embedding) | Encodes relative positions via rotation matrices | LLaMA, Mistral |
+| **ALiBi** | Linear bias based on distance (no positional embedding) | BLOOM |
+| **Sliding Window Attention** | Each token attends only to nearby tokens | Mistral |
+| **Ring Attention** | Distributes sequence across multiple GPUs | Long-context training |
+| **YaRN** | Extends RoPE to longer contexts via interpolation | Extended LLaMA |
+
+### The "Lost in the Middle" Problem
+
+Research shows LLMs tend to:
+
+- Remember information at the **beginning** and **end** of context well
+- Struggle with information in the **middle** of long contexts
+- Performance degrades as relevant information is placed further from query
+
+### Practical Considerations
+
+- Longer context ≠ better retrieval (RAG often outperforms naive long context)
+- KV cache memory grows linearly with sequence length
+- Inference cost increases with context length even if most tokens are irrelevant
+
+---
+
+## Q3: What is model quantization and how does it enable LLM deployment?
+
+**Answer:**
+
+**Quantization** reduces the numerical precision of model weights (and sometimes activations) from high-precision formats (FP32/FP16) to lower-precision formats (INT8/INT4), dramatically reducing memory and improving inference speed.
+
+```{mermaid}
+graph LR
+    subgraph Precision["Precision Formats"]
+        FP32["FP32 (32-bit)<br/>Full precision<br/>4 bytes per param"]
+        FP16["FP16/BF16 (16-bit)<br/>Half precision<br/>2 bytes per param"]
+        INT8["INT8 (8-bit)<br/>Quarter precision<br/>1 byte per param"]
+        INT4["INT4 (4-bit)<br/>Eighth precision<br/>0.5 bytes per param"]
+    end
+
+    FP32 -->|"2x compression"| FP16
+    FP16 -->|"2x compression"| INT8
+    INT8 -->|"2x compression"| INT4
+
+    style FP32 fill:#ff7851,stroke:#333,color:#fff
+    style FP16 fill:#ffce67,stroke:#333
+    style INT8 fill:#6cc3d5,stroke:#333,color:#fff
+    style INT4 fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Memory Requirements Example (LLaMA-70B)
+
+| Precision | Memory Required | Hardware Needed |
+|-----------|----------------|-----------------|
+| FP32 | ~280 GB | 4× A100 80GB |
+| FP16 | ~140 GB | 2× A100 80GB |
+| INT8 | ~70 GB | 1× A100 80GB |
+| INT4 | ~35 GB | 1× A6000 48GB or consumer GPU |
+
+### Quantization Approaches
+
+| Method | Type | Description |
+|--------|------|-------------|
+| **PTQ** (Post-Training Quantization) | After training | Quantize a trained model without retraining |
+| **QAT** (Quantization-Aware Training) | During training | Simulate quantization during training for better accuracy |
+| **GPTQ** | PTQ, weight-only | Layer-wise quantization using calibration data |
+| **AWQ** (Activation-Aware) | PTQ, weight-only | Protects salient weights based on activation magnitude |
+| **GGUF** (llama.cpp format) | PTQ, various bits | CPU-friendly format with mixed precision |
+
+### Quality vs. Compression Tradeoff
+
+| Quantization | Perplexity Impact | Speed Gain | Use Case |
+|--------------|-------------------|------------|----------|
+| FP16 → INT8 | Negligible (<0.1%) | 1.5-2x | Production serving |
+| FP16 → INT4 | Small (1-3%) | 2-3x | Edge deployment, personal use |
+| FP16 → INT2 | Significant (5-15%) | 3-4x | Experimental only |
+
+### Key Insight
+
+4-bit quantization (GPTQ, AWQ) has become the standard for local LLM deployment because it offers **near-lossless quality** with 4x memory reduction — enabling 70B models to run on consumer hardware.
+
+---
+
+## Q4: What are LLM Agents and how do they extend LLM capabilities?
+
+**Answer:**
+
+**LLM Agents** are systems where an LLM acts as a reasoning engine that can plan, use tools, and take actions to accomplish goals — going beyond simple text generation.
+
+```{mermaid}
+graph TD
+    subgraph Agent["LLM Agent Architecture"]
+        LLM_CORE["LLM (Brain)<br/>Reasoning & Planning"]
+        MEMORY["Memory<br/>Short-term: conversation<br/>Long-term: vector store"]
+        TOOLS["Tools<br/>Code execution, APIs,<br/>Search, Databases"]
+        PLANNING["Planning<br/>Task decomposition,<br/>Reflection, Replanning"]
+    end
+
+    USER["User Goal"] --> LLM_CORE
+    LLM_CORE --> PLANNING
+    PLANNING --> TOOLS
+    TOOLS --> |"Observation"| LLM_CORE
+    LLM_CORE --> MEMORY
+    MEMORY --> LLM_CORE
+    LLM_CORE --> RESULT["Final Result"]
+
+    style Agent fill:#56cc9d,stroke:#333,color:#fff
+    style USER fill:#6cc3d5,stroke:#333,color:#fff
+    style RESULT fill:#ffce67,stroke:#333
+```
+
+### Core Agent Patterns
+
+| Pattern | How it works | Example |
+|---------|-------------|---------|
+| **ReAct** | Reason → Act → Observe loop | "I need to search for X" → search → "I found Y, now I'll..." |
+| **Plan-and-Execute** | Create full plan first, then execute steps | Break complex task into subtasks |
+| **Reflection** | Agent critiques its own output and improves | Self-check for errors before responding |
+| **Multi-Agent** | Multiple specialized agents collaborate | Researcher + Coder + Reviewer |
+
+### Tool Use
+
+Tools transform LLMs from text generators into **action-taking systems**:
+
+| Tool Category | Examples | Why Needed |
+|---------------|----------|------------|
+| **Code Execution** | Python REPL, sandboxed environments | Precise computation, data analysis |
+| **Search** | Web search, document retrieval | Access to current information |
+| **APIs** | Weather, calendar, databases | Real-world interactions |
+| **File I/O** | Read/write files, parse documents | Persistent data manipulation |
+
+### Agent Frameworks
+
+| Framework | Approach | Strength |
+|-----------|----------|----------|
+| **LangGraph** | Graph-based state machines | Complex workflows, cycles |
+| **CrewAI** | Role-based multi-agent | Team collaboration metaphor |
+| **AutoGen** | Conversational agents | Multi-agent conversation |
+| **OpenAI Assistants** | Managed agent platform | Easy deployment |
+
+### Challenges
+
+- **Reliability:** Agents can go off-track or loop infinitely
+- **Cost:** Multiple LLM calls per task (tool reasoning is expensive)
+- **Safety:** Autonomous actions need guardrails
+- **Evaluation:** Hard to benchmark open-ended agent behavior
+
+---
+
+## Q5: How do you evaluate LLM performance and what metrics are used?
+
+**Answer:**
+
+LLM evaluation is uniquely challenging because outputs are open-ended text. Different tasks require different evaluation approaches.
+
+```{mermaid}
+graph TD
+    EVAL["LLM Evaluation"]
+    EVAL --> AUTO["Automated Metrics"]
+    EVAL --> HUMAN["Human Evaluation"]
+    EVAL --> LLM_JUDGE["LLM-as-Judge"]
+    EVAL --> BENCH["Benchmarks"]
+
+    AUTO --> A1["Perplexity"]
+    AUTO --> A2["BLEU / ROUGE"]
+    AUTO --> A3["BERTScore"]
+    AUTO --> A4["Exact Match / F1"]
+
+    HUMAN --> H1["Preference ranking"]
+    HUMAN --> H2["Likert scale ratings"]
+    HUMAN --> H3["Task completion rate"]
+
+    LLM_JUDGE --> L1["Pairwise comparison"]
+    LLM_JUDGE --> L2["Rubric-based scoring"]
+    LLM_JUDGE --> L3["Reference-free evaluation"]
+
+    BENCH --> B1["MMLU (knowledge)"]
+    BENCH --> B2["HumanEval (coding)"]
+    BENCH --> B3["GSM8K (math)"]
+    BENCH --> B4["TruthfulQA (honesty)"]
+
+    style EVAL fill:#56cc9d,stroke:#333,color:#fff
+    style AUTO fill:#6cc3d5,stroke:#333,color:#fff
+    style LLM_JUDGE fill:#ffce67,stroke:#333
+    style BENCH fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Metric Selection by Task
+
+| Task | Primary Metrics | Why |
+|------|----------------|-----|
+| **Summarization** | ROUGE-L, faithfulness, BERTScore | Overlap + semantic similarity |
+| **Translation** | BLEU, chrF, COMET | N-gram overlap + learned metrics |
+| **Code Generation** | pass@k, HumanEval | Functional correctness |
+| **Question Answering** | Exact Match, F1, faithfulness | Factual accuracy |
+| **Chat/Dialog** | Human preference, LLM-judge | No single ground truth |
+| **Reasoning** | Accuracy on benchmarks (GSM8K, MATH) | Verifiable correct answers |
+
+### LLM-as-Judge
+
+Using a stronger LLM to evaluate outputs has become standard:
+
+```
+System: You are an expert evaluator. Rate the following response on:
+1. Helpfulness (1-5)
+2. Accuracy (1-5)
+3. Harmlessness (1-5)
+
+Provide scores and brief justification.
+```
+
+**Advantages:** Scalable, consistent, correlates well with human judgment  
+**Limitations:** Biases (position bias, verbosity bias, self-preference)
+
+### Key Benchmarks (2024-2026)
+
+| Benchmark | What it tests | Top performers |
+|-----------|--------------|----------------|
+| **MMLU** | 57 subjects, world knowledge | GPT-4, Claude 3.5 |
+| **HumanEval / MBPP** | Code generation | GPT-4, Claude 3.5, DeepSeek |
+| **GSM8K / MATH** | Mathematical reasoning | O1, Claude 3.5 |
+| **MT-Bench** | Multi-turn conversation | GPT-4, Claude |
+| **GPQA** | PhD-level science questions | O1, Gemini Ultra |
+| **SWE-Bench** | Real-world software engineering | Claude 3.5, Devin |
+
+### Evaluation Anti-Patterns
+
+- **Benchmark contamination:** Test data leaks into training
+- **Over-optimizing for benchmarks:** Gaming metrics without real improvement
+- **Single metric reliance:** Missing failure modes
+- **Static evaluation:** Not tracking performance over time in production
+
+---
+
+## Q6: What are embeddings and how are they used in LLM applications?
+
+**Answer:**
+
+**Embeddings** are dense vector representations that capture semantic meaning. They convert text (words, sentences, documents) into numerical vectors where similar meanings are geometrically close.
+
+```{mermaid}
+graph LR
+    subgraph Embedding_Space["Embedding Space"]
+        direction TB
+        K["'king' [0.2, 0.8, ...]"]
+        Q["'queen' [0.3, 0.8, ...]"]
+        M["'man' [0.2, 0.1, ...]"]
+        W["'woman' [0.3, 0.1, ...]"]
+    end
+
+    subgraph Applications["Applications"]
+        SEM["Semantic Search"]
+        CLUST["Clustering"]
+        CLASS["Classification"]
+        RAG_APP["RAG Retrieval"]
+        REC["Recommendations"]
+    end
+
+    Embedding_Space --> Applications
+
+    style Embedding_Space fill:#6cc3d5,stroke:#333,color:#fff
+    style Applications fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Types of Embeddings
+
+| Type | Granularity | Models | Use Case |
+|------|-------------|--------|----------|
+| **Word embeddings** | Single words | Word2Vec, GloVe | Legacy, fast lookup |
+| **Contextual embeddings** | Words in context | BERT, GPT hidden states | NER, classification |
+| **Sentence embeddings** | Full sentences | E5, BGE, all-MiniLM | Semantic search, RAG |
+| **Document embeddings** | Paragraphs/pages | Voyage, Cohere Embed | Document retrieval |
+
+### Similarity Metrics
+
+| Metric | Formula | Range | Best for |
+|--------|---------|-------|----------|
+| **Cosine similarity** | $\frac{A \cdot B}{\|A\| \|B\|}$ | [-1, 1] | Most NLP tasks |
+| **Euclidean distance** | $\|A - B\|_2$ | [0, ∞) | Clustering |
+| **Dot product** | $A \cdot B$ | (-∞, ∞) | When magnitude matters |
+
+### Modern Embedding Models (2024-2026)
+
+| Model | Dimensions | Context | Strength |
+|-------|-----------|---------|----------|
+| **OpenAI text-embedding-3-large** | 3072 | 8K | General purpose |
+| **BGE-M3** | 1024 | 8K | Multilingual, multi-granularity |
+| **E5-Mistral-7B** | 4096 | 32K | Long documents |
+| **Cohere Embed v3** | 1024 | 512 | Multi-language, classification |
+| **Voyage-3** | 1024 | 32K | Code + text |
+
+### Practical Embedding Pipeline
+
+1. **Chunk documents** into semantically meaningful segments
+2. **Embed chunks** using a sentence embedding model
+3. **Store vectors** in a vector database (Pinecone, Weaviate, pgvector)
+4. **Query-time:** embed the user query with the same model
+5. **Retrieve:** find top-k nearest neighbors via ANN (approximate nearest neighbor)
+
+### Common Pitfalls
+
+- Using different embedding models for indexing vs. querying
+- Chunks too large (loses specificity) or too small (loses context)
+- Not normalizing vectors when using cosine similarity
+- Ignoring embedding model's max token limit
+
+---
+
+## Q7: What is Mixture of Experts (MoE) and how does it enable efficient scaling?
+
+**Answer:**
+
+**Mixture of Experts (MoE)** is an architecture where only a subset of the model's parameters are activated for each input token, enabling much larger models without proportional compute increase.
+
+```{mermaid}
+graph TD
+    INPUT["Input Token"]
+    INPUT --> ROUTER["Router/Gating Network<br/>Learns which experts to activate"]
+    ROUTER -->|"Top-k selection"| E1["Expert 1<br/>(FFN)"]
+    ROUTER -->|"Top-k selection"| E2["Expert 2<br/>(FFN)"]
+    ROUTER -.->|"Not selected"| E3["Expert 3<br/>(FFN)"]
+    ROUTER -.->|"Not selected"| E4["Expert 4<br/>(FFN)"]
+    ROUTER -.->|"Not selected"| EN["Expert N<br/>(FFN)"]
+
+    E1 --> COMBINE["Weighted Combination"]
+    E2 --> COMBINE
+    COMBINE --> OUTPUT["Output"]
+
+    style INPUT fill:#56cc9d,stroke:#333,color:#fff
+    style ROUTER fill:#ffce67,stroke:#333
+    style E1 fill:#6cc3d5,stroke:#333,color:#fff
+    style E2 fill:#6cc3d5,stroke:#333,color:#fff
+    style COMBINE fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Dense vs. MoE Comparison
+
+| Aspect | Dense Model | MoE Model |
+|--------|-------------|-----------|
+| Parameters activated per token | 100% | ~12-25% (top-k experts) |
+| Total parameters | e.g., 70B | e.g., 8×7B = 56B total, ~13B active |
+| Inference compute | Proportional to total params | Proportional to active params |
+| Memory | Moderate | High (all experts in memory) |
+| Training efficiency | Lower | Higher (more params per FLOP) |
+
+### Notable MoE Models
+
+| Model | Architecture | Active Params | Total Params |
+|-------|-------------|---------------|--------------|
+| **Mixtral 8×7B** | 8 experts, top-2 routing | ~13B | ~47B |
+| **GPT-4** (rumored) | MoE architecture | Unknown | ~1.8T |
+| **DeepSeek-V2** | 160 experts, top-6 | ~21B | ~236B |
+| **Switch Transformer** | Top-1 routing | Variable | Up to 1.6T |
+
+### Challenges with MoE
+
+| Challenge | Description | Mitigation |
+|-----------|-------------|------------|
+| **Load balancing** | Some experts get used more than others | Auxiliary loss, expert capacity limits |
+| **Memory** | All experts must be in memory | Expert parallelism, offloading |
+| **Training instability** | Routing can collapse to few experts | Noisy top-k, load balancing loss |
+| **Communication overhead** | Experts on different GPUs need data transfer | Efficient all-to-all communication |
+
+### Why MoE Matters
+
+MoE allows training models with **trillions of parameters** while keeping inference costs manageable — it's likely the architecture behind the largest frontier models.
+
+---
+
+## Q8: What is the KV Cache and how does it affect LLM inference?
+
+**Answer:**
+
+The **KV (Key-Value) Cache** stores previously computed key and value vectors from the attention mechanism, avoiding redundant computation during autoregressive generation.
+
+### Why KV Cache is Necessary
+
+During generation, the LLM produces one token at a time. Without caching, generating token $t$ requires recomputing attention over all previous $t-1$ tokens from scratch.
+
+```{mermaid}
+graph LR
+    subgraph Without_Cache["Without KV Cache"]
+        W1["Token 1: compute K,V for [1]"]
+        W2["Token 2: compute K,V for [1,2]"]
+        W3["Token 3: compute K,V for [1,2,3]"]
+        W4["Token N: compute K,V for [1,...,N]"]
+        W1 --> W2 --> W3 --> W4
+    end
+
+    subgraph With_Cache["With KV Cache"]
+        C1["Token 1: compute & store K₁,V₁"]
+        C2["Token 2: compute K₂,V₂, reuse K₁,V₁"]
+        C3["Token 3: compute K₃,V₃, reuse K₁,V₁,K₂,V₂"]
+        C1 --> C2 --> C3
+    end
+
+    style Without_Cache fill:#ff7851,stroke:#333,color:#fff
+    style With_Cache fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Complexity Comparison
+
+| Metric | Without KV Cache | With KV Cache |
+|--------|------------------|---------------|
+| Compute per token | $O(n \cdot d^2)$ (recompute all) | $O(d^2)$ (new token only) |
+| Total generation | $O(n^2 \cdot d^2)$ | $O(n \cdot d^2)$ |
+| Memory | $O(d)$ | $O(n \cdot d)$ grows with sequence |
+
+### KV Cache Memory Problem
+
+For a model with $L$ layers, $H$ heads, $d_h$ head dimension, sequence length $n$:
+
+$$\text{KV Cache Size} = 2 \times L \times H \times d_h \times n \times \text{bytes per element}$$
+
+**Example:** LLaMA-70B with 128K context in FP16:
+$2 \times 80 \times 64 \times 128 \times 128000 \times 2 \approx 167$ GB — just for the cache!
+
+### KV Cache Optimization Techniques
+
+| Technique | How it helps | Compression |
+|-----------|-------------|-------------|
+| **Multi-Query Attention (MQA)** | Share K,V across all heads | ~8-16x reduction |
+| **Grouped-Query Attention (GQA)** | Share K,V across groups of heads | ~4-8x reduction |
+| **KV Cache Quantization** | Store K,V in INT8/INT4 | 2-4x reduction |
+| **Paged Attention (vLLM)** | Virtual memory for KV cache | Better memory utilization |
+| **Sliding Window** | Only cache recent tokens | Bounded cache size |
+
+### Prefill vs. Decode Phases
+
+| Phase | What happens | Bottleneck |
+|-------|-------------|------------|
+| **Prefill** | Process all input tokens in parallel, fill KV cache | Compute-bound |
+| **Decode** | Generate one token at a time using cached KV | Memory-bandwidth-bound |
+
+The decode phase is typically **memory-bandwidth-bound** because each new token requires reading the entire KV cache from memory.
+
+---
+
+## Q9: What is instruction tuning and how does it differ from pre-training and RLHF?
+
+**Answer:**
+
+**Instruction tuning** (also called supervised fine-tuning or SFT) trains a base LLM on (instruction, response) pairs to follow human instructions — it's the critical bridge between a next-token predictor and a useful assistant.
+
+```{mermaid}
+graph LR
+    subgraph Pipeline["LLM Training Pipeline"]
+        direction LR
+        PT["Pre-training<br/>Next-token prediction<br/>on internet text<br/>(Trillions of tokens)"]
+        IT["Instruction Tuning (SFT)<br/>Train on (instruction, response)<br/>pairs from humans<br/>(10K-1M examples)"]
+        RLHF_step["RLHF / DPO<br/>Align with human preferences<br/>via reward signals<br/>(Preference pairs)"]
+    end
+
+    PT -->|"Base model"| IT
+    IT -->|"SFT model"| RLHF_step
+    RLHF_step -->|"Aligned model"| FINAL["Production Model"]
+
+    style PT fill:#6cc3d5,stroke:#333,color:#fff
+    style IT fill:#56cc9d,stroke:#333,color:#fff
+    style RLHF_step fill:#ffce67,stroke:#333
+```
+
+### Comparison of Training Stages
+
+| Aspect | Pre-training | Instruction Tuning | RLHF/DPO |
+|--------|-------------|-------------------|-----------|
+| **Objective** | Predict next token | Follow instructions | Align with preferences |
+| **Data** | Raw text (web crawl) | (Instruction, Response) pairs | Ranked response pairs |
+| **Data size** | Trillions of tokens | 10K–1M examples | 10K–100K comparisons |
+| **Compute** | Massive (months on clusters) | Moderate (hours–days) | Moderate |
+| **Effect** | General language understanding | Task following, formatting | Helpfulness, safety, style |
+
+### What Makes Good Instruction Tuning Data?
+
+| Quality Factor | Description |
+|---------------|-------------|
+| **Diversity** | Cover many task types (QA, coding, math, writing, analysis) |
+| **Complexity** | Include both simple and multi-step instructions |
+| **Format variety** | JSON, markdown, code, natural language responses |
+| **Correctness** | Responses must be accurate and complete |
+| **Safety** | Include refusal examples for harmful requests |
+
+### Notable Instruction Datasets
+
+| Dataset | Size | Source | Used By |
+|---------|------|--------|---------|
+| **FLAN** | 1.8M | Converted NLP tasks into instructions | Flan-T5, Flan-PaLM |
+| **Alpaca** | 52K | GPT-4 generated | Stanford Alpaca |
+| **ShareGPT** | 90K+ | User conversations with ChatGPT | Vicuna |
+| **OpenHermes** | 1M+ | Curated multi-source | Many open models |
+| **UltraChat** | 1.5M | Multi-turn synthetic dialogues | Zephyr |
+
+### Base Model vs. Instruction-Tuned Behavior
+
+**Prompt:** "What is the capital of France?"
+
+- **Base model:** "What is the capital of Germany? What is the capital of Spain?..." (continues the pattern)
+- **Instruction-tuned:** "The capital of France is Paris." (answers directly)
+
+---
+
+## Q10: What are the key inference optimization techniques for serving LLMs at scale?
+
+**Answer:**
+
+Serving LLMs in production requires optimizing for **latency** (time to first token, tokens per second), **throughput** (requests per second), and **cost** (dollars per token).
+
+```{mermaid}
+graph TD
+    OPT["LLM Inference Optimization"]
+    OPT --> MODEL["Model-Level"]
+    OPT --> SYSTEM["System-Level"]
+    OPT --> SERVE["Serving-Level"]
+
+    MODEL --> M1["Quantization (INT4/INT8)"]
+    MODEL --> M2["Distillation"]
+    MODEL --> M3["Pruning"]
+    MODEL --> M4["Speculative Decoding"]
+
+    SYSTEM --> S1["Flash Attention"]
+    SYSTEM --> S2["Continuous Batching"]
+    SYSTEM --> S3["Paged Attention (vLLM)"]
+    SYSTEM --> S4["Tensor Parallelism"]
+
+    SERVE --> SV1["KV Cache Management"]
+    SERVE --> SV2["Request Scheduling"]
+    SERVE --> SV3["Prefix Caching"]
+    SERVE --> SV4["Model Routing"]
+
+    style OPT fill:#56cc9d,stroke:#333,color:#fff
+    style MODEL fill:#6cc3d5,stroke:#333,color:#fff
+    style SYSTEM fill:#ffce67,stroke:#333
+    style SERVE fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Speculative Decoding
+
+Uses a small, fast **draft model** to predict multiple tokens, then the large model **verifies** them in parallel:
+
+| Step | What happens |
+|------|-------------|
+| 1 | Draft model generates k candidate tokens quickly |
+| 2 | Large model verifies all k tokens in one forward pass |
+| 3 | Accept correct tokens, reject and regenerate from first mismatch |
+| **Result** | 2-3x faster generation with identical output quality |
+
+### Continuous Batching vs. Static Batching
+
+| Approach | Description | Efficiency |
+|----------|-------------|------------|
+| **Static batching** | Wait for all sequences to finish | Low (short sequences wait for long ones) |
+| **Continuous batching** | Insert new requests as old ones finish | High (no idle GPU cycles) |
+
+### Parallelism Strategies
+
+| Strategy | What it splits | When to use |
+|----------|---------------|-------------|
+| **Tensor Parallelism** | Individual layers across GPUs | Single node, low latency |
+| **Pipeline Parallelism** | Different layers on different GPUs | Multi-node, high throughput |
+| **Data Parallelism** | Same model, different batches | Scaling throughput |
+| **Expert Parallelism** | MoE experts across GPUs | MoE models |
+
+### LLM Serving Frameworks
+
+| Framework | Key Feature | Best For |
+|-----------|-------------|----------|
+| **vLLM** | Paged Attention, continuous batching | High-throughput serving |
+| **TensorRT-LLM** | NVIDIA-optimized kernels | NVIDIA GPUs, lowest latency |
+| **llama.cpp** | CPU/Metal inference, GGUF format | Edge/local deployment |
+| **TGI** (Text Generation Inference) | Hugging Face integration | Quick deployment |
+| **SGLang** | RadixAttention, structured generation | Complex prompting workflows |
+
+### Key Metrics for Production Serving
+
+| Metric | Definition | Target |
+|--------|-----------|--------|
+| **TTFT** (Time to First Token) | Latency before generation starts | <500ms |
+| **TPS** (Tokens Per Second) | Generation speed per request | 30-100 TPS |
+| **Throughput** | Total tokens/sec across all requests | Maximize |
+| **P99 latency** | Worst-case latency | <2s TTFT |
+| **Cost per 1M tokens** | Dollar efficiency | Minimize |
+
+---
+
+## Summary Table
+
+| # | Topic | Key Concept |
+|---|-------|-------------|
+| 1 | Scaling Laws | Performance improves predictably as power law with model/data/compute |
+| 2 | Long Context | Quadratic attention problem; solved by Flash Attention, RoPE, sparse methods |
+| 3 | Quantization | 4-bit weights enable 70B models on consumer GPUs with minimal quality loss |
+| 4 | LLM Agents | LLMs + tools + memory + planning = autonomous task completion |
+| 5 | Evaluation | Benchmarks, LLM-as-Judge, and task-specific metrics |
+| 6 | Embeddings | Dense vectors for semantic search, RAG retrieval, clustering |
+| 7 | Mixture of Experts | Activate subset of parameters per token for efficient scaling |
+| 8 | KV Cache | Store computed keys/values to avoid redundant attention computation |
+| 9 | Instruction Tuning | Transform base models into instruction-following assistants |
+| 10 | Inference Optimization | Speculative decoding, continuous batching, parallelism for production |
+
+---
+
+## What's Next?
+
+This article covered advanced LLM engineering topics for interview preparation. For related content:
+
+- **Foundational LLM concepts:** [LLM Interview QA - 1](/posts/llm-interview/LLM-Interview-QA-1.html)
+- **ML fundamentals:** [ML Interview QA - 1](/posts/ml-interview/ML-Interview-QA-1.html)
+- **Metrics and feature engineering:** [ML Interview QA - 2](/posts/ml-interview/ML-Interview-QA-2.html)

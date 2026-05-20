@@ -1,0 +1,610 @@
+---
+title: "LLM Interview QA - 1"
+description: "10 most frequently asked Large Language Model interview questions with in-depth answers, diagrams, examples, and real-world applications."
+image: /images/llm-interview/thumb_LLM_interview_qa_300.png
+date: "2026-05-20"
+keywords:
+  - "LLM interview"
+  - "large language model interview questions"
+  - "transformer architecture"
+  - "self-attention mechanism"
+  - "tokenization"
+  - "fine-tuning LLM"
+  - "RLHF"
+  - "hallucination"
+  - "prompt engineering"
+  - "RAG"
+  - "temperature sampling"
+  - "encoder decoder"
+---
+
+## Introduction
+
+This is **Part 1** of our LLM Interview QA series. It covers 10 foundational questions that appear in nearly every LLM Engineer, AI Engineer, and Applied ML interview — from startups to FAANG. Each answer goes beyond surface-level definitions with diagrams, concrete examples, and real-world applications.
+
+> This series complements our ML Interview series. For foundational machine learning concepts, see [ML Interview QA - 1](/posts/ml-interview/ML-Interview-QA-1.html). For evaluation metrics and feature engineering, see [ML Interview QA - 2](/posts/ml-interview/ML-Interview-QA-2.html).
+
+---
+
+## Q1: What is the Transformer architecture and why did it replace RNNs/LSTMs?
+
+**Answer:**
+
+The Transformer is a neural network architecture introduced in the 2017 paper *"Attention Is All You Need"*. It relies entirely on **self-attention mechanisms** instead of recurrence or convolution to model dependencies in sequences.
+
+```{mermaid}
+graph LR
+    subgraph Transformer["Transformer Architecture"]
+        direction TB
+        INPUT["Input Embeddings <br/>+ Positional Encoding"]
+        ENC["Encoder Stack (N layers)"]
+        DEC["Decoder Stack (N layers)"]
+        OUTPUT["Output Probabilities"]
+
+        INPUT --> ENC
+        ENC --> DEC
+        DEC --> OUTPUT
+    end
+
+    subgraph Encoder_Layer["Each Encoder Layer"]
+        SA["Multi-Head Self-Attention"]
+        FFN["Feed-Forward Network"]
+        LN1["Layer Norm + Residual"]
+        LN2["Layer Norm + Residual"]
+
+        SA --> LN1 --> FFN --> LN2
+    end
+
+    subgraph Decoder_Layer["Each Decoder Layer"]
+        MSA["Masked Multi-Head Self-Attention"]
+        CA["Cross-Attention (to Encoder)"]
+        FFN2["Feed-Forward Network"]
+
+        MSA --> CA --> FFN2
+    end
+
+    style Transformer fill:#56cc9d,stroke:#333,color:#fff
+    style Encoder_Layer fill:#6cc3d5,stroke:#333,color:#fff
+    style Decoder_Layer fill:#ffce67,stroke:#333
+```
+
+### Why Transformers replaced RNNs/LSTMs
+
+| Aspect | RNN/LSTM | Transformer |
+|--------|----------|-------------|
+| Parallelization | Sequential (word by word) | Fully parallel |
+| Long-range dependencies | Struggles (vanishing gradient) | Handles via attention |
+| Training speed | Slow | Much faster on GPUs |
+| Context window | Limited by hidden state | Limited by memory (can be very large) |
+| Positional info | Implicit in sequence order | Explicit positional encoding |
+
+### Key Insight
+
+RNNs process tokens sequentially — to understand the relationship between the first and last word in a sentence, information must pass through every intermediate hidden state. Transformers compute attention scores between **all pairs of tokens simultaneously**, making them vastly more efficient and effective at capturing long-range dependencies.
+
+---
+
+## Q2: How does the Self-Attention mechanism work?
+
+**Answer:**
+
+Self-attention allows each token in a sequence to attend to every other token, computing a weighted sum of their representations based on relevance.
+
+### The QKV Framework
+
+For each input token, three vectors are computed:
+
+- **Query (Q):** "What am I looking for?"
+- **Key (K):** "What do I contain?"
+- **Value (V):** "What information do I provide?"
+
+The attention score is computed as:
+
+$$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right) V$$
+
+where $d_k$ is the dimension of the key vectors (the scaling factor prevents dot products from growing too large).
+
+```{mermaid}
+graph LR
+    subgraph Self_Attention["Self-Attention Computation"]
+        I["Input Embeddings"] --> Q["Q = X · W_Q"]
+        I --> K["K = X · W_K"]
+        I --> V["V = X · W_V"]
+        Q --> DOT["Q · K^T"]
+        K --> DOT
+        DOT --> SCALE["÷ √d_k"]
+        SCALE --> SOFT["Softmax"]
+        SOFT --> MUL["× V"]
+        V --> MUL
+        MUL --> OUT["Output"]
+    end
+
+    style Self_Attention fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Multi-Head Attention
+
+Instead of one attention function, Transformers run **multiple attention heads in parallel** (e.g., 8 or 16 heads). Each head learns different relationships:
+
+- One head might learn syntactic relationships (subject-verb)
+- Another might learn coreference (pronouns to their antecedents)
+- Another might learn positional proximity
+
+The outputs of all heads are concatenated and linearly projected.
+
+### Example
+
+For the sentence: *"The cat sat on the mat because it was tired"*
+
+The self-attention mechanism helps the model understand that "it" refers to "the cat" — the attention weight between "it" and "cat" will be high, while the weight between "it" and "mat" will be lower.
+
+---
+
+## Q3: What is tokenization and what are the main tokenization strategies used in LLMs?
+
+**Answer:**
+
+**Tokenization** is the process of splitting text into smaller units (tokens) that the model can process. Tokens are the fundamental input units for LLMs.
+
+### Main Tokenization Strategies
+
+| Strategy | Description | Example ("unhappiness") | Used By |
+|----------|-------------|------------------------|---------|
+| **Word-level** | Split by spaces/punctuation | ["unhappiness"] | Early models |
+| **Character-level** | Each character is a token | ["u","n","h","a","p","p","i","n","e","s","s"] | Some small models |
+| **BPE** (Byte Pair Encoding) | Iteratively merge frequent character pairs | ["un", "happiness"] | GPT-2, GPT-3, GPT-4 |
+| **WordPiece** | Like BPE but maximizes likelihood | ["un", "##happiness"] | BERT |
+| **SentencePiece/Unigram** | Probabilistic subword model | ["▁un", "happi", "ness"] | T5, LLaMA |
+
+```{mermaid}
+graph TD
+    TEXT["Raw Text: 'The cats are playing'"]
+    TEXT --> WL["Word-level: ['The', 'cats', 'are', 'playing']"]
+    TEXT --> BPE["BPE: ['The', ' c', 'ats', ' are', ' play', 'ing']"]
+    TEXT --> WP["WordPiece: ['The', 'cats', 'are', 'play', '##ing']"]
+
+    style TEXT fill:#56cc9d,stroke:#333,color:#fff
+    style BPE fill:#6cc3d5,stroke:#333,color:#fff
+    style WP fill:#ffce67,stroke:#333
+```
+
+### Why Subword Tokenization?
+
+- **Handles unknown words:** Can represent any word by breaking it into known subwords
+- **Efficient vocabulary:** Balances vocabulary size with sequence length
+- **Morphological awareness:** Captures meaningful parts (prefixes, suffixes, roots)
+
+### Practical Considerations
+
+- **1 token ≈ 4 characters** (English) or **≈ 0.75 words**
+- Vocabulary sizes: GPT-4 uses ~100k tokens, LLaMA uses ~32k tokens
+- Non-English languages and code often require more tokens per word
+
+---
+
+## Q4: What is the difference between Encoder-only, Decoder-only, and Encoder-Decoder models?
+
+**Answer:**
+
+```{mermaid}
+graph LR
+    subgraph EO["Encoder-Only"]
+        EO1["Bidirectional attention"]
+        EO2["Sees all tokens at once"]
+        EO3["Best for: Understanding"]
+        EO4["Examples: BERT, RoBERTa"]
+    end
+
+    subgraph DO["Decoder-Only"]
+        DO1["Causal (left-to-right) attention"]
+        DO2["Each token sees only prior tokens"]
+        DO3["Best for: Generation"]
+        DO4["Examples: GPT-4, LLaMA, Claude"]
+    end
+
+    subgraph ED["Encoder-Decoder"]
+        ED1["Encoder: bidirectional"]
+        ED2["Decoder: causal + cross-attention"]
+        ED3["Best for: Seq-to-Seq tasks"]
+        ED4["Examples: T5, BART, Flan-T5"]
+    end
+
+    style EO fill:#56cc9d,stroke:#333,color:#fff
+    style DO fill:#6cc3d5,stroke:#333,color:#fff
+    style ED fill:#ffce67,stroke:#333
+```
+
+### Detailed Comparison
+
+| Aspect | Encoder-Only | Decoder-Only | Encoder-Decoder |
+|--------|-------------|--------------|-----------------|
+| Attention | Bidirectional | Causal (masked) | Both |
+| Pre-training | Masked Language Modeling | Next Token Prediction | Span corruption / denoising |
+| Strengths | Classification, NER, embeddings | Text generation, reasoning | Translation, summarization |
+| Context | Full input visibility | Only left context | Full input → sequential output |
+| Scaling trend | Less common at scale | Dominant paradigm (GPT-4, Claude) | Used for specific tasks (T5) |
+
+### Why Decoder-Only Dominates Today
+
+Most modern LLMs (GPT-4, Claude, LLaMA, Gemini) are decoder-only because:
+
+1. **Simplicity:** One unified architecture for all tasks
+2. **Scalability:** Easier to scale with more parameters
+3. **Generality:** Can handle classification, generation, and reasoning via prompting
+4. **Emergent abilities:** Larger decoder-only models exhibit chain-of-thought reasoning
+
+---
+
+## Q5: What is fine-tuning and what are the main approaches for adapting LLMs?
+
+**Answer:**
+
+**Fine-tuning** is the process of further training a pre-trained LLM on a specific dataset or task to customize its behavior.
+
+```{mermaid}
+graph TD
+    PT["Pre-trained LLM<br/>(trained on internet-scale data)"]
+    PT --> FFT["Full Fine-Tuning<br/>Update ALL parameters"]
+    PT --> PEFT["Parameter-Efficient Fine-Tuning<br/>Update FEW parameters"]
+    PT --> RLHF_node["RLHF / Alignment<br/>Human preference training"]
+
+    PEFT --> LORA["LoRA"]
+    PEFT --> PREFIX["Prefix Tuning"]
+    PEFT --> ADAPTER["Adapters"]
+    PEFT --> QLORA["QLoRA"]
+
+    style PT fill:#56cc9d,stroke:#333,color:#fff
+    style FFT fill:#ff7851,stroke:#333,color:#fff
+    style PEFT fill:#6cc3d5,stroke:#333,color:#fff
+    style RLHF_node fill:#ffce67,stroke:#333
+```
+
+### Fine-Tuning Approaches
+
+| Approach | What it does | Parameters Updated | Cost |
+|----------|-------------|-------------------|------|
+| **Full Fine-Tuning** | Updates all model weights | 100% | Very high (multiple GPUs) |
+| **LoRA** | Adds low-rank matrices to attention layers | ~0.1-1% | Low |
+| **QLoRA** | LoRA + 4-bit quantization | ~0.1-1% | Very low |
+| **Prefix Tuning** | Prepends trainable vectors to inputs | <1% | Low |
+| **Adapters** | Inserts small trainable layers | ~1-5% | Low |
+
+### LoRA (Low-Rank Adaptation) — Most Popular
+
+LoRA freezes the pre-trained weights and injects trainable low-rank decomposition matrices:
+
+$$W' = W + \Delta W = W + BA$$
+
+where $B \in \mathbb{R}^{d \times r}$ and $A \in \mathbb{R}^{r \times d}$, with rank $r \ll d$.
+
+### When to Use What
+
+- **Prompt engineering first** — no training needed, quick iteration
+- **LoRA/QLoRA** — when you need task-specific behavior with limited compute
+- **Full fine-tuning** — when you have large datasets and significant compute budget
+- **RLHF** — when aligning model outputs with human preferences
+
+---
+
+## Q6: What is RLHF (Reinforcement Learning from Human Feedback) and how does it work?
+
+**Answer:**
+
+RLHF is a training technique that aligns LLM outputs with human preferences. It's the key process that makes models like ChatGPT helpful, harmless, and honest.
+
+```{mermaid}
+graph TD
+    subgraph Step1["Step 1: Supervised Fine-Tuning (SFT)"]
+        SFT1["Pre-trained LLM"]
+        SFT2["Human-written demonstrations"]
+        SFT3["Fine-tuned model (SFT model)"]
+        SFT1 --> SFT2 --> SFT3
+    end
+
+    subgraph Step2["Step 2: Reward Model Training"]
+        RM1["SFT model generates multiple responses"]
+        RM2["Humans rank responses by quality"]
+        RM3["Train reward model on rankings"]
+        RM1 --> RM2 --> RM3
+    end
+
+    subgraph Step3["Step 3: PPO Optimization"]
+        PPO1["SFT model generates response"]
+        PPO2["Reward model scores it"]
+        PPO3["PPO updates policy to maximize reward"]
+        PPO4["KL penalty prevents drift from SFT"]
+        PPO1 --> PPO2 --> PPO3
+        PPO3 --> PPO4
+    end
+
+    Step1 --> Step2 --> Step3
+
+    style Step1 fill:#56cc9d,stroke:#333,color:#fff
+    style Step2 fill:#6cc3d5,stroke:#333,color:#fff
+    style Step3 fill:#ffce67,stroke:#333
+```
+
+### The Three Steps
+
+1. **SFT (Supervised Fine-Tuning):** Train the base model on high-quality human-written responses
+2. **Reward Model:** Train a separate model to score responses based on human preference rankings
+3. **RL Optimization (PPO):** Use the reward model as a signal to optimize the LLM's outputs
+
+### Alternatives to RLHF
+
+| Method | Approach | Advantage |
+|--------|----------|-----------|
+| **DPO** (Direct Preference Optimization) | Directly optimize from preferences without a reward model | Simpler, more stable training |
+| **RLAIF** | Use AI feedback instead of human feedback | Cheaper, more scalable |
+| **Constitutional AI** | Self-critique against a set of principles | Less human annotation needed |
+
+### Why RLHF Matters
+
+Without RLHF, base LLMs tend to:
+
+- Continue text rather than answer questions
+- Generate toxic, biased, or harmful content
+- Hallucinate confidently
+- Ignore user instructions
+
+---
+
+## Q7: What are hallucinations in LLMs and how can they be mitigated?
+
+**Answer:**
+
+**Hallucinations** are confident-sounding outputs that are factually incorrect, nonsensical, or unfaithful to the provided context. They are one of the biggest challenges in deploying LLMs.
+
+### Types of Hallucinations
+
+```{mermaid}
+graph TD
+    H["LLM Hallucinations"]
+    H --> INT["Intrinsic Hallucination<br/>Contradicts the source input"]
+    H --> EXT["Extrinsic Hallucination<br/>Cannot be verified from source"]
+
+    INT --> INT_EX["Example: Summary says 'John went to Paris'<br/>when source says 'John went to London'"]
+    EXT --> EXT_EX["Example: Model adds details<br/>not present in any source"]
+
+    style H fill:#ff7851,stroke:#333,color:#fff
+    style INT fill:#ffce67,stroke:#333
+    style EXT fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Causes
+
+| Cause | Explanation |
+|-------|-------------|
+| Training data noise | Incorrect or contradictory information in pre-training corpus |
+| Knowledge cutoff | Model generates outdated information |
+| Pattern completion | Model prioritizes fluency over accuracy |
+| Exposure bias | Errors compound during autoregressive generation |
+| Lack of grounding | No mechanism to verify claims against facts |
+
+### Mitigation Strategies
+
+| Strategy | How it helps |
+|----------|-------------|
+| **RAG** (Retrieval-Augmented Generation) | Grounds responses in retrieved documents |
+| **Chain-of-thought prompting** | Forces step-by-step reasoning, reduces logical errors |
+| **Temperature reduction** | Lowers randomness, picks more likely tokens |
+| **Self-consistency** | Generate multiple answers, pick the most common |
+| **Constrained decoding** | Restrict outputs to valid formats |
+| **Citation requirements** | Force model to cite sources |
+| **Fine-tuning on verified data** | Teach the model to say "I don't know" |
+
+### Real-World Impact
+
+Hallucinations are critical in high-stakes applications (legal, medical, financial). Production LLM systems almost always use RAG or other grounding techniques to minimize hallucinations.
+
+---
+
+## Q8: What is Retrieval-Augmented Generation (RAG) and why is it important?
+
+**Answer:**
+
+**RAG** combines a retrieval system with a generative LLM to ground responses in external knowledge, reducing hallucinations and enabling access to up-to-date or domain-specific information.
+
+```{mermaid}
+graph LR
+    Q["User Query"]
+    Q --> EMB["Embed Query"]
+    EMB --> SEARCH["Vector Search<br/>(retrieve top-k documents)"]
+    DB["Document Store<br/>(vector database)"] --> SEARCH
+    SEARCH --> CONTEXT["Retrieved Context"]
+    CONTEXT --> PROMPT["Augmented Prompt<br/>(query + context)"]
+    Q --> PROMPT
+    PROMPT --> LLM["LLM generates answer"]
+    LLM --> ANS["Grounded Response"]
+
+    style Q fill:#56cc9d,stroke:#333,color:#fff
+    style SEARCH fill:#6cc3d5,stroke:#333,color:#fff
+    style LLM fill:#ffce67,stroke:#333
+    style ANS fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### RAG Pipeline Components
+
+| Component | Purpose | Common Tools |
+|-----------|---------|--------------|
+| **Document Loader** | Ingest documents (PDF, web, DB) | LangChain, LlamaIndex |
+| **Chunking** | Split documents into manageable pieces | Recursive, semantic splitting |
+| **Embedding Model** | Convert text to dense vectors | OpenAI ada-002, BGE, E5 |
+| **Vector Store** | Store and search embeddings | Pinecone, Weaviate, ChromaDB, FAISS |
+| **Retriever** | Find relevant chunks for a query | Similarity search, hybrid search |
+| **Generator (LLM)** | Produce final answer from context | GPT-4, Claude, LLaMA |
+
+### RAG vs. Fine-Tuning
+
+| Aspect | RAG | Fine-Tuning |
+|--------|-----|-------------|
+| Knowledge update | Instant (update document store) | Requires retraining |
+| Cost | Lower (no GPU training) | Higher (compute for training) |
+| Hallucination | Reduced (grounded in docs) | Can still hallucinate |
+| Use case | Dynamic knowledge, Q&A | Style/behavior change |
+| Transparency | Can cite sources | Black-box |
+
+### When to Use RAG
+
+- Knowledge changes frequently (news, documentation)
+- Need verifiable, source-cited answers
+- Domain-specific knowledge not in pre-training data
+- Legal/compliance requirements for traceability
+
+---
+
+## Q9: What is prompt engineering and what are the key techniques?
+
+**Answer:**
+
+**Prompt engineering** is the practice of designing inputs to LLMs to elicit desired outputs without modifying model weights. It's the most accessible and cost-effective way to control LLM behavior.
+
+### Key Prompting Techniques
+
+```{mermaid}
+graph TD
+    PE["Prompt Engineering Techniques"]
+    PE --> ZS["Zero-Shot<br/>'Classify this review as positive/negative'"]
+    PE --> FS["Few-Shot<br/>'Here are 3 examples, now do this one'"]
+    PE --> COT["Chain-of-Thought<br/>'Think step by step'"]
+    PE --> SC["Self-Consistency<br/>Sample multiple CoT paths, majority vote"]
+    PE --> TOT["Tree-of-Thought<br/>Explore multiple reasoning branches"]
+    PE --> ROLE["Role Prompting<br/>'You are an expert data scientist...'"]
+
+    style PE fill:#56cc9d,stroke:#333,color:#fff
+    style COT fill:#6cc3d5,stroke:#333,color:#fff
+    style SC fill:#ffce67,stroke:#333
+```
+
+### Comparison of Techniques
+
+| Technique | When to Use | Performance Boost |
+|-----------|-------------|-------------------|
+| **Zero-shot** | Simple tasks, large models | Baseline |
+| **Few-shot** | Need format guidance, smaller models | +10-30% on structured tasks |
+| **Chain-of-thought** | Reasoning, math, logic | +20-50% on reasoning tasks |
+| **Self-consistency** | High-accuracy requirements | +5-15% over single CoT |
+| **Tree-of-thought** | Complex multi-step problems | Best for planning/search |
+
+### System Prompt Best Practices
+
+1. **Be specific:** "Extract the person's name, company, and role" > "Extract information"
+2. **Define format:** Specify JSON, markdown, or other output structures
+3. **Set constraints:** "Answer only based on the provided context"
+4. **Provide examples:** Show input-output pairs for complex tasks
+5. **Assign a role:** "You are a senior Python developer reviewing code"
+
+### Temperature and Sampling Parameters
+
+| Parameter | Effect | Use Case |
+|-----------|--------|----------|
+| **Temperature** (0-2) | Controls randomness. Lower = deterministic | 0 for factual, 0.7-1.0 for creative |
+| **Top-p** (nucleus sampling) | Considers tokens within cumulative probability p | 0.9 for balanced generation |
+| **Top-k** | Considers only top k most likely tokens | Limits vocabulary for generation |
+| **Frequency penalty** | Reduces repetition | Longer outputs without loops |
+
+---
+
+## Q10: What are the key challenges and considerations when deploying LLMs in production?
+
+**Answer:**
+
+Deploying LLMs in production involves challenges beyond model accuracy — including latency, cost, safety, and reliability.
+
+```{mermaid}
+graph TD
+    PROD["LLM Production Challenges"]
+    PROD --> PERF["Performance"]
+    PROD --> COST["Cost"]
+    PROD --> SAFETY["Safety & Guardrails"]
+    PROD --> EVAL["Evaluation"]
+    PROD --> OPS["Operations"]
+
+    PERF --> P1["Latency (TTFT, TPS)"]
+    PERF --> P2["Throughput"]
+    PERF --> P3["Context window limits"]
+
+    COST --> C1["Token costs"]
+    COST --> C2["Infrastructure"]
+    COST --> C3["Caching strategies"]
+
+    SAFETY --> S1["Content filtering"]
+    SAFETY --> S2["PII detection"]
+    SAFETY --> S3["Prompt injection defense"]
+
+    EVAL --> E1["Automated metrics"]
+    EVAL --> E2["Human evaluation"]
+    EVAL --> E3["A/B testing"]
+
+    OPS --> O1["Monitoring & observability"]
+    OPS --> O2["Version management"]
+    OPS --> O3["Fallback strategies"]
+
+    style PROD fill:#56cc9d,stroke:#333,color:#fff
+    style PERF fill:#6cc3d5,stroke:#333,color:#fff
+    style SAFETY fill:#ff7851,stroke:#333,color:#fff
+    style COST fill:#ffce67,stroke:#333
+```
+
+### Key Production Patterns
+
+| Pattern | Purpose | Implementation |
+|---------|---------|----------------|
+| **Caching** | Reduce cost & latency | Semantic cache (similar queries), exact cache |
+| **Streaming** | Improve perceived latency | Server-sent events, token-by-token delivery |
+| **Guardrails** | Prevent harmful outputs | Input/output validators, content filters |
+| **Fallbacks** | Handle failures gracefully | Model cascading, rule-based backup |
+| **Rate limiting** | Manage costs and abuse | Token budgets, per-user limits |
+| **Observability** | Monitor quality over time | Log prompts/responses, track metrics |
+
+### Optimization Techniques
+
+| Technique | Benefit |
+|-----------|---------|
+| **Quantization** (4-bit, 8-bit) | 2-4x memory reduction with minimal quality loss |
+| **KV-cache optimization** | Faster inference for long contexts |
+| **Speculative decoding** | 2-3x speed improvement |
+| **Model distillation** | Smaller, faster models that mimic larger ones |
+| **Prompt compression** | Reduce token count while preserving meaning |
+| **Batching** | Higher throughput for concurrent requests |
+
+### Evaluation in Production
+
+- **Automated:** BLEU, ROUGE, BERTScore for generation quality
+- **LLM-as-Judge:** Use a stronger model to evaluate outputs
+- **Human feedback:** Thumbs up/down, preference ratings
+- **Task-specific:** Accuracy, F1, faithfulness scores
+- **Safety:** Toxicity rates, refusal rates, PII leakage
+
+### Security Considerations
+
+- **Prompt injection:** Adversarial inputs that override system instructions
+- **Data leakage:** Model revealing training data or system prompts
+- **PII exposure:** Generating or storing personally identifiable information
+- **Jailbreaking:** Users bypassing safety guardrails
+
+---
+
+## Summary Table
+
+| # | Topic | Key Concept |
+|---|-------|-------------|
+| 1 | Transformer Architecture | Self-attention replaces recurrence for parallel, long-range processing |
+| 2 | Self-Attention | QKV mechanism computes token relevance scores |
+| 3 | Tokenization | Subword strategies (BPE, WordPiece) balance vocabulary and sequence length |
+| 4 | Model Types | Encoder-only, decoder-only, encoder-decoder serve different tasks |
+| 5 | Fine-Tuning | LoRA/QLoRA enable efficient adaptation with minimal parameters |
+| 6 | RLHF | Three-step alignment: SFT → Reward Model → PPO |
+| 7 | Hallucinations | Confident wrong outputs; mitigated by RAG, CoT, temperature |
+| 8 | RAG | Retrieval + generation for grounded, up-to-date responses |
+| 9 | Prompt Engineering | Zero-shot, few-shot, CoT, and sampling parameters |
+| 10 | Production Deployment | Latency, cost, safety, evaluation, and operational concerns |
+
+---
+
+## What's Next?
+
+This article covered the foundational LLM concepts most commonly tested in interviews. For deeper dives into specific topics:
+
+- **ML fundamentals** that underpin LLMs: [ML Interview QA - 1](/posts/ml-interview/ML-Interview-QA-1.html)
+- **Evaluation metrics and data handling:** [ML Interview QA - 2](/posts/ml-interview/ML-Interview-QA-2.html)

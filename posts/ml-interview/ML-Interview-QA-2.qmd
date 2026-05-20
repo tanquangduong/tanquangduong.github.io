@@ -1,0 +1,958 @@
+---
+title: "ML Interview QA - 2"
+description: "10 essential ML interview questions on evaluation metrics, feature engineering, PCA, XGBoost, imbalanced data, missing values, and data leakage — with diagrams and examples."
+image: /images/ml-interview/thumb_ML_interview_qa_300.png
+date: "2026-05-17"
+keywords:
+  - "machine learning interview"
+  - "precision recall F1"
+  - "ROC AUC curve"
+  - "imbalanced dataset"
+  - "feature engineering"
+  - "PCA"
+  - "XGBoost gradient boosting"
+  - "missing data imputation"
+  - "data leakage"
+  - "curse of dimensionality"
+  - "generative discriminative models"
+---
+
+## Introduction
+
+This is **Part 2** of our ML Interview QA series. It covers 10 questions on evaluation metrics, feature engineering, and data handling — the practical skills that separate candidates who build models from those who build **reliable** models.
+
+> For foundational concepts (bias-variance, algorithms, ensembles), see [ML Interview QA - 1](/posts/ml-interview/ML-Interview-QA-1.html).
+
+---
+
+## Q1: Explain precision, recall, and F1-score.
+
+**Answer:**
+
+These metrics go beyond accuracy to measure **specific types of errors** in classification.
+
+```{mermaid}
+graph TD
+    subgraph cm["Confusion Matrix"]
+        direction TB
+        TP["True Positive (TP)<br/>Correctly predicted positive"]
+        FP["False Positive (FP)<br/>Incorrectly predicted positive<br/>(Type I error)"]
+        FN["False Negative (FN)<br/>Missed positive<br/>(Type II error)"]
+        TN["True Negative (TN)<br/>Correctly predicted negative"]
+    end
+
+    cm --> PREC["Precision = TP/(TP+FP)<br/>Of those I flagged,<br/>how many are correct?"]
+    cm --> REC["Recall = TP/(TP+FN)<br/>Of all positives,<br/>how many did I catch?"]
+    PREC --> F1["F1 = 2·P·R/(P+R)<br/>Harmonic mean<br/>balances both"]
+    REC --> F1
+
+    style TP fill:#56cc9d,stroke:#333,color:#fff
+    style TN fill:#56cc9d,stroke:#333,color:#fff
+    style FP fill:#ff7851,stroke:#333,color:#fff
+    style FN fill:#ffce67,stroke:#333
+    style F1 fill:#6cc3d5,stroke:#333,color:#fff
+    style cm fill:#fff,color:#fff
+```
+
+### Formulas
+
+$$\text{Precision} = \frac{TP}{TP + FP} \qquad \text{Recall} = \frac{TP}{TP + FN} \qquad F1 = \frac{2 \cdot P \cdot R}{P + R}$$
+
+### Example: Email Spam Filter
+
+Out of 1000 emails: 50 actual spam, 950 legitimate.
+
+| Scenario | TP | FP | FN | Precision | Recall | F1 |
+|----------|----|----|----|----|----|----|
+| **Aggressive filter** | 48 | 30 | 2 | 48/78 = 0.62 | 48/50 = 0.96 | 0.75 |
+| **Conservative filter** | 40 | 2 | 10 | 40/42 = 0.95 | 40/50 = 0.80 | 0.87 |
+
+- **Aggressive:** Catches almost all spam (high recall) but blocks 30 good emails (low precision)
+- **Conservative:** Rarely blocks good emails (high precision) but misses 10 spam (lower recall)
+
+### The Precision-Recall Tradeoff
+
+```{mermaid}
+graph LR
+    subgraph low_threshold["Low Threshold (0.2)"]
+        LT["Predict more as positive<br/>↑ Recall, ↓ Precision"]
+    end
+    subgraph mid_threshold["Medium Threshold (0.5)"]
+        MT["Balanced trade-off"]
+    end
+    subgraph high_threshold["High Threshold (0.8)"]
+        HT["Predict fewer as positive<br/>↓ Recall, ↑ Precision"]
+    end
+
+    low_threshold --> mid_threshold --> high_threshold
+
+    style low_threshold fill:#6cc3d5,stroke:#333,color:#fff
+    style mid_threshold fill:#56cc9d,stroke:#333,color:#fff
+    style high_threshold fill:#ffce67,stroke:#333
+```
+
+### When to Prioritize Which
+
+| Metric | Prioritize When | Example |
+|--------|----------------|---------|
+| **Precision** | False positives are costly | Spam filter (don't block important emails) |
+| **Recall** | False negatives are costly | Cancer screening (don't miss tumors) |
+| **F1** | Need single balanced metric | General classification with imbalanced classes |
+| **F-beta** | Custom tradeoff needed | F2 (recall 2x important), F0.5 (precision 2x important) |
+
+### Application
+
+- **Fraud detection:** Optimize recall (catch all fraud), accept some false positives that humans review
+- **Search engines:** Optimize precision (show only relevant results)
+- **Medical AI:** Regulatory bodies often require minimum recall thresholds
+- **Content moderation:** Balance — too aggressive frustrates users, too lenient misses harmful content
+
+---
+
+## Q2: What is the ROC curve and AUC?
+
+**Answer:**
+
+The **ROC curve** (Receiver Operating Characteristic) visualizes classifier performance across **all possible thresholds** by plotting True Positive Rate vs. False Positive Rate.
+
+$$TPR = \frac{TP}{TP + FN} \qquad FPR = \frac{FP}{FP + TN}$$
+
+```{mermaid}
+graph TD
+    subgraph roc["ROC Curve Interpretation"]
+        direction TB
+        PERFECT["Perfect classifier<br/>AUC = 1.0<br/>(top-left corner)"]
+        GOOD["Good classifier<br/>AUC = 0.85<br/>(curve above diagonal)"]
+        RANDOM["Random guessing<br/>AUC = 0.5<br/>(diagonal line)"]
+        WORST["Inverse classifier<br/>AUC = 0.0<br/>(below diagonal)"]
+    end
+
+    style PERFECT fill:#56cc9d,stroke:#333,color:#fff
+    style GOOD fill:#6cc3d5,stroke:#333,color:#fff
+    style RANDOM fill:#ffce67,stroke:#333
+    style WORST fill:#ff7851,stroke:#333,color:#fff
+    style roc fill:#fff,color:#333
+```
+
+### How It Works: Threshold Sweep
+
+```{mermaid}
+graph LR
+    A["Model outputs<br/>probabilities<br/>for each sample"] --> B["Sweep threshold<br/>from 0.0 to 1.0"]
+    B --> C["At each threshold:<br/>compute TPR and FPR"]
+    C --> D["Plot all (FPR, TPR)<br/>points → ROC curve"]
+    D --> E["Area Under Curve<br/>= AUC score"]
+
+    style E fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Example: Comparing Two Models
+
+```python
+from sklearn.metrics import roc_auc_score, roc_curve
+
+# Model A: Logistic Regression
+y_prob_A = model_A.predict_proba(X_test)[:, 1]
+auc_A = roc_auc_score(y_test, y_prob_A)  # 0.82
+
+# Model B: Random Forest
+y_prob_B = model_B.predict_proba(X_test)[:, 1]
+auc_B = roc_auc_score(y_test, y_prob_B)  # 0.91
+
+# Model B has better discrimination power
+# It ranks positives higher than negatives more consistently
+```
+
+**Interpretation of AUC = 0.91:** If you randomly pick one positive sample and one negative sample, there's a 91% probability that the model assigns a higher score to the positive sample.
+
+### When ROC-AUC Fails: Imbalanced Data
+
+```{mermaid}
+graph TD
+    A["Dataset: 10,000 samples<br/>9,900 negative, 100 positive"] --> B["Model predicts ALL as negative"]
+    B --> C["FPR = 0/(0+9900) = 0<br/>TPR = 0/(0+100) = 0"]
+    B --> D["Accuracy = 99%<br/>Looks great!"]
+    B --> E["ROC-AUC can still be<br/>misleadingly high"]
+
+    E --> F["Solution: Use PR-AUC<br/>(Precision-Recall AUC)<br/>for imbalanced data"]
+
+    style D fill:#ff7851,stroke:#333,color:#fff
+    style F fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### ROC-AUC vs. PR-AUC
+
+| Metric | Best For | Why |
+|--------|----------|-----|
+| ROC-AUC | Balanced datasets | Considers both classes equally |
+| PR-AUC | Imbalanced datasets (rare positives) | Focuses on positive class performance |
+
+### Application
+
+- **Model selection:** Compare models that output probabilities (higher AUC = better ranking)
+- **Threshold selection:** Pick the operating point on the ROC curve that matches business needs
+- **Clinical trials:** Evaluate diagnostic tests across different decision thresholds
+- **Credit scoring:** Regulators compare AUC across demographic groups for fairness
+
+---
+
+## Q3: How do you handle imbalanced datasets?
+
+**Answer:**
+
+Class imbalance occurs when one class vastly outnumbers the other (e.g., 99% negative, 1% positive). Standard accuracy becomes meaningless — a model predicting "always negative" gets 99% accuracy.
+
+```{mermaid}
+graph TD
+    PROBLEM["Imbalanced Dataset<br/>e.g., 1% fraud, 99% legitimate"] --> APPROACH["Multi-level approach"]
+
+    APPROACH --> L1["Level 1: Metrics<br/>(change how you measure)"]
+    APPROACH --> L2["Level 2: Algorithm<br/>(change how model learns)"]
+    APPROACH --> L3["Level 3: Data<br/>(change the data itself)"]
+
+    L1 --> L1A["Use F1, PR-AUC, recall<br/>instead of accuracy"]
+    L2 --> L2A["Class weights<br/>Threshold tuning<br/>Cost-sensitive learning"]
+    L3 --> L3A["SMOTE (oversample minority)<br/>Undersample majority<br/>Collect more minority data"]
+
+    style L1 fill:#56cc9d,stroke:#333,color:#fff
+    style L2 fill:#6cc3d5,stroke:#333,color:#fff
+    style L3 fill:#ffce67,stroke:#333
+```
+
+### Strategy Priority (use in order)
+
+```{mermaid}
+graph TD
+    S1["1. Fix your METRICS first<br/>Stop using accuracy"] --> S2["2. Try CLASS WEIGHTS<br/>(free, no data changes)"]
+    S2 --> S3["3. Tune THRESHOLD<br/>(adjust decision boundary)"]
+    S3 --> S4["4. Try RESAMPLING<br/>(SMOTE, undersampling)"]
+    S4 --> S5["5. Use specialized ENSEMBLES<br/>(Balanced RF, EasyEnsemble)"]
+
+    style S1 fill:#56cc9d,stroke:#333,color:#fff
+    style S2 fill:#56cc9d,stroke:#333,color:#fff
+    style S3 fill:#6cc3d5,stroke:#333,color:#fff
+    style S4 fill:#ffce67,stroke:#333,color:#fff
+    style S5 fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Example: Fraud Detection (0.3% fraud rate)
+
+```python
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, precision_recall_curve
+
+# BAD: Default model
+rf_default = RandomForestClassifier(n_estimators=100)
+rf_default.fit(X_train, y_train)
+# Accuracy: 99.7% → but catches only 20% of fraud!
+
+# BETTER: Class weights
+rf_weighted = RandomForestClassifier(
+    n_estimators=100,
+    class_weight={0: 1, 1: 333}  # inverse of class frequency
+)
+rf_weighted.fit(X_train, y_train)
+# Recall: 85% fraud caught, precision: 12% → many false alerts
+
+# BEST: Threshold tuning after weighting
+y_proba = rf_weighted.predict_proba(X_test)[:, 1]
+# Find threshold where precision ≥ 5% AND recall ≥ 80%
+precisions, recalls, thresholds = precision_recall_curve(y_test, y_proba)
+# Choose threshold = 0.35 → Recall: 82%, Precision: 8%
+# Human reviewers handle 8% false alert rate
+```
+
+### SMOTE (Synthetic Minority Oversampling)
+
+SMOTE creates **synthetic** minority samples by interpolating between existing minority samples and their k-nearest neighbors.
+
+```{mermaid}
+graph LR
+    A["Minority sample A"] --> MID["New synthetic sample<br/>(random point between A and B)"]
+    B["Nearest neighbor B"] --> MID
+
+    style MID fill:#56cc9d,stroke:#333,color:#fff
+    style A fill:#6cc3d5,stroke:#333,color:#fff
+    style B fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+**Caution:** Always apply SMOTE **only on training data** (after splitting) — never on test/validation sets.
+
+### Application
+
+| Domain | Imbalance Ratio | Strategy |
+|--------|----------------|----------|
+| Fraud detection | 1:1000 | Class weights + threshold tuning + human review |
+| Disease diagnosis | 1:100 | SMOTE + ensemble + high recall threshold |
+| Manufacturing defects | 1:500 | Anomaly detection (one-class SVM, Isolation Forest) |
+| Click prediction | 1:50 | Calibrated probabilities + ranking metrics |
+
+---
+
+## Q4: What is feature engineering and why does it matter?
+
+**Answer:**
+
+Feature engineering is the process of creating, transforming, and selecting input features to improve model performance. It often has a **greater impact** than model choice or hyperparameter tuning.
+
+```{mermaid}
+graph LR
+    RAW["Raw Data"] --> FE["Feature Engineering"]
+
+    FE --> CREATE["Create new features<br/>(domain knowledge)"]
+    FE --> TRANSFORM["Transform existing features<br/>(scaling, encoding)"]
+    FE --> SELECT["Select relevant features<br/>(remove noise)"]
+
+    CREATE --> EX1["age + income <br/> → income_per_year_of_age"]
+    CREATE --> EX2["timestamp <br/> → hour_of_day, is_weekend"]
+    CREATE --> EX3["lat + lon <br/> → distance_to_store"]
+
+    TRANSFORM --> EX4["log(income) <br/> — reduce skew"]
+    TRANSFORM --> EX5["one-hot(city) <br/> — encode categories"]
+    TRANSFORM --> EX6["StandardScaler <br/> — normalize ranges"]
+
+    SELECT --> EX7["Remove correlated features"]
+    SELECT --> EX8["L1 regularization <br/> → sparsity"]
+    SELECT --> EX9["Tree importance scores"]
+
+    style FE fill:#56cc9d,stroke:#333,color:#fff
+    style CREATE fill:#6cc3d5,stroke:#333,color:#fff
+    style TRANSFORM fill:#ffce67,stroke:#333
+    style SELECT fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Example: Predicting Taxi Trip Duration
+
+**Raw features:** pickup_time, pickup_lat, pickup_lon, dropoff_lat, dropoff_lon
+
+**Engineered features (much more predictive):**
+
+```python
+import numpy as np
+
+# Distance (Haversine formula)
+df['distance_km'] = haversine(
+    df['pickup_lat'], df['pickup_lon'],
+    df['dropoff_lat'], df['dropoff_lon']
+)
+
+# Time-based features
+df['hour'] = df['pickup_time'].dt.hour
+df['is_rush_hour'] = df['hour'].isin([7,8,9,17,18,19]).astype(int)
+df['is_weekend'] = df['pickup_time'].dt.dayofweek.isin([5,6]).astype(int)
+
+# Interaction features
+df['distance_x_rush'] = df['distance_km'] * df['is_rush_hour']
+# ^ During rush hour, distance has a MUCH bigger impact on duration
+
+# Aggregation features
+df['avg_speed_this_hour'] = df.groupby('hour')['speed'].transform('mean')
+```
+
+**Result:** Model accuracy improves from R² = 0.45 (raw features) to R² = 0.82 (engineered features) — **same model, better features**.
+
+### Feature Selection Methods
+
+| Method | Type | How it works | When to use |
+|--------|------|-------------|-------------|
+| Correlation filter | Filter | Remove features correlated > 0.95 with others | Quick first pass |
+| Mutual information | Filter | Keep features with high MI with target | Non-linear relationships |
+| Recursive elimination | Wrapper | Repeatedly remove least important feature | When compute allows |
+| L1 regularization | Embedded | Model zeros out irrelevant weights | Linear models |
+| Tree importance | Embedded | Features that reduce impurity most | Tree-based models |
+
+### Application
+
+- **E-commerce:** RFM features (Recency, Frequency, Monetary) from transaction logs
+- **NLP:** TF-IDF, n-grams, embedding features from text
+- **Finance:** Moving averages, volatility, technical indicators from price data
+- **Computer Vision:** HOG features, edge histograms (classical), or learned features (deep learning)
+
+---
+
+## Q5: What is the curse of dimensionality?
+
+**Answer:**
+
+As features increase, the feature space grows exponentially, making data increasingly sparse and distance metrics less meaningful.
+
+```{mermaid}
+graph TD
+    subgraph d1["1D: Line"]
+        D1["10 points fill a line well<br/>Dense coverage"]
+    end
+    subgraph d2["2D: Square"]
+        D2["10 points in a square<br/>Getting sparse"]
+    end
+    subgraph d3["3D: Cube"]
+        D3["10 points in a cube<br/>Very sparse"]
+    end
+    subgraph d100["100D: Hypercube"]
+        D100["10 points in 100 dimensions<br/>Essentially EMPTY<br/>Need 10¹⁰⁰ points to fill!"]
+    end
+
+    d1 --> d2 --> d3 --> d100
+
+    style d1 fill:#56cc9d,stroke:#333,color:#fff
+    style d2 fill:#6cc3d5,stroke:#333,color:#fff
+    style d3 fill:#ffce67,stroke:#333
+    style d100 fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Why This Matters: Distances Become Meaningless
+
+In high dimensions, the ratio of maximum to minimum distance between any pair of points approaches 1:
+
+$$\lim_{d \to \infty} \frac{dist_{max} - dist_{min}}{dist_{min}} \to 0$$
+
+This means **all points are approximately equidistant**, which destroys distance-based algorithms.
+
+### Example: KNN Fails in High Dimensions
+
+```python
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.datasets import make_classification
+
+# Low dimension: KNN works great
+X_low, y = make_classification(n_features=5, n_informative=5)
+knn = KNeighborsClassifier(n_neighbors=5)
+# Accuracy: 92%
+
+# High dimension: KNN fails
+X_high, y = make_classification(n_features=500, n_informative=5)
+knn = KNeighborsClassifier(n_neighbors=5)
+# Accuracy: 55% — barely better than random!
+# Because with 500 features, "nearest" neighbors aren't really near
+```
+
+### Models Most Affected
+
+| Severely affected | Somewhat resilient | Why |
+|------------------|-------------------|-----|
+| KNN | Decision Trees | Trees split on one feature at a time |
+| K-Means | Random Forest | Feature subsampling helps |
+| SVM (RBF kernel) | Gradient Boosting | Sequential error correction |
+| Gaussian processes | Neural Networks (with dropout) | Learn relevant subspaces |
+
+### Solutions
+
+```{mermaid}
+graph LR
+    CURSE["Curse of<br/>Dimensionality"] --> S1["Feature Selection<br/>(keep only<br/>informative features)"]
+    CURSE --> S2["PCA / Autoencoders<br/>(project to<br/>lower dimensions)"]
+    CURSE --> S3["Regularization<br/>(L1 drives irrelevant<br/>weights to zero)"]
+    CURSE --> S4["Domain Knowledge<br/>(only include<br/>meaningful features)"]
+    CURSE --> S5["Get More Data<br/>(fill the space better)"]
+
+    style S1 fill:#56cc9d,stroke:#333,color:#fff
+    style S2 fill:#6cc3d5,stroke:#333,color:#fff
+    style S3 fill:#ffce67,stroke:#333
+```
+
+### Application
+
+- **Genomics:** 20,000 genes, 100 patients — need aggressive feature selection
+- **Text/NLP:** Bag-of-words creates 100K+ features — use TF-IDF + dimensionality reduction
+- **Image data:** Raw pixels (millions of dimensions) — use CNNs to learn lower-dimensional representations
+- **Recommendation systems:** Millions of items → embedding spaces reduce dimensionality
+
+---
+
+## Q6: Explain PCA (Principal Component Analysis).
+
+**Answer:**
+
+PCA is an unsupervised technique that finds the **directions of maximum variance** in the data and projects data onto a lower-dimensional subspace.
+
+```{mermaid}
+graph TD
+    A["Original data<br/>(d dimensions)"] --> B["Standardize features<br/>(mean=0, std=1)"]
+    B --> C["Compute covariance matrix<br/>(d × d)"]
+    C --> D["Find eigenvectors & eigenvalues"]
+    D --> E["Sort by eigenvalue<br/>(variance explained)"]
+    E --> F["Select top k components<br/>(capture 95% variance)"]
+    F --> G["Project data onto k dimensions"]
+
+    style A fill:#6cc3d5,stroke:#333,color:#fff
+    style F fill:#56cc9d,stroke:#333,color:#fff
+    style G fill:#ffce67,stroke:#333
+```
+
+### How It Works: Intuition
+
+Imagine data scattered in 3D space but most of the spread is in a 2D plane. PCA finds that plane (the directions of maximum variance) and projects all points onto it — reducing from 3D to 2D with minimal information loss.
+
+### Example: Dimensionality Reduction for Visualization
+
+```python
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+
+# Original: 50 features
+X_scaled = StandardScaler().fit_transform(X)  # Always scale first!
+
+# Reduce to 2D for visualization
+pca = PCA(n_components=2)
+X_2d = pca.fit_transform(X_scaled)
+
+# How much information is preserved?
+print(f"Variance explained: {pca.explained_variance_ratio_.sum():.2%}")
+# Output: "Variance explained: 72.4%"
+# → 2 components capture 72.4% of the total variance
+
+# For modeling: find k that captures 95%
+pca_95 = PCA(n_components=0.95)  # auto-select k
+X_reduced = pca_95.fit_transform(X_scaled)
+print(f"Components needed for 95%: {pca_95.n_components_}")
+# Output: "Components needed for 95%: 12"
+# → Reduced from 50 to 12 features!
+```
+
+### When to Use and When Not
+
+```{mermaid}
+graph LR
+    PCA_NODE["PCA"] --> USE["✅ Use when"]
+    PCA_NODE --> AVOID["❌ Avoid when"]
+
+    USE --> U1["Features are correlated<br/>(redundant)"]
+    USE --> U2["Visualization needed<br/>(reduce to 2-3D)"]
+    USE --> U3["Speed up training<br/>(fewer features)"]
+    USE --> U4["Reduce noise<br/>(drop low-variance components)"]
+
+    AVOID --> A1["Features are<br/>already independent"]
+    AVOID --> A2["Interpretability is critical<br/>(components are<br/>hard to explain)"]
+    AVOID --> A3["Non-linear relationships<br/>dominate (use t-SNE,<br/>UMAP, or autoencoders)"]
+
+    style USE fill:#56cc9d,stroke:#333,color:#fff
+    style AVOID fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Application
+
+- **Image compression:** Reduce image from 784 pixels (28×28) to 50 components
+- **Genomics:** Visualize population structure from thousands of genetic markers
+- **Finance:** Identify latent factors driving asset returns
+- **Preprocessing:** Remove multicollinearity before linear regression
+
+---
+
+## Q7: What is the difference between generative and discriminative models?
+
+**Answer:**
+
+```{mermaid}
+graph TD
+    subgraph disc["Discriminative Model"]
+        direction TB
+        D1["Learns: P(y|x) directly"]
+        D2["'Given features,<br/>what's the class?'"]
+        D3["Draws decision boundary"]
+    end
+
+    disc --> D_EX["Examples:<br/>• Logistic Regression<br/>• SVM<br/>• Neural Networks<br/>• Random Forest"]
+
+    style disc fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+```{mermaid}
+graph TD
+    subgraph gen["Generative Model"]
+        direction TB
+        G1["Learns: P(x|y) and P(y)"]
+        G2["'What does each<br/>class look like?'"]
+        G3["Models full data distribution"]
+    end
+
+    gen --> G_EX["Examples:<br/>• Naive Bayes<br/>• Gaussian Mixture Models<br/>• VAE, GANs<br/>• Hidden Markov Models"]
+
+    style gen fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Intuition: Cat vs. Dog Classifier
+
+**Discriminative approach:** Learn the boundary between cats and dogs. "This side = cat, that side = dog." Doesn't know what a cat or dog looks like — just where the line is.
+
+**Generative approach:** Learn what cats look like (fur patterns, ear shapes) and what dogs look like separately. Classify new images by asking "Does this look more like a cat or a dog?" Can also **generate** new cat/dog images.
+
+### Understanding the Math
+
+**Discriminative — models $P(y|x)$ directly:**
+
+- Asks: "Given these input features $x$, what is the probability of each class $y$?"
+- Example: Given an email's word frequencies, directly output $P(\text{spam} | \text{words}) = 0.87$
+- Learns the decision boundary without modeling how the data was generated
+
+**Generative — models $P(x|y) \cdot P(y)$ then applies Bayes' rule:**
+
+$$P(y|x) = \frac{P(x|y) \cdot P(y)}{P(x)}$$
+
+- $P(x|y)$ = **likelihood** — "What does data from class $y$ look like?" (e.g., what word patterns do spam emails have?)
+- $P(y)$ = **prior** — "How common is class $y$?" (e.g., 20% of all emails are spam)
+- $P(x)$ = **evidence** — normalizing constant (same for all classes, often ignored)
+- To classify: compute $P(x|y) \cdot P(y)$ for each class, pick the highest
+
+### Example: Spam Detection — Two Approaches
+
+```python
+# Discriminative: Logistic Regression
+# Learns P(spam | words) directly
+from sklearn.linear_model import LogisticRegression
+lr = LogisticRegression()
+lr.fit(X_tfidf, y_labels)
+# Finds the decision boundary in word-frequency space
+
+# Generative: Naive Bayes
+# Learns P(words | spam) and P(words | not_spam) separately
+from sklearn.naive_bayes import MultinomialNB
+nb = MultinomialNB()
+nb.fit(X_tfidf, y_labels)
+# Models how spam emails "look" vs. how normal emails "look"
+# Classifies using Bayes' rule: P(spam|words) ∝ P(words|spam)·P(spam)
+```
+
+### Comparison
+
+| Aspect | Discriminative | Generative |
+|--------|---------------|------------|
+| What it models | P(y\|x) — boundary | P(x\|y)·P(y) — full distribution |
+| Accuracy with enough data | Usually higher | Often lower for classification |
+| Small data performance | Can struggle | Often better (stronger assumptions help) |
+| Can generate new data? | No | Yes |
+| Handles missing features | Poorly | Naturally (marginalize out) |
+| Training efficiency | Focuses only on boundary | Models more than needed for classification |
+
+### Application
+
+- **Discriminative:** Most production classification tasks (credit scoring, image classification, NLP)
+- **Generative:** Data augmentation (GANs), anomaly detection, handling missing data, text generation (GPT), drug discovery
+- **Modern trend:** Generative AI (LLMs, diffusion models) uses generative models for creation, while discriminative models remain dominant for classification/prediction tasks
+
+---
+
+## Q8: What is gradient boosting and how does XGBoost work?
+
+**Answer:**
+
+Gradient boosting sequentially builds an ensemble where each new model **corrects the residual errors** of the previous ensemble.
+
+```{mermaid}
+graph TD
+    A["Training Data<br/>(X, y)"] --> B["Model 1: Simple tree<br/>Prediction: ŷ₁"]
+    B --> C["Compute residuals<br/>r₁ = y - ŷ₁"]
+    C --> D["Model 2: Fit residuals r₁<br/>Prediction: ŷ₂"]
+    D --> E["Compute residuals<br/>r₂ = y - (ŷ₁ + η·ŷ₂)"]
+    E --> F["Model 3: Fit residuals r₂<br/>Prediction: ŷ₃"]
+    F --> G["...continue..."]
+    G --> H["Final: ŷ = ŷ₁ + η·ŷ₂ + η·ŷ₃ + ..."]
+
+    style A fill:#6cc3d5,stroke:#333,color:#fff
+    style H fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### How XGBoost Improves Gradient Boosting
+
+```{mermaid}
+graph LR
+    GB["Standard<br/>Gradient Boosting"] --> XGB["XGBoost<br/>Improvements"]
+
+    XGB --> I1["Regularization<br/>(L1 + L2 on<br/>leaf weights)"]
+    XGB --> I2["Second-order gradients<br/>(Newton's method<br/>— faster convergence)"]
+    XGB --> I3["Column subsampling<br/>(like Random Forest<br/>— reduces overfitting)"]
+    XGB --> I4["Built-in missing<br/>value handling<br/>(learns optimal direction)"]
+    XGB --> I5["Tree pruning<br/>(max_depth +<br/>gain-based pruning)"]
+    XGB --> I6["Parallel feature<br/>computation<br/>(fast training)"]
+
+    style XGB fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Example: House Price Prediction
+
+```python
+import xgboost as xgb
+from sklearn.model_selection import cross_val_score
+
+model = xgb.XGBRegressor(
+    n_estimators=500,        # 500 sequential trees
+    max_depth=4,             # shallow trees (high bias per tree)
+    learning_rate=0.05,      # shrinkage — small steps
+    subsample=0.8,           # 80% of rows per tree
+    colsample_bytree=0.8,   # 80% of features per tree
+    reg_alpha=0.1,           # L1 regularization
+    reg_lambda=1.0,          # L2 regularization
+    early_stopping_rounds=50 # stop if no improvement
+)
+
+# With eval set for early stopping
+model.fit(
+    X_train, y_train,
+    eval_set=[(X_val, y_val)],
+    verbose=False
+)
+
+# Result: RMSE improved from $45K (single tree) to $18K (XGBoost)
+print(f"Best iteration: {model.best_iteration}")  # Stopped at 312 trees
+```
+
+### Key Hyperparameters and Tuning Order
+
+| Priority | Parameter | Range | Effect |
+|----------|-----------|-------|--------|
+| 1st | `learning_rate` | 0.01-0.3 | Lower = more robust but needs more trees |
+| 1st | `n_estimators` | 100-5000 | Use early stopping to find optimal |
+| 2nd | `max_depth` | 3-8 | Controls tree complexity |
+| 2nd | `subsample` | 0.6-1.0 | Row sampling (regularization) |
+| 3rd | `colsample_bytree` | 0.6-1.0 | Feature sampling (regularization) |
+| 3rd | `reg_alpha`, `reg_lambda` | 0-10 | Weight penalties |
+
+### Application
+
+- **Kaggle competitions:** XGBoost/LightGBM win majority of tabular data competitions
+- **Industry standard:** Fraud detection, credit scoring, recommendation ranking
+- **When to use:** Tabular data with < 1M rows (for larger data, prefer LightGBM)
+- **When NOT to use:** Image/text/audio data (use deep learning), very small data (use simpler models)
+
+---
+
+## Q9: How do you handle missing data?
+
+**Answer:**
+
+Missing data handling requires understanding **why** data is missing before choosing a strategy.
+
+```{mermaid}
+graph TD
+    MISSING["Missing Data"] --> TYPE["Understand the type"]
+
+    TYPE --> MCAR["MCAR<br/>Missing Completely<br/>at Random<br/>(no pattern)"]
+    TYPE --> MAR["MAR<br/>Missing at Random<br/>(depends on<br/>observed features)"]
+    TYPE --> MNAR["MNAR<br/>Missing Not at Random<br/>(depends on the<br/>missing value itself)"]
+
+    MCAR --> MCAR_EX["Example: Sensor<br/>randomly fails<br/>→ Safe to drop or impute"]
+    MAR --> MAR_EX["Example: Rich people<br/>skip income question<br/>→ Impute using other features"]
+    MNAR --> MNAR_EX["Example: Sick patients<br/>miss appointments<br/>→ Missingness IS informative"]
+
+    style MCAR fill:#56cc9d,stroke:#333,color:#fff
+    style MAR fill:#6cc3d5,stroke:#333,color:#fff
+    style MNAR fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Strategies Decision Tree
+
+```{mermaid}
+graph TD
+    Q1{"How much is missing?"} -->|">50% of column"| DROP_COL["Drop the column"]
+    Q1 -->|"<5% of rows"| DROP_ROW["Drop rows<br/>(if MCAR)"]
+    Q1 -->|"5-50%"| Q2{"What type of feature?"}
+
+    Q2 -->|"Numerical"| Q3{"Distribution?"}
+    Q2 -->|"Categorical"| CAT["Mode or 'Unknown' category"]
+
+    Q3 -->|"Symmetric"| MEAN["Mean imputation"]
+    Q3 -->|"Skewed / outliers"| MEDIAN["Median imputation"]
+    Q3 -->|"Complex patterns"| MODEL["Model-based<br/>(KNN, Iterative)"]
+
+    DROP_COL --> FLAG["+ Add missingness indicator<br/>if MNAR suspected"]
+    MEDIAN --> FLAG
+
+    style FLAG fill:#ffce67,stroke:#333, color:#000
+    style MODEL fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Example: Customer Data with Missing Values
+
+```python
+import pandas as pd
+from sklearn.impute import SimpleImputer, KNNImputer
+from sklearn.pipeline import Pipeline
+
+# Dataset:
+# age: 2% missing (random sensor error) → MCAR
+# income: 15% missing (high earners skip) → MAR
+# credit_score: 30% missing (new customers) → MNAR
+
+# Strategy 1: Simple imputation
+imputer_age = SimpleImputer(strategy='median')    # robust to outliers
+imputer_income = KNNImputer(n_neighbors=5)        # use similar customers
+# For credit_score: add a flag + impute
+
+df['credit_score_missing'] = df['credit_score'].isna().astype(int)  # flag
+df['credit_score'] = df['credit_score'].fillna(df['credit_score'].median())
+
+# CRITICAL: fit imputers on TRAINING data only!
+from sklearn.model_selection import train_test_split
+X_train, X_test = train_test_split(X)
+
+imputer = KNNImputer(n_neighbors=5)
+X_train_imputed = imputer.fit_transform(X_train)   # fit + transform
+X_test_imputed = imputer.transform(X_test)         # only transform!
+```
+
+### Common Mistakes
+
+| Mistake | Why it's wrong | Fix |
+|---------|---------------|-----|
+| Impute before splitting | Leaks test info into training | Split first, fit imputer on train only |
+| Use mean for skewed data | Mean pulled by outliers | Use median |
+| Drop all missing rows | Loses data + introduces bias | Impute or flag |
+| Ignore MNAR patterns | Loses predictive signal | Add missingness indicator |
+| Impute time series with future | Temporal leakage | Use forward-fill or rolling window |
+
+### Application
+
+- **Healthcare:** Patient data often has MNAR (sicker patients have more missing tests) — missingness flag is critical
+- **Surveys:** Income/age often MAR — use KNN imputer with demographic features
+- **IoT/Sensors:** Usually MCAR — simple median/interpolation works
+- **Production systems:** Build imputation into the ML pipeline (sklearn Pipeline) so it's applied consistently at training and inference time
+
+---
+
+## Q10: What is data leakage and how do you prevent it?
+
+**Answer:**
+
+Data leakage occurs when information that **would not be available at prediction time** is used during training. It inflates metrics offline but causes catastrophic failure in production.
+
+```{mermaid}
+graph LR
+    subgraph leakage["Data Leakage:<br/>What Happens"]
+        direction LR
+        L1["Training uses<br/>future/target info"] --> L2["Model gets 99%<br/>accuracy offline"]
+        L2 --> L3["Deploy to production"]
+        L3 --> L4["Performance drops to 60%<br/>❌ FAILURE"]
+    end
+
+    style leakage fill:#ff7851,stroke:#333,color:#fff
+    linkStyle default stroke:#000
+```
+
+```{mermaid}
+graph LR
+    subgraph clean["No Leakage:<br/>What Should Happen"]
+        direction LR
+        C1["Training uses<br/>only available info"] --> C2["Model gets 85%<br/>accuracy offline"]
+        C2 --> C3["Deploy to production"]
+        C3 --> C4["Performance stays at 83%<br/>✅ SUCCESS"]
+    end
+
+    style clean fill:#56cc9d,stroke:#333,color:#fff
+    linkStyle default stroke:#000
+```
+
+### Intuitive Example: Predicting Hospital Readmission
+
+Imagine you're building a model to predict whether a patient will be **readmitted within 30 days**.
+
+| Feature | Leakage? | Why |
+|---------|----------|-----|
+| Patient age, diagnosis | ✅ Safe | Available at discharge |
+| Length of stay | ✅ Safe | Known when patient leaves |
+| "Readmission scheduled" flag | ❌ **Leakage!** | Only exists AFTER readmission happens |
+| Discharge summary mentioning "follow-up in 2 weeks" | ⚠️ Subtle leakage | Written by doctor who already decided on readmission plan |
+| Number of future appointments booked | ❌ **Leakage!** | Created after the prediction point |
+
+**The key question:** "Would I have this feature at the moment I need to make the prediction?"
+
+If the answer is no — it's leakage. The model isn't learning to *predict* the future; it's learning to *read* the future.
+
+### Common Types of Leakage
+
+```{mermaid}
+graph TD
+    LEAK["Data Leakage Types"] --> T1["Target Leakage<br/>(feature derived from target)"]
+    LEAK --> T2["Temporal Leakage<br/>(using future data)"]
+    LEAK --> T3["Train-Test Contamination<br/>(preprocessing on full data)"]
+    LEAK --> T4["Group Leakage<br/>(same entity in train & test)"]
+
+    T1 --> T1_EX["Example: 'diagnosis_code'<br/>predicting 'has_disease'<br/>(code IS the diagnosis!)"]
+    T2 --> T2_EX["Example: Using tomorrow's<br/>stock price as a feature<br/>to predict today's"]
+    T3 --> T3_EX["Example: Scaling/encoding<br/>fit on full data before split"]
+    T4 --> T4_EX["Example: Same patient in<br/>train & test<br/>(memorizes patient, not pattern)"]
+
+    style T1 fill:#ff7851,stroke:#333,color:#fff
+    style T2 fill:#ffce67,stroke:#333
+    style T3 fill:#6cc3d5,stroke:#333,color:#fff
+    style T4 fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Example: Churn Prediction with Leakage
+
+```python
+# ❌ LEAKAGE: Feature "days_since_last_login" is computed AFTER the churn event
+# If someone churned 30 days ago, days_since_last_login = 30
+# The model is just detecting "they already churned" not "they will churn"
+
+# ❌ LEAKAGE: Scaling before splitting
+from sklearn.preprocessing import StandardScaler
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)  # fit on ALL data including test
+X_train, X_test = train_test_split(X_scaled)
+# Test data statistics leaked into scaler!
+
+# ✅ CORRECT: Split first, then preprocess
+X_train, X_test = train_test_split(X)
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)  # fit only on train
+X_test_scaled = scaler.transform(X_test)        # transform only
+```
+
+### Prevention Checklist
+
+```{mermaid}
+graph TD
+    A["Prevention Strategy"] --> B["1. Split FIRST<br/>before any preprocessing"]
+    B --> C["2. Validate feature availability<br/>'Would I have this at inference time?'"]
+    C --> D["3. Use time-based splits<br/>for temporal data"]
+    D --> E["4. Group by entity<br/>(user, patient, store)"]
+    E --> F["5. Sanity check<br/>'Is accuracy suspiciously high?'"]
+    F --> G["6. Test with shuffled target<br/>(should give ~50% accuracy)"]
+
+    style A fill:#56cc9d,stroke:#333,color:#000
+    style B fill:#56cc9d,stroke:#333,color:#000
+    style C fill:#56cc9d,stroke:#333,color:#000
+    style D fill:#56cc9d,stroke:#333,color:#000
+    style E fill:#56cc9d,stroke:#333,color:#000 
+    style F fill:#ffce67,stroke:#333,color:#000
+    style G fill:#ff7851,stroke:#333,color:#000
+```
+
+### Red Flags That Suggest Leakage
+
+| Signal | What to check |
+|--------|--------------|
+| Accuracy > 95% on first attempt | Too good to be true — inspect features |
+| Single feature dominates importance | May be a proxy for the target |
+| Train and test scores are nearly identical | Model may be seeing test info |
+| Performance drops dramatically in production | Classic leakage symptom |
+| Cross-validation scores are unstable | Leakage present in some folds |
+
+### Application
+
+- **Time series:** Always use forward-chaining (train on past, predict future). Never shuffle temporal data.
+- **Medical studies:** Ensure no patient appears in both train and test sets.
+- **Feature stores:** Implement point-in-time correctness — features computed using only data available at prediction time.
+- **ML pipelines:** Use sklearn `Pipeline` to bundle preprocessing + model, ensuring transforms are fit only on training data during cross-validation.
+
+---
+
+## Summary
+
+| Question | Core Concept | Key Takeaway |
+|----------|-------------|--------------|
+| Q1 | Precision/Recall/F1 | Choose metrics based on error costs, not defaults |
+| Q2 | ROC-AUC | Good for ranking; use PR-AUC for imbalanced data |
+| Q3 | Imbalanced data | Fix metrics first, then weights, then resampling |
+| Q4 | Feature engineering | Better features beat better models — invest here |
+| Q5 | Curse of dimensionality | High dimensions break distance; reduce or regularize |
+| Q6 | PCA | Find maximum-variance directions; scale first |
+| Q7 | Generative vs. Discriminative | Discriminative for classification; generative for creation |
+| Q8 | Gradient Boosting/XGBoost | Sequential error correction; king of tabular data |
+| Q9 | Missing data | Understand WHY it's missing before choosing how to fix |
+| Q10 | Data leakage | Split first; validate feature availability at inference time |
+
+> **Previous:** [ML Interview QA - 1](/posts/ml-interview/ML-Interview-QA-1.html) covers learning paradigms, bias-variance, overfitting, regularization, gradient descent, cross-validation, logistic regression, decision trees, Random Forest, and bagging vs. boosting.
+
+<!-- nav-buttons -->
+
+[{{< fa brain >}} ML Interview QA - 1](/posts/ml-interview/ML-Interview-QA-1.html){.btn .btn-primary .btn-lg}
+[{{< fa house >}} Home](../../index.qmd){.btn .btn-primary .btn-lg}

@@ -1,0 +1,813 @@
+---
+title: "LLM Interview QA - 3"
+description: "10 essential LLM interview questions on configuration parameters, temperature, context windows, decoding strategies, determinism, and generation control — with diagrams and examples."
+image: /images/llm-interview/thumb_LLM_interview_qa_300.png
+date: "2026-05-20"
+keywords:
+  - "LLM interview"
+  - "LLM parameters"
+  - "temperature"
+  - "top-p nucleus sampling"
+  - "top-k sampling"
+  - "context window"
+  - "decoding strategies"
+  - "greedy decoding"
+  - "beam search"
+  - "deterministic generation"
+  - "max tokens"
+  - "frequency penalty"
+  - "stop sequences"
+---
+
+## Introduction
+
+This is **Part 3** of our LLM Interview QA series, focused on **LLM configuration and generation control**. Understanding how to configure LLM parameters — temperature, sampling strategies, context windows, and decoding methods — is essential for building reliable AI systems.
+
+> For foundational LLM concepts (transformers, attention, RAG, RLHF), see [LLM Interview QA - 1](/posts/llm-interview/LLM-Interview-QA-1.html). For advanced topics (scaling, quantization, agents), see [LLM Interview QA - 2](/posts/llm-interview/LLM-Interview-QA-2.html). For ML fundamentals, see [ML Interview QA - 1](/posts/ml-interview/ML-Interview-QA-1.html).
+
+---
+
+## Q1: What are the main configurable parameters when calling an LLM API?
+
+**Answer:**
+
+When making an LLM API call, several parameters control the behavior, quality, and cost of the generated output.
+
+```{mermaid}
+graph TD
+    CONFIG["LLM Configuration Parameters"]
+    CONFIG --> GEN["Generation Control"]
+    CONFIG --> SAMP["Sampling Parameters"]
+    CONFIG --> OUT["Output Control"]
+    CONFIG --> SYS["System Parameters"]
+
+    GEN --> G1["temperature"]
+    GEN --> G2["top_p (nucleus)"]
+    GEN --> G3["top_k"]
+    GEN --> G4["seed"]
+
+    SAMP --> S1["frequency_penalty"]
+    SAMP --> S2["presence_penalty"]
+    SAMP --> S3["repetition_penalty"]
+    SAMP --> S4["logit_bias"]
+
+    OUT --> O1["max_tokens / max_new_tokens"]
+    OUT --> O2["stop sequences"]
+    OUT --> O3["n (num_return_sequences)"]
+    OUT --> O4["stream"]
+
+    SYS --> SY1["model"]
+    SYS --> SY2["system prompt"]
+    SYS --> SY3["response_format"]
+    SYS --> SY4["tools / functions"]
+
+    style CONFIG fill:#56cc9d,stroke:#333,color:#fff
+    style GEN fill:#6cc3d5,stroke:#333,color:#fff
+    style SAMP fill:#ffce67,stroke:#333
+    style OUT fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Parameter Overview
+
+| Parameter | Range | Default | Purpose |
+|-----------|-------|---------|---------|
+| `temperature` | 0.0 – 2.0 | 1.0 | Controls randomness of output |
+| `top_p` | 0.0 – 1.0 | 1.0 | Nucleus sampling threshold |
+| `top_k` | 1 – vocab_size | 50 (varies) | Limits token candidates |
+| `max_tokens` | 1 – context_limit | Model-specific | Maximum output length |
+| `frequency_penalty` | -2.0 – 2.0 | 0.0 | Penalizes repeated tokens |
+| `presence_penalty` | -2.0 – 2.0 | 0.0 | Encourages topic diversity |
+| `seed` | Any integer | None | Enables deterministic output |
+| `stop` | List of strings | None | Stops generation at specific tokens |
+| `n` | 1+ | 1 | Number of completions to generate |
+
+### Practical Configuration Examples
+
+| Use Case | temperature | top_p | max_tokens | Other |
+|----------|-------------|-------|------------|-------|
+| Code generation | 0.0 – 0.2 | 1.0 | 2048 | `stop=["\n\n"]` |
+| Creative writing | 0.8 – 1.2 | 0.95 | 4096 | `frequency_penalty=0.5` |
+| Data extraction | 0.0 | 1.0 | 512 | `response_format=json` |
+| Chat conversation | 0.7 | 0.9 | 1024 | `presence_penalty=0.3` |
+| Factual Q&A | 0.0 – 0.3 | 1.0 | 256 | — |
+
+---
+
+## Q2: What is temperature and how does it affect LLM output?
+
+**Answer:**
+
+**Temperature** controls the randomness of the probability distribution over the vocabulary at each generation step. It's applied to the logits before the softmax function.
+
+### Mathematical Definition
+
+Given logits $z_i$ for each token $i$ in the vocabulary:
+
+$$P(w_i) = \frac{e^{z_i / T}}{\sum_j e^{z_j / T}}$$
+
+where $T$ is the temperature.
+
+```{mermaid}
+graph LR
+    subgraph T0["Temperature = 0 (Greedy)"]
+        T0_1["Token A: 99.9%"]
+        T0_2["Token B: 0.1%"]
+        T0_3["Token C: ~0%"]
+    end
+
+    subgraph T07["Temperature = 0.7"]
+        T07_1["Token A: 75%"]
+        T07_2["Token B: 20%"]
+        T07_3["Token C: 5%"]
+    end
+
+    subgraph T1["Temperature = 1.0 (Default)"]
+        T1_1["Token A: 60%"]
+        T1_2["Token B: 25%"]
+        T1_3["Token C: 15%"]
+    end
+
+    subgraph T2["Temperature = 2.0"]
+        T2_1["Token A: 40%"]
+        T2_2["Token B: 32%"]
+        T2_3["Token C: 28%"]
+    end
+
+    style T0 fill:#56cc9d,stroke:#333,color:#fff
+    style T07 fill:#6cc3d5,stroke:#333,color:#fff
+    style T1 fill:#ffce67,stroke:#333
+    style T2 fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Effect of Temperature
+
+| Temperature | Distribution | Behavior | Output Character |
+|-------------|-------------|----------|-----------------|
+| **T → 0** | Extremely peaked | Always picks highest-probability token | Deterministic, repetitive, safe |
+| **T = 0.3** | Slightly softened | Mostly picks top tokens, rare surprises | Conservative, coherent |
+| **T = 0.7** | Moderately spread | Balanced between likely and creative | Good default for most tasks |
+| **T = 1.0** | Original distribution | Model's "natural" uncertainty | Raw model behavior |
+| **T > 1.0** | Flattened | Low-probability tokens become likely | Creative but potentially incoherent |
+| **T = 2.0** | Nearly uniform | Almost random selection | Chaotic, nonsensical |
+
+### Intuition
+
+Think of temperature as a "creativity knob":
+
+- **Low temperature (0–0.3):** The model is **confident and focused** — it picks the most obvious next word. Great for factual tasks, code, structured extraction.
+- **Medium temperature (0.5–0.8):** The model is **balanced** — it explores alternatives while staying coherent. Best for general chat and writing.
+- **High temperature (1.0+):** The model is **adventurous** — it considers unlikely words, producing surprising or creative outputs.
+
+### Common Interview Follow-Up: "What does temperature=0 actually mean?"
+
+Setting `temperature=0` is a shortcut for **greedy decoding** — the model always selects the single highest-probability token. However:
+
+- It's still based on floating-point arithmetic, so minor non-determinism can occur across hardware
+- Most APIs interpret `temperature=0` as "return the argmax token" deterministically
+- Some providers require setting a `seed` parameter for guaranteed reproducibility
+
+---
+
+## Q3: What is the difference between Top-p (nucleus) sampling and Top-k sampling?
+
+**Answer:**
+
+Both **Top-p** and **Top-k** are token filtering strategies that limit which tokens are considered during generation, but they differ in **how** they determine the candidate set.
+
+### Top-k Sampling
+
+Select the **k most probable tokens** and redistribute probability among them:
+
+$$V_{\text{top-k}} = \{w_1, w_2, \ldots, w_k\} \quad \text{(ordered by probability)}$$
+
+### Top-p (Nucleus) Sampling
+
+Select the **smallest set of tokens** whose cumulative probability exceeds $p$:
+
+$$V_{\text{top-p}} = \text{smallest } V' \text{ such that } \sum_{w \in V'} P(w) \geq p$$
+
+```{mermaid}
+graph TD
+    subgraph TopK["Top-k = 3 (Fixed Size)"]
+        direction LR
+        K1["'the' (0.40) ✓"]
+        K2["'a' (0.25) ✓"]
+        K3["'my' (0.15) ✓"]
+        K4["'his' (0.10) ✗"]
+        K5["'our' (0.05) ✗"]
+        K6["'their' (0.03) ✗"]
+    end
+
+    subgraph TopP["Top-p = 0.9 (Dynamic Size)"]
+        direction LR
+        P1["'the' (0.40) ✓ → cumulative: 0.40"]
+        P2["'a' (0.25) ✓ → cumulative: 0.65"]
+        P3["'my' (0.15) ✓ → cumulative: 0.80"]
+        P4["'his' (0.10) ✓ → cumulative: 0.90 ≥ p"]
+        P5["'our' (0.05) ✗"]
+        P6["'their' (0.03) ✗"]
+    end
+
+    style TopK fill:#6cc3d5,stroke:#333,color:#fff
+    style TopP fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Key Differences
+
+| Aspect | Top-k | Top-p |
+|--------|-------|-------|
+| Candidate set size | **Fixed** (always k tokens) | **Dynamic** (varies per step) |
+| Adapts to distribution shape | No — same k regardless of certainty | Yes — fewer tokens when confident |
+| Risk when distribution is peaked | Includes unlikely tokens unnecessarily | Naturally narrows to top few |
+| Risk when distribution is flat | May exclude reasonable tokens | Naturally includes more candidates |
+
+### Why Top-p is Generally Preferred
+
+Consider two scenarios at different generation steps:
+
+**Step A (peaked distribution):** Model is 95% sure the next word is "Paris"
+
+- Top-k=50: Considers 50 tokens (49 are noise)
+- Top-p=0.95: Considers only 1-2 tokens (adaptive!)
+
+**Step B (flat distribution):** Model is uncertain, many tokens are equally likely
+
+- Top-k=50: Might miss some reasonable candidates if vocabulary is large
+- Top-p=0.95: Includes all tokens until 95% mass is covered (could be 100+ tokens)
+
+### Combining Top-k and Top-p
+
+In practice, many systems use **both** simultaneously:
+
+1. First apply Top-k to limit to k candidates
+2. Then apply Top-p within those k candidates
+
+This provides both an upper bound (Top-k) and adaptive filtering (Top-p).
+
+### Recommended Settings
+
+| Task | top_k | top_p | Rationale |
+|------|-------|-------|-----------|
+| Deterministic (code, facts) | 1 | 1.0 | Equivalent to greedy |
+| Balanced (chat) | 40-50 | 0.9 | Diverse but coherent |
+| Creative (stories) | 100+ | 0.95 | Wide exploration |
+| Structured output (JSON) | 5-10 | 0.8 | Limited, safe choices |
+
+---
+
+## Q4: What is the context window and how does it constrain LLM behavior?
+
+**Answer:**
+
+The **context window** (also called context length or maximum sequence length) is the total number of tokens an LLM can process in a single inference call — this includes **both input tokens and output tokens**.
+
+$$\text{Context Window} = \text{Input Tokens (prompt)} + \text{Output Tokens (completion)}$$
+
+```{mermaid}
+graph LR
+    subgraph CW["Context Window (e.g., 128K tokens)"]
+        direction LR
+        SYS["System Prompt<br/>(500 tokens)"]
+        CTX["Retrieved Context / RAG<br/>(10,000 tokens)"]
+        HIST["Conversation History<br/>(5,000 tokens)"]
+        USER["User Message<br/>(200 tokens)"]
+        RESP["Model Response<br/>(max_tokens: 4,096)"]
+    end
+
+    style CW fill:#56cc9d,stroke:#333,color:#fff
+    style RESP fill:#ffce67,stroke:#333
+```
+
+### Context Window Sizes (2024–2026)
+
+| Model | Context Window | Notes |
+|-------|---------------|-------|
+| GPT-3.5 Turbo | 16K tokens | ~12K words |
+| GPT-4 | 128K tokens | ~96K words |
+| GPT-4o | 128K tokens | ~96K words |
+| Claude 3.5 Sonnet | 200K tokens | ~150K words |
+| Gemini 1.5 Pro | 1M–2M tokens | Longest available |
+| LLaMA 3.1 | 128K tokens | Open-source |
+| Mistral Large | 128K tokens | |
+| DeepSeek-V3 | 128K tokens | |
+
+### What Happens When You Exceed the Context Window?
+
+| Behavior | Description |
+|----------|-------------|
+| **Truncation** | Oldest tokens are dropped (APIs return error or truncate) |
+| **Error** | API rejects the request if input exceeds limit |
+| **Degraded performance** | Even within limits, performance drops in the "middle" |
+
+### Context Window vs. Effective Context
+
+**Key insight for interviews:** The *advertised* context window is not the same as *effective* context:
+
+| Concept | Meaning |
+|---------|---------|
+| **Maximum context** | Technical limit the model supports |
+| **Effective context** | Length at which performance remains high |
+| **"Lost in the middle"** | Information in the center of long contexts is often missed |
+| **Needle-in-a-haystack** | Benchmark: can the model find a fact placed at position X? |
+
+### Strategies for Context Window Management
+
+| Strategy | How it works |
+|----------|-------------|
+| **Chunking + RAG** | Only retrieve relevant chunks, don't stuff everything |
+| **Summarization** | Compress conversation history into summaries |
+| **Sliding window** | Keep recent messages + system prompt, drop old middle |
+| **Hierarchical context** | Summary of old messages + full recent messages |
+| **Prompt compression** | Use tools like LLMLingua to compress prompts |
+
+### Cost Implications
+
+Context window directly affects cost:
+
+$$\text{Cost} = (\text{Input tokens} \times \text{price/input token}) + (\text{Output tokens} \times \text{price/output token})$$
+
+Longer contexts mean higher costs, higher latency, and more KV-cache memory usage.
+
+---
+
+## Q5: Is LLM generation deterministic? How do you achieve reproducible outputs?
+
+**Answer:**
+
+By default, LLM generation is **non-deterministic** — the same prompt can produce different outputs across calls. This is intentional but can be controlled.
+
+```{mermaid}
+graph TD
+    subgraph NonDet["Non-Deterministic (Default)"]
+        ND1["Same prompt"]
+        ND2["Run 1: 'The capital is Paris.'"]
+        ND3["Run 2: 'Paris is the capital of France.'"]
+        ND4["Run 3: 'France's capital city is Paris.'"]
+        ND1 --> ND2
+        ND1 --> ND3
+        ND1 --> ND4
+    end
+
+    subgraph Det["Deterministic (Configured)"]
+        D1["Same prompt + seed + temp=0"]
+        D2["Run 1: 'The capital is Paris.'"]
+        D3["Run 2: 'The capital is Paris.'"]
+        D4["Run 3: 'The capital is Paris.'"]
+        D1 --> D2
+        D1 --> D3
+        D1 --> D4
+    end
+
+    style NonDet fill:#ffce67,stroke:#333
+    style Det fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Sources of Non-Determinism
+
+| Source | Explanation | Controllable? |
+|--------|-------------|---------------|
+| **Sampling** (temperature > 0) | Random token selection from distribution | Yes — set temperature=0 |
+| **Top-p / Top-k filtering** | Random selection within candidate set | Yes — set top_p=1, top_k=1 |
+| **Floating-point non-determinism** | GPU parallel operations not strictly ordered | Partially — depends on hardware |
+| **Batching effects** | Different batch compositions may affect computation | No (server-side) |
+| **Model updates** | Provider may update model without notice | No (use versioned models) |
+| **System prompt caching** | Some providers cache and may route differently | No |
+
+### How to Achieve Deterministic Output
+
+| Method | What it does | Guarantee Level |
+|--------|-------------|-----------------|
+| `temperature=0` | Greedy decoding (argmax) | High — nearly deterministic |
+| `seed` parameter | Fixes random state for sampling | High (API-dependent) |
+| `temperature=0` + `seed` | Both greedy and fixed state | Highest available |
+| Self-hosted + fixed seed + deterministic CUDA | Full control over hardware | True determinism |
+
+### When Determinism Matters
+
+| Use Case | Need Deterministic? | Why |
+|----------|--------------------|----|
+| **Unit testing** | Yes | Reproducible test assertions |
+| **Evaluation/benchmarks** | Yes | Fair comparison across models |
+| **Caching** | Yes | Same input → cache hit |
+| **Audit/compliance** | Yes | Reproducible decisions |
+| **Creative writing** | No | Variety is desired |
+| **Chat conversations** | No | Natural variation is expected |
+
+### Important Caveat
+
+Even with `temperature=0` and a `seed`, **exact determinism is not always guaranteed**:
+
+- GPU floating-point operations may vary across hardware versions
+- API providers may route requests to different hardware
+- Model quantization can introduce slight variations
+- OpenAI states: "deterministic outputs are not guaranteed" even with seed (but are "mostly deterministic")
+
+---
+
+## Q6: What are the main decoding strategies and when should you use each?
+
+**Answer:**
+
+**Decoding** is the process of selecting which token to generate next given the probability distribution from the model. The choice of decoding strategy dramatically affects output quality.
+
+```{mermaid}
+graph TD
+    DECODE["Decoding Strategies"]
+    DECODE --> DETERM["Deterministic"]
+    DECODE --> STOCH["Stochastic (Sampling)"]
+    DECODE --> HYBRID["Hybrid / Advanced"]
+
+    DETERM --> GREEDY["Greedy Search<br/>Pick argmax at each step"]
+    DETERM --> BEAM["Beam Search<br/>Track top-n hypotheses"]
+
+    STOCH --> PURE["Pure Sampling<br/>Sample from full distribution"]
+    STOCH --> TOPK["Top-k Sampling<br/>Sample from top k tokens"]
+    STOCH --> TOPP["Top-p Sampling<br/>Sample from nucleus"]
+    STOCH --> TEMP_SAMP["Temperature Sampling<br/>Reshape distribution then sample"]
+
+    HYBRID --> SPEC["Speculative Decoding<br/>Draft + verify"]
+    HYBRID --> CONTRAST["Contrastive Decoding<br/>Subtract weak model's distribution"]
+    HYBRID --> GUIDED["Guided/Constrained<br/>Enforce output structure"]
+
+    style DECODE fill:#56cc9d,stroke:#333,color:#fff
+    style DETERM fill:#6cc3d5,stroke:#333,color:#fff
+    style STOCH fill:#ffce67,stroke:#333
+    style HYBRID fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Detailed Comparison
+
+| Strategy | How it works | Pros | Cons |
+|----------|-------------|------|------|
+| **Greedy** | Always pick highest probability token | Fast, deterministic, simple | Repetitive, misses better sequences |
+| **Beam Search** | Track top-n partial sequences | Finds higher-probability sequences | Still repetitive, expensive, poor for open-ended |
+| **Top-k Sampling** | Sample from top k tokens | Reduces nonsense, some diversity | Fixed k not adaptive to distribution |
+| **Top-p Sampling** | Sample from smallest set covering p mass | Adaptive to uncertainty, natural | Slightly less predictable |
+| **Temperature + Sampling** | Reshape distribution then sample | Fine-grained control | Need to tune parameter |
+| **Speculative Decoding** | Small model drafts, large model verifies | 2-3x faster, same quality | Needs draft model |
+| **Contrastive Decoding** | Subtract amateur model's preferences | Reduces repetition, more coherent | Complex setup |
+| **Constrained Decoding** | Force output to follow grammar/schema | Guarantees valid structure | Limits expressiveness |
+
+### Greedy Search: The Simplest Strategy
+
+At each step, pick the token with the highest probability:
+
+$$w_t = \arg\max_{w} P(w | w_{1:t-1})$$
+
+**Problem:** Greedy search is **locally optimal** but not **globally optimal**. A low-probability token now might lead to a much better overall sequence.
+
+**Example:** "The dog" (0.4) → "has" (0.9) gives sequence probability 0.36, while "The nice" (0.5) → "woman" (0.4) gives 0.20. Greedy picks "nice" first but misses the better path.
+
+### Beam Search: Exploring Multiple Paths
+
+Maintains `num_beams` parallel hypotheses:
+
+```
+Beam 1: "The" → "dog" → "has" → "a"      (prob: 0.36 × ...)
+Beam 2: "The" → "nice" → "woman" → "is"   (prob: 0.20 × ...)
+Beam 3: "The" → "cat" → "sat" → "on"      (prob: 0.15 × ...)
+```
+
+**When to use beam search:**
+
+- Translation (known output length)
+- Summarization (structured output)
+- NOT for open-ended generation (causes repetition)
+
+### When to Use Which Strategy
+
+| Task | Recommended Strategy | Why |
+|------|---------------------|-----|
+| Code generation | Greedy (temp=0) | Correctness over creativity |
+| Translation | Beam search (beams=4-5) | Quality over diversity |
+| Creative writing | Top-p=0.95, temp=0.8 | Diversity and surprise |
+| Chat/conversation | Top-p=0.9, temp=0.7 | Natural but coherent |
+| Structured extraction | Constrained decoding | Must follow schema |
+| JSON output | Greedy + grammar constraints | Validity guaranteed |
+| Fast inference | Speculative decoding | Speed with no quality loss |
+
+---
+
+## Q7: What are frequency penalty and presence penalty, and how do they reduce repetition?
+
+**Answer:**
+
+**Frequency penalty** and **presence penalty** are post-processing adjustments to token logits that discourage the model from repeating itself.
+
+### Mathematical Definitions
+
+The logit for token $i$ is adjusted before sampling:
+
+$$z_i' = z_i - (\text{frequency\_penalty} \times \text{count}(i)) - (\text{presence\_penalty} \times \mathbb{1}[\text{count}(i) > 0])$$
+
+where $\text{count}(i)$ is how many times token $i$ has appeared in the output so far.
+
+```{mermaid}
+graph TD
+    subgraph FP["Frequency Penalty"]
+        FP1["Penalizes proportionally to<br/>how MANY times token appeared"]
+        FP2["Token appeared 5× → big penalty"]
+        FP3["Token appeared 1× → small penalty"]
+        FP4["Effect: Reduces repetitive words"]
+    end
+
+    subgraph PP["Presence Penalty"]
+        PP1["Penalizes equally if token<br/>appeared AT ALL (binary)"]
+        PP2["Token appeared 5× → same penalty as 1×"]
+        PP3["Token never appeared → no penalty"]
+        PP4["Effect: Encourages new topics"]
+    end
+
+    style FP fill:#6cc3d5,stroke:#333,color:#fff
+    style PP fill:#ffce67,stroke:#333
+```
+
+### Comparison
+
+| Aspect | Frequency Penalty | Presence Penalty |
+|--------|-------------------|------------------|
+| Scales with count? | Yes (proportional) | No (binary: appeared or not) |
+| Range (OpenAI) | -2.0 to 2.0 | -2.0 to 2.0 |
+| Primary effect | Reduces word-level repetition | Encourages topic diversity |
+| Use case | Avoid saying "very very very..." | Avoid staying on same topic |
+| Analogy | "Don't repeat words" | "Talk about new things" |
+
+### Practical Examples
+
+**Without penalties (both = 0):**
+> "The weather is nice. The weather is really nice. The weather makes me happy. The weather..."
+
+**With frequency_penalty = 0.8:**
+> "The weather is nice. It's a beautiful day. The sunshine makes me happy. I think I'll go outside..."
+
+**With presence_penalty = 1.0:**
+> "The weather is nice. I've been reading a great book lately. My garden is blooming. Tomorrow I plan to cook..."
+
+### Repetition Penalty (Hugging Face)
+
+Hugging Face uses a multiplicative `repetition_penalty` instead:
+
+$$z_i' = \begin{cases} z_i / \text{repetition\_penalty} & \text{if } z_i > 0 \text{ and token appeared} \\ z_i \times \text{repetition\_penalty} & \text{if } z_i < 0 \text{ and token appeared} \end{cases}$$
+
+- `repetition_penalty = 1.0`: No effect
+- `repetition_penalty = 1.2`: Moderate de-repetition (common default)
+- `repetition_penalty > 1.5`: Strong — may cause incoherence
+
+---
+
+## Q8: What is `max_tokens` and how does it interact with the context window?
+
+**Answer:**
+
+`max_tokens` (or `max_new_tokens`) sets the **maximum number of tokens** the model will generate in its response. It's a hard cap — generation stops even if the response is incomplete.
+
+```{mermaid}
+graph LR
+    subgraph Budget["Token Budget Allocation"]
+        direction LR
+        CW["Context Window: 128K"]
+        INPUT["Input tokens used: 50K"]
+        AVAILABLE["Available for output: 78K"]
+        MAX["max_tokens set: 4096"]
+        ACTUAL["Actual output: min(4096, until EOS)"]
+    end
+
+    CW --> INPUT --> AVAILABLE --> MAX --> ACTUAL
+
+    style Budget fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Key Relationships
+
+$$\text{max\_tokens} \leq \text{context\_window} - \text{input\_tokens}$$
+
+If you set `max_tokens` higher than available space, the API will either:
+
+- Silently cap it at the available space
+- Return an error
+
+### `max_tokens` vs. `max_new_tokens`
+
+| Parameter | Framework | What it means |
+|-----------|-----------|---------------|
+| `max_tokens` | OpenAI, Anthropic APIs | Max tokens in the completion |
+| `max_new_tokens` | Hugging Face Transformers | Max new tokens to generate (same concept) |
+| `max_length` | Hugging Face (older) | Max total length (input + output) |
+
+### Why Generation Stops
+
+Generation terminates when **any** of these conditions is met:
+
+| Condition | Description |
+|-----------|-------------|
+| `max_tokens` reached | Hard output length limit |
+| EOS token generated | Model naturally finishes its response |
+| Stop sequence matched | A specified string pattern is found |
+| Context window full | Input + output fills the entire window |
+
+### Practical Implications
+
+| Setting | Effect | Risk |
+|---------|--------|------|
+| Too low (e.g., 50) | Responses get cut off mid-sentence | Incomplete, incoherent outputs |
+| Too high (e.g., 16384) | Model can write as much as it wants | Higher cost, potential rambling |
+| Right-sized | Complete responses without waste | Requires knowing task needs |
+
+### Cost Optimization
+
+Since APIs charge per token:
+
+- Set `max_tokens` appropriate to the task (not arbitrarily high)
+- Use `stop` sequences to terminate early
+- Monitor actual token usage vs. max_tokens budget
+
+---
+
+## Q9: What are stop sequences and how do they control generation?
+
+**Answer:**
+
+**Stop sequences** are strings that, when generated by the model, immediately terminate generation. They're a powerful mechanism for controlling output format and length.
+
+```{mermaid}
+graph TD
+    GEN["Model Generating..."]
+    GEN --> CHECK{"Generated text<br/>contains stop sequence?"}
+    CHECK -->|"No"| CONT["Continue generating"]
+    CONT --> GEN
+    CHECK -->|"Yes"| STOP["Stop immediately<br/>Return output (stop seq excluded)"]
+
+    style GEN fill:#6cc3d5,stroke:#333,color:#fff
+    style STOP fill:#56cc9d,stroke:#333,color:#fff
+    style CHECK fill:#ffce67,stroke:#333
+```
+
+### Common Stop Sequence Use Cases
+
+| Use Case | Stop Sequences | Purpose |
+|----------|---------------|---------|
+| Single-line answer | `["\n"]` | Prevent multi-line responses |
+| Code function | `["\n\n", "def ", "class "]` | Stop after one function |
+| Structured QA | `["Q:", "Question:"]` | Stop before generating next question |
+| Chat role-play | `["User:", "Human:"]` | Prevent model from simulating user |
+| JSON extraction | `["}"]` or `["}\n"]` | Stop after closing brace |
+| Numbered list | `["11."]` | Limit to 10 items |
+
+### Example: Controlling Multi-Turn Chat
+
+```python
+response = client.chat.completions.create(
+    model="gpt-4",
+    messages=[{"role": "user", "content": "List 3 fruits"}],
+    stop=["\n\n", "4."],  # Stop after 3 items
+    max_tokens=200
+)
+```
+
+**Without stop sequences:** Model might continue listing dozens of fruits or add commentary.
+
+**With stop sequences:** Generation stops cleanly after the third item.
+
+### Stop Sequences vs. Other Stopping Mechanisms
+
+| Mechanism | How it works | Granularity |
+|-----------|-------------|-------------|
+| **Stop sequences** | Match specific text strings | Fine (exact strings) |
+| **max_tokens** | Hard token count limit | Coarse (may cut mid-word) |
+| **EOS token** | Model decides it's done | Model-controlled |
+| **Constrained decoding** | Grammar forces valid endings | Structural |
+
+### Best Practices
+
+1. **Include the delimiter** that separates outputs (e.g., `"\n\n"` between paragraphs)
+2. **Test with variations** — models might generate `"\n "` instead of `"\n\n"`
+3. **Combine with max_tokens** as a safety net
+4. **Don't over-specify** — too many stop sequences can cause premature truncation
+
+---
+
+## Q10: How do you choose the right configuration for different LLM tasks?
+
+**Answer:**
+
+Choosing the right parameters is about matching the **creativity-accuracy tradeoff** to your specific task requirements.
+
+```{mermaid}
+graph LR
+    subgraph Spectrum["Creativity ↔ Accuracy Spectrum"]
+        direction LR
+        DET["🎯 Deterministic<br/>temp=0, top_p=1"]
+        CON["🔒 Conservative<br/>temp=0.2, top_p=0.9"]
+        BAL["⚖️ Balanced<br/>temp=0.7, top_p=0.9"]
+        CRE["🎨 Creative<br/>temp=1.0, top_p=0.95"]
+        WILD["🌀 Wild<br/>temp=1.5, top_p=1.0"]
+    end
+
+    DET --> CON --> BAL --> CRE --> WILD
+
+    style DET fill:#56cc9d,stroke:#333,color:#fff
+    style CON fill:#6cc3d5,stroke:#333,color:#fff
+    style BAL fill:#ffce67,stroke:#333
+    style CRE fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Decision Framework
+
+| Question | If Yes → | If No → |
+|----------|----------|---------|
+| Does output need to be exactly correct? | temp=0, greedy | Consider sampling |
+| Is creativity/variety valued? | temp=0.7-1.0 | temp=0-0.3 |
+| Must output follow strict format? | Constrained decoding, low temp | Higher freedom |
+| Running evaluations/benchmarks? | temp=0, seed set | Doesn't matter |
+| Is this user-facing chat? | temp=0.7, penalties for variety | Task-dependent |
+| Generating multiple candidates? | Higher temp, n>1 | Standard settings |
+
+### Complete Configuration Recipes
+
+#### Recipe 1: Code Generation
+```
+temperature: 0.0
+top_p: 1.0
+max_tokens: 2048
+stop: ["\n\n\n", "```"]
+frequency_penalty: 0.0
+```
+**Why:** Code requires precision. Any "creativity" means bugs.
+
+#### Recipe 2: Customer Support Bot
+```
+temperature: 0.3
+top_p: 0.9
+max_tokens: 512
+presence_penalty: 0.2
+stop: ["Human:", "Customer:"]
+```
+**Why:** Slightly varied but consistent, professional responses.
+
+#### Recipe 3: Creative Story Writing
+```
+temperature: 0.9
+top_p: 0.95
+max_tokens: 4096
+frequency_penalty: 0.7
+presence_penalty: 0.5
+```
+**Why:** Maximum variety, avoids repetition, explores narrative directions.
+
+#### Recipe 4: Data Extraction (JSON)
+```
+temperature: 0.0
+top_p: 1.0
+max_tokens: 256
+response_format: {"type": "json_object"}
+stop: ["}\n"]
+```
+**Why:** Must produce valid, consistent structured output.
+
+#### Recipe 5: Brainstorming / Ideation
+```
+temperature: 1.2
+top_p: 0.95
+max_tokens: 1024
+frequency_penalty: 1.0
+presence_penalty: 1.5
+n: 5
+```
+**Why:** Generate diverse ideas; high penalties force exploration of new territory.
+
+### Common Mistakes
+
+| Mistake | Problem | Fix |
+|---------|---------|-----|
+| `temperature=0` for creative tasks | Bland, repetitive output | Increase to 0.7-1.0 |
+| `temperature=1.0` for factual tasks | Hallucinations, wrong facts | Decrease to 0-0.3 |
+| Ignoring `max_tokens` | Unexpected costs, truncation | Always set appropriate limit |
+| Setting both `temperature` and `top_p` low | Over-constrained, degenerate | Usually modify one, keep other default |
+| No stop sequences in agentic loops | Model generates beyond intended boundary | Add role/delimiter stops |
+
+---
+
+## Summary Table
+
+| # | Topic | Key Concept |
+|---|-------|-------------|
+| 1 | API Parameters | temperature, top_p, max_tokens, penalties, stop sequences |
+| 2 | Temperature | Controls distribution sharpness: 0=greedy, 1=natural, >1=chaotic |
+| 3 | Top-p vs. Top-k | Fixed-size (k) vs. adaptive probability mass (p) filtering |
+| 4 | Context Window | Total input+output token budget; affects cost, latency, quality |
+| 5 | Determinism | temp=0 + seed for reproducibility; true determinism is hard |
+| 6 | Decoding Strategies | Greedy, beam search, sampling, speculative, constrained |
+| 7 | Penalties | frequency_penalty (proportional) vs. presence_penalty (binary) |
+| 8 | max_tokens | Hard output cap; interacts with context window budget |
+| 9 | Stop Sequences | String patterns that terminate generation cleanly |
+| 10 | Configuration Recipes | Match creativity-accuracy tradeoff to task requirements |
+
+---
+
+## What's Next?
+
+This article covered the practical configuration knowledge tested in LLM engineering interviews. For related content:
+
+- **Core LLM concepts (transformers, RAG, RLHF):** [LLM Interview QA - 1](/posts/llm-interview/LLM-Interview-QA-1.html)
+- **Advanced topics (scaling, agents, inference):** [LLM Interview QA - 2](/posts/llm-interview/LLM-Interview-QA-2.html)
+- **ML fundamentals:** [ML Interview QA - 1](/posts/ml-interview/ML-Interview-QA-1.html) and [ML Interview QA - 2](/posts/ml-interview/ML-Interview-QA-2.html)

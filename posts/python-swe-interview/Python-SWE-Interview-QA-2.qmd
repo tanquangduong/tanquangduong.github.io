@@ -1,0 +1,1128 @@
+---
+title: "Python SWE Interview QA - 2"
+description: "10 advanced Python software engineering interview questions covering async/await, type hints, dataclasses, metaclasses, testing, exception handling, descriptors, slots, collections, and design patterns."
+image: /images/python-swe-interview/thumb_python_swe_interview_qa_300.png
+date: "2026-05-20"
+keywords:
+  - "Python advanced interview"
+  - "async await Python"
+  - "type hints annotations"
+  - "dataclasses Python"
+  - "metaclasses"
+  - "Python testing unittest pytest"
+  - "exception handling"
+  - "descriptors protocol"
+  - "__slots__"
+  - "collections module"
+  - "Python design patterns"
+  - "classmethod staticmethod"
+---
+
+## Introduction
+
+This is **Part 2** of our Python SWE Interview QA series, covering **advanced topics** that distinguish senior engineers from junior candidates. These questions test deeper understanding of Python internals, modern Python features, and production-quality code practices.
+
+> For foundational Python topics (GIL, decorators, generators, etc.), see [Python SWE Interview QA - 1](/posts/python-swe-interview/Python-SWE-Interview-QA-1.html). For ML/AI interview content, see [ML Interview QA - 1](/posts/ml-interview/ML-Interview-QA-1.html) and [LLM Interview QA - 1](/posts/llm-interview/LLM-Interview-QA-1.html).
+
+---
+
+## Q1: How does `async`/`await` work in Python and when should you use it?
+
+**Answer:**
+
+`async`/`await` is Python's syntax for **cooperative multitasking** — it allows writing concurrent code that handles many I/O operations simultaneously within a single thread using an event loop.
+
+```{mermaid}
+graph TD
+    EL["Event Loop"]
+    EL --> T1["Task 1: await fetch(url1)"]
+    EL --> T2["Task 2: await fetch(url2)"]
+    EL --> T3["Task 3: await fetch(url3)"]
+
+    T1 -->|"suspended while waiting"| EL
+    T2 -->|"suspended while waiting"| EL
+    T3 -->|"suspended while waiting"| EL
+
+    subgraph Timeline["Execution Timeline"]
+        direction LR
+        S1["Start T1"] --> W1["T1 waits (I/O)"]
+        W1 --> S2["Start T2"]
+        S2 --> W2["T2 waits (I/O)"]
+        W2 --> S3["Start T3"]
+        S3 --> R1["T1 resumes"]
+        R1 --> R2["T2 resumes"]
+        R2 --> R3["T3 resumes"]
+    end
+
+    style EL fill:#56cc9d,stroke:#333,color:#fff
+    style Timeline fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Key Concepts
+
+| Concept | Description |
+|---------|-------------|
+| `async def` | Declares a **coroutine** function |
+| `await` | Suspends execution until the awaited coroutine completes |
+| Event Loop | Schedules and runs coroutines; switches between them at `await` points |
+| `asyncio.gather()` | Runs multiple coroutines concurrently |
+| `asyncio.create_task()` | Schedules a coroutine to run in the background |
+
+### Practical Example
+
+```python
+import asyncio
+import aiohttp
+
+async def fetch_url(session, url):
+    """Fetch a single URL — suspends at await, frees event loop."""
+    async with session.get(url) as response:
+        return await response.text()
+
+async def fetch_all(urls):
+    """Fetch all URLs concurrently — not sequentially!"""
+    async with aiohttp.ClientSession() as session:
+        tasks = [asyncio.create_task(fetch_url(session, url)) for url in urls]
+        return await asyncio.gather(*tasks)
+
+# Sequential: 10 URLs × 200ms = ~2000ms
+# Concurrent: 10 URLs overlapped = ~200ms
+urls = [f"https://api.example.com/data/{i}" for i in range(10)]
+results = asyncio.run(fetch_all(urls))
+```
+
+### When to Use (and NOT Use) async
+
+| Use async/await | Don't use async/await |
+|-----------------|----------------------|
+| Many network requests (APIs, web scraping) | CPU-heavy computation |
+| Database queries (async drivers) | Simple scripts with one I/O call |
+| WebSocket servers | File I/O on local NVMe (already fast) |
+| Chat applications, real-time feeds | When libraries don't support async |
+
+### Common Pitfalls
+
+```python
+# WRONG: Calling coroutine without await
+result = fetch_url(session, url)  # Returns coroutine object, not result!
+
+# WRONG: Sequential awaits when concurrency is possible
+for url in urls:
+    result = await fetch_url(session, url)  # One at a time!
+
+# RIGHT: Concurrent execution
+results = await asyncio.gather(*[fetch_url(session, url) for url in urls])
+
+# WRONG: Blocking call inside async function
+async def bad():
+    time.sleep(5)  # Blocks entire event loop!
+
+# RIGHT: Use async sleep
+async def good():
+    await asyncio.sleep(5)  # Yields control to event loop
+```
+
+---
+
+## Q2: What are type hints and how do they improve Python code?
+
+**Answer:**
+
+**Type hints** (PEP 484+) are optional annotations that declare expected types for variables, function parameters, and return values. They don't affect runtime behavior but enable **static analysis**, better IDE support, and self-documenting code.
+
+```{mermaid}
+graph LR
+    CODE["Type-Annotated Code"]
+    CODE --> MYPY["mypy / pyright<br/>Static type checker"]
+    CODE --> IDE["IDE<br/>Autocompletion + errors"]
+    CODE --> DOC["Documentation<br/>Self-documenting API"]
+
+    MYPY --> BUGS["Catches bugs<br/>before runtime"]
+    IDE --> PROD["Faster development"]
+    DOC --> MAINT["Easier maintenance"]
+
+    style CODE fill:#56cc9d,stroke:#333,color:#fff
+    style MYPY fill:#ff7851,stroke:#333,color:#fff
+    style IDE fill:#6cc3d5,stroke:#333,color:#fff
+    style DOC fill:#ffce67,stroke:#333
+```
+
+### Modern Type Hint Syntax (Python 3.10+)
+
+```python
+# Basic types
+name: str = "Alice"
+age: int = 30
+scores: list[float] = [98.5, 87.3, 92.1]
+
+# Union types (Python 3.10+: use |)
+def find_user(user_id: int) -> dict | None:
+    ...
+
+# Function signatures
+def process_items(
+    items: list[str],
+    *,
+    batch_size: int = 32,
+    callback: Callable[[str, int], bool] | None = None,
+) -> dict[str, int]:
+    ...
+
+# Generics
+from typing import TypeVar, Generic
+
+T = TypeVar("T")
+
+class Stack(Generic[T]):
+    def __init__(self) -> None:
+        self._items: list[T] = []
+
+    def push(self, item: T) -> None:
+        self._items.append(item)
+
+    def pop(self) -> T:
+        return self._items.pop()
+
+# Usage
+int_stack: Stack[int] = Stack()
+int_stack.push(42)
+```
+
+### Advanced Type Features
+
+```python
+from typing import Protocol, TypedDict, Literal, TypeGuard
+
+# Protocol: structural subtyping (duck typing with types)
+class Drawable(Protocol):
+    def draw(self) -> None: ...
+
+def render(obj: Drawable) -> None:
+    obj.draw()  # Any object with draw() method works
+
+# TypedDict: typed dictionaries
+class UserDict(TypedDict):
+    name: str
+    age: int
+    email: str | None
+
+# Literal: restrict to specific values
+def set_mode(mode: Literal["read", "write", "append"]) -> None: ...
+
+# TypeGuard: narrow types in conditionals
+def is_string_list(val: list[object]) -> TypeGuard[list[str]]:
+    return all(isinstance(x, str) for x in val)
+```
+
+### Type Hints in Production
+
+| Tool | Purpose |
+|------|---------|
+| `mypy` | Industry-standard static type checker |
+| `pyright` | Fast type checker (powers Pylance in VS Code) |
+| `pydantic` | Runtime type validation (APIs, configs) |
+| `beartype` | Lightweight runtime type checking decorator |
+
+---
+
+## Q3: What are `dataclasses` and when should you use them vs. regular classes?
+
+**Answer:**
+
+`dataclasses` (Python 3.7+) automatically generate `__init__`, `__repr__`, `__eq__`, and other boilerplate methods for classes that primarily store data.
+
+```{mermaid}
+graph TD
+    subgraph Regular["Regular Class (Manual)"]
+        R1["Write __init__"]
+        R2["Write __repr__"]
+        R3["Write __eq__"]
+        R4["Write __hash__"]
+        R5["~30 lines of boilerplate"]
+    end
+
+    subgraph DC["@dataclass (Auto-generated)"]
+        D1["@dataclass decorator"]
+        D2["Just define fields"]
+        D3["Everything generated"]
+        D4["~5 lines total"]
+    end
+
+    style Regular fill:#ff7851,stroke:#333,color:#fff
+    style DC fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Comparison: Before vs After
+
+```python
+# WITHOUT dataclass: ~25 lines of boilerplate
+class PointManual:
+    def __init__(self, x: float, y: float, label: str = ""):
+        self.x = x
+        self.y = y
+        self.label = label
+
+    def __repr__(self):
+        return f"PointManual(x={self.x!r}, y={self.y!r}, label={self.label!r})"
+
+    def __eq__(self, other):
+        if not isinstance(other, PointManual):
+            return NotImplemented
+        return (self.x, self.y, self.label) == (other.x, other.y, other.label)
+
+    def __hash__(self):
+        return hash((self.x, self.y, self.label))
+
+# WITH dataclass: 5 lines, same functionality
+from dataclasses import dataclass, field
+
+@dataclass(frozen=True)  # frozen=True makes it immutable + hashable
+class Point:
+    x: float
+    y: float
+    label: str = ""
+```
+
+### Advanced Dataclass Features
+
+```python
+from dataclasses import dataclass, field, asdict, astuple
+from typing import ClassVar
+
+@dataclass(order=True, slots=True)  # slots=True for memory efficiency (3.10+)
+class Employee:
+    # ClassVar excluded from __init__ and __repr__
+    company: ClassVar[str] = "Acme Corp"
+
+    # Sort key (used for ordering)
+    sort_index: int = field(init=False, repr=False)
+
+    name: str
+    salary: float
+    skills: list[str] = field(default_factory=list)  # Mutable default!
+
+    def __post_init__(self):
+        self.sort_index = self.salary  # Sort by salary
+
+# Usage
+emp = Employee("Alice", 95000, ["Python", "SQL"])
+emp_dict = asdict(emp)   # Convert to dict
+emp_tuple = astuple(emp) # Convert to tuple
+```
+
+### When to Use What
+
+| Use Case | Choice |
+|----------|--------|
+| Simple data containers | `@dataclass` |
+| Immutable values (configs, coords) | `@dataclass(frozen=True)` |
+| API validation + serialization | `pydantic.BaseModel` |
+| Named tuples (lightweight, immutable) | `NamedTuple` |
+| Complex behavior + data | Regular class |
+| Minimal memory footprint | `@dataclass(slots=True)` or `__slots__` |
+
+---
+
+## Q4: What are metaclasses and when would you use them?
+
+**Answer:**
+
+A **metaclass** is the "class of a class" — it controls how classes themselves are created. Just as a class defines how instances behave, a metaclass defines how classes behave.
+
+```{mermaid}
+graph TD
+    META["Metaclass (type)<br/>Creates classes"]
+    META --> CLS["Class<br/>Created by metaclass"]
+    CLS --> OBJ["Instance<br/>Created by class"]
+
+    META2["type('Dog', (Animal,), {'speak': ...})"]
+    META2 --> CLS2["class Dog(Animal):<br/>    def speak(): ..."]
+    CLS2 --> OBJ2["fido = Dog()"]
+
+    style META fill:#ff7851,stroke:#333,color:#fff
+    style CLS fill:#ffce67,stroke:#333
+    style OBJ fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### How Class Creation Works
+
+```python
+# These are EQUIVALENT:
+class Dog:
+    def speak(self):
+        return "Woof"
+
+# is the same as:
+Dog = type("Dog", (), {"speak": lambda self: "Woof"})
+# type(name, bases, namespace) → creates a new class
+```
+
+### Custom Metaclass Example: Enforcing Rules
+
+```python
+class ValidatedMeta(type):
+    """Metaclass that enforces all methods have docstrings."""
+
+    def __new__(mcs, name, bases, namespace):
+        for key, value in namespace.items():
+            if callable(value) and not key.startswith("_"):
+                if not value.__doc__:
+                    raise TypeError(
+                        f"Method '{key}' in class '{name}' must have a docstring"
+                    )
+        return super().__new__(mcs, name, bases, namespace)
+
+class APIEndpoint(metaclass=ValidatedMeta):
+    def get(self):
+        """Handle GET request."""  # OK: has docstring
+        ...
+
+    def post(self):  # ERROR at class creation time!
+        ...          # TypeError: Method 'post' must have a docstring
+```
+
+### Singleton Pattern with Metaclass
+
+```python
+class SingletonMeta(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super().__call__(*args, **kwargs)
+        return cls._instances[cls]
+
+class Database(metaclass=SingletonMeta):
+    def __init__(self):
+        self.connection = "connected"
+
+db1 = Database()
+db2 = Database()
+assert db1 is db2  # Same instance!
+```
+
+### When to Use Metaclasses (Rarely!)
+
+| Use Case | Example |
+|----------|---------|
+| Framework/library design | Django models, SQLAlchemy declarative base |
+| Automatic registration | Plugin systems, API endpoint discovery |
+| Enforcing interface contracts | Require methods/docstrings at class creation |
+| Singleton pattern | Database connections, config objects |
+
+### Alternatives (Prefer These First)
+
+| Alternative | When |
+|-------------|------|
+| `@dataclass` / decorators | Add behavior to classes |
+| `__init_subclass__` | Hook into subclass creation (simpler) |
+| Abstract base classes (`ABC`) | Enforce interface contracts |
+| Class decorators | Modify class after creation |
+
+> **Interview tip:** "I rarely need metaclasses in application code, but I understand them because frameworks like Django/SQLAlchemy use them internally."
+
+---
+
+## Q5: How does Python's exception handling work, and what are best practices?
+
+**Answer:**
+
+Python's exception handling uses `try`/`except`/`else`/`finally` to manage errors gracefully. Understanding the full flow and best practices separates production code from beginner code.
+
+```{mermaid}
+graph TD
+    TRY["try:<br/>Code that might raise"]
+    TRY -->|"Exception raised"| EXCEPT["except SomeError as e:<br/>Handle error"]
+    TRY -->|"No exception"| ELSE["else:<br/>Code that runs only on success"]
+    EXCEPT --> FINALLY["finally:<br/>ALWAYS runs (cleanup)"]
+    ELSE --> FINALLY
+
+    style TRY fill:#6cc3d5,stroke:#333,color:#fff
+    style EXCEPT fill:#ff7851,stroke:#333,color:#fff
+    style ELSE fill:#56cc9d,stroke:#333,color:#fff
+    style FINALLY fill:#ffce67,stroke:#333
+```
+
+### Complete Exception Flow
+
+```python
+def divide(a, b):
+    try:
+        result = a / b
+    except ZeroDivisionError:
+        print("Cannot divide by zero")
+        return None
+    except TypeError as e:
+        print(f"Type error: {e}")
+        raise  # Re-raise the original exception
+    else:
+        # Only runs if NO exception occurred
+        print(f"Division successful: {result}")
+        return result
+    finally:
+        # ALWAYS runs — even if return/raise happened above
+        print("Cleanup complete")
+```
+
+### Custom Exceptions (Production Pattern)
+
+```python
+class AppError(Exception):
+    """Base exception for application."""
+    def __init__(self, message: str, code: str, details: dict | None = None):
+        super().__init__(message)
+        self.code = code
+        self.details = details or {}
+
+class ValidationError(AppError):
+    """Raised when input validation fails."""
+    pass
+
+class NotFoundError(AppError):
+    """Raised when a resource is not found."""
+    pass
+
+# Usage
+def get_user(user_id: int) -> dict:
+    if user_id < 0:
+        raise ValidationError(
+            "User ID must be positive",
+            code="INVALID_USER_ID",
+            details={"user_id": user_id}
+        )
+    user = db.find(user_id)
+    if not user:
+        raise NotFoundError(
+            f"User {user_id} not found",
+            code="USER_NOT_FOUND"
+        )
+    return user
+```
+
+### Best Practices
+
+| Practice | Why |
+|----------|-----|
+| Catch specific exceptions, not bare `except:` | Bare except catches `SystemExit`, `KeyboardInterrupt` |
+| Use `else` for success-only code | Keeps try block minimal |
+| Use `finally` for cleanup (or context managers) | Ensures resources are released |
+| Chain exceptions with `raise X from Y` | Preserves original traceback |
+| Don't use exceptions for control flow | Performance penalty; use conditions instead |
+| Create exception hierarchies | Allows catching at different granularity levels |
+
+### Exception Chaining
+
+```python
+try:
+    data = json.loads(raw_input)
+except json.JSONDecodeError as e:
+    raise ValidationError("Invalid JSON input") from e
+    # Original exception preserved in __cause__
+
+# Python 3.11+: Exception Groups
+async def fetch_all(urls):
+    async with asyncio.TaskGroup() as tg:
+        tasks = [tg.create_task(fetch(url)) for url in urls]
+    # If multiple tasks fail, raises ExceptionGroup
+```
+
+---
+
+## Q6: What is the difference between `@classmethod`, `@staticmethod`, and instance methods?
+
+**Answer:**
+
+Python classes have three types of methods, each receiving different first arguments and serving different purposes.
+
+```{mermaid}
+graph TD
+    subgraph Instance["Instance Method"]
+        IM["def method(self, ...)"]
+        IM --> IMA["Access: instance + class data"]
+        IM --> IMB["Called on: object"]
+    end
+
+    subgraph Class["@classmethod"]
+        CM["def method(cls, ...)"]
+        CM --> CMA["Access: class data only"]
+        CM --> CMB["Called on: class or object"]
+    end
+
+    subgraph Static["@staticmethod"]
+        SM["def method(...)"]
+        SM --> SMA["Access: no class/instance data"]
+        SM --> SMB["Called on: class or object"]
+    end
+
+    style Instance fill:#56cc9d,stroke:#333,color:#fff
+    style Class fill:#6cc3d5,stroke:#333,color:#fff
+    style Static fill:#ffce67,stroke:#333
+```
+
+### Complete Example
+
+```python
+class Pizza:
+    # Class variable
+    base_price = 10.0
+
+    def __init__(self, toppings: list[str], size: str = "medium"):
+        self.toppings = toppings
+        self.size = size
+
+    # INSTANCE METHOD: accesses self (instance data)
+    def get_price(self) -> float:
+        """Calculate price based on instance data."""
+        topping_cost = len(self.toppings) * 1.50
+        size_multiplier = {"small": 0.8, "medium": 1.0, "large": 1.3}
+        return (self.base_price + topping_cost) * size_multiplier[self.size]
+
+    # CLASS METHOD: accesses cls (class data), alternative constructor
+    @classmethod
+    def margherita(cls) -> "Pizza":
+        """Factory method: create a standard Margherita."""
+        return cls(["mozzarella", "tomato", "basil"])
+
+    @classmethod
+    def set_base_price(cls, price: float) -> None:
+        """Modify class-level data."""
+        cls.base_price = price
+
+    # STATIC METHOD: no access to cls or self, utility function
+    @staticmethod
+    def validate_topping(topping: str) -> bool:
+        """Pure utility — doesn't need class or instance data."""
+        valid = {"mozzarella", "pepperoni", "mushrooms", "olives", "basil", "tomato"}
+        return topping.lower() in valid
+
+# Usage
+p = Pizza.margherita()           # classmethod as factory
+print(p.get_price())             # instance method
+Pizza.validate_topping("olives") # staticmethod — no instance needed
+```
+
+### Decision Guide
+
+| Question | Use |
+|----------|-----|
+| Does it need `self` (instance data)? | Instance method |
+| Does it need `cls` (class data), or is it an alternative constructor? | `@classmethod` |
+| Does it need neither — just a related utility? | `@staticmethod` |
+| Could it be a standalone function? | Consider module-level function instead |
+
+### Factory Pattern with `@classmethod`
+
+```python
+class Serializer:
+    def __init__(self, data: dict):
+        self.data = data
+
+    @classmethod
+    def from_json(cls, json_string: str) -> "Serializer":
+        return cls(json.loads(json_string))
+
+    @classmethod
+    def from_csv(cls, csv_path: str) -> "Serializer":
+        with open(csv_path) as f:
+            reader = csv.DictReader(f)
+            return cls(next(reader))
+
+    @classmethod
+    def from_yaml(cls, yaml_string: str) -> "Serializer":
+        return cls(yaml.safe_load(yaml_string))
+```
+
+---
+
+## Q7: What are `__slots__` and when should you use them?
+
+**Answer:**
+
+`__slots__` replaces the default per-instance `__dict__` with a fixed set of attribute slots, providing **significant memory savings** and **slightly faster attribute access**.
+
+```{mermaid}
+graph LR
+    subgraph WithDict["Normal Class (with __dict__)"]
+        D1["Each instance has a dict"]
+        D2["~200+ bytes overhead per instance"]
+        D3["Dynamic: can add any attribute"]
+    end
+
+    subgraph WithSlots["Class with __slots__"]
+        S1["Fixed attribute slots"]
+        S2["~40-80% less memory"]
+        S3["Static: only declared attributes"]
+    end
+
+    style WithDict fill:#ff7851,stroke:#333,color:#fff
+    style WithSlots fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Basic Usage
+
+```python
+class PointRegular:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+class PointSlots:
+    __slots__ = ("x", "y")
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+# Memory comparison (1 million instances)
+import sys
+
+regular = PointRegular(1.0, 2.0)
+slotted = PointSlots(1.0, 2.0)
+
+print(sys.getsizeof(regular.__dict__))  # 104 bytes (just the dict!)
+# PointSlots has no __dict__ — memory is inline
+
+# Dynamic attribute behavior
+regular.z = 3.0       # Works — __dict__ allows anything
+# slotted.z = 3.0    # AttributeError! Not in __slots__
+```
+
+### Memory Savings at Scale
+
+```python
+# For 1 million instances:
+# Regular class: ~170 bytes/instance × 1M = ~170 MB
+# Slotted class: ~56 bytes/instance × 1M = ~56 MB
+# Savings: ~67%!
+
+# Python 3.10+ dataclass with slots
+from dataclasses import dataclass
+
+@dataclass(slots=True)
+class Coordinate:
+    x: float
+    y: float
+    z: float = 0.0
+```
+
+### Trade-offs
+
+| Aspect | `__slots__` | Regular (with `__dict__`) |
+|--------|-------------|---------------------------|
+| Memory per instance | Much lower | Higher (dict overhead) |
+| Attribute access speed | Slightly faster | Slightly slower |
+| Dynamic attributes | Not allowed | Allowed |
+| `__dict__` available | No (unless explicitly added) | Yes |
+| Inheritance | Must redeclare slots in subclass | Works naturally |
+| Pickling/serialization | May need custom `__getstate__` | Works automatically |
+| Weak references | Need `__weakref__` in slots | Works automatically |
+
+### When to Use `__slots__`
+
+| Use | Don't Use |
+|-----|-----------|
+| Millions of instances (data processing) | Few instances |
+| Performance-critical inner loops | Prototyping/exploration |
+| Known, fixed set of attributes | Need dynamic attributes |
+| ORM model objects | Classes using multiple inheritance heavily |
+
+---
+
+## Q8: How do you write effective tests in Python with `pytest`?
+
+**Answer:**
+
+`pytest` is Python's most popular testing framework — simpler than `unittest`, with powerful fixtures, parametrization, and plugin ecosystem.
+
+```{mermaid}
+graph TD
+    TEST["Testing Pyramid"]
+    TEST --> UNIT["Unit Tests (70%)<br/>Fast, isolated, many"]
+    TEST --> INT["Integration Tests (20%)<br/>Components together"]
+    TEST --> E2E["E2E Tests (10%)<br/>Full system, slow"]
+
+    subgraph Pytest["pytest Features"]
+        F1["Simple assertions (assert x == y)"]
+        F2["Fixtures (setup/teardown)"]
+        F3["Parametrize (multiple inputs)"]
+        F4["Mocking (unittest.mock)"]
+        F5["Markers (skip, xfail, slow)"]
+    end
+
+    style TEST fill:#56cc9d,stroke:#333,color:#fff
+    style UNIT fill:#6cc3d5,stroke:#333,color:#fff
+    style Pytest fill:#ffce67,stroke:#333
+```
+
+### Basic Test Structure
+
+```python
+# test_calculator.py
+import pytest
+from calculator import Calculator
+
+class TestCalculator:
+    """Group related tests in a class."""
+
+    def test_add_positive_numbers(self):
+        calc = Calculator()
+        assert calc.add(2, 3) == 5
+
+    def test_add_negative_numbers(self):
+        calc = Calculator()
+        assert calc.add(-1, -1) == -2
+
+    def test_divide_by_zero_raises(self):
+        calc = Calculator()
+        with pytest.raises(ZeroDivisionError):
+            calc.divide(10, 0)
+```
+
+### Fixtures: Shared Setup/Teardown
+
+```python
+import pytest
+
+@pytest.fixture
+def db_connection():
+    """Setup: create connection. Teardown: close it."""
+    conn = Database.connect("test_db")
+    yield conn  # Test runs here
+    conn.close()  # Cleanup after test
+
+@pytest.fixture
+def sample_user(db_connection):
+    """Fixtures can depend on other fixtures."""
+    user = db_connection.create_user("Alice", "alice@test.com")
+    yield user
+    db_connection.delete_user(user.id)
+
+def test_user_email(sample_user):
+    assert sample_user.email == "alice@test.com"
+```
+
+### Parametrize: Test Multiple Inputs
+
+```python
+@pytest.mark.parametrize("input_val,expected", [
+    ("hello", "HELLO"),
+    ("world", "WORLD"),
+    ("Python", "PYTHON"),
+    ("", ""),
+])
+def test_uppercase(input_val, expected):
+    assert input_val.upper() == expected
+
+@pytest.mark.parametrize("a,b,expected", [
+    (1, 2, 3),
+    (-1, 1, 0),
+    (0, 0, 0),
+    (100, -50, 50),
+])
+def test_add(a, b, expected):
+    assert add(a, b) == expected
+```
+
+### Mocking External Dependencies
+
+```python
+from unittest.mock import patch, MagicMock
+
+def test_api_call():
+    """Mock external HTTP calls."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"name": "Alice"}
+
+    with patch("requests.get", return_value=mock_response):
+        result = get_user_from_api(user_id=1)
+        assert result["name"] == "Alice"
+
+# Or as a decorator
+@patch("myapp.services.send_email")
+def test_registration(mock_send_email):
+    register_user("alice@test.com")
+    mock_send_email.assert_called_once_with("alice@test.com", subject="Welcome!")
+```
+
+### Testing Best Practices
+
+| Practice | Reason |
+|----------|--------|
+| Test one behavior per test | Clear failure messages |
+| Use descriptive test names | `test_user_login_fails_with_wrong_password` |
+| Arrange-Act-Assert (AAA) pattern | Consistent structure |
+| Don't test implementation details | Tests shouldn't break on refactoring |
+| Use `conftest.py` for shared fixtures | DRY across test files |
+| Mark slow tests with `@pytest.mark.slow` | Run fast tests separately |
+
+---
+
+## Q9: What is the `collections` module and its key data structures?
+
+**Answer:**
+
+The `collections` module provides **specialized container types** that extend Python's built-in `dict`, `list`, `set`, and `tuple` with additional functionality for common patterns.
+
+```{mermaid}
+graph TD
+    COLL["collections module"]
+    COLL --> DD["defaultdict<br/>Auto-initializing dict"]
+    COLL --> CT["Counter<br/>Element counting"]
+    COLL --> DQ["deque<br/>Double-ended queue"]
+    COLL --> OD["OrderedDict<br/>Ordered key operations"]
+    COLL --> NT["namedtuple<br/>Lightweight immutable record"]
+    COLL --> CM["ChainMap<br/>Multiple dict lookup"]
+
+    style COLL fill:#56cc9d,stroke:#333,color:#fff
+    style DD fill:#6cc3d5,stroke:#333,color:#fff
+    style CT fill:#ffce67,stroke:#333
+```
+
+### `defaultdict` — Eliminates Key-Existence Checks
+
+```python
+from collections import defaultdict
+
+# WITHOUT defaultdict
+word_groups = {}
+for word in words:
+    first_letter = word[0]
+    if first_letter not in word_groups:
+        word_groups[first_letter] = []
+    word_groups[first_letter].append(word)
+
+# WITH defaultdict — cleaner!
+word_groups = defaultdict(list)
+for word in words:
+    word_groups[word[0]].append(word)
+
+# Common factory functions
+counts = defaultdict(int)      # Missing keys default to 0
+groups = defaultdict(list)     # Missing keys default to []
+nested = defaultdict(dict)     # Missing keys default to {}
+sets = defaultdict(set)        # Missing keys default to set()
+```
+
+### `Counter` — Counting Made Easy
+
+```python
+from collections import Counter
+
+# Count elements
+words = ["apple", "banana", "apple", "cherry", "banana", "apple"]
+word_counts = Counter(words)
+# Counter({'apple': 3, 'banana': 2, 'cherry': 1})
+
+# Most common
+word_counts.most_common(2)  # [('apple', 3), ('banana', 2)]
+
+# Arithmetic
+c1 = Counter(a=3, b=1)
+c2 = Counter(a=1, b=2)
+c1 + c2   # Counter({'a': 4, 'b': 3})
+c1 - c2   # Counter({'a': 2})  — drops zero/negative
+
+# Count characters in string
+Counter("mississippi")
+# Counter({'s': 4, 'i': 4, 'p': 2, 'm': 1})
+```
+
+### `deque` — Fast Appends/Pops from Both Ends
+
+```python
+from collections import deque
+
+# O(1) operations on both ends (list.pop(0) is O(n)!)
+dq = deque([1, 2, 3])
+dq.appendleft(0)   # [0, 1, 2, 3]
+dq.popleft()       # 0, deque is [1, 2, 3]
+
+# Fixed-size sliding window
+recent_logs = deque(maxlen=100)
+recent_logs.append("event1")  # Auto-removes oldest when full
+
+# BFS implementation
+def bfs(graph, start):
+    visited = set()
+    queue = deque([start])
+    while queue:
+        node = queue.popleft()  # O(1) vs list.pop(0) O(n)
+        if node not in visited:
+            visited.add(node)
+            queue.extend(graph[node])
+    return visited
+```
+
+### `namedtuple` — Lightweight Immutable Records
+
+```python
+from collections import namedtuple
+
+# Create a type
+Point = namedtuple("Point", ["x", "y"])
+Color = namedtuple("Color", "red green blue")
+
+p = Point(3, 4)
+print(p.x, p.y)    # Named access
+print(p[0], p[1])  # Index access
+x, y = p           # Unpacking
+
+# With defaults (Python 3.6.1+)
+Server = namedtuple("Server", ["host", "port", "protocol"], defaults=["https"])
+s = Server("example.com", 443)  # protocol defaults to "https"
+```
+
+### Performance Comparison
+
+| Operation | `list` | `deque` |
+|-----------|--------|---------|
+| Append right | O(1) amortized | O(1) |
+| Pop right | O(1) | O(1) |
+| Append left | O(n) | O(1) |
+| Pop left | O(n) | O(1) |
+| Random access `[i]` | O(1) | O(n) |
+
+---
+
+## Q10: What are Python descriptors and the descriptor protocol?
+
+**Answer:**
+
+A **descriptor** is any object that defines `__get__`, `__set__`, or `__delete__` methods. Descriptors power Python's property system, classmethods, staticmethods, and `__slots__`.
+
+```{mermaid}
+graph TD
+    DESC["Descriptor Protocol"]
+    DESC --> GET["__get__(self, obj, objtype)<br/>Attribute access: obj.attr"]
+    DESC --> SET["__set__(self, obj, value)<br/>Assignment: obj.attr = value"]
+    DESC --> DEL["__delete__(self, obj)<br/>Deletion: del obj.attr"]
+
+    subgraph Types["Descriptor Types"]
+        DD["Data Descriptor<br/>Defines __set__ and/or __delete__<br/>Takes priority over instance __dict__"]
+        ND["Non-Data Descriptor<br/>Only defines __get__<br/>Instance __dict__ takes priority"]
+    end
+
+    style DESC fill:#56cc9d,stroke:#333,color:#fff
+    style Types fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### How `property` Works Under the Hood
+
+```python
+# property() is actually a descriptor!
+class property:
+    def __init__(self, fget=None, fset=None, fdel=None):
+        self.fget = fget
+        self.fset = fset
+        self.fdel = fdel
+
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
+        return self.fget(obj)
+
+    def __set__(self, obj, value):
+        self.fset(obj, value)
+
+    def __delete__(self, obj):
+        self.fdel(obj)
+```
+
+### Custom Descriptor: Validated Attribute
+
+```python
+class Validated:
+    """Descriptor that validates values on assignment."""
+
+    def __init__(self, min_value=None, max_value=None):
+        self.min_value = min_value
+        self.max_value = max_value
+
+    def __set_name__(self, owner, name):
+        """Called automatically when descriptor is assigned to a class attribute."""
+        self.name = name
+        self.private_name = f"_{name}"
+
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
+        return getattr(obj, self.private_name, None)
+
+    def __set__(self, obj, value):
+        if self.min_value is not None and value < self.min_value:
+            raise ValueError(f"{self.name} must be >= {self.min_value}, got {value}")
+        if self.max_value is not None and value > self.max_value:
+            raise ValueError(f"{self.name} must be <= {self.max_value}, got {value}")
+        setattr(obj, self.private_name, value)
+
+# Usage — validation happens automatically on assignment
+class Product:
+    price = Validated(min_value=0)
+    quantity = Validated(min_value=0, max_value=10000)
+    rating = Validated(min_value=0, max_value=5)
+
+    def __init__(self, name, price, quantity):
+        self.name = name
+        self.price = price        # Triggers Validated.__set__
+        self.quantity = quantity   # Triggers Validated.__set__
+
+p = Product("Widget", 9.99, 100)
+# p.price = -5  # ValueError: price must be >= 0, got -5
+```
+
+### Attribute Lookup Order
+
+| Priority | Source | Example |
+|----------|--------|---------|
+| 1 (highest) | Data descriptor on class | `property`, `Validated` above |
+| 2 | Instance `__dict__` | `self.x = 5` |
+| 3 | Non-data descriptor on class | Functions (become bound methods) |
+| 4 | Class `__dict__` | Class variables |
+| 5 (lowest) | `__getattr__` | Fallback hook |
+
+### Built-in Descriptors You Already Use
+
+```python
+# These are ALL descriptors:
+class MyClass:
+    @property          # Data descriptor
+    def value(self): ...
+
+    @classmethod       # Non-data descriptor
+    def create(cls): ...
+
+    @staticmethod      # Non-data descriptor
+    def utility(): ...
+
+    __slots__ = ("x",) # Creates data descriptors for each slot
+```
+
+---
+
+## Summary Table
+
+| # | Topic | Key Concept |
+|---|-------|-------------|
+| 1 | async/await | Cooperative concurrency via event loop; use for I/O-bound tasks |
+| 2 | Type Hints | Static annotations for tools (mypy/pyright); `Protocol` for structural typing |
+| 3 | Dataclasses | Auto-generate `__init__`, `__repr__`, `__eq__`; use `frozen=True` for immutability |
+| 4 | Metaclasses | "Classes of classes"; control class creation; prefer `__init_subclass__` alternatives |
+| 5 | Exception Handling | Specific catches, `else`/`finally`, custom hierarchies, exception chaining |
+| 6 | classmethod/staticmethod | `cls` for factories/class data, `self` for instance, static for utilities |
+| 7 | `__slots__` | Replace `__dict__` with fixed slots; 40-80% memory savings at scale |
+| 8 | Testing (pytest) | Fixtures, parametrize, mocking; test behavior not implementation |
+| 9 | collections | `defaultdict`, `Counter`, `deque`, `namedtuple` for specialized containers |
+| 10 | Descriptors | `__get__`/`__set__`/`__delete__` protocol; powers `property`, `@classmethod` |
+
+---
+
+## What's Next?
+
+This article covered advanced Python internals and production patterns. For related content:
+
+- **Python fundamentals:** [Python SWE Interview QA - 1](/posts/python-swe-interview/Python-SWE-Interview-QA-1.html)
+- **Machine learning concepts:** [ML Interview QA - 1](/posts/ml-interview/ML-Interview-QA-1.html) and [ML Interview QA - 2](/posts/ml-interview/ML-Interview-QA-2.html)
+- **LLM architecture and concepts:** [LLM Interview QA - 1](/posts/llm-interview/LLM-Interview-QA-1.html)
+- **Advanced LLM topics:** [LLM Interview QA - 2](/posts/llm-interview/LLM-Interview-QA-2.html)
+- **LLM configuration and decoding:** [LLM Interview QA - 3](/posts/llm-interview/LLM-Interview-QA-3.html)

@@ -1,0 +1,918 @@
+---
+title: "Python SWE Interview QA - 1"
+description: "10 most frequently asked Python software engineering interview questions with in-depth answers, code examples, diagrams, and real-world applications."
+image: /images/python-swe-interview/thumb_python_swe_interview_qa_300.png
+date: "2026-05-20"
+keywords:
+  - "Python interview"
+  - "Python SWE interview questions"
+  - "mutable immutable"
+  - "GIL global interpreter lock"
+  - "decorators"
+  - "generators iterators"
+  - "list comprehension"
+  - "shallow deep copy"
+  - "args kwargs"
+  - "Python OOP"
+  - "Python data structures"
+  - "Python concurrency"
+---
+
+## Introduction
+
+This is **Part 1** of our Python SWE Interview QA series. It covers 10 foundational questions that appear in nearly every Python Software Engineer interview — from startups to FAANG. Each answer includes code examples, diagrams, and real-world context.
+
+> This series complements our AI/ML interview preparation. For machine learning concepts, see [ML Interview QA - 1](/posts/ml-interview/ML-Interview-QA-1.html) and [ML Interview QA - 2](/posts/ml-interview/ML-Interview-QA-2.html). For LLM topics, see [LLM Interview QA - 1](/posts/llm-interview/LLM-Interview-QA-1.html).
+
+---
+
+## Q1: What is the difference between mutable and immutable objects in Python?
+
+**Answer:**
+
+In Python, objects are either **mutable** (can be changed after creation) or **immutable** (cannot be changed after creation). This distinction affects how Python handles memory, function arguments, and hashability.
+
+```{mermaid}
+graph TD
+    subgraph Immutable["Immutable Objects"]
+        I1["int: 42"]
+        I2["float: 3.14"]
+        I3["str: 'hello'"]
+        I4["tuple: (1, 2, 3)"]
+        I5["frozenset: frozenset({1,2})"]
+        I6["bool: True"]
+    end
+
+    subgraph Mutable["Mutable Objects"]
+        M1["list: [1, 2, 3]"]
+        M2["dict: {'a': 1}"]
+        M3["set: {1, 2, 3}"]
+        M4["bytearray"]
+        M5["Custom objects (default)"]
+    end
+
+    style Immutable fill:#56cc9d,stroke:#333,color:#fff
+    style Mutable fill:#ffce67,stroke:#333
+```
+
+### Key Behavioral Differences
+
+| Aspect | Mutable | Immutable |
+|--------|---------|-----------|
+| Modification | Changed in-place | New object created on "modification" |
+| Hashable? | No (can't be dict keys) | Yes (can be dict keys/set members) |
+| Thread safety | Needs synchronization | Inherently thread-safe |
+| Memory | Same id after modification | New id after any "change" |
+| Function arguments | Changes visible to caller | Changes not visible to caller |
+
+### Code Example: The Critical Difference
+
+```python
+# Immutable: str
+s = "hello"
+s_id = id(s)
+s += " world"       # Creates a NEW string object
+print(id(s) == s_id)  # False — different object!
+
+# Mutable: list
+lst = [1, 2, 3]
+lst_id = id(lst)
+lst.append(4)        # Modifies SAME object
+print(id(lst) == lst_id)  # True — same object!
+```
+
+### Why This Matters: Mutable Default Arguments Bug
+
+```python
+# DANGEROUS: mutable default argument
+def append_item(item, items=[]):
+    items.append(item)
+    return items
+
+print(append_item(1))  # [1]
+print(append_item(2))  # [1, 2] — BUG! Expected [2]
+
+# SAFE: use None as default
+def append_item_safe(item, items=None):
+    if items is None:
+        items = []
+    items.append(item)
+    return items
+```
+
+### Real-World Impact
+
+- **Dict keys:** Only immutable objects can be dict keys (`tuple` yes, `list` no)
+- **Function caching:** `@functools.lru_cache` only works with hashable (immutable) arguments
+- **Concurrent programming:** Immutable objects are inherently thread-safe
+
+---
+
+## Q2: What is the Global Interpreter Lock (GIL) and how does it affect concurrency?
+
+**Answer:**
+
+The **GIL** is a mutex in CPython that allows only **one thread to execute Python bytecode at a time**, even on multi-core machines. It exists to protect CPython's memory management (reference counting) from race conditions.
+
+```{mermaid}
+graph TD
+    subgraph GIL_Effect["GIL: Only One Thread Executes at a Time"]
+        T1["Thread 1: Running ✓"]
+        T2["Thread 2: Waiting ✗"]
+        T3["Thread 3: Waiting ✗"]
+    end
+
+    subgraph CPU["Multi-Core CPU"]
+        C1["Core 1: Active"]
+        C2["Core 2: Idle"]
+        C3["Core 3: Idle"]
+        C4["Core 4: Idle"]
+    end
+
+    GIL_Effect --> CPU
+
+    style GIL_Effect fill:#ff7851,stroke:#333,color:#fff
+    style CPU fill:#ffce67,stroke:#333
+```
+
+### Impact on Different Workloads
+
+| Workload Type | Threading Helps? | Why |
+|---------------|-----------------|-----|
+| **CPU-bound** (math, processing) | No — GIL blocks parallelism | Only one thread computes at a time |
+| **I/O-bound** (network, file, DB) | Yes — GIL released during I/O | Threads can wait concurrently |
+| **C extensions** (NumPy, Pandas) | Yes — GIL released in C code | Heavy computation happens outside GIL |
+
+### Solutions for CPU-Bound Parallelism
+
+```python
+# ✗ Threading — limited by GIL for CPU work
+import threading
+
+# ✓ Multiprocessing — separate processes, separate GILs
+from multiprocessing import Pool
+
+def cpu_heavy(n):
+    return sum(i * i for i in range(n))
+
+with Pool(4) as p:
+    results = p.map(cpu_heavy, [10**7] * 4)
+
+# ✓ asyncio — for I/O-bound concurrency
+import asyncio
+
+async def fetch_data(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            return await resp.json()
+```
+
+### When to Use What
+
+| Approach | Best For | GIL Impact |
+|----------|----------|------------|
+| `threading` | I/O-bound (API calls, file I/O) | GIL released during I/O waits |
+| `multiprocessing` | CPU-bound (data processing) | Each process has own GIL |
+| `asyncio` | Many concurrent I/O operations | Single thread, no GIL contention |
+| C extensions | Heavy numerical computation | Can release GIL explicitly |
+
+### Key Interview Point
+
+Python 3.13+ introduced a **free-threaded mode** (PEP 703) that experimentally removes the GIL, enabling true multi-threaded parallelism. This is the biggest change to CPython's concurrency model in its history.
+
+---
+
+## Q3: What are decorators and how do they work?
+
+**Answer:**
+
+A **decorator** is a function that takes another function as input and returns a modified version of it — adding behavior before/after without changing the original function's code.
+
+```{mermaid}
+graph LR
+    ORIG["Original Function<br/>def greet(): ..."]
+    DEC["Decorator<br/>@log_calls"]
+    WRAPPED["Wrapped Function<br/>logging + greet() + logging"]
+
+    ORIG --> DEC --> WRAPPED
+
+    style ORIG fill:#6cc3d5,stroke:#333,color:#fff
+    style DEC fill:#ffce67,stroke:#333
+    style WRAPPED fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### How Decorators Work Under the Hood
+
+```python
+# This decorator syntax:
+@my_decorator
+def say_hello():
+    print("Hello!")
+
+# Is exactly equivalent to:
+def say_hello():
+    print("Hello!")
+say_hello = my_decorator(say_hello)
+```
+
+### Writing a Proper Decorator
+
+```python
+import functools
+import time
+
+def timer(func):
+    """Decorator that measures execution time."""
+    @functools.wraps(func)  # Preserves original function metadata
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        elapsed = time.perf_counter() - start
+        print(f"{func.__name__} took {elapsed:.4f}s")
+        return result
+    return wrapper
+
+@timer
+def process_data(n):
+    """Process n items."""
+    return sum(range(n))
+
+process_data(1_000_000)
+# Output: process_data took 0.0312s
+print(process_data.__name__)  # "process_data" (preserved by @wraps)
+```
+
+### Decorators with Arguments
+
+```python
+def retry(max_attempts=3, delay=1):
+    """Decorator that retries on failure."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_attempts):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if attempt == max_attempts - 1:
+                        raise
+                    time.sleep(delay)
+        return wrapper
+    return decorator
+
+@retry(max_attempts=5, delay=2)
+def call_api(url):
+    ...
+```
+
+### Common Production Use Cases
+
+| Use Case | Example |
+|----------|---------|
+| **Logging** | `@log_calls` — log function entry/exit |
+| **Authentication** | `@login_required` (Flask/Django) |
+| **Caching** | `@functools.lru_cache` |
+| **Rate limiting** | `@rate_limit(calls=10, period=60)` |
+| **Validation** | `@validate_input` — check argument types |
+| **Timing** | `@timer` — measure execution time |
+| **Retry logic** | `@retry(max_attempts=3)` |
+
+---
+
+## Q4: What are generators and how do they differ from regular functions?
+
+**Answer:**
+
+A **generator** is a function that uses `yield` to produce a sequence of values lazily (one at a time), instead of computing and storing all values in memory at once.
+
+```{mermaid}
+graph LR
+    subgraph Regular["Regular Function"]
+        RF1["Computes ALL results"]
+        RF2["Stores in memory (list)"]
+        RF3["Returns entire collection"]
+    end
+
+    subgraph Generator["Generator Function"]
+        GF1["Computes ONE result at a time"]
+        GF2["Suspends state between yields"]
+        GF3["Resumes on next() call"]
+    end
+
+    style Regular fill:#ff7851,stroke:#333,color:#fff
+    style Generator fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Key Differences
+
+| Aspect | Regular Function | Generator |
+|--------|-----------------|-----------|
+| Keyword | `return` | `yield` |
+| Execution | Runs to completion | Pauses at each `yield` |
+| Memory | All results in memory | One value at a time |
+| Returns | Value | Generator iterator |
+| State | Lost after return | Preserved between yields |
+| Reusable | Call again | Must create new generator |
+
+### Code Example
+
+```python
+# Regular function: stores ALL values in memory
+def get_squares_list(n):
+    result = []
+    for i in range(n):
+        result.append(i ** 2)
+    return result  # 1 billion items = ~8 GB RAM!
+
+# Generator: produces ONE value at a time
+def get_squares_gen(n):
+    for i in range(n):
+        yield i ** 2  # Pauses here, resumes on next()
+
+# Memory comparison
+squares_list = get_squares_list(1_000_000_000)  # MemoryError!
+squares_gen = get_squares_gen(1_000_000_000)     # Instant, ~0 bytes
+next(squares_gen)  # 0
+next(squares_gen)  # 1
+```
+
+### Generator Expressions (One-liners)
+
+```python
+# List comprehension: creates full list in memory
+squares_list = [x**2 for x in range(10_000_000)]  # ~80 MB
+
+# Generator expression: lazy evaluation
+squares_gen = (x**2 for x in range(10_000_000))   # ~0 bytes
+```
+
+### Real-World Use Cases
+
+| Use Case | Why Generator |
+|----------|--------------|
+| Reading large files | Process line by line without loading entire file |
+| Streaming data | Handle infinite/continuous data streams |
+| Pipeline processing | Chain transformations without intermediate lists |
+| Database cursors | Fetch rows one at a time from large result sets |
+| API pagination | Yield pages as they're fetched |
+
+### `yield from` — Delegating to Sub-generators
+
+```python
+def flatten(nested_list):
+    for item in nested_list:
+        if isinstance(item, list):
+            yield from flatten(item)  # Delegate to recursive generator
+        else:
+            yield item
+
+list(flatten([1, [2, [3, 4]], 5]))  # [1, 2, 3, 4, 5]
+```
+
+---
+
+## Q5: Explain Python's data model: `__init__`, `__repr__`, `__eq__`, and dunder methods.
+
+**Answer:**
+
+Python's **data model** (dunder/magic methods) defines how objects behave with built-in operations. By implementing these methods, custom classes integrate seamlessly with Python's syntax and built-in functions.
+
+```{mermaid}
+graph TD
+    DM["Python Data Model (Dunder Methods)"]
+    DM --> LIFE["Object Lifecycle"]
+    DM --> REP["Representation"]
+    DM --> COMP["Comparison"]
+    DM --> CONT["Container Protocol"]
+    DM --> MATH["Arithmetic"]
+    DM --> CTX["Context Manager"]
+
+    LIFE --> L1["__init__: Initialize"]
+    LIFE --> L2["__new__: Create"]
+    LIFE --> L3["__del__: Finalize"]
+
+    REP --> R1["__repr__: Developer string"]
+    REP --> R2["__str__: User string"]
+    REP --> R3["__format__: f-string"]
+
+    COMP --> C1["__eq__: =="]
+    COMP --> C2["__lt__: <"]
+    COMP --> C3["__hash__: hash()"]
+
+    CONT --> CO1["__len__: len()"]
+    CONT --> CO2["__getitem__: obj[key]"]
+    CONT --> CO3["__iter__: for loop"]
+    CONT --> CO4["__contains__: in"]
+
+    style DM fill:#56cc9d,stroke:#333,color:#fff
+    style LIFE fill:#6cc3d5,stroke:#333,color:#fff
+    style COMP fill:#ffce67,stroke:#333
+```
+
+### Essential Dunder Methods
+
+```python
+from functools import total_ordering
+
+@total_ordering  # Generates __le__, __gt__, __ge__ from __eq__ and __lt__
+class Money:
+    def __init__(self, amount, currency="USD"):
+        self.amount = amount
+        self.currency = currency
+
+    def __repr__(self):
+        """For developers: unambiguous, ideally eval()-able."""
+        return f"Money({self.amount!r}, {self.currency!r})"
+
+    def __str__(self):
+        """For users: readable."""
+        return f"${self.amount:.2f} {self.currency}"
+
+    def __eq__(self, other):
+        if not isinstance(other, Money):
+            return NotImplemented
+        return self.amount == other.amount and self.currency == other.currency
+
+    def __lt__(self, other):
+        if not isinstance(other, Money):
+            return NotImplemented
+        if self.currency != other.currency:
+            raise ValueError("Cannot compare different currencies")
+        return self.amount < other.amount
+
+    def __hash__(self):
+        return hash((self.amount, self.currency))
+
+    def __add__(self, other):
+        if not isinstance(other, Money):
+            return NotImplemented
+        if self.currency != other.currency:
+            raise ValueError("Cannot add different currencies")
+        return Money(self.amount + other.amount, self.currency)
+
+    def __bool__(self):
+        return self.amount != 0
+```
+
+### Usage
+
+```python
+wallet = Money(50.00)
+tip = Money(10.00)
+
+print(repr(wallet))     # Money(50.0, 'USD')
+print(str(wallet))      # $50.00 USD
+print(wallet + tip)     # $60.00 USD
+print(wallet > tip)     # True
+print(wallet == Money(50.0))  # True
+
+# Works as dict key (hashable)
+prices = {Money(9.99): "coffee", Money(24.99): "book"}
+```
+
+### Key Rules
+
+| Rule | Explanation |
+|------|-------------|
+| `__repr__` should be unambiguous | Ideally `eval(repr(obj))` recreates the object |
+| `__eq__` implies `__hash__` | If you define `__eq__`, define `__hash__` too (or set to None) |
+| Return `NotImplemented` | For operators with incompatible types (lets Python try reverse) |
+| `@dataclass` automates this | Python 3.7+ dataclasses generate `__init__`, `__repr__`, `__eq__` |
+
+---
+
+## Q6: What is the difference between `deepcopy` and shallow copy?
+
+**Answer:**
+
+```{mermaid}
+graph TD
+    subgraph Original["Original Object"]
+        O["outer list"]
+        O --> A["inner list [1, 2]"]
+        O --> B["inner list [3, 4]"]
+    end
+
+    subgraph Shallow["Shallow Copy"]
+        S["new outer list"]
+        S --> A
+        S --> B
+    end
+
+    subgraph Deep["Deep Copy"]
+        D["new outer list"]
+        D --> A2["new inner list [1, 2]"]
+        D --> B2["new inner list [3, 4]"]
+    end
+
+    style Original fill:#6cc3d5,stroke:#333,color:#fff
+    style Shallow fill:#ffce67,stroke:#333
+    style Deep fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Three Levels of "Copying"
+
+| Operation | What it does | Nested objects |
+|-----------|-------------|----------------|
+| **Assignment** (`b = a`) | New reference to SAME object | Shared — changes in `b` affect `a` |
+| **Shallow copy** (`copy.copy(a)`) | New outer object, references same inner objects | Shared — inner changes affect both |
+| **Deep copy** (`copy.deepcopy(a)`) | New everything recursively | Independent — fully separate |
+
+### Code Demonstration
+
+```python
+import copy
+
+original = [[1, 2, 3], [4, 5, 6]]
+
+# Assignment: same object
+assigned = original
+assigned[0][0] = 99
+print(original[0][0])  # 99 — both point to same object!
+
+# Shallow copy: new outer, shared inner
+original = [[1, 2, 3], [4, 5, 6]]
+shallow = copy.copy(original)
+shallow.append([7, 8])        # Only affects shallow (new outer)
+shallow[0][0] = 99            # Affects BOTH (shared inner)
+print(original[0][0])         # 99 — inner list is shared!
+print(len(original))          # 2 — outer list is independent
+
+# Deep copy: fully independent
+original = [[1, 2, 3], [4, 5, 6]]
+deep = copy.deepcopy(original)
+deep[0][0] = 99               # Only affects deep
+print(original[0][0])         # 1 — completely independent
+```
+
+### Quick Shallow Copy Methods
+
+```python
+# All of these create shallow copies:
+lst_copy = lst[:]              # Slice
+lst_copy = lst.copy()          # .copy() method
+lst_copy = list(lst)           # Constructor
+dict_copy = {**original_dict}  # Dict unpacking
+dict_copy = dict.copy()        # .copy() method
+```
+
+### When to Use What
+
+| Situation | Use |
+|-----------|-----|
+| Simple flat lists/dicts | Shallow copy (fast, sufficient) |
+| Nested structures you'll modify | Deep copy (safe, slower) |
+| Immutable content (tuples of ints) | Shallow copy (inner can't change) |
+| Performance-critical code | Shallow copy (avoid deep copy overhead) |
+
+---
+
+## Q7: How does Python's `*args` and `**kwargs` work?
+
+**Answer:**
+
+`*args` and `**kwargs` allow functions to accept a **variable number of arguments**:
+
+- `*args` collects extra **positional** arguments into a **tuple**
+- `**kwargs` collects extra **keyword** arguments into a **dict**
+
+```{mermaid}
+graph TD
+    CALL["function(1, 2, 3, name='Alice', age=30)"]
+    CALL --> POS["Positional: (1, 2, 3) → *args tuple"]
+    CALL --> KW["Keyword: {'name': 'Alice', 'age': 30} → **kwargs dict"]
+
+    style CALL fill:#56cc9d,stroke:#333,color:#fff
+    style POS fill:#6cc3d5,stroke:#333,color:#fff
+    style KW fill:#ffce67,stroke:#333
+```
+
+### Function Parameter Order
+
+```python
+def func(pos_only, /, normal, *args, kw_only, **kwargs):
+    """Complete parameter order (Python 3.8+)"""
+    pass
+
+# Order: positional-only / normal / *args / keyword-only / **kwargs
+```
+
+### Practical Examples
+
+```python
+# Flexible logging function
+def log(message, *args, level="INFO", **kwargs):
+    formatted = message.format(*args) if args else message
+    print(f"[{level}] {formatted}", kwargs if kwargs else "")
+
+log("User {} logged in from {}", "Alice", "NYC", level="DEBUG")
+# [DEBUG] User Alice logged in from NYC
+
+# Forwarding arguments (decorator pattern)
+def decorator(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        print(f"Calling {func.__name__}")
+        return func(*args, **kwargs)  # Forward everything
+    return wrapper
+
+# Unpacking in function calls
+def greet(first, last, greeting="Hello"):
+    return f"{greeting}, {first} {last}!"
+
+args = ("Alice", "Smith")
+kwargs = {"greeting": "Hi"}
+greet(*args, **kwargs)  # "Hi, Alice Smith!"
+```
+
+### Common Patterns
+
+| Pattern | Use Case |
+|---------|----------|
+| `def func(*args)` | Accept any number of positional args |
+| `def func(**kwargs)` | Accept any keyword args (config dicts) |
+| `func(*list_var)` | Unpack list into positional args |
+| `func(**dict_var)` | Unpack dict into keyword args |
+| `def wrapper(*args, **kwargs)` | Forward all args (decorators, proxies) |
+| `{**dict1, **dict2}` | Merge dictionaries |
+
+---
+
+## Q8: What are context managers and the `with` statement?
+
+**Answer:**
+
+A **context manager** is an object that defines setup and cleanup actions for a block of code, ensuring resources are properly managed even if exceptions occur.
+
+```{mermaid}
+graph TD
+    WITH["with open('file.txt') as f:"]
+    WITH --> ENTER["__enter__() called<br/>• Open resource<br/>• Return value assigned to 'f'"]
+    ENTER --> BODY["Execute body<br/>• Read/write file<br/>• May raise exception"]
+    BODY --> EXIT["__exit__() called ALWAYS<br/>• Close resource<br/>• Handle exceptions"]
+
+    style WITH fill:#56cc9d,stroke:#333,color:#fff
+    style ENTER fill:#6cc3d5,stroke:#333,color:#fff
+    style EXIT fill:#ffce67,stroke:#333
+```
+
+### Why Context Managers Matter
+
+```python
+# WITHOUT context manager — resource leak if exception occurs!
+f = open("data.txt")
+try:
+    data = f.read()
+    process(data)     # If this raises, file stays open!
+finally:
+    f.close()
+
+# WITH context manager — always cleaned up
+with open("data.txt") as f:
+    data = f.read()
+    process(data)     # File closed even if exception raised
+```
+
+### Writing Custom Context Managers
+
+```python
+# Method 1: Class-based
+class DatabaseConnection:
+    def __init__(self, connection_string):
+        self.connection_string = connection_string
+        self.conn = None
+
+    def __enter__(self):
+        self.conn = connect(self.connection_string)
+        return self.conn
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.conn.close()
+        return False  # Don't suppress exceptions
+
+# Method 2: contextlib (simpler for most cases)
+from contextlib import contextmanager
+
+@contextmanager
+def timer(label):
+    start = time.perf_counter()
+    try:
+        yield  # Code inside 'with' block runs here
+    finally:
+        elapsed = time.perf_counter() - start
+        print(f"{label}: {elapsed:.4f}s")
+
+with timer("data processing"):
+    process_large_dataset()
+```
+
+### Common Built-in Context Managers
+
+| Context Manager | Purpose |
+|----------------|---------|
+| `open(file)` | File handling (auto-close) |
+| `threading.Lock()` | Thread synchronization |
+| `sqlite3.connect()` | Database connection |
+| `tempfile.TemporaryFile()` | Auto-deleted temp files |
+| `contextlib.suppress(Exception)` | Ignore specific exceptions |
+| `decimal.localcontext()` | Temporary decimal precision |
+
+---
+
+## Q9: How does Python handle memory management and garbage collection?
+
+**Answer:**
+
+Python uses a combination of **reference counting** (primary) and **cyclic garbage collection** (secondary) to manage memory automatically.
+
+```{mermaid}
+graph TD
+    MM["Python Memory Management"]
+    MM --> RC["Reference Counting<br/>(Primary mechanism)"]
+    MM --> GC["Cyclic Garbage Collector<br/>(Handles reference cycles)"]
+    MM --> POOL["Memory Pools<br/>(Small object optimization)"]
+
+    RC --> RC1["Every object has a count<br/>of references pointing to it"]
+    RC --> RC2["Count reaches 0 →<br/>immediately deallocated"]
+
+    GC --> GC1["Detects reference cycles<br/>(A → B → A)"]
+    GC --> GC2["Generational collection<br/>(Gen 0, 1, 2)"]
+
+    POOL --> P1["Objects < 512 bytes<br/>use memory pools"]
+    POOL --> P2["Integer caching<br/>(-5 to 256 pre-allocated)"]
+
+    style MM fill:#56cc9d,stroke:#333,color:#fff
+    style RC fill:#6cc3d5,stroke:#333,color:#fff
+    style GC fill:#ffce67,stroke:#333
+```
+
+### Reference Counting
+
+```python
+import sys
+
+a = [1, 2, 3]         # refcount = 1
+b = a                  # refcount = 2
+print(sys.getrefcount(a))  # 3 (includes temporary ref from getrefcount)
+
+del b                  # refcount drops to 1
+del a                  # refcount drops to 0 → immediately freed
+```
+
+### The Cyclic Reference Problem
+
+```python
+# Reference counting alone can't handle this:
+class Node:
+    def __init__(self):
+        self.ref = None
+
+a = Node()
+b = Node()
+a.ref = b    # a → b
+b.ref = a    # b → a (cycle!)
+
+del a, b     # refcount never reaches 0!
+# Cyclic GC detects and collects these
+```
+
+### Generational Garbage Collection
+
+| Generation | Contains | Collected |
+|-----------|----------|-----------|
+| Gen 0 | Newly created objects | Most frequently |
+| Gen 1 | Survived one collection | Less frequently |
+| Gen 2 | Long-lived objects | Rarely |
+
+### Practical Tips
+
+```python
+import gc
+
+# Force garbage collection (rarely needed)
+gc.collect()
+
+# Disable GC for performance-critical sections
+gc.disable()
+# ... time-critical code ...
+gc.enable()
+
+# Avoid reference cycles with weak references
+import weakref
+cache = weakref.WeakValueDictionary()
+```
+
+---
+
+## Q10: What are list comprehensions, and when should you use them vs. alternatives?
+
+**Answer:**
+
+**List comprehensions** are concise, readable one-line expressions for creating lists. They're faster than equivalent `for` loops because they're optimized at the bytecode level.
+
+### Syntax
+
+```python
+# Basic: [expression for item in iterable]
+squares = [x**2 for x in range(10)]
+
+# With condition: [expression for item in iterable if condition]
+evens = [x for x in range(20) if x % 2 == 0]
+
+# Nested: [expression for item1 in iter1 for item2 in iter2]
+pairs = [(x, y) for x in range(3) for y in range(3) if x != y]
+```
+
+### Comprehension Types
+
+```python
+# List comprehension
+squares = [x**2 for x in range(10)]           # → list
+
+# Dict comprehension
+word_len = {w: len(w) for w in words}          # → dict
+
+# Set comprehension
+unique_lower = {s.lower() for s in names}      # → set
+
+# Generator expression (lazy!)
+sum_squares = sum(x**2 for x in range(10**9))  # → generator (no memory!)
+```
+
+### When to Use vs. Alternatives
+
+| Approach | Use When | Example |
+|----------|----------|---------|
+| **List comprehension** | Simple transform/filter, result needed as list | `[x*2 for x in nums if x > 0]` |
+| **Generator expression** | Large data, only iterating once | `sum(x*2 for x in nums)` |
+| **`map()` + `filter()`** | Already have named functions | `map(str.upper, words)` |
+| **For loop** | Complex logic, side effects, multiple statements | Multi-step processing |
+
+### Performance Comparison
+
+```python
+import timeit
+
+# List comprehension: ~30% faster than loop
+timeit.timeit('[x**2 for x in range(1000)]', number=10000)
+
+# Equivalent for loop
+timeit.timeit('''
+result = []
+for x in range(1000):
+    result.append(x**2)
+''', number=10000)
+```
+
+### Anti-Pattern: Over-Complex Comprehensions
+
+```python
+# TOO COMPLEX — use a regular loop instead
+result = [
+    transform(x)
+    for group in data
+    for x in group.items
+    if x.is_valid()
+    if x.score > threshold
+]
+
+# BETTER — readable for loop
+result = []
+for group in data:
+    for x in group.items:
+        if x.is_valid() and x.score > threshold:
+            result.append(transform(x))
+```
+
+### Rule of Thumb
+
+If a comprehension **doesn't fit on one line** or requires **mental effort to parse**, use a regular `for` loop. Readability beats cleverness.
+
+---
+
+## Summary Table
+
+| # | Topic | Key Concept |
+|---|-------|-------------|
+| 1 | Mutable vs Immutable | Lists/dicts mutable; strings/tuples immutable. Affects hashability and function args |
+| 2 | GIL | Allows one thread at a time; use multiprocessing for CPU-bound parallelism |
+| 3 | Decorators | Functions that wrap other functions; `@functools.wraps` preserves metadata |
+| 4 | Generators | `yield` for lazy evaluation; memory-efficient for large datasets |
+| 5 | Data Model | Dunder methods (`__repr__`, `__eq__`, etc.) define object behavior |
+| 6 | Shallow vs Deep Copy | Shallow shares inner objects; deep copies everything recursively |
+| 7 | `*args` / `**kwargs` | Variable positional (tuple) and keyword (dict) arguments |
+| 8 | Context Managers | `with` statement ensures cleanup; `__enter__` / `__exit__` |
+| 9 | Memory Management | Reference counting + cyclic GC; generational collection |
+| 10 | List Comprehensions | Fast, readable one-liners; use generator expressions for large data |
+
+---
+
+## What's Next?
+
+This article covered foundational Python concepts for SWE interviews. For related content:
+
+- **Machine learning fundamentals:** [ML Interview QA - 1](/posts/ml-interview/ML-Interview-QA-1.html)
+- **Evaluation metrics and data handling:** [ML Interview QA - 2](/posts/ml-interview/ML-Interview-QA-2.html)
+- **LLM concepts for AI engineers:** [LLM Interview QA - 1](/posts/llm-interview/LLM-Interview-QA-1.html)
+- **Advanced LLM topics:** [LLM Interview QA - 2](/posts/llm-interview/LLM-Interview-QA-2.html)
+- **LLM configuration and decoding:** [LLM Interview QA - 3](/posts/llm-interview/LLM-Interview-QA-3.html)
