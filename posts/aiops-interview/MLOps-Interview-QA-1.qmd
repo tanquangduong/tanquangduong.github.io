@@ -1,0 +1,801 @@
+---
+title: "MLOps Interview QA - 1"
+description: "10 most-asked MLOps interview questions covering ML pipelines, CI/CD for ML, model deployment, monitoring, data drift, feature stores, experiment tracking, model registry, automated retraining, and A/B testing."
+image: /images/aiops/thumb_mlops_interview_qa_300.png
+date: "2026-05-21"
+keywords:
+  - "MLOps interview"
+  - "ML pipeline"
+  - "CI/CD machine learning"
+  - "model deployment"
+  - "model monitoring"
+  - "data drift"
+  - "concept drift"
+  - "feature store"
+  - "experiment tracking"
+  - "model registry"
+  - "MLflow"
+  - "Kubeflow"
+  - "automated retraining"
+  - "A/B testing ML models"
+---
+
+## Introduction
+
+This is **Part 1** of our MLOps Interview QA series, covering the **10 most frequently asked MLOps interview questions**. MLOps (Machine Learning Operations) bridges the gap between data science and production engineering — ensuring ML models are developed, deployed, monitored, and maintained reliably at scale.
+
+> For system design fundamentals, see [System Design Interview QA - 1](/posts/system-design/System-Design-Interview-QA-1.html). For infrastructure deep dives (CI/CD, Kubernetes, monitoring), see [System Design Interview QA - 2](/posts/system-design/System-Design-Interview-QA-2.html). For design patterns, see [Design Pattern Interview QA - 1](/posts/design-pattern/Design-Pattern-Interview-QA-1.html).
+
+---
+
+## Q1: What Is MLOps and How Does It Differ from DevOps?
+
+**Answer:**
+
+MLOps is a set of practices that combines Machine Learning, DevOps, and Data Engineering to deploy and maintain ML systems in production reliably and efficiently. While DevOps focuses on software application lifecycle, MLOps addresses the unique challenges of ML systems — data dependencies, experiment tracking, model decay, and continuous training.
+
+```{mermaid}
+graph TD
+    subgraph DevOps["DevOps (Software)"]
+        D1["Code"] --> D2["Build"] --> D3["Test"] --> D4["Deploy"] --> D5["Monitor"]
+        D5 -->|"Feedback"| D1
+    end
+
+    subgraph MLOps["MLOps (ML Systems)"]
+        M1["Data"] --> M2["Feature Eng"] --> M3["Train"] --> M4["Evaluate"]
+        M4 --> M5["Deploy Model"] --> M6["Monitor<br/>(data + model)"]
+        M6 -->|"Drift detected"| M1
+        M6 -->|"Retrain trigger"| M3
+    end
+
+    style DevOps fill:#6cc3d5,stroke:#333,color:#fff
+    style MLOps fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### DevOps vs MLOps
+
+| Aspect | DevOps | MLOps |
+|--------|--------|-------|
+| **Primary artifact** | Code (application binary) | Code + Data + Model |
+| **Testing** | Unit/integration/E2E tests | + Data validation, model quality, bias tests |
+| **Versioning** | Code (Git) | Code + Data + Model + Parameters + Environment |
+| **CI/CD** | Build → Test → Deploy app | Build → Train → Validate → Deploy model |
+| **Monitoring** | Latency, errors, uptime | + Data drift, prediction quality, feature distribution |
+| **Rollback** | Revert to previous code version | Revert to previous model version (model registry) |
+| **Degradation** | Bug → fix code → redeploy | Model decay → retrain with new data → redeploy |
+| **Reproducibility** | Deterministic builds | Requires pinning: data, hyperparams, seeds, environment |
+
+### MLOps Maturity Levels
+
+| Level | Description | Practices |
+|-------|-------------|-----------|
+| **Level 0** (Manual) | Manual training, manual deployment, no monitoring | Jupyter notebooks, scp model to server |
+| **Level 1** (ML Pipeline Automation) | Automated training pipeline, manual deployment | Orchestrated pipelines (Airflow), experiment tracking |
+| **Level 2** (CI/CD for ML) | Automated training AND deployment, monitoring | Full CI/CD, model registry, automated retraining |
+| **Level 3** (Full Automation) | Self-healing, auto-retraining on drift, A/B testing | Feature store, shadow deployment, automated rollback |
+
+---
+
+## Q2: How Do You Design an End-to-End ML Pipeline?
+
+**Answer:**
+
+An ML pipeline is a sequence of automated steps that takes raw data and produces a deployed, monitored model. Each step is reproducible, versioned, and can be triggered independently.
+
+```{mermaid}
+graph LR
+    DATA["Data Ingestion<br/>(batch / stream)"]
+    DATA --> VALID["Data Validation<br/>(Great Expectations)"]
+    VALID --> FEAT["Feature Engineering<br/>(Feature Store)"]
+    FEAT --> SPLIT["Train/Val/Test<br/>Split"]
+    SPLIT --> TRAIN["Model Training<br/>(Hyperparameter Tuning)"]
+    TRAIN --> EVAL["Model Evaluation<br/>(metrics, bias, fairness)"]
+    EVAL --> REG["Model Registry<br/>(versioning, approval)"]
+    REG --> DEPLOY["Model Deployment<br/>(serving endpoint)"]
+    DEPLOY --> MONITOR["Model Monitoring<br/>(drift, latency, quality)"]
+    MONITOR -->|"Drift detected"| DATA
+
+    style DATA fill:#6cc3d5,stroke:#333,color:#fff
+    style TRAIN fill:#56cc9d,stroke:#333,color:#fff
+    style MONITOR fill:#ffce67,stroke:#333
+```
+
+### Pipeline Stages
+
+| Stage | Purpose | Tools |
+|-------|---------|-------|
+| **Data Ingestion** | Collect data from sources (APIs, DBs, files, streams) | Apache Kafka, Airbyte, AWS Glue |
+| **Data Validation** | Check schema, statistics, detect anomalies | Great Expectations, TensorFlow Data Validation (TFDV) |
+| **Feature Engineering** | Transform raw data into model-ready features | Feast, Tecton, Spark, dbt |
+| **Model Training** | Train model with versioned data and hyperparameters | MLflow, Weights & Biases, SageMaker |
+| **Model Evaluation** | Compute metrics, compare with baseline, check bias | MLflow, Evidently AI, Fairlearn |
+| **Model Registry** | Version, approve, stage models (dev → staging → prod) | MLflow Model Registry, Vertex AI Model Registry |
+| **Model Deployment** | Serve model via API, batch, or edge | Seldon Core, TorchServe, TF Serving, KServe |
+| **Model Monitoring** | Track predictions, detect drift, alert on degradation | Evidently AI, WhyLabs, Prometheus + Grafana |
+
+### Pipeline Orchestration
+
+| Tool | Type | Best For |
+|------|------|----------|
+| **Apache Airflow** | DAG-based workflow | General-purpose data + ML pipelines |
+| **Kubeflow Pipelines** | Kubernetes-native | ML-specific pipelines on K8s |
+| **Prefect** | Modern orchestrator | Python-native, dynamic workflows |
+| **Vertex AI Pipelines** | Managed (GCP) | Teams on GCP wanting minimal infra |
+| **ZenML** | ML-specific framework | Portable pipelines across infra |
+| **Dagster** | Asset-based orchestrator | Data-aware pipelines with lineage |
+
+### Pipeline Design Principles
+
+```
+1. Idempotent steps: Re-running any step produces same result
+2. Versioned artifacts: Every output (data, features, model) is versioned
+3. Parameterized: Hyperparameters, thresholds passed as config (not hardcoded)
+4. Cached: Skip steps whose inputs haven't changed
+5. Testable: Each step has unit tests
+6. Observable: Metrics and logs at every stage
+7. Triggerable: Can be triggered by schedule, event, or manual
+```
+
+---
+
+## Q3: How Do You Implement CI/CD for Machine Learning?
+
+**Answer:**
+
+CI/CD for ML extends traditional software CI/CD with additional pipelines for data validation, model training, model evaluation, and model deployment. It ensures that changes to code, data, or configuration automatically result in tested, validated model deployments.
+
+```{mermaid}
+graph TD
+    subgraph CI["Continuous Integration"]
+        CODE["Code Push<br/>(Git)"]
+        CODE --> LINT["Lint & Unit Tests"]
+        LINT --> DATA_TEST["Data Validation<br/>Tests"]
+        DATA_TEST --> TRAIN_TEST["Training Pipeline<br/>Tests (small data)"]
+        TRAIN_TEST --> BUILD["Build Container<br/>Image"]
+    end
+
+    subgraph CT["Continuous Training"]
+        TRIGGER["Trigger:<br/>schedule / new data / drift"]
+        TRIGGER --> PIPELINE["Full Training Pipeline<br/>(production data)"]
+        PIPELINE --> EVAL_GATE["Evaluation Gate<br/>(metrics threshold)"]
+        EVAL_GATE -->|"Pass"| REGISTER["Register Model<br/>(Model Registry)"]
+        EVAL_GATE -->|"Fail"| ALERT["Alert Team"]
+    end
+
+    subgraph CD["Continuous Deployment"]
+        REGISTER --> STAGE["Deploy to Staging"]
+        STAGE --> SHADOW["Shadow / Canary<br/>Evaluation"]
+        SHADOW -->|"Approved"| PROD["Deploy to Production"]
+    end
+
+    style CI fill:#6cc3d5,stroke:#333,color:#fff
+    style CT fill:#56cc9d,stroke:#333,color:#fff
+    style CD fill:#ffce67,stroke:#333
+```
+
+### CI/CD Pipeline Stages for ML
+
+| Stage | What It Does | Trigger |
+|-------|-------------|---------|
+| **Code CI** | Lint, unit tests, integration tests for pipeline code | Git push / PR |
+| **Data validation** | Schema checks, distribution tests on new data | New data arrives |
+| **Training (CT)** | Full training pipeline with production data | Schedule / drift alert / manual |
+| **Model evaluation** | Compare new model vs current production model | After training completes |
+| **Model registration** | Version and tag model in registry | Evaluation passes threshold |
+| **Staging deployment** | Deploy model to staging for integration tests | Model registered |
+| **Production deployment** | Canary/shadow → full rollout | Manual approval or auto |
+
+### Evaluation Gate (Quality Gates)
+
+```python
+# Example: Automated quality gate in training pipeline
+def evaluate_model_for_promotion(new_model_metrics, production_metrics, thresholds):
+    """
+    Decide whether to promote new model to production.
+    Returns True if new model passes all quality gates.
+    """
+    checks = {
+        "accuracy_improvement": (
+            new_model_metrics["accuracy"] >= production_metrics["accuracy"] - thresholds["max_accuracy_drop"]
+        ),
+        "latency_acceptable": (
+            new_model_metrics["p99_latency_ms"] <= thresholds["max_p99_latency_ms"]
+        ),
+        "bias_check": (
+            new_model_metrics["demographic_parity_diff"] <= thresholds["max_bias_score"]
+        ),
+        "data_coverage": (
+            new_model_metrics["test_coverage"] >= thresholds["min_test_coverage"]
+        ),
+    }
+
+    all_passed = all(checks.values())
+    return all_passed, checks
+```
+
+### CI/CD Tools for ML
+
+| Tool | Purpose |
+|------|---------|
+| **GitHub Actions / GitLab CI** | Code CI, trigger training pipelines |
+| **DVC (Data Version Control)** | Version datasets alongside code in Git |
+| **MLflow** | Experiment tracking, model registry |
+| **CML (Continuous Machine Learning)** | Auto-generate model reports in PRs |
+| **Seldon Core / KServe** | Model serving on Kubernetes |
+| **ArgoCD** | GitOps deployment of model services |
+
+---
+
+## Q4: How Do You Deploy ML Models to Production?
+
+**Answer:**
+
+Model deployment is the process of making a trained model available to serve predictions in a production environment. The deployment strategy depends on latency requirements, scale, and how the model is consumed.
+
+```{mermaid}
+graph TD
+    subgraph Serving["Model Serving Patterns"]
+        BATCH["Batch Inference<br/>(scheduled, offline)"]
+        ONLINE["Online Inference<br/>(real-time API)"]
+        STREAM["Streaming Inference<br/>(event-driven)"]
+        EDGE["Edge Inference<br/>(on-device)"]
+    end
+
+    BATCH --> STORE["Prediction Store<br/>(DB / Data Lake)"]
+    ONLINE --> API["REST / gRPC API<br/>(low latency)"]
+    STREAM --> KAFKA["Kafka Consumer<br/>(process events)"]
+    EDGE --> DEVICE["Mobile / IoT<br/>(TFLite, ONNX)"]
+
+    style ONLINE fill:#56cc9d,stroke:#333,color:#fff
+    style BATCH fill:#6cc3d5,stroke:#333,color:#fff
+    style STREAM fill:#ffce67,stroke:#333
+```
+
+### Deployment Patterns
+
+| Pattern | Latency | Use Case | Example |
+|---------|---------|----------|---------|
+| **Batch inference** | Minutes-hours | Recommendations, risk scores | Nightly user recommendations → stored in DB |
+| **Online (real-time)** | <100ms | Fraud detection, search ranking | REST API returns prediction per request |
+| **Streaming** | Seconds | Anomaly detection, real-time personalization | Kafka consumer scores each event |
+| **Edge** | <10ms | Autonomous vehicles, mobile apps | ONNX model on mobile device |
+| **Embedded** | <1ms | Game AI, robotics | Model compiled into application binary |
+
+### Model Serving Infrastructure
+
+| Tool | Type | Key Feature |
+|------|------|-------------|
+| **TensorFlow Serving** | gRPC/REST server | Optimized for TF models, model versioning |
+| **TorchServe** | REST server | PyTorch-native, custom handlers |
+| **Triton Inference Server** | Multi-framework | Supports TF, PyTorch, ONNX; GPU batching |
+| **Seldon Core** | Kubernetes-native | Multi-model serving, A/B, canary |
+| **KServe** | Kubernetes-native | Serverless inference, autoscaling to zero |
+| **BentoML** | Python-native | Easy packaging, batch/online, multi-model |
+| **vLLM** | LLM serving | PagedAttention, continuous batching |
+| **Ray Serve** | Distributed | Complex inference graphs, multi-model |
+
+### Model Deployment Strategies
+
+```{mermaid}
+graph LR
+    subgraph Shadow["Shadow Deployment"]
+        PROD_M["Production Model<br/>(serves traffic)"]
+        SHADOW_M["New Model<br/>(receives traffic copy,<br/>predictions discarded)"]
+    end
+
+    subgraph Canary["Canary Deployment"]
+        OLD["Old Model<br/>(95% traffic)"]
+        NEW["New Model<br/>(5% traffic)"]
+    end
+
+    subgraph AB["A/B Testing"]
+        MODEL_A["Model A<br/>(Control group)"]
+        MODEL_B["Model B<br/>(Treatment group)"]
+    end
+
+    style Shadow fill:#6cc3d5,stroke:#333,color:#fff
+    style Canary fill:#56cc9d,stroke:#333,color:#fff
+    style AB fill:#ffce67,stroke:#333
+```
+
+| Strategy | How It Works | Risk Level | When to Use |
+|----------|-------------|-----------|-------------|
+| **Direct replacement** | Swap old model with new immediately | High | Low-risk models, strong offline eval |
+| **Shadow (dark launch)** | New model runs alongside, predictions logged but not served | Zero | High-risk models needing production validation |
+| **Canary** | Route small % of traffic to new model | Low | Gradual rollout with monitoring |
+| **A/B test** | Split users into groups, measure business metrics | Low | Need statistical proof of improvement |
+| **Multi-armed bandit** | Dynamically allocate traffic based on performance | Low | Continuous optimization |
+
+---
+
+## Q5: What Is Model Monitoring and How Do You Detect Drift?
+
+**Answer:**
+
+Model monitoring is the continuous observation of a deployed model's performance, input data, and predictions to detect degradation before it impacts business outcomes. **Drift** is when the statistical properties of data or the relationship between features and target change over time.
+
+```{mermaid}
+graph TD
+    INPUTS["Input Data<br/>(features)"]
+    INPUTS --> MODEL["Production Model"]
+    MODEL --> PREDS["Predictions"]
+
+    INPUTS --> DATA_MON["Data Monitoring<br/>(feature distributions)"]
+    PREDS --> PRED_MON["Prediction Monitoring<br/>(output distributions)"]
+    MODEL --> PERF_MON["Performance Monitoring<br/>(accuracy, latency)"]
+
+    DATA_MON --> ALERT["Alert: Data Drift<br/>Detected!"]
+    PRED_MON --> ALERT2["Alert: Prediction<br/>Distribution Shift!"]
+    PERF_MON --> ALERT3["Alert: Model<br/>Degradation!"]
+
+    ALERT --> RETRAIN["Trigger Retraining"]
+    ALERT2 --> RETRAIN
+    ALERT3 --> RETRAIN
+
+    style DATA_MON fill:#56cc9d,stroke:#333,color:#fff
+    style PRED_MON fill:#ffce67,stroke:#333
+    style PERF_MON fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Types of Drift
+
+| Drift Type | What Changes | Detection | Example |
+|-----------|-------------|-----------|---------|
+| **Data drift** (covariate shift) | Input feature distributions change | Compare feature stats (mean, variance, distributions) | User demographics shift after expansion to new market |
+| **Concept drift** | Relationship between features and target changes | Monitor prediction quality over time | Customer churn behavior changes after competitor launches |
+| **Prediction drift** | Model output distribution changes | Monitor prediction distribution | Model starts predicting "positive" 80% of the time (was 50%) |
+| **Label drift** | Target variable distribution changes | Compare ground truth distributions | Fraud rate increases from 1% to 5% |
+
+### Drift Detection Methods
+
+| Method | How It Works | Best For |
+|--------|-------------|----------|
+| **Population Stability Index (PSI)** | Compare bins of feature distributions between reference and current | Numerical features, simple threshold |
+| **Kolmogorov-Smirnov test** | Statistical test for distribution difference | Numerical features, rigorous |
+| **Chi-squared test** | Compare categorical distributions | Categorical features |
+| **Jensen-Shannon Divergence** | Symmetric measure of distribution difference | Probability distributions |
+| **Wasserstein Distance** | "Earth mover's distance" between distributions | Sensitive to shape changes |
+| **ADWIN** | Adaptive windowing for streaming data | Online/streaming drift detection |
+
+### What to Monitor
+
+| Category | Metrics | Alert Threshold |
+|----------|---------|-----------------|
+| **Data quality** | Missing values %, schema violations, outlier count | >5% nulls, any schema break |
+| **Feature drift** | PSI per feature, KS statistic | PSI > 0.2, p-value < 0.05 |
+| **Prediction quality** | Accuracy, precision, recall, AUC (when labels available) | >5% degradation from baseline |
+| **Prediction distribution** | Mean, std, quantiles of predictions | Significant shift from reference |
+| **Latency** | P50, P95, P99 inference time | P99 > 200ms |
+| **Throughput** | Requests per second | Sudden drop > 30% |
+| **Resource usage** | GPU utilization, memory, CPU | >90% sustained |
+
+### Monitoring Tools
+
+| Tool | Focus |
+|------|-------|
+| **Evidently AI** | Open-source data/model monitoring dashboards |
+| **WhyLabs** | Managed monitoring with drift detection |
+| **Arize AI** | Production ML observability platform |
+| **Prometheus + Grafana** | Infrastructure + custom ML metrics |
+| **Great Expectations** | Data quality validation |
+| **NannyML** | Performance estimation without ground truth |
+
+---
+
+## Q6: What Is a Feature Store and Why Is It Important?
+
+**Answer:**
+
+A feature store is a centralized repository for storing, managing, and serving features used in ML models. It ensures consistency between training and serving (avoiding training-serving skew), enables feature reuse across teams, and provides point-in-time correct features for training.
+
+```{mermaid}
+graph TD
+    subgraph Sources["Data Sources"]
+        DB["Databases"]
+        STREAM["Streams (Kafka)"]
+        API["APIs"]
+    end
+
+    Sources --> FE["Feature Engineering<br/>(transformations)"]
+    FE --> FS["Feature Store"]
+
+    subgraph FS["Feature Store"]
+        OFFLINE["Offline Store<br/>(historical features)<br/>for training"]
+        ONLINE["Online Store<br/>(latest features)<br/>for serving"]
+    end
+
+    OFFLINE --> TRAIN["Training Pipeline<br/>(point-in-time correct)"]
+    ONLINE --> SERVE["Model Serving<br/>(low-latency lookup)"]
+
+    style FS fill:#56cc9d,stroke:#333,color:#fff
+    style OFFLINE fill:#6cc3d5,stroke:#333,color:#fff
+    style ONLINE fill:#ffce67,stroke:#333
+```
+
+### Why Feature Stores Exist
+
+| Problem | Without Feature Store | With Feature Store |
+|---------|---------------------|-------------------|
+| **Training-serving skew** | Features computed differently in training vs serving → silent bugs | Same feature definitions used everywhere |
+| **Feature duplication** | Teams reimplement same features independently | Central catalog, reuse across models |
+| **Point-in-time correctness** | Training with future data (data leakage) | Time-travel queries ensure no leakage |
+| **Feature freshness** | Stale features in production | Online store updated in real-time |
+| **Discovery** | "Does anyone already compute user_age_days?" | Searchable feature catalog |
+
+### Feature Store Architecture
+
+| Component | Purpose | Technology |
+|-----------|---------|-----------|
+| **Feature definitions** | Code that transforms raw data → features | Python/SQL transformations |
+| **Offline store** | Historical feature values for training | Data warehouse (BigQuery, Snowflake, Parquet files) |
+| **Online store** | Latest feature values for low-latency serving | Redis, DynamoDB, Bigtable |
+| **Feature registry** | Metadata catalog (names, types, owners, lineage) | Built-in registry UI |
+| **Materialization** | Process that computes and loads features into stores | Batch (Spark) + Stream (Flink/Kafka) |
+
+### Feature Store Tools
+
+| Tool | Type | Best For |
+|------|------|----------|
+| **Feast** | Open-source | Teams wanting flexibility and self-managed |
+| **Tecton** | Managed | Production-grade, real-time features |
+| **Databricks Feature Store** | Integrated | Teams already on Databricks |
+| **Vertex AI Feature Store** | Managed (GCP) | GCP-native workflows |
+| **Amazon SageMaker Feature Store** | Managed (AWS) | AWS-native workflows |
+| **Hopsworks** | Open-source + managed | Real-time features with Kafka |
+
+### Example: Feature Definition (Feast)
+
+```python
+from feast import Entity, Feature, FeatureView, FileSource, ValueType
+from datetime import timedelta
+
+# Entity (the primary key for feature lookup)
+user = Entity(name="user_id", value_type=ValueType.INT64)
+
+# Feature view definition
+user_features = FeatureView(
+    name="user_features",
+    entities=[user],
+    ttl=timedelta(days=1),
+    features=[
+        Feature(name="total_purchases_30d", dtype=ValueType.INT64),
+        Feature(name="avg_order_value_30d", dtype=ValueType.FLOAT),
+        Feature(name="days_since_last_login", dtype=ValueType.INT64),
+        Feature(name="account_age_days", dtype=ValueType.INT64),
+    ],
+    online=True,   # Materialize to online store
+    source=FileSource(path="data/user_features.parquet", timestamp_field="event_timestamp"),
+)
+
+# Training: get historical features (point-in-time correct)
+training_df = store.get_historical_features(
+    entity_df=entity_df,  # DataFrame with user_id + event_timestamp
+    features=["user_features:total_purchases_30d", "user_features:avg_order_value_30d"],
+).to_df()
+
+# Serving: get latest features for online inference
+feature_vector = store.get_online_features(
+    features=["user_features:total_purchases_30d", "user_features:avg_order_value_30d"],
+    entity_rows=[{"user_id": 12345}],
+).to_dict()
+```
+
+---
+
+## Q7: How Do You Track Experiments and Manage Model Versions?
+
+**Answer:**
+
+Experiment tracking records all parameters, metrics, code versions, and artifacts from every training run, enabling comparison, reproducibility, and auditability. A model registry provides lifecycle management for models from development to production.
+
+```{mermaid}
+graph TD
+    EXP["Experiment Runs"]
+    EXP --> RUN1["Run 1: lr=0.01, acc=0.85"]
+    EXP --> RUN2["Run 2: lr=0.001, acc=0.91"]
+    EXP --> RUN3["Run 3: lr=0.001, dropout=0.3, acc=0.93"]
+
+    RUN3 -->|"Best model"| REG["Model Registry"]
+
+    subgraph REG["Model Registry"]
+        V1["v1 (Production)"]
+        V2["v2 (Staging)"]
+        V3["v3 (Archived)"]
+    end
+
+    V2 -->|"Promoted"| PROD["Production<br/>Serving"]
+
+    style EXP fill:#6cc3d5,stroke:#333,color:#fff
+    style REG fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### What to Track in Every Experiment
+
+| Category | Items | Why |
+|----------|-------|-----|
+| **Parameters** | Hyperparameters, model architecture, feature set | Reproduce the exact configuration |
+| **Metrics** | Accuracy, loss, F1, AUC, latency, model size | Compare runs objectively |
+| **Artifacts** | Model weights, plots, confusion matrix, data sample | Full traceability |
+| **Environment** | Python version, package versions, hardware (GPU type) | Reproduce environment |
+| **Data** | Dataset version, split ratios, preprocessing steps | Ensure data lineage |
+| **Code** | Git commit hash, branch | Link results to exact code |
+| **Tags** | "production-candidate", "baseline", "experiment-42" | Organize and filter runs |
+
+### Experiment Tracking Tools
+
+| Tool | Key Features | Best For |
+|------|-------------|----------|
+| **MLflow** | Open-source, model registry, model serving | General purpose, self-hosted |
+| **Weights & Biases (W&B)** | Visualization, collaboration, sweeps | Teams wanting rich UI |
+| **Neptune.ai** | Lightweight tracking, integrations | Quick setup, SaaS |
+| **Comet ML** | Code tracking, real-time comparison | Collaborative teams |
+| **DVC** | Git-based, data + model versioning | Git-centric workflows |
+| **Vertex AI Experiments** | Managed (GCP) | GCP-native |
+
+### MLflow Example
+
+```python
+import mlflow
+import mlflow.sklearn
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, f1_score
+
+# Set experiment
+mlflow.set_experiment("churn-prediction")
+
+with mlflow.start_run(run_name="rf-baseline"):
+    # Log parameters
+    params = {"n_estimators": 100, "max_depth": 10, "min_samples_split": 5}
+    mlflow.log_params(params)
+
+    # Train model
+    model = RandomForestClassifier(**params)
+    model.fit(X_train, y_train)
+
+    # Evaluate and log metrics
+    y_pred = model.predict(X_test)
+    mlflow.log_metric("accuracy", accuracy_score(y_test, y_pred))
+    mlflow.log_metric("f1_score", f1_score(y_test, y_pred))
+
+    # Log model artifact
+    mlflow.sklearn.log_model(model, "model")
+
+    # Log additional artifacts
+    mlflow.log_artifact("feature_importance.png")
+
+    # Register model if it meets threshold
+    if accuracy_score(y_test, y_pred) > 0.90:
+        mlflow.register_model(
+            f"runs:/{mlflow.active_run().info.run_id}/model",
+            "churn-prediction-model"
+        )
+```
+
+### Model Registry Lifecycle
+
+| Stage | Description | Action |
+|-------|-------------|--------|
+| **None** | Model just registered | Auto after training |
+| **Staging** | Candidate for production, undergoing validation | Manual or automated promotion |
+| **Production** | Actively serving traffic | After passing evaluation gate |
+| **Archived** | Replaced by newer version, kept for rollback | After new model promoted |
+
+---
+
+## Q8: How Do You Implement Automated Model Retraining?
+
+**Answer:**
+
+Automated retraining ensures models stay fresh as data evolves. A retraining pipeline is triggered by schedules, data changes, or drift detection — then validates the new model before promotion.
+
+```{mermaid}
+graph TD
+    TRIGGER["Trigger"]
+    TRIGGER -->|"Schedule (weekly)"| PIPELINE["Retraining Pipeline"]
+    TRIGGER -->|"Drift alert"| PIPELINE
+    TRIGGER -->|"New data threshold"| PIPELINE
+
+    PIPELINE --> FETCH["Fetch Latest Data"]
+    FETCH --> FEATURE["Feature Engineering"]
+    FEATURE --> TRAIN["Train New Model"]
+    TRAIN --> EVAL["Evaluate vs Production"]
+    EVAL -->|"Better?"| REGISTER["Register & Deploy"]
+    EVAL -->|"Worse?"| SKIP["Skip, Alert Team"]
+
+    REGISTER --> CANARY["Canary Deployment<br/>(5% traffic)"]
+    CANARY -->|"Healthy for 24h"| FULL["Full Rollout"]
+    CANARY -->|"Degradation"| ROLLBACK["Rollback"]
+
+    style TRIGGER fill:#6cc3d5,stroke:#333,color:#fff
+    style PIPELINE fill:#56cc9d,stroke:#333,color:#fff
+    style EVAL fill:#ffce67,stroke:#333
+```
+
+### Retraining Triggers
+
+| Trigger | When to Use | Example |
+|---------|-------------|---------|
+| **Schedule** | Data changes predictably (daily/weekly) | Retrain recommendation model every Sunday |
+| **Data volume** | New data accumulates | Retrain after 100K new labeled samples |
+| **Performance degradation** | Monitoring detects metric drop | Retrain when accuracy drops >3% |
+| **Data drift** | Feature distributions shift significantly | Retrain when PSI > 0.2 on key features |
+| **Manual** | Ad-hoc improvements, new features | Data scientist triggers after feature update |
+
+### Retraining Strategies
+
+| Strategy | Description | Pros | Cons |
+|----------|-------------|------|------|
+| **Full retrain** | Train from scratch on all data | Simple, captures all patterns | Expensive, slow |
+| **Incremental / fine-tune** | Update existing model on new data only | Fast, cheap | May forget old patterns |
+| **Sliding window** | Train on last N days of data | Adapts to recent trends | Loses long-term patterns |
+| **Expanding window** | Train on all data from start to now | Full history | Growing training time |
+
+### Safeguards for Automated Retraining
+
+```
+Before deploying retrained model:
+  1. Performance check: new_model.accuracy >= prod_model.accuracy - 0.02
+  2. Bias check: fairness metrics within acceptable bounds
+  3. Latency check: inference time within SLA
+  4. Data quality: training data passed validation (no corruption)
+  5. Sanity check: predictions on known inputs match expectations
+  6. Shadow deployment: run alongside production for N hours
+  7. Gradual rollout: canary (5%) → 25% → 50% → 100%
+  8. Automatic rollback: if error rate spikes after deployment
+```
+
+---
+
+## Q9: How Do You Perform A/B Testing for ML Models?
+
+**Answer:**
+
+A/B testing for ML models is the process of comparing two (or more) models in production by splitting traffic between them and measuring the impact on business metrics with statistical rigor.
+
+```{mermaid}
+graph TD
+    USERS["Incoming Users"]
+    USERS -->|"Random 50/50 split"| ROUTER["Traffic Router<br/>(feature flag / gateway)"]
+    ROUTER -->|"Group A (control)"| MODEL_A["Model A<br/>(current production)"]
+    ROUTER -->|"Group B (treatment)"| MODEL_B["Model B<br/>(challenger)"]
+
+    MODEL_A --> METRICS_A["Metrics A:<br/>CTR: 3.2%<br/>Revenue: $5.10/user"]
+    MODEL_B --> METRICS_B["Metrics B:<br/>CTR: 3.8%<br/>Revenue: $5.45/user"]
+
+    METRICS_A --> ANALYSIS["Statistical Analysis<br/>(significance test)"]
+    METRICS_B --> ANALYSIS
+    ANALYSIS --> DECISION["Decision:<br/>Model B wins (p < 0.05)"]
+
+    style ROUTER fill:#56cc9d,stroke:#333,color:#fff
+    style ANALYSIS fill:#ffce67,stroke:#333
+```
+
+### A/B Test Design for ML Models
+
+| Aspect | Consideration |
+|--------|--------------|
+| **Hypothesis** | "New model will increase CTR by >5% with p<0.05" |
+| **Randomization unit** | User ID (not request) — ensures consistent experience |
+| **Sample size** | Calculate required sample based on expected effect size and power |
+| **Duration** | Run for full business cycle (e.g., 1-2 weeks minimum) |
+| **Guardrail metrics** | Revenue, latency, error rate — must not degrade |
+| **Primary metric** | The one metric that decides winner |
+| **Novelty effect** | Wait for initial excitement to wear off |
+
+### Statistical Testing
+
+| Method | When to Use |
+|--------|-------------|
+| **t-test / z-test** | Continuous metrics (revenue, time on site) |
+| **Chi-squared test** | Proportions (conversion rate, CTR) |
+| **Mann-Whitney U test** | Non-normally distributed metrics |
+| **Bayesian analysis** | Want probability of being better (not just p-value) |
+| **Sequential testing** | Want to peek at results early without inflating error |
+
+### Beyond A/B: Advanced Deployment Testing
+
+| Method | Description | Advantage |
+|--------|-------------|-----------|
+| **Shadow mode** | New model runs in parallel, predictions logged not served | Zero risk, validate in production |
+| **Interleaving** | Mix recommendations from both models in one list | Needs fewer samples than A/B |
+| **Multi-armed bandit** | Dynamically shift traffic to better-performing model | Faster convergence, less regret |
+| **Backtest** | Evaluate on historical data before live test | Pre-validate offline |
+
+---
+
+## Q10: How Do You Ensure Reproducibility in ML Systems?
+
+**Answer:**
+
+Reproducibility means that given the same inputs, code, and configuration, you can produce the same model and predictions. It's critical for debugging, auditing, regulatory compliance, and collaboration.
+
+```{mermaid}
+graph TD
+    REPRO["Reproducibility Requires Versioning"]
+    REPRO --> CODE["Code<br/>(Git commit hash)"]
+    REPRO --> DATA["Data<br/>(DVC hash / snapshot)"]
+    REPRO --> ENV["Environment<br/>(Docker image / lockfile)"]
+    REPRO --> PARAMS["Parameters<br/>(config file / experiment tracker)"]
+    REPRO --> SEEDS["Random Seeds<br/>(explicit in code)"]
+    REPRO --> HW["Hardware<br/>(GPU type, driver version)"]
+
+    style REPRO fill:#56cc9d,stroke:#333,color:#fff
+    style CODE fill:#6cc3d5,stroke:#333,color:#fff
+    style DATA fill:#ffce67,stroke:#333
+```
+
+### Reproducibility Checklist
+
+| Dimension | What to Version | Tool |
+|-----------|----------------|------|
+| **Code** | Exact source code that produced the model | Git (commit SHA) |
+| **Data** | Training/validation/test datasets | DVC, LakeFS, Delta Lake |
+| **Environment** | Python packages, system libraries, OS | Docker, conda-lock, pip freeze |
+| **Configuration** | Hyperparameters, feature list, thresholds | YAML/JSON config files in Git |
+| **Random state** | Seeds for train/test split, weight initialization | Set in code and log to tracker |
+| **Pipeline order** | DAG of transformations | Airflow/Kubeflow pipeline definition |
+| **Model artifacts** | Trained model weights | MLflow artifact store, S3 |
+| **Hardware** | GPU model, CUDA version, number of workers | Log in experiment tracker |
+
+### Reproducibility Patterns
+
+```
+Pattern 1: Containerized Training
+  - Dockerfile pins EVERY dependency (including CUDA, cuDNN)
+  - docker build → immutable training environment
+  - docker run → exact same environment everywhere
+
+Pattern 2: DVC for Data Versioning
+  - dvc add data/training_set.parquet  (hashes file, stores in remote)
+  - git add data/training_set.parquet.dvc  (version the pointer in Git)
+  - Reproduce: dvc checkout → git checkout → exact same data + code
+
+Pattern 3: Experiment Tracking
+  - Every training run logs: git_commit, docker_image, data_hash, params
+  - To reproduce: pull that commit, build that image, fetch that data, run with those params
+
+Pattern 4: Pipeline as Code
+  - Pipeline defined in code (not manually run notebooks)
+  - Each step: deterministic inputs → deterministic outputs
+  - Cached: re-run only steps whose inputs changed
+```
+
+### Common Reproducibility Pitfalls
+
+| Pitfall | Problem | Solution |
+|---------|---------|----------|
+| Non-deterministic GPU operations | cuDNN auto-tuning selects different algorithms | Set `torch.backends.cudnn.deterministic = True` |
+| Floating-point ordering | Multi-threaded reduction → different sum order | Set fixed number of workers, use deterministic ops |
+| Data ordering | Shuffled differently across runs | Set shuffle seed explicitly |
+| Package version drift | `pip install pandas` gets different version later | Use lockfile (uv.lock, poetry.lock) |
+| Undocumented preprocessing | Notebook cells run out of order | Codify in pipeline scripts |
+| Secret hyperparameters | Tuning done manually, not recorded | Log ALL params to experiment tracker |
+
+---
+
+## Summary Table
+
+| # | Topic | Key Concepts |
+|---|-------|-------------|
+| 1 | **MLOps vs DevOps** | Data+model versioning, experiment tracking, continuous training, maturity levels |
+| 2 | **ML Pipelines** | Data validation → feature engineering → train → evaluate → deploy → monitor |
+| 3 | **CI/CD for ML** | Code CI + continuous training + evaluation gates + model deployment |
+| 4 | **Model Deployment** | Batch/online/streaming/edge, serving tools, shadow/canary/A/B strategies |
+| 5 | **Model Monitoring** | Data drift, concept drift, PSI/KS tests, four signals, monitoring tools |
+| 6 | **Feature Stores** | Offline/online stores, training-serving consistency, point-in-time features |
+| 7 | **Experiment Tracking** | Parameters/metrics/artifacts, MLflow, model registry lifecycle |
+| 8 | **Automated Retraining** | Triggers (schedule/drift), evaluation gates, safeguards, rollout strategy |
+| 9 | **A/B Testing** | Traffic splitting, statistical significance, guardrail metrics, bandits |
+| 10 | **Reproducibility** | Version everything (code+data+env+params+seeds), containerized training |
+
+---
+
+## What's Next?
+
+This article covered core MLOps concepts and practices. For related content:
+
+- **System design foundations:** [System Design Interview QA - 1](/posts/system-design/System-Design-Interview-QA-1.html)
+- **Infrastructure (CI/CD, K8s, monitoring):** [System Design Interview QA - 2](/posts/system-design/System-Design-Interview-QA-2.html)
+- **Design problems (URL shortener, chat, etc.):** [System Design Interview QA - 3](/posts/system-design/System-Design-Interview-QA-3.html)
+- **Python production APIs:** [Python SWE Interview QA - 4](/posts/swe-interview/Python-SWE-Interview-QA-4.html)
+- **Design patterns:** [Design Pattern Interview QA - 1](/posts/design-pattern/Design-Pattern-Interview-QA-1.html)

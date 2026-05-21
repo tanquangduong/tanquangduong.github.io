@@ -1,0 +1,846 @@
+---
+title: "System Design Interview QA - 1"
+description: "10 essential system design interview questions on foundational concepts: scalability, reliability, performance, distributed systems, infrastructure, APIs, databases, networking, and security."
+image: /images/system-design/thumb_system_design_interview_qa_300.png
+date: "2026-05-21"
+keywords:
+  - "system design interview"
+  - "scalability"
+  - "reliability"
+  - "distributed systems"
+  - "load balancing"
+  - "database sharding"
+  - "caching"
+  - "CAP theorem"
+  - "API design"
+  - "microservices"
+  - "networking"
+  - "security"
+  - "FAANG interview"
+---
+
+## Introduction
+
+This is **Part 1** of our System Design Interview QA series, focusing on the **foundational concepts** that underpin every system design interview. System design is about designing the entire architecture of a software system — understanding how components fit together at scale, how failures are handled, and how trade-offs are made across scalability, reliability, performance, databases, APIs, networking, and security.
+
+> For infrastructure deep dives (load balancing, caching, Kubernetes, etc.), see [System Design Interview QA - 2](/posts/system-design/System-Design-Interview-QA-2.html). For hands-on design problems (URL shortener, chat system, etc.), see [System Design Interview QA - 3](/posts/system-design/System-Design-Interview-QA-3.html).
+
+---
+
+## Q1: What Is Scalability and How Do You Scale a System?
+
+**Answer:**
+
+Scalability is the ability of a system to handle growing amounts of work by adding resources. There are two fundamental approaches: **vertical scaling** (bigger machines) and **horizontal scaling** (more machines).
+
+```{mermaid}
+graph TD
+    subgraph Vertical["Vertical Scaling (Scale Up)"]
+        V1["Small Server<br/>4 CPU, 16GB RAM"]
+        V1 -->|"Upgrade"| V2["Large Server<br/>64 CPU, 512GB RAM"]
+    end
+
+    subgraph Horizontal["Horizontal Scaling (Scale Out)"]
+        LB["Load Balancer"]
+        LB --> S1["Server 1"]
+        LB --> S2["Server 2"]
+        LB --> S3["Server 3"]
+        LB --> S4["Server N..."]
+    end
+
+    style Vertical fill:#6cc3d5,stroke:#333,color:#fff
+    style Horizontal fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Vertical vs Horizontal Scaling
+
+| Aspect | Vertical Scaling (Scale Up) | Horizontal Scaling (Scale Out) |
+|--------|---------------------------|-------------------------------|
+| **Approach** | Add more CPU/RAM/disk to one machine | Add more machines behind a load balancer |
+| **Complexity** | Simple — no code changes | Complex — need stateless design, data partitioning |
+| **Cost** | Exponential cost for high-end hardware | Linear cost — commodity hardware |
+| **Limit** | Hard ceiling (largest machine available) | Practically unlimited |
+| **Downtime** | Requires restart to upgrade | Zero downtime — add/remove nodes |
+| **Failure** | Single point of failure | Fault tolerant — one node fails, others serve |
+| **Example** | Upgrade PostgreSQL server from 32GB to 256GB RAM | Shard PostgreSQL across 8 nodes |
+
+### Key Scaling Strategies
+
+```{mermaid}
+graph TD
+    SCALE["Scaling Strategies"]
+    SCALE --> LB["Load Balancing<br/>(distribute traffic)"]
+    SCALE --> CACHE["Caching<br/>(reduce DB load)"]
+    SCALE --> SHARD["Database Sharding<br/>(split data across DBs)"]
+    SCALE --> ASYNC["Async Processing<br/>(message queues)"]
+    SCALE --> CDN["CDN<br/>(serve static content at edge)"]
+    SCALE --> MS["Microservices<br/>(scale services independently)"]
+
+    style SCALE fill:#56cc9d,stroke:#333,color:#fff
+    style LB fill:#ffce67,stroke:#333
+    style CACHE fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+| Strategy | What It Does | When to Use |
+|----------|-------------|-------------|
+| **Load balancing** | Distribute requests across servers | Always, for any multi-server setup |
+| **Caching** | Store frequently accessed data in memory | Read-heavy workloads (80/20 rule) |
+| **Database sharding** | Split data across multiple databases | Data too large for single DB, or write throughput limit hit |
+| **Async processing** | Offload work to background queues | Long-running tasks (email, video transcoding) |
+| **CDN** | Cache static assets at edge locations | Global user base, static content |
+| **Microservices** | Break monolith into independently scalable services | When different components have different scaling needs |
+
+### Stateless vs Stateful Services
+
+```
+Stateless (preferred for horizontal scaling):
+  - Server holds NO user session data
+  - Any server can handle any request
+  - Session stored in external store (Redis, DB)
+  - Easy to add/remove servers
+
+Stateful (harder to scale):
+  - Server holds user session in memory
+  - Requests must be routed to same server (sticky sessions)
+  - Server failure loses user state
+  - Scaling requires state migration
+```
+
+---
+
+## Q2: How Do You Ensure Reliability and Fault Tolerance?
+
+**Answer:**
+
+Reliability means a system continues to work correctly even when things go wrong — hardware failures, software bugs, network issues, or traffic spikes. Fault tolerance is achieved through **redundancy**, **replication**, **graceful degradation**, and **automatic recovery**.
+
+```{mermaid}
+graph TD
+    subgraph Redundancy["Redundancy at Every Layer"]
+        LB1["Load Balancer<br/>(Active)"]
+        LB2["Load Balancer<br/>(Standby)"]
+        LB1 --> APP1["App Server 1"]
+        LB1 --> APP2["App Server 2"]
+        LB1 --> APP3["App Server 3"]
+        APP1 --> DB_P["DB Primary"]
+        APP2 --> DB_P
+        APP3 --> DB_P
+        DB_P -->|"Replication"| DB_R1["DB Replica 1"]
+        DB_P -->|"Replication"| DB_R2["DB Replica 2"]
+    end
+
+    style LB1 fill:#56cc9d,stroke:#333,color:#fff
+    style DB_P fill:#6cc3d5,stroke:#333,color:#fff
+    style LB2 fill:#ffce67,stroke:#333
+```
+
+### Reliability Patterns
+
+| Pattern | Description | Example |
+|---------|-------------|---------|
+| **Replication** | Keep multiple copies of data/services | 3 DB replicas across availability zones |
+| **Failover** | Automatically switch to backup when primary fails | Primary DB fails → promote replica |
+| **Health checks** | Monitor component health, remove unhealthy nodes | Load balancer pings `/health` every 5s |
+| **Circuit breaker** | Stop calling a failing service, fail fast | If payment API errors >50%, stop calling for 30s |
+| **Retry with backoff** | Retry failed requests with increasing delay | Retry after 1s, 2s, 4s, 8s (exponential backoff) |
+| **Bulkhead** | Isolate failures to prevent cascading | Separate thread pools for payment vs catalog |
+| **Graceful degradation** | Serve partial functionality when subsystems fail | Show cached feed if recommendation service is down |
+
+### Availability Levels
+
+| Level | Downtime/Year | Downtime/Month | Use Case |
+|-------|--------------|----------------|----------|
+| **99%** (two 9s) | 3.65 days | 7.3 hours | Internal tools |
+| **99.9%** (three 9s) | 8.76 hours | 43.8 minutes | SaaS applications |
+| **99.99%** (four 9s) | 52.6 minutes | 4.4 minutes | E-commerce, banking |
+| **99.999%** (five 9s) | 5.26 minutes | 26.3 seconds | DNS, payment processing |
+
+### Failure Handling Flow
+
+```
+Request comes in:
+  1. Load balancer routes to healthy server
+     - If server unreachable → try next server
+  2. Server processes request
+     - If downstream service fails → circuit breaker
+       - Circuit CLOSED: forward request normally
+       - Circuit OPEN: return cached/fallback response immediately
+       - Circuit HALF-OPEN: try one request, if success → close
+  3. Database write
+     - Write to primary → replicate to replicas
+     - If primary fails → promote replica (automatic failover)
+  4. Return response
+     - If timeout → client retries with exponential backoff
+     - If persistent failure → graceful degradation (partial response)
+```
+
+---
+
+## Q3: What Are the Key Performance Optimization Strategies?
+
+**Answer:**
+
+Performance optimization reduces **latency** (time to respond) and increases **throughput** (requests handled per second). The key principle is to identify and eliminate bottlenecks at each layer: network, application, and database.
+
+```{mermaid}
+graph LR
+    subgraph Latency["Latency Numbers Every Engineer Should Know"]
+        L1["L1 cache: 0.5 ns"]
+        L2["L2 cache: 7 ns"]
+        L3["RAM access: 100 ns"]
+        L4["SSD read: 150 μs"]
+        L5["HDD seek: 10 ms"]
+        L6["Same datacenter roundtrip: 0.5 ms"]
+        L7["Cross-region roundtrip: 150 ms"]
+    end
+
+    style Latency fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Performance Optimization by Layer
+
+| Layer | Strategy | Impact |
+|-------|----------|--------|
+| **Network** | CDN for static assets | Reduces latency by 10-100x for global users |
+| **Network** | HTTP/2 multiplexing, gzip compression | Fewer connections, smaller payloads |
+| **Network** | Connection pooling | Avoid TCP handshake overhead per request |
+| **Application** | Caching (Redis/Memcached) | Sub-millisecond reads vs 10-100ms DB queries |
+| **Application** | Async processing (message queues) | Don't block user on slow operations |
+| **Application** | Pagination and lazy loading | Return only what user needs now |
+| **Database** | Indexing | Speed up queries from O(n) to O(log n) |
+| **Database** | Read replicas | Distribute read load across multiple DBs |
+| **Database** | Query optimization | Avoid N+1 queries, use JOINs efficiently |
+| **Database** | Denormalization | Trade storage for faster reads (avoid JOINs) |
+
+### Caching Strategy Deep Dive
+
+```{mermaid}
+graph TD
+    REQ["Request"]
+    REQ --> APP["Application"]
+    APP --> CHECK{"Cache<br/>hit?"}
+    CHECK -->|"Hit"| RETURN["Return cached data<br/>(< 1ms)"]
+    CHECK -->|"Miss"| DB["Query Database<br/>(10-100ms)"]
+    DB --> UPDATE["Update Cache"]
+    UPDATE --> RETURN2["Return data"]
+
+    style CHECK fill:#ffce67,stroke:#333
+    style RETURN fill:#56cc9d,stroke:#333,color:#fff
+```
+
+| Caching Pattern | How It Works | Best For |
+|----------------|-------------|----------|
+| **Cache-aside** (lazy loading) | App checks cache → if miss, query DB → write to cache | General purpose, read-heavy |
+| **Write-through** | Write to cache AND DB simultaneously | When reads immediately follow writes |
+| **Write-behind** (write-back) | Write to cache first, async write to DB | Write-heavy, can tolerate brief inconsistency |
+| **Read-through** | Cache itself fetches from DB on miss | Simpler app code, cache acts as primary interface |
+
+### Cache Invalidation Strategies
+
+| Strategy | Description | Trade-off |
+|----------|-------------|-----------|
+| **TTL (Time-To-Live)** | Cache expires after N seconds | Simple but may serve stale data |
+| **Event-driven invalidation** | Invalidate on write/update event | Fresh data but more complex |
+| **Version-based** | Key includes version number, bump on update | No stale data, slight overhead |
+
+---
+
+## Q4: How Do Distributed Systems Work and What Are the Key Challenges?
+
+**Answer:**
+
+A distributed system is a collection of independent computers that appear to users as a single coherent system. They are necessary when a single machine cannot handle the load, data, or availability requirements.
+
+```{mermaid}
+graph TD
+    subgraph Challenges["8 Fallacies of Distributed Computing"]
+        F1["1. The network is NOT reliable"]
+        F2["2. Latency is NOT zero"]
+        F3["3. Bandwidth is NOT infinite"]
+        F4["4. The network is NOT secure"]
+        F5["5. Topology DOES change"]
+        F6["6. There is NOT one administrator"]
+        F7["7. Transport cost is NOT zero"]
+        F8["8. The network is NOT homogeneous"]
+    end
+
+    style Challenges fill:#ff7851,stroke:#333,color:#fff
+```
+
+### CAP Theorem
+
+Every distributed data store can provide at most **two of three** guarantees simultaneously:
+
+| Property | Definition | Example |
+|----------|-----------|---------|
+| **Consistency** | Every read receives the most recent write | All replicas return the same value |
+| **Availability** | Every request receives a response (success or failure) | System never refuses a request |
+| **Partition Tolerance** | System operates despite network failures between nodes | Nodes can't communicate but keep serving |
+
+```
+Since network partitions WILL happen, you must choose:
+
+  CP (Consistency + Partition Tolerance):
+    → During partition: reject requests rather than return stale data
+    → Examples: MongoDB, HBase, Redis Cluster, ZooKeeper
+    → Use for: Banking, inventory, leader election
+
+  AP (Availability + Partition Tolerance):
+    → During partition: serve requests even if data might be stale
+    → Examples: Cassandra, DynamoDB, CouchDB
+    → Use for: Social media feeds, shopping carts, analytics
+```
+
+### Consensus Algorithms
+
+| Algorithm | Purpose | How It Works | Used In |
+|-----------|---------|-------------|---------|
+| **Paxos** | Agreement among nodes | Proposer → Acceptors → Learners; majority quorum | Google Chubby |
+| **Raft** | Leader-based consensus | Elect leader → leader replicates log entries; easier to understand | etcd, CockroachDB |
+| **Gossip Protocol** | Information dissemination | Nodes periodically exchange state with random peers | Cassandra, DynamoDB |
+
+### Consistency Models
+
+| Model | Guarantee | Latency | Use Case |
+|-------|----------|---------|----------|
+| **Strong consistency** | Read always returns latest write | High (synchronous replication) | Banking transactions |
+| **Eventual consistency** | Reads converge to latest write over time | Low (async replication) | Social media likes/counts |
+| **Causal consistency** | Preserves cause-and-effect ordering | Medium | Comment threads, chat |
+| **Read-your-writes** | User sees their own writes immediately | Medium | User profile updates |
+
+---
+
+## Q5: What Infrastructure Components Make Up a Production System?
+
+**Answer:**
+
+A production system is composed of multiple infrastructure layers working together. Understanding each component's role and how they interact is essential for system design.
+
+```{mermaid}
+graph TD
+    USERS["Users"]
+    USERS --> DNS["DNS<br/>(Route53, Cloudflare)"]
+    DNS --> CDN["CDN<br/>(CloudFront, Akamai)"]
+    CDN --> LB["Load Balancer<br/>(ALB, Nginx)"]
+    LB --> API["API Gateway"]
+    API --> SVC1["Service A"]
+    API --> SVC2["Service B"]
+    API --> SVC3["Service C"]
+    SVC1 --> CACHE["Cache<br/>(Redis / Memcached)"]
+    SVC1 --> DB["Database<br/>(PostgreSQL / MySQL)"]
+    SVC2 --> MQ["Message Queue<br/>(Kafka / RabbitMQ)"]
+    MQ --> WORKER["Background Workers"]
+    WORKER --> STORE["Object Storage<br/>(S3)"]
+    SVC3 --> SEARCH["Search Engine<br/>(Elasticsearch)"]
+
+    subgraph Observability
+        LOG["Logging<br/>(ELK Stack)"]
+        METRIC["Metrics<br/>(Prometheus / Grafana)"]
+        TRACE["Tracing<br/>(Jaeger / Zipkin)"]
+    end
+
+    style LB fill:#56cc9d,stroke:#333,color:#fff
+    style CACHE fill:#ffce67,stroke:#333
+    style DB fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Infrastructure Components Reference
+
+| Component | Purpose | Examples | When to Use |
+|-----------|---------|----------|-------------|
+| **DNS** | Domain → IP resolution, geographic routing | Route53, Cloudflare DNS | Always — entry point for all traffic |
+| **CDN** | Cache static content at edge locations globally | CloudFront, Akamai, Fastly | Static assets, global user base |
+| **Load Balancer** | Distribute traffic across servers | ALB/NLB (AWS), Nginx, HAProxy | Multiple app servers |
+| **API Gateway** | Routing, auth, rate limiting, protocol translation | Kong, AWS API Gateway, Envoy | Microservices architecture |
+| **Cache** | In-memory store for frequently accessed data | Redis, Memcached | Read-heavy workloads |
+| **Message Queue** | Async communication, decouple producers/consumers | Kafka, RabbitMQ, SQS | Background processing, event-driven |
+| **Object Storage** | Store blobs (images, videos, backups) | S3, GCS, Azure Blob | Media files, backups, data lake |
+| **Search Engine** | Full-text search, analytics | Elasticsearch, OpenSearch | Product search, log analysis |
+| **Container Orchestration** | Deploy, scale, manage containerized services | Kubernetes, ECS | Microservices deployment |
+
+### Monolith vs Microservices
+
+| Aspect | Monolith | Microservices |
+|--------|----------|---------------|
+| **Deployment** | Single deployable unit | Independent services, independent deployments |
+| **Scaling** | Scale everything together | Scale each service independently |
+| **Complexity** | Simple to develop and deploy initially | Complex: service discovery, distributed tracing |
+| **Data** | Single shared database | Database per service (data isolation) |
+| **Team** | Single team, tight coupling | Small teams own individual services |
+| **Failure** | One bug can crash entire system | Failure isolated to one service (with proper design) |
+| **Best for** | Small teams, early-stage products | Large teams, complex domains, different scaling needs |
+
+### When to Move from Monolith to Microservices
+
+```
+Start with a monolith. Split when:
+  1. Team size > 10-15 engineers (coordination overhead)
+  2. Different components have vastly different scaling needs
+  3. Deployment of one feature blocks another team
+  4. Different services need different tech stacks
+  5. You need independent failure isolation
+
+Do NOT split prematurely — microservices add operational complexity:
+  - Service discovery
+  - Distributed transactions (Saga pattern)
+  - Network latency between services
+  - Distributed debugging and tracing
+  - Data consistency across service boundaries
+```
+
+---
+
+## Q6: How Do You Design RESTful APIs and Choose Between API Styles?
+
+**Answer:**
+
+APIs are the contracts between system components. Choosing the right API style and designing clean, consistent interfaces is a core system design skill.
+
+### API Style Comparison
+
+| Style | Protocol | Format | Best For |
+|-------|----------|--------|----------|
+| **REST** | HTTP | JSON | CRUD web services, public APIs |
+| **GraphQL** | HTTP | JSON | Complex queries, frontend-driven data needs |
+| **gRPC** | HTTP/2 | Protobuf (binary) | Low-latency microservice communication |
+| **WebSocket** | TCP (upgraded HTTP) | Any | Real-time bidirectional (chat, gaming) |
+| **Webhook** | HTTP (push) | JSON | Event notifications (payment processed, build complete) |
+
+### REST API Design Principles
+
+```
+Good REST API design:
+
+  Resources (nouns, not verbs):
+    ✅ GET    /api/v1/users              → List users
+    ✅ GET    /api/v1/users/123          → Get user 123
+    ✅ POST   /api/v1/users              → Create user
+    ✅ PUT    /api/v1/users/123          → Update user 123
+    ✅ DELETE /api/v1/users/123          → Delete user 123
+    ❌ GET    /api/v1/getUser?id=123     → Verb in URL (bad)
+
+  Nested resources:
+    GET  /api/v1/users/123/orders       → Orders for user 123
+    GET  /api/v1/users/123/orders/456   → Specific order
+
+  Pagination:
+    GET /api/v1/users?page=2&limit=20
+    GET /api/v1/users?cursor=abc123&limit=20  (cursor-based, preferred)
+
+  Filtering and sorting:
+    GET /api/v1/users?role=admin&sort=-created_at
+
+  Versioning:
+    /api/v1/users  → URL path versioning (most common)
+    Accept: application/vnd.api.v1+json  → Header versioning
+```
+
+### HTTP Status Codes
+
+| Code | Meaning | When to Use |
+|------|---------|-------------|
+| **200** | OK | Successful GET, PUT |
+| **201** | Created | Successful POST (resource created) |
+| **204** | No Content | Successful DELETE |
+| **400** | Bad Request | Invalid input, validation error |
+| **401** | Unauthorized | Missing or invalid authentication |
+| **403** | Forbidden | Authenticated but insufficient permissions |
+| **404** | Not Found | Resource doesn't exist |
+| **409** | Conflict | Duplicate resource, version conflict |
+| **429** | Too Many Requests | Rate limit exceeded |
+| **500** | Internal Server Error | Unhandled server error |
+| **503** | Service Unavailable | Server overloaded or in maintenance |
+
+### Idempotency
+
+| Method | Idempotent? | Safe? | Notes |
+|--------|------------|-------|-------|
+| **GET** | Yes | Yes | Retrieves data, no side effects |
+| **PUT** | Yes | No | Same request produces same result |
+| **DELETE** | Yes | No | Deleting same resource twice = same outcome |
+| **POST** | **No** | No | Use idempotency keys (e.g., `Idempotency-Key: uuid`) |
+| **PATCH** | No | No | Partial update — result depends on current state |
+
+### Pagination: Offset vs Cursor
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **Offset** (`?page=5&limit=20`) | Simple, can jump to any page | Slow on large datasets (OFFSET scans rows); inconsistent with inserts |
+| **Cursor** (`?cursor=abc&limit=20`) | Consistent, fast (indexed seek); handles real-time inserts | Can't jump to arbitrary page |
+
+---
+
+## Q7: How Do You Choose the Right Database?
+
+**Answer:**
+
+Database selection is one of the most impactful decisions in system design. The choice depends on data structure, access patterns, consistency requirements, and scale.
+
+```{mermaid}
+graph TD
+    CHOOSE["Choose Your Database"]
+    CHOOSE --> REL["Relational (SQL)"]
+    CHOOSE --> DOC["Document Store"]
+    CHOOSE --> KV["Key-Value Store"]
+    CHOOSE --> COL["Wide-Column Store"]
+    CHOOSE --> GRAPH["Graph Database"]
+    CHOOSE --> TS["Time-Series DB"]
+    CHOOSE --> SEARCH["Search Engine"]
+
+    REL --> REL_EX["PostgreSQL, MySQL<br/>ACID, complex queries, JOINs"]
+    DOC --> DOC_EX["MongoDB, CouchDB<br/>Flexible schema, nested data"]
+    KV --> KV_EX["Redis, DynamoDB<br/>Cache, session, simple lookups"]
+    COL --> COL_EX["Cassandra, HBase<br/>Write-heavy, time-series-like"]
+    GRAPH --> GRAPH_EX["Neo4j, Neptune<br/>Relationships, social networks"]
+    TS --> TS_EX["InfluxDB, TimescaleDB<br/>Metrics, IoT, monitoring"]
+    SEARCH --> SEARCH_EX["Elasticsearch<br/>Full-text search, analytics"]
+
+    style CHOOSE fill:#56cc9d,stroke:#333,color:#fff
+    style REL fill:#6cc3d5,stroke:#333,color:#fff
+    style DOC fill:#ffce67,stroke:#333
+```
+
+### Database Selection Guide
+
+| Requirement | Best Choice | Why |
+|-------------|------------|-----|
+| Complex relationships, ACID transactions | **PostgreSQL / MySQL** | Strong consistency, JOINs, mature tooling |
+| Flexible schema, nested documents | **MongoDB** | Schema-less, easy horizontal scaling |
+| Ultra-fast key-value lookups, caching | **Redis** | In-memory, sub-millisecond latency |
+| Massive write throughput, append-only | **Cassandra** | Distributed, tunable consistency, linear scaling |
+| Social graph, recommendations | **Neo4j** | Optimized for traversing relationships |
+| Full-text search, log analytics | **Elasticsearch** | Inverted index, near real-time search |
+| Time-series data (metrics, IoT) | **TimescaleDB / InfluxDB** | Optimized for time-bucketed queries |
+| Globally distributed, strong consistency | **CockroachDB / Spanner** | Distributed SQL, serializable isolation |
+
+### SQL vs NoSQL Trade-offs
+
+| Aspect | SQL (Relational) | NoSQL |
+|--------|-----------------|-------|
+| **Schema** | Fixed schema, migrations required | Flexible / schema-less |
+| **Consistency** | ACID (strong by default) | BASE (eventual, tunable) |
+| **Scaling** | Vertical (primarily), read replicas | Horizontal (built-in sharding) |
+| **Queries** | Complex JOINs, aggregations, SQL | Simple lookups, limited JOINs |
+| **Transactions** | Multi-table transactions native | Limited (single-partition or Saga pattern) |
+| **Best for** | Financial, e-commerce, complex relationships | High-scale, simple access patterns, flexible data |
+
+### Database Scaling Strategies
+
+```{mermaid}
+graph TD
+    DBSCALE["Database Scaling"]
+    DBSCALE --> RR["Read Replicas<br/>(scale reads)"]
+    DBSCALE --> SHARD["Sharding<br/>(scale writes + storage)"]
+    DBSCALE --> PART["Partitioning<br/>(split tables)"]
+    DBSCALE --> POOL["Connection Pooling<br/>(scale connections)"]
+
+    RR --> RR_D["Primary handles writes<br/>Replicas handle reads<br/>Async replication"]
+    SHARD --> SHARD_D["Split data by key<br/>(user_id % N shards)<br/>Each shard is a full DB"]
+
+    style DBSCALE fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Sharding Strategies
+
+| Strategy | How It Works | Pros | Cons |
+|----------|-------------|------|------|
+| **Hash-based** | `shard = hash(key) % N` | Even distribution | Adding shards requires reshuffling |
+| **Range-based** | `shard 1: A-M, shard 2: N-Z` | Range queries efficient | Hotspots if data is skewed |
+| **Directory-based** | Lookup table maps key → shard | Flexible, no reshuffling | Lookup table is single point of failure |
+| **Consistent hashing** | Hash ring, minimal key movement on changes | Add/remove nodes easily | Slightly uneven with few nodes (use virtual nodes) |
+
+---
+
+## Q8: How Does Networking Work in Distributed Systems?
+
+**Answer:**
+
+Understanding networking fundamentals is essential for system design — from how a request reaches your server to how services communicate internally.
+
+### How a Web Request Works (End-to-End)
+
+```{mermaid}
+graph LR
+    BROWSER["Browser"]
+    BROWSER -->|"1. DNS Lookup"| DNS["DNS Server<br/>→ IP address"]
+    DNS -->|"2. TCP Handshake"| LB["Load Balancer"]
+    LB -->|"3. TLS Handshake<br/>(HTTPS)"| APP["App Server"]
+    APP -->|"4. Process Request"| DB["Database"]
+    DB -->|"5. Response"| APP
+    APP -->|"6. HTTP Response"| BROWSER
+
+    style BROWSER fill:#6cc3d5,stroke:#333,color:#fff
+    style LB fill:#56cc9d,stroke:#333,color:#fff
+    style APP fill:#ffce67,stroke:#333
+```
+
+```
+Step-by-step breakdown:
+  1. DNS resolution: browser.com → 93.184.216.34  (~50ms first time, cached after)
+  2. TCP handshake: SYN → SYN-ACK → ACK           (~1 RTT = 0.5ms same DC, 150ms cross-region)
+  3. TLS handshake: Certificate exchange, key setup (~1-2 RTT additional for HTTPS)
+  4. HTTP request: GET /api/users                   (headers + body)
+  5. Server processes, queries DB, builds response
+  6. HTTP response: 200 OK + JSON payload
+  7. Browser renders response
+```
+
+### Communication Protocols
+
+| Protocol | Layer | Use Case | Key Property |
+|----------|-------|----------|-------------|
+| **TCP** | Transport | Most web traffic, databases | Reliable, ordered delivery |
+| **UDP** | Transport | Video streaming, gaming, DNS | Fast, no handshake, unreliable |
+| **HTTP/1.1** | Application | Traditional web APIs | Text-based, one request per connection |
+| **HTTP/2** | Application | Modern web APIs | Multiplexing, header compression, binary |
+| **HTTP/3 (QUIC)** | Application | Next-gen web | UDP-based, zero-RTT, faster handshake |
+| **WebSocket** | Application | Real-time communication | Full-duplex, persistent connection |
+| **gRPC** | Application | Microservice calls | HTTP/2 + Protobuf, streaming support |
+
+### Real-Time Communication Patterns
+
+| Pattern | How It Works | Latency | Server Load | Best For |
+|---------|-------------|---------|-------------|----------|
+| **Short polling** | Client sends HTTP request every N seconds | High (N sec delay) | High (many requests) | Simple status checks |
+| **Long polling** | Client sends request, server holds until data available | Medium | Medium | Notifications, chat fallback |
+| **Server-Sent Events (SSE)** | Server pushes events over single HTTP connection | Low | Low | Live feeds, dashboards |
+| **WebSocket** | Full-duplex persistent TCP connection | Very low | Low | Chat, gaming, real-time collaboration |
+
+### DNS and Load Balancing at Network Level
+
+| Level | Technology | Purpose |
+|-------|-----------|---------|
+| **DNS-level** | Route53, Cloudflare | Geographic routing, failover between data centers |
+| **L4 (Transport)** | NLB, HAProxy (TCP mode) | Route based on IP/port, very fast, no content inspection |
+| **L7 (Application)** | ALB, Nginx, Envoy | Route based on URL path, headers, content; SSL termination |
+
+---
+
+## Q9: How Do You Design for Security in Distributed Systems?
+
+**Answer:**
+
+Security must be designed into every layer of a system — from network perimeter to data at rest. In system design interviews, demonstrating security awareness distinguishes senior candidates.
+
+```{mermaid}
+graph TD
+    subgraph Perimeter["Perimeter Security"]
+        FW["Firewall / WAF"]
+        DDOS["DDoS Protection<br/>(Cloudflare, Shield)"]
+    end
+
+    subgraph Network["Network Security"]
+        TLS["TLS / HTTPS<br/>(encryption in transit)"]
+        VPC["VPC / Private Subnets"]
+        SG["Security Groups"]
+    end
+
+    subgraph Application["Application Security"]
+        AUTH["Authentication<br/>(OAuth 2.0, JWT)"]
+        AUTHZ["Authorization<br/>(RBAC, ABAC)"]
+        VALID["Input Validation<br/>(prevent injection)"]
+        RL["Rate Limiting"]
+    end
+
+    subgraph Data["Data Security"]
+        ENC["Encryption at Rest<br/>(AES-256)"]
+        HASH["Password Hashing<br/>(bcrypt, argon2)"]
+        MASK["Data Masking<br/>(PII protection)"]
+    end
+
+    Perimeter --> Network --> Application --> Data
+
+    style Perimeter fill:#ff7851,stroke:#333,color:#fff
+    style Network fill:#ffce67,stroke:#333
+    style Application fill:#56cc9d,stroke:#333,color:#fff
+    style Data fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Authentication vs Authorization
+
+| Concept | Question | Mechanism | Example |
+|---------|----------|-----------|---------|
+| **Authentication (AuthN)** | "Who are you?" | Username/password, OAuth, SSO, MFA | Login with Google |
+| **Authorization (AuthZ)** | "What can you do?" | RBAC, ABAC, ACL, policy engines | Admin can delete users, viewer cannot |
+
+### Token-Based Authentication Flow (OAuth 2.0 + JWT)
+
+```
+1. User logs in → Auth Server validates credentials
+2. Auth Server issues:
+   - Access token (JWT, short-lived: 15-60 min)
+   - Refresh token (opaque, long-lived: 7-30 days)
+3. Client sends Access token in header: Authorization: Bearer <token>
+4. API Gateway / Service validates JWT:
+   - Verify signature (no DB call needed)
+   - Check expiration
+   - Extract user ID, roles from claims
+5. Token expired → client uses Refresh token to get new Access token
+6. Refresh token expired → user must log in again
+```
+
+### JWT Structure
+
+```
+Header.Payload.Signature
+
+Header:  {"alg": "RS256", "typ": "JWT"}
+Payload: {"sub": "user123", "role": "admin", "exp": 1716300000, "iat": 1716296400}
+Signature: HMACSHA256(base64(header) + "." + base64(payload), secret)
+
+Key design decisions:
+  - Use RS256 (asymmetric) for microservices (public key verification, no shared secret)
+  - Keep payload small (don't put entire user profile)
+  - Set short expiration (15 min) + use refresh tokens
+  - Never store sensitive data in JWT (it's base64, not encrypted)
+```
+
+### Common Security Threats and Mitigations
+
+| Threat | Description | Mitigation |
+|--------|-------------|------------|
+| **SQL injection** | Malicious SQL in user input | Parameterized queries, ORM |
+| **XSS** | Injecting scripts into web pages | Input sanitization, CSP headers |
+| **CSRF** | Forged requests from authenticated browser | CSRF tokens, SameSite cookies |
+| **DDoS** | Overwhelming system with traffic | Rate limiting, WAF, CDN, auto-scaling |
+| **Man-in-the-middle** | Intercepting network traffic | TLS everywhere, certificate pinning |
+| **Broken authentication** | Weak passwords, no MFA | bcrypt/argon2 hashing, MFA, account lockout |
+| **Data breach** | Unauthorized data access | Encryption at rest, principle of least privilege |
+| **API abuse** | Scraping, brute force | Rate limiting, API keys, OAuth scopes |
+
+### Security Checklist for System Design
+
+```
+✅ HTTPS/TLS for all communication (internal and external)
+✅ Authentication at the API gateway layer
+✅ Authorization checks at the service level
+✅ Input validation and sanitization at system boundaries
+✅ Rate limiting per client/IP/API key
+✅ Encryption at rest for sensitive data (AES-256)
+✅ Password hashing with bcrypt or argon2 (never plain text or MD5)
+✅ Secrets in vault (HashiCorp Vault, AWS Secrets Manager) — not in code
+✅ Audit logging for security-relevant events
+✅ Principle of least privilege for service accounts
+✅ Network segmentation (private subnets for DBs, no public access)
+```
+
+---
+
+## Q10: What Is Back-of-the-Envelope Estimation and How Do You Do It?
+
+**Answer:**
+
+Back-of-the-envelope estimation is a quick calculation technique to estimate system capacity and requirements. Interviewers use it to test whether you can reason about scale and make informed design decisions.
+
+### Power of 2 Reference
+
+| Power | Exact Value | Approximate | Name |
+|-------|-------------|-------------|------|
+| 2^10 | 1,024 | ~1 Thousand | 1 KB |
+| 2^20 | 1,048,576 | ~1 Million | 1 MB |
+| 2^30 | 1,073,741,824 | ~1 Billion | 1 GB |
+| 2^40 | ~1.1 × 10^12 | ~1 Trillion | 1 TB |
+| 2^50 | ~1.1 × 10^15 | ~1 Quadrillion | 1 PB |
+
+### Common Data Sizes
+
+| Data Type | Typical Size |
+|-----------|-------------|
+| Character (ASCII) | 1 byte |
+| Character (UTF-8) | 1-4 bytes |
+| Integer | 4-8 bytes |
+| UUID | 16 bytes |
+| Timestamp | 8 bytes |
+| Short string (name) | ~50 bytes |
+| URL | ~100 bytes |
+| Tweet / SMS | ~200 bytes |
+| JSON API response | ~1-10 KB |
+| Compressed image thumbnail | ~10-50 KB |
+| Photo (high quality) | ~2-5 MB |
+| Short video (1 min) | ~50-100 MB |
+| Database row (typical) | ~500 bytes - 2 KB |
+
+### QPS (Queries Per Second) Estimation
+
+```
+Formula: QPS = DAU × queries_per_user / seconds_per_day
+
+Example: Twitter
+  - 500M DAU
+  - Each user views feed 5 times/day, each feed = 10 API calls
+  - Total queries/day = 500M × 50 = 25B
+  - QPS = 25B / 86,400 ≈ 290,000 QPS
+  - Peak QPS ≈ 2 × average ≈ 580,000 QPS
+
+Quick shortcut:
+  - Seconds in a day ≈ 100,000 (actual: 86,400)
+  - 1M requests/day ≈ 10 QPS
+  - 100M requests/day ≈ 1,000 QPS
+  - 1B requests/day ≈ 10,000 QPS
+```
+
+### Storage Estimation
+
+```
+Formula: Storage = records_per_day × record_size × retention_period
+
+Example: Chat application
+  - 500M DAU, 100 messages/user/day
+  - Message size: ~100 bytes (text) + ~100 bytes (metadata) = 200 bytes
+  - Daily: 500M × 100 × 200 bytes = 10TB/day
+  - Yearly: 10TB × 365 = 3.65 PB/year
+  - 5 years with replication (3x): ~55 PB total
+```
+
+### Bandwidth Estimation
+
+```
+Formula: Bandwidth = QPS × avg_response_size
+
+Example: Image serving
+  - 100K QPS, average image = 200KB
+  - Bandwidth = 100,000 × 200KB = 20GB/s = 160 Gbps
+  - With CDN absorbing 90%: origin bandwidth ≈ 16 Gbps
+```
+
+### Server Estimation
+
+```
+Rule of thumb:
+  - 1 web server handles ~1,000-10,000 QPS (depends on complexity)
+  - 1 DB server handles ~1,000-5,000 QPS (depends on query complexity)
+  - 1 cache server (Redis): ~100,000-500,000 QPS
+
+Example: 500K QPS API
+  - App servers: 500K / 5,000 = 100 servers (with headroom: 150)
+  - DB (with read replicas): 1 primary + 10 read replicas
+  - Cache: 500K / 200K = 3 Redis nodes (with replication: 6)
+```
+
+---
+
+## Summary Table
+
+| # | Topic | Key Concepts |
+|---|-------|-------------|
+| 1 | **Scalability** | Vertical vs horizontal scaling, stateless design, load balancing, caching, sharding |
+| 2 | **Reliability** | Replication, failover, circuit breaker, bulkhead, graceful degradation, 99.99% availability |
+| 3 | **Performance** | Caching strategies, latency numbers, CDN, indexing, read replicas, denormalization |
+| 4 | **Distributed Systems** | CAP theorem, consistency models, consensus (Raft/Paxos), gossip protocol |
+| 5 | **Infrastructure** | DNS → CDN → LB → API Gateway → Services → DB; monolith vs microservices |
+| 6 | **APIs** | REST vs GraphQL vs gRPC, HTTP status codes, pagination, idempotency, versioning |
+| 7 | **Databases** | SQL vs NoSQL, sharding strategies, read replicas, choosing the right DB |
+| 8 | **Networking** | TCP/UDP, HTTP/2/3, WebSocket, SSE, DNS, L4 vs L7 load balancing |
+| 9 | **Security** | AuthN/AuthZ, JWT/OAuth, TLS, encryption at rest, OWASP threats, zero trust |
+| 10 | **Estimation** | QPS, storage, bandwidth, server count, powers of 2, latency numbers |
+
+---
+
+## What's Next?
+
+This article covered foundational system design concepts. Continue with:
+
+- **Infrastructure deep dives:** [System Design Interview QA - 2](/posts/system-design/System-Design-Interview-QA-2.html) — load balancing, caching, message queues, Kubernetes, CI/CD, monitoring
+- **Hands-on design problems:** [System Design Interview QA - 3](/posts/system-design/System-Design-Interview-QA-3.html) — URL shortener, chat system, news feed, video streaming, and more
+- **Design patterns:** [Design Pattern Interview QA - 1](/posts/design-pattern/Design-Pattern-Interview-QA-1.html)
+- **Enterprise patterns (Spring, CQRS):** [Design Pattern Interview QA - 2](/posts/design-pattern/Design-Pattern-Interview-QA-2.html)

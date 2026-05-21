@@ -1,0 +1,1624 @@
+---
+title: "Design Pattern Interview QA - 2"
+description: "10 design pattern interview questions covering Spring Framework dependency injection, Inversion of Control, Template Method, State, Facade, Flyweight, Mediator, Repository, MVC, and CQRS patterns with Java and Python examples."
+image: /images/design-pattern/thumb_design_pattern_interview_qa_300.png
+date: "2026-05-21"
+keywords:
+  - "Spring Framework dependency injection"
+  - "Inversion of Control"
+  - "Spring IoC container"
+  - "template method pattern"
+  - "state pattern"
+  - "facade pattern"
+  - "flyweight pattern"
+  - "mediator pattern"
+  - "repository pattern"
+  - "MVC pattern"
+  - "CQRS pattern"
+  - "Spring Boot design patterns"
+---
+
+## Introduction
+
+This is **Part 2** of our Design Pattern Interview QA series, focused on **dependency injection frameworks (Spring)**, **Inversion of Control**, and additional enterprise patterns frequently asked in backend and full-stack interviews.
+
+> For the 10 most commonly asked GoF patterns (Singleton, Factory, Observer, Strategy, Decorator, Adapter, Builder, Command, Chain of Responsibility, Proxy), see [Design Pattern Interview QA - 1](/posts/design-pattern/Design-Pattern-Interview-QA-1.html).
+
+---
+
+## Q1: What is Dependency Injection and how does the Spring Framework implement it?
+
+**Answer:**
+
+**Dependency Injection (DI)** is a design pattern where an object's dependencies are provided from the outside rather than created internally. The **Spring Framework** is the most widely used DI container in Java — it manages object creation, wiring, and lifecycle automatically.
+
+```{mermaid}
+graph TD
+    subgraph Without["Without DI (Tight Coupling)"]
+        A["OrderService"] -->|"new"| B["MySQLOrderRepo()"]
+        A -->|"new"| C["SmtpEmailService()"]
+    end
+
+    subgraph With["With DI (Spring Container)"]
+        CONTAINER["Spring IoC Container"]
+        CONTAINER -->|"injects"| D["OrderService"]
+        CONTAINER -->|"creates"| E["OrderRepository"]
+        CONTAINER -->|"creates"| F["EmailService"]
+        E -.->|"injected into"| D
+        F -.->|"injected into"| D
+    end
+
+    style Without fill:#ff7851,stroke:#333,color:#fff
+    style With fill:#56cc9d,stroke:#333,color:#fff
+    style CONTAINER fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Spring DI: Three Injection Types
+
+```java
+// 1. CONSTRUCTOR INJECTION (recommended by Spring team)
+@Service
+public class OrderService {
+
+    private final OrderRepository orderRepo;
+    private final EmailService emailService;
+
+    // Spring auto-injects matching beans
+    @Autowired // Optional in Spring 4.3+ with single constructor
+    public OrderService(OrderRepository orderRepo, EmailService emailService) {
+        this.orderRepo = orderRepo;
+        this.emailService = emailService;
+    }
+
+    public Order createOrder(OrderRequest request) {
+        Order order = orderRepo.save(new Order(request));
+        emailService.sendConfirmation(order);
+        return order;
+    }
+}
+
+// 2. SETTER INJECTION (for optional dependencies)
+@Service
+public class ReportService {
+
+    private ReportFormatter formatter;
+
+    @Autowired(required = false) // Optional dependency
+    public void setFormatter(ReportFormatter formatter) {
+        this.formatter = formatter;
+    }
+
+    public String generate(List<Data> data) {
+        if (formatter != null) {
+            return formatter.format(data);
+        }
+        return data.toString(); // Fallback
+    }
+}
+
+// 3. FIELD INJECTION (discouraged — hard to test)
+@Service
+public class UserService {
+
+    @Autowired // Injected directly — no constructor or setter
+    private UserRepository userRepo;
+
+    // Hard to test: can't easily provide a mock
+}
+```
+
+### Spring Bean Scopes and Lifecycle
+
+```java
+// Define beans with different scopes
+@Component
+@Scope("singleton") // Default — one instance per container
+public class AppConfig { }
+
+@Component
+@Scope("prototype") // New instance every time it's injected
+public class RequestHandler { }
+
+@Component
+@Scope("request") // One instance per HTTP request (web apps)
+public class RequestContext { }
+
+// Bean lifecycle hooks
+@Component
+public class DatabasePool {
+
+    @PostConstruct // Called after dependency injection
+    public void init() {
+        System.out.println("Initializing connection pool...");
+    }
+
+    @PreDestroy // Called before bean is destroyed
+    public void cleanup() {
+        System.out.println("Closing connections...");
+    }
+}
+```
+
+### Spring Configuration Approaches
+
+```java
+// Approach 1: Annotation-based (most common in Spring Boot)
+@Configuration
+public class AppConfig {
+
+    @Bean
+    public DataSource dataSource() {
+        return new HikariDataSource(hikariConfig());
+    }
+
+    @Bean
+    public OrderRepository orderRepository(DataSource ds) {
+        return new JdbcOrderRepository(ds); // Spring injects DataSource
+    }
+}
+
+// Approach 2: Component scanning
+@SpringBootApplication // Enables @ComponentScan
+public class Application {
+    public static void main(String[] args) {
+        SpringApplication.run(Application.class, args);
+    }
+}
+
+// Approach 3: Profiles for environment-specific beans
+@Configuration
+@Profile("production")
+public class ProdConfig {
+    @Bean
+    public EmailService emailService() {
+        return new SmtpEmailService(); // Real email in production
+    }
+}
+
+@Configuration
+@Profile("test")
+public class TestConfig {
+    @Bean
+    public EmailService emailService() {
+        return new MockEmailService(); // Fake email in tests
+    }
+}
+```
+
+### Testing with Spring DI
+
+```java
+// Unit test — inject mocks manually (no Spring container)
+class OrderServiceTest {
+
+    @Test
+    void shouldCreateOrder() {
+        // Arrange — construct with mocks
+        OrderRepository mockRepo = mock(OrderRepository.class);
+        EmailService mockEmail = mock(EmailService.class);
+        OrderService service = new OrderService(mockRepo, mockEmail);
+
+        when(mockRepo.save(any())).thenReturn(new Order(1L));
+
+        // Act
+        Order order = service.createOrder(new OrderRequest("Widget"));
+
+        // Assert
+        verify(mockRepo).save(any());
+        verify(mockEmail).sendConfirmation(order);
+    }
+}
+
+// Integration test — Spring wires everything
+@SpringBootTest
+class OrderServiceIntegrationTest {
+
+    @Autowired
+    private OrderService orderService; // Spring injects real beans
+
+    @MockBean
+    private EmailService emailService; // Replace with mock
+
+    @Test
+    void shouldCreateOrderWithRealDB() {
+        Order order = orderService.createOrder(new OrderRequest("Gadget"));
+        assertNotNull(order.getId());
+    }
+}
+```
+
+### Why Constructor Injection Is Preferred
+
+| Injection Type | Pros | Cons |
+|---------------|------|------|
+| **Constructor** | Immutable fields; easy to test; fail-fast on missing deps | Verbose with many dependencies |
+| **Setter** | Good for optional deps; reconfigurable | Mutable; easy to forget injection |
+| **Field** | Concise | Cannot test without reflection; hides dependencies |
+
+---
+
+## Q2: What is Inversion of Control (IoC) and how does it relate to DI?
+
+**Answer:**
+
+**Inversion of Control (IoC)** is a broad principle where the flow of control is inverted — instead of your code controlling the creation and wiring of objects, a **framework or container** takes over. **Dependency Injection** is one specific implementation of IoC.
+
+```{mermaid}
+graph TD
+    subgraph Traditional["Traditional Control Flow"]
+        APP["Your Code"]
+        APP -->|"creates"| DEP1["Database"]
+        APP -->|"creates"| DEP2["Logger"]
+        APP -->|"calls"| FRAMEWORK["Framework"]
+    end
+
+    subgraph IoC["Inversion of Control"]
+        CONTAINER["IoC Container<br/>(Spring / FastAPI)"]
+        CONTAINER -->|"creates & injects"| DEP3["Database"]
+        CONTAINER -->|"creates & injects"| DEP4["Logger"]
+        CONTAINER -->|"calls"| YOUR_CODE["Your Code"]
+    end
+
+    style Traditional fill:#ff7851,stroke:#333,color:#fff
+    style IoC fill:#56cc9d,stroke:#333,color:#fff
+    style CONTAINER fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### IoC Implementations
+
+| IoC Type | Mechanism | Example |
+|----------|-----------|---------|
+| **Dependency Injection** | Container injects dependencies | Spring `@Autowired`, FastAPI `Depends()` |
+| **Service Locator** | Object asks container for deps | `ServiceLocator.get(UserRepo.class)` |
+| **Template Method** | Framework calls your overrides | `HttpServlet.doGet()`, Django views |
+| **Event-driven** | Framework calls handlers | Spring `@EventListener`, Observer pattern |
+| **Strategy via config** | Framework picks implementation | Spring profiles, plugin systems |
+
+### Spring IoC Container Architecture
+
+```java
+// The Spring ApplicationContext IS the IoC container
+// It manages the full lifecycle:
+
+// 1. BEAN DEFINITION: Read configuration (annotations, XML, Java config)
+// 2. INSTANTIATION: Create bean instances
+// 3. DEPENDENCY RESOLUTION: Wire dependencies (DI)
+// 4. INITIALIZATION: Call @PostConstruct, InitializingBean
+// 5. READY: Beans available for use
+// 6. DESTRUCTION: Call @PreDestroy on shutdown
+
+// Two main container types:
+// BeanFactory — basic DI, lazy initialization
+// ApplicationContext — extends BeanFactory with:
+//   - Event publishing
+//   - Internationalization (i18n)
+//   - Resource loading
+//   - AOP integration
+
+@SpringBootApplication
+public class MyApp {
+    public static void main(String[] args) {
+        // Creates the IoC container
+        ApplicationContext ctx = SpringApplication.run(MyApp.class, args);
+
+        // Container manages all beans
+        OrderService service = ctx.getBean(OrderService.class);
+        service.createOrder(new OrderRequest("Widget"));
+    }
+}
+```
+
+### IoC in Python (FastAPI Depends)
+
+```python
+from fastapi import FastAPI, Depends
+from typing import Annotated
+
+app = FastAPI()
+
+# Dependencies are functions — FastAPI's IoC container calls them
+def get_db():
+    db = Database("postgres://localhost/mydb")
+    try:
+        yield db  # Injected into endpoint
+    finally:
+        db.close()  # Cleanup (like @PreDestroy)
+
+def get_user_service(db: Database = Depends(get_db)):
+    return UserService(db)  # Composed dependency
+
+# FastAPI resolves the entire dependency tree (IoC)
+@app.get("/users/{user_id}")
+async def get_user(
+    user_id: int,
+    service: Annotated[UserService, Depends(get_user_service)],
+):
+    return service.get_by_id(user_id)
+```
+
+### DI vs Service Locator
+
+| Aspect | Dependency Injection | Service Locator |
+|--------|---------------------|-----------------|
+| Coupling | Low — deps are explicit in constructor | Medium — class depends on locator |
+| Testability | Easy — pass mocks directly | Harder — must configure locator for tests |
+| Transparency | Dependencies visible in API | Dependencies hidden inside methods |
+| Spring approach | `@Autowired` / constructor | `ApplicationContext.getBean()` (discouraged) |
+
+---
+
+## Q3: What is the Template Method Pattern?
+
+**Answer:**
+
+The **Template Method** pattern defines the skeleton of an algorithm in a base class, letting subclasses override specific steps without changing the algorithm's structure. It's a key pattern behind many frameworks (Spring, Django, JUnit).
+
+```{mermaid}
+graph TD
+    ABSTRACT["AbstractClass<br/>(defines template)"]
+    ABSTRACT --> STEP1["step1() — fixed"]
+    ABSTRACT --> STEP2["step2() — abstract<br/>(subclass overrides)"]
+    ABSTRACT --> STEP3["step3() — abstract<br/>(subclass overrides)"]
+    ABSTRACT --> STEP4["step4() — fixed"]
+
+    CONCRETE_A["ConcreteClassA<br/>overrides step2, step3"]
+    CONCRETE_B["ConcreteClassB<br/>overrides step2, step3"]
+
+    ABSTRACT -.-> CONCRETE_A
+    ABSTRACT -.-> CONCRETE_B
+
+    style ABSTRACT fill:#56cc9d,stroke:#333,color:#fff
+    style CONCRETE_A fill:#6cc3d5,stroke:#333,color:#fff
+    style CONCRETE_B fill:#ffce67,stroke:#333
+```
+
+### Java Implementation
+
+```java
+// Template method in an abstract class
+public abstract class DataExporter {
+
+    // TEMPLATE METHOD — defines the algorithm skeleton
+    // Marked final so subclasses can't change the overall flow
+    public final void export(String query) {
+        List<Map<String, Object>> data = fetchData(query);   // Step 1
+        List<Map<String, Object>> transformed = transform(data); // Step 2
+        String formatted = format(transformed);               // Step 3
+        write(formatted);                                     // Step 4
+        cleanup();                                            // Step 5 (hook)
+    }
+
+    // Concrete step — same for all subclasses
+    private List<Map<String, Object>> fetchData(String query) {
+        return database.query(query);
+    }
+
+    // Abstract steps — subclasses MUST implement
+    protected abstract List<Map<String, Object>> transform(
+        List<Map<String, Object>> data
+    );
+    protected abstract String format(List<Map<String, Object>> data);
+    protected abstract void write(String content);
+
+    // Hook method — optional override (default does nothing)
+    protected void cleanup() { }
+}
+
+// Concrete implementation: CSV exporter
+public class CsvExporter extends DataExporter {
+
+    @Override
+    protected List<Map<String, Object>> transform(List<Map<String, Object>> data) {
+        // Remove sensitive columns
+        data.forEach(row -> row.remove("password"));
+        return data;
+    }
+
+    @Override
+    protected String format(List<Map<String, Object>> data) {
+        StringBuilder sb = new StringBuilder();
+        // Header
+        sb.append(String.join(",", data.get(0).keySet())).append("\n");
+        // Rows
+        data.forEach(row ->
+            sb.append(String.join(",",
+                row.values().stream().map(Object::toString).toList()
+            )).append("\n")
+        );
+        return sb.toString();
+    }
+
+    @Override
+    protected void write(String content) {
+        Files.writeString(Path.of("export.csv"), content);
+    }
+}
+
+// Concrete implementation: JSON exporter
+public class JsonExporter extends DataExporter {
+
+    @Override
+    protected List<Map<String, Object>> transform(List<Map<String, Object>> data) {
+        return data; // No transformation needed for JSON
+    }
+
+    @Override
+    protected String format(List<Map<String, Object>> data) {
+        return new ObjectMapper().writeValueAsString(data);
+    }
+
+    @Override
+    protected void write(String content) {
+        Files.writeString(Path.of("export.json"), content);
+    }
+}
+
+// Usage — algorithm structure is fixed, details vary
+DataExporter csvExporter = new CsvExporter();
+csvExporter.export("SELECT * FROM users");
+
+DataExporter jsonExporter = new JsonExporter();
+jsonExporter.export("SELECT * FROM users");
+```
+
+### Python Implementation
+
+```python
+from abc import ABC, abstractmethod
+
+class DataPipeline(ABC):
+    """Template method: extract → validate → transform → load."""
+
+    def run(self, source: str) -> int:
+        """Template method — defines the pipeline skeleton."""
+        raw = self.extract(source)
+        valid = self.validate(raw)
+        transformed = self.transform(valid)
+        count = self.load(transformed)
+        self.on_complete(count)  # Hook
+        return count
+
+    @abstractmethod
+    def extract(self, source: str) -> list[dict]: ...
+
+    def validate(self, data: list[dict]) -> list[dict]:
+        """Default validation — subclasses can override."""
+        return [row for row in data if row]  # Remove empty rows
+
+    @abstractmethod
+    def transform(self, data: list[dict]) -> list[dict]: ...
+
+    @abstractmethod
+    def load(self, data: list[dict]) -> int: ...
+
+    def on_complete(self, count: int) -> None:
+        """Hook — optional override."""
+        pass
+
+class CsvToPostgresPipeline(DataPipeline):
+
+    def extract(self, source: str) -> list[dict]:
+        import csv
+        with open(source) as f:
+            return list(csv.DictReader(f))
+
+    def transform(self, data: list[dict]) -> list[dict]:
+        for row in data:
+            row["email"] = row["email"].lower().strip()
+        return data
+
+    def load(self, data: list[dict]) -> int:
+        db.bulk_insert("users", data)
+        return len(data)
+
+    def on_complete(self, count: int) -> None:
+        print(f"Loaded {count} records into PostgreSQL")
+
+# Run the pipeline
+pipeline = CsvToPostgresPipeline()
+pipeline.run("users.csv")
+```
+
+### Template Method in Frameworks
+
+| Framework | Template Method | You Override |
+|-----------|----------------|-------------|
+| Spring MVC | `DispatcherServlet.doDispatch()` | `@Controller` methods |
+| JUnit | `TestCase.runBare()` | `@Test`, `@BeforeEach` |
+| Django | `View.dispatch()` | `get()`, `post()` |
+| Python `unittest` | `TestCase.run()` | `setUp()`, `test_*()` |
+| Java Servlets | `HttpServlet.service()` | `doGet()`, `doPost()` |
+
+---
+
+## Q4: What is the State Pattern?
+
+**Answer:**
+
+The **State pattern** allows an object to alter its behavior when its internal state changes. The object appears to change its class. It's used to replace complex `if/else` or `switch` chains for state-dependent behavior.
+
+```{mermaid}
+graph TD
+    CONTEXT["Context<br/>(Order)"]
+    CONTEXT --> STATE["Current State"]
+    STATE --> S1["PendingState"]
+    STATE --> S2["PaidState"]
+    STATE --> S3["ShippedState"]
+    STATE --> S4["DeliveredState"]
+    STATE --> S5["CancelledState"]
+
+    S1 -->|"pay()"| S2
+    S2 -->|"ship()"| S3
+    S3 -->|"deliver()"| S4
+    S1 -->|"cancel()"| S5
+
+    style CONTEXT fill:#56cc9d,stroke:#333,color:#fff
+    style STATE fill:#ffce67,stroke:#333
+```
+
+### Implementation: Order State Machine
+
+```python
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from order import Order
+
+# State interface
+class OrderState(ABC):
+    @abstractmethod
+    def pay(self, order: "Order") -> None: ...
+
+    @abstractmethod
+    def ship(self, order: "Order") -> None: ...
+
+    @abstractmethod
+    def deliver(self, order: "Order") -> None: ...
+
+    @abstractmethod
+    def cancel(self, order: "Order") -> None: ...
+
+# Concrete states
+class PendingState(OrderState):
+    def pay(self, order: "Order") -> None:
+        print("Payment processed. Order is now paid.")
+        order.set_state(PaidState())
+
+    def ship(self, order: "Order") -> None:
+        raise InvalidOperationError("Cannot ship — order not yet paid")
+
+    def deliver(self, order: "Order") -> None:
+        raise InvalidOperationError("Cannot deliver — order not yet shipped")
+
+    def cancel(self, order: "Order") -> None:
+        print("Order cancelled.")
+        order.set_state(CancelledState())
+
+class PaidState(OrderState):
+    def pay(self, order: "Order") -> None:
+        raise InvalidOperationError("Order already paid")
+
+    def ship(self, order: "Order") -> None:
+        print("Order shipped.")
+        order.set_state(ShippedState())
+
+    def deliver(self, order: "Order") -> None:
+        raise InvalidOperationError("Cannot deliver — order not yet shipped")
+
+    def cancel(self, order: "Order") -> None:
+        print("Refund issued. Order cancelled.")
+        order.set_state(CancelledState())
+
+class ShippedState(OrderState):
+    def pay(self, order: "Order") -> None:
+        raise InvalidOperationError("Order already paid")
+
+    def ship(self, order: "Order") -> None:
+        raise InvalidOperationError("Order already shipped")
+
+    def deliver(self, order: "Order") -> None:
+        print("Order delivered!")
+        order.set_state(DeliveredState())
+
+    def cancel(self, order: "Order") -> None:
+        raise InvalidOperationError("Cannot cancel — order already shipped")
+
+class DeliveredState(OrderState):
+    def pay(self, order): raise InvalidOperationError("Order completed")
+    def ship(self, order): raise InvalidOperationError("Order completed")
+    def deliver(self, order): raise InvalidOperationError("Already delivered")
+    def cancel(self, order): raise InvalidOperationError("Cannot cancel delivered order")
+
+class CancelledState(OrderState):
+    def pay(self, order): raise InvalidOperationError("Order cancelled")
+    def ship(self, order): raise InvalidOperationError("Order cancelled")
+    def deliver(self, order): raise InvalidOperationError("Order cancelled")
+    def cancel(self, order): raise InvalidOperationError("Already cancelled")
+
+class InvalidOperationError(Exception):
+    pass
+
+# Context
+class Order:
+    def __init__(self, order_id: str):
+        self.order_id = order_id
+        self._state: OrderState = PendingState()
+
+    def set_state(self, state: OrderState) -> None:
+        self._state = state
+
+    @property
+    def status(self) -> str:
+        return type(self._state).__name__.replace("State", "")
+
+    def pay(self) -> None:
+        self._state.pay(self)
+
+    def ship(self) -> None:
+        self._state.ship(self)
+
+    def deliver(self) -> None:
+        self._state.deliver(self)
+
+    def cancel(self) -> None:
+        self._state.cancel(self)
+
+# Usage
+order = Order("ORD-001")
+print(order.status)  # "Pending"
+
+order.pay()
+print(order.status)  # "Paid"
+
+order.ship()
+print(order.status)  # "Shipped"
+
+order.deliver()
+print(order.status)  # "Delivered"
+
+# Invalid transition raises error
+try:
+    order.cancel()  # InvalidOperationError: Cannot cancel delivered order
+except InvalidOperationError as e:
+    print(f"Error: {e}")
+```
+
+### State vs Strategy
+
+| Aspect | State | Strategy |
+|--------|-------|----------|
+| Purpose | Object changes behavior as state changes | Client chooses algorithm |
+| Transitions | States know about and trigger transitions | Client explicitly sets strategy |
+| Awareness | States may know about each other | Strategies are independent |
+| Example | Order lifecycle, TCP connection | Sorting algorithm, compression |
+
+---
+
+## Q5: What is the Facade Pattern?
+
+**Answer:**
+
+The **Facade pattern** provides a simplified interface to a complex subsystem. It doesn't hide the subsystem — it provides a convenient default interface while still allowing direct access when needed.
+
+```{mermaid}
+graph TD
+    CLIENT["Client"]
+    CLIENT --> FACADE["Facade<br/>(simple interface)"]
+    FACADE --> S1["VideoCodec"]
+    FACADE --> S2["AudioCodec"]
+    FACADE --> S3["Muxer"]
+    FACADE --> S4["FileWriter"]
+    FACADE --> S5["MetadataParser"]
+
+    CLIENT2["Advanced Client"]
+    CLIENT2 --> S1
+    CLIENT2 --> S3
+
+    style FACADE fill:#56cc9d,stroke:#333,color:#fff
+    style CLIENT fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Implementation
+
+```python
+# Complex subsystem classes
+class VideoCodec:
+    def decode(self, file: str) -> bytes:
+        print(f"Decoding video from {file}")
+        return b"video_data"
+
+    def encode(self, data: bytes, format: str) -> bytes:
+        print(f"Encoding video to {format}")
+        return b"encoded_video"
+
+class AudioCodec:
+    def extract(self, file: str) -> bytes:
+        print(f"Extracting audio from {file}")
+        return b"audio_data"
+
+    def encode(self, data: bytes, bitrate: int) -> bytes:
+        print(f"Encoding audio at {bitrate}kbps")
+        return b"encoded_audio"
+
+class Muxer:
+    def mux(self, video: bytes, audio: bytes) -> bytes:
+        print("Multiplexing audio and video streams")
+        return b"muxed_data"
+
+class FileWriter:
+    def write(self, data: bytes, output: str) -> None:
+        print(f"Writing to {output}")
+
+# FACADE — simple interface to the complex subsystem
+class VideoConverter:
+    """Facade that hides the complexity of video conversion."""
+
+    def __init__(self):
+        self._video = VideoCodec()
+        self._audio = AudioCodec()
+        self._muxer = Muxer()
+        self._writer = FileWriter()
+
+    def convert(self, input_file: str, output_file: str, format: str = "mp4") -> None:
+        """One method does everything — clients don't need to know the steps."""
+        video_data = self._video.decode(input_file)
+        audio_data = self._audio.extract(input_file)
+
+        encoded_video = self._video.encode(video_data, format)
+        encoded_audio = self._audio.encode(audio_data, bitrate=192)
+
+        muxed = self._muxer.mux(encoded_video, encoded_audio)
+        self._writer.write(muxed, output_file)
+        print(f"Conversion complete: {output_file}")
+
+# Client uses the simple facade
+converter = VideoConverter()
+converter.convert("input.avi", "output.mp4")
+# vs manually orchestrating 5 subsystem objects
+```
+
+### Java: Spring Boot as a Facade
+
+```java
+// Spring Boot itself is a FACADE over the Spring ecosystem!
+// Instead of manually configuring:
+//   - DispatcherServlet
+//   - ViewResolver
+//   - DataSource + JPA EntityManager
+//   - Transaction manager
+//   - Embedded server (Tomcat)
+
+// You just write:
+@SpringBootApplication  // Facade annotation — auto-configures everything
+public class Application {
+    public static void main(String[] args) {
+        SpringApplication.run(Application.class, args);
+    }
+}
+
+// Service facade example:
+@Service
+public class CheckoutFacade {
+
+    private final InventoryService inventory;
+    private final PaymentService payment;
+    private final ShippingService shipping;
+    private final NotificationService notifications;
+
+    public CheckoutFacade(InventoryService inventory, PaymentService payment,
+                          ShippingService shipping, NotificationService notifications) {
+        this.inventory = inventory;
+        this.payment = payment;
+        this.shipping = shipping;
+        this.notifications = notifications;
+    }
+
+    // One method hides the complexity of checkout
+    public OrderResult checkout(Cart cart, PaymentInfo paymentInfo) {
+        inventory.reserve(cart.getItems());
+        PaymentResult payResult = payment.charge(paymentInfo, cart.getTotal());
+        ShipmentTracking tracking = shipping.createShipment(cart);
+        notifications.sendConfirmation(cart.getUserEmail(), tracking);
+        return new OrderResult(payResult.getTransactionId(), tracking.getId());
+    }
+}
+```
+
+### When to Use Facade
+
+| Scenario | Example |
+|----------|---------|
+| Simplify complex library APIs | Video conversion, PDF generation |
+| Decouple client from subsystem | Checkout process hiding 5 services |
+| Provide default configuration | Spring Boot auto-configuration |
+| Layer boundaries | Service layer facade over repositories |
+| Legacy system wrapping | Clean API over messy legacy code |
+
+---
+
+## Q6: What is the Flyweight Pattern?
+
+**Answer:**
+
+The **Flyweight pattern** reduces memory usage by sharing common state across many objects instead of storing it in each instance. It splits object state into **intrinsic** (shared) and **extrinsic** (unique per context) parts.
+
+```{mermaid}
+graph TD
+    FACTORY["Flyweight Factory<br/>(caches shared objects)"]
+    FACTORY --> FW1["Flyweight 'A'<br/>(intrinsic: font, size, color)"]
+    FACTORY --> FW2["Flyweight 'B'"]
+    FACTORY --> FW3["Flyweight 'C'"]
+
+    C1["Context 1<br/>(extrinsic: position x=10, y=20)"]
+    C2["Context 2<br/>(extrinsic: position x=50, y=80)"]
+    C3["Context 3<br/>(extrinsic: position x=30, y=60)"]
+
+    C1 --> FW1
+    C2 --> FW1
+    C3 --> FW2
+
+    NOTE["Contexts 1 & 2 share<br/>the same Flyweight"]
+
+    style FACTORY fill:#56cc9d,stroke:#333,color:#fff
+    style FW1 fill:#6cc3d5,stroke:#333,color:#fff
+    style NOTE fill:#ffce67,stroke:#333
+```
+
+### Implementation: Text Editor Character Rendering
+
+```python
+from dataclasses import dataclass
+
+# Flyweight — stores intrinsic (shared) state
+@dataclass(frozen=True)  # Immutable — safe to share
+class CharacterStyle:
+    """Shared state: font properties that many characters share."""
+    font_family: str
+    font_size: int
+    is_bold: bool
+    is_italic: bool
+    color: str
+
+# Flyweight Factory — caches and reuses styles
+class StyleFactory:
+    _cache: dict[tuple, CharacterStyle] = {}
+
+    @classmethod
+    def get_style(
+        cls,
+        font_family: str = "Arial",
+        font_size: int = 12,
+        is_bold: bool = False,
+        is_italic: bool = False,
+        color: str = "black",
+    ) -> CharacterStyle:
+        key = (font_family, font_size, is_bold, is_italic, color)
+        if key not in cls._cache:
+            cls._cache[key] = CharacterStyle(*key)
+        return cls._cache[key]
+
+    @classmethod
+    def cache_size(cls) -> int:
+        return len(cls._cache)
+
+# Context — stores extrinsic (unique) state
+@dataclass
+class Character:
+    """Each character has unique position but shares style."""
+    char: str
+    row: int
+    col: int
+    style: CharacterStyle  # Reference to shared flyweight
+
+# Usage: 10,000 characters but only a few style objects
+document: list[Character] = []
+
+normal = StyleFactory.get_style()  # Cached
+bold = StyleFactory.get_style(is_bold=True)  # Cached
+heading = StyleFactory.get_style(font_size=24, is_bold=True)  # Cached
+
+# All 'normal' characters share the SAME style object
+for i, char in enumerate("This is a long document with many characters..."):
+    document.append(Character(char, row=0, col=i, style=normal))
+
+# Bold words share the bold style object
+for i, char in enumerate("IMPORTANT"):
+    document.append(Character(char, row=1, col=i, style=bold))
+
+print(f"Characters: {len(document)}")  # 56
+print(f"Unique styles: {StyleFactory.cache_size()}")  # 3 (not 56!)
+
+# Memory saved: 53 fewer CharacterStyle objects
+```
+
+### Java: String Pool as Flyweight
+
+```java
+// Java's String pool IS the Flyweight pattern!
+String a = "hello";  // From string pool
+String b = "hello";  // Same object from pool
+System.out.println(a == b);  // true — same reference
+
+// Integer cache is also Flyweight
+Integer x = Integer.valueOf(127);  // Cached (-128 to 127)
+Integer y = Integer.valueOf(127);
+System.out.println(x == y);  // true — same object from cache
+
+// Boolean.TRUE, Boolean.FALSE — only 2 instances ever
+```
+
+### When to Use Flyweight
+
+| Use When | Don't Use When |
+|----------|----------------|
+| Millions of similar objects | Few objects in memory |
+| Objects share most of their state | Each object is unique |
+| Memory is a bottleneck | CPU is the bottleneck |
+| Immutable shared state | Shared state needs modification |
+| Game particles, text characters, map tiles | Business entities with distinct state |
+
+---
+
+## Q7: What is the Mediator Pattern?
+
+**Answer:**
+
+The **Mediator pattern** reduces chaotic dependencies between objects by forcing them to communicate only through a mediator object. Instead of N objects knowing about each other (N² connections), they all talk through one mediator (N connections).
+
+```{mermaid}
+graph TD
+    subgraph Without["Without Mediator (N² connections)"]
+        A1["Button"] <--> B1["TextBox"]
+        A1 <--> C1["Dropdown"]
+        B1 <--> C1
+        A1 <--> D1["Checkbox"]
+        B1 <--> D1
+        C1 <--> D1
+    end
+
+    subgraph With["With Mediator (N connections)"]
+        M["Mediator<br/>(Dialog)"]
+        A2["Button"] --> M
+        B2["TextBox"] --> M
+        C2["Dropdown"] --> M
+        D2["Checkbox"] --> M
+        M --> A2
+        M --> B2
+        M --> C2
+        M --> D2
+    end
+
+    style Without fill:#ff7851,stroke:#333,color:#fff
+    style With fill:#56cc9d,stroke:#333,color:#fff
+    style M fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Implementation: Chat Room
+
+```python
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from datetime import datetime
+
+# Mediator interface
+class ChatMediator(ABC):
+    @abstractmethod
+    def send_message(self, message: str, sender: "User") -> None: ...
+
+    @abstractmethod
+    def add_user(self, user: "User") -> None: ...
+
+# Concrete mediator
+class ChatRoom(ChatMediator):
+    def __init__(self, name: str):
+        self.name = name
+        self._users: list["User"] = []
+
+    def add_user(self, user: "User") -> None:
+        self._users.append(user)
+        user.chat_room = self
+        self.send_message(f"{user.name} joined the room", user)
+
+    def send_message(self, message: str, sender: "User") -> None:
+        timestamp = datetime.now().strftime("%H:%M")
+        for user in self._users:
+            if user != sender:  # Don't echo to sender
+                user.receive(f"[{timestamp}] {sender.name}: {message}")
+
+# Colleague
+@dataclass
+class User:
+    name: str
+    chat_room: ChatMediator | None = None
+    messages: list[str] = field(default_factory=list)
+
+    def send(self, message: str) -> None:
+        if self.chat_room:
+            self.chat_room.send_message(message, self)
+
+    def receive(self, message: str) -> None:
+        self.messages.append(message)
+        print(f"  {self.name} received: {message}")
+
+# Usage — users don't know about each other, only the mediator
+room = ChatRoom("Engineering")
+
+alice = User("Alice")
+bob = User("Bob")
+charlie = User("Charlie")
+
+room.add_user(alice)
+room.add_user(bob)
+room.add_user(charlie)
+
+alice.send("Hey team, standup in 5 minutes!")
+# Bob received: [10:00] Alice: Hey team, standup in 5 minutes!
+# Charlie received: [10:00] Alice: Hey team, standup in 5 minutes!
+
+bob.send("On my way!")
+# Alice received: [10:00] Bob: On my way!
+# Charlie received: [10:00] Bob: On my way!
+```
+
+### Mediator in Enterprise Systems
+
+```java
+// Spring's ApplicationEventPublisher is a Mediator!
+@Service
+public class OrderService {
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher; // Mediator
+
+    public Order createOrder(OrderRequest request) {
+        Order order = orderRepo.save(new Order(request));
+        // Publish event — OrderService doesn't know who handles it
+        eventPublisher.publishEvent(new OrderCreatedEvent(order));
+        return order;
+    }
+}
+
+// Listeners are decoupled — they don't know about each other
+@Component
+public class InventoryListener {
+    @EventListener
+    public void onOrderCreated(OrderCreatedEvent event) {
+        inventoryService.reserve(event.getOrder().getItems());
+    }
+}
+
+@Component
+public class NotificationListener {
+    @EventListener
+    public void onOrderCreated(OrderCreatedEvent event) {
+        emailService.sendConfirmation(event.getOrder());
+    }
+}
+```
+
+### Mediator vs Observer
+
+| Aspect | Mediator | Observer |
+|--------|----------|----------|
+| Communication | Bidirectional through mediator | One-way (subject → observers) |
+| Coupling | Components know the mediator | Observers don't know each other |
+| Complexity | Mediator can become complex (God object) | Simpler, distributed logic |
+| Example | Chat room, air traffic control | Event bus, pub/sub |
+
+---
+
+## Q8: What is the Repository Pattern?
+
+**Answer:**
+
+The **Repository pattern** mediates between the domain/business layer and data access, providing a collection-like interface for accessing domain objects. It isolates the domain from persistence concerns and is a cornerstone of both Spring Data and Domain-Driven Design.
+
+```{mermaid}
+graph TD
+    SERVICE["Service Layer<br/>(business logic)"]
+    SERVICE --> REPO["Repository Interface<br/>findById(), save(), delete()"]
+    REPO --> IMPL1["JPA Implementation"]
+    REPO --> IMPL2["MongoDB Implementation"]
+    REPO --> IMPL3["In-Memory (tests)"]
+
+    IMPL1 --> DB1["PostgreSQL"]
+    IMPL2 --> DB2["MongoDB"]
+    IMPL3 --> DB3["HashMap"]
+
+    style REPO fill:#56cc9d,stroke:#333,color:#fff
+    style SERVICE fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Spring Data JPA Repository
+
+```java
+// Spring Data auto-generates the implementation!
+@Repository
+public interface UserRepository extends JpaRepository<User, Long> {
+
+    // Method name IS the query — Spring generates SQL
+    List<User> findByEmail(String email);
+
+    List<User> findByRoleAndActiveTrue(String role);
+
+    @Query("SELECT u FROM User u WHERE u.createdAt > :since")
+    List<User> findRecentUsers(@Param("since") LocalDateTime since);
+
+    // Pagination built in
+    Page<User> findByRole(String role, Pageable pageable);
+}
+
+// Entity
+@Entity
+@Table(name = "users")
+public class User {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true)
+    private String email;
+
+    @Column(nullable = false)
+    private String name;
+
+    private String role;
+    private boolean active;
+    private LocalDateTime createdAt;
+
+    // Getters, setters, constructors...
+}
+
+// Service uses repository — doesn't know about JPA/SQL
+@Service
+public class UserService {
+
+    private final UserRepository userRepo;
+
+    public UserService(UserRepository userRepo) {
+        this.userRepo = userRepo;
+    }
+
+    public User createUser(CreateUserRequest request) {
+        if (!userRepo.findByEmail(request.getEmail()).isEmpty()) {
+            throw new DuplicateEmailException(request.getEmail());
+        }
+        User user = new User(request.getName(), request.getEmail());
+        return userRepo.save(user);
+    }
+
+    public Page<User> listAdmins(int page, int size) {
+        return userRepo.findByRole("admin", PageRequest.of(page, size));
+    }
+}
+```
+
+### Python Repository Pattern
+
+```python
+from typing import Protocol, TypeVar, Generic
+from dataclasses import dataclass
+
+T = TypeVar("T")
+
+# Generic repository interface
+class Repository(Protocol[T]):
+    def get_by_id(self, id: int) -> T | None: ...
+    def list_all(self) -> list[T]: ...
+    def save(self, entity: T) -> T: ...
+    def delete(self, id: int) -> bool: ...
+
+# Domain entity
+@dataclass
+class User:
+    id: int | None
+    name: str
+    email: str
+    role: str = "user"
+
+# PostgreSQL implementation
+class PostgresUserRepository:
+    def __init__(self, db_pool):
+        self._pool = db_pool
+
+    async def get_by_id(self, id: int) -> User | None:
+        row = await self._pool.fetchrow(
+            "SELECT * FROM users WHERE id = $1", id
+        )
+        return User(**dict(row)) if row else None
+
+    async def list_all(self) -> list[User]:
+        rows = await self._pool.fetch("SELECT * FROM users")
+        return [User(**dict(r)) for r in rows]
+
+    async def save(self, user: User) -> User:
+        if user.id is None:
+            row = await self._pool.fetchrow(
+                "INSERT INTO users (name, email, role) VALUES ($1, $2, $3) RETURNING id",
+                user.name, user.email, user.role,
+            )
+            user.id = row["id"]
+        else:
+            await self._pool.execute(
+                "UPDATE users SET name=$1, email=$2, role=$3 WHERE id=$4",
+                user.name, user.email, user.role, user.id,
+            )
+        return user
+
+    async def delete(self, id: int) -> bool:
+        result = await self._pool.execute(
+            "DELETE FROM users WHERE id = $1", id
+        )
+        return result == "DELETE 1"
+
+# In-memory implementation (for testing)
+class InMemoryUserRepository:
+    def __init__(self):
+        self._store: dict[int, User] = {}
+        self._next_id = 1
+
+    async def get_by_id(self, id: int) -> User | None:
+        return self._store.get(id)
+
+    async def list_all(self) -> list[User]:
+        return list(self._store.values())
+
+    async def save(self, user: User) -> User:
+        if user.id is None:
+            user.id = self._next_id
+            self._next_id += 1
+        self._store[user.id] = user
+        return user
+
+    async def delete(self, id: int) -> bool:
+        return self._store.pop(id, None) is not None
+
+# Service works with either implementation
+class UserService:
+    def __init__(self, repo: Repository[User]):
+        self._repo = repo
+```
+
+### Repository vs DAO vs Active Record
+
+| Pattern | Description | Example |
+|---------|-------------|---------|
+| **Repository** | Domain-oriented collection interface | Spring Data, custom repos |
+| **DAO** | Table-oriented data access | JDBC DAOs, lower-level |
+| **Active Record** | Entity knows how to persist itself | Django ORM, Rails |
+| **Data Mapper** | Separate mapper objects | SQLAlchemy (mapper mode) |
+
+---
+
+## Q9: What is the MVC Pattern and how does Spring implement it?
+
+**Answer:**
+
+**Model-View-Controller (MVC)** separates an application into three concerns: the **Model** (data + business logic), the **View** (presentation), and the **Controller** (handles input and coordinates model/view).
+
+```{mermaid}
+graph TD
+    USER["User (Browser)"]
+    USER -->|"HTTP Request"| CONTROLLER["Controller<br/>(handles input)"]
+    CONTROLLER -->|"calls"| MODEL["Model / Service<br/>(business logic)"]
+    MODEL -->|"returns data"| CONTROLLER
+    CONTROLLER -->|"selects + populates"| VIEW["View<br/>(renders response)"]
+    VIEW -->|"HTTP Response"| USER
+
+    subgraph Spring["Spring MVC"]
+        DS["DispatcherServlet<br/>(Front Controller)"]
+        DS --> HM["Handler Mapping<br/>(route → controller)"]
+        DS --> HA["Handler Adapter<br/>(invoke controller)"]
+        DS --> VR["View Resolver<br/>(template → HTML)"]
+    end
+
+    style CONTROLLER fill:#56cc9d,stroke:#333,color:#fff
+    style MODEL fill:#6cc3d5,stroke:#333,color:#fff
+    style VIEW fill:#ffce67,stroke:#333
+    style DS fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Spring MVC Implementation
+
+```java
+// MODEL — Entity + Service
+@Entity
+public class Product {
+    @Id @GeneratedValue
+    private Long id;
+    private String name;
+    private BigDecimal price;
+    private int stock;
+    // Getters, setters...
+}
+
+@Service
+public class ProductService {
+    private final ProductRepository repo;
+
+    public ProductService(ProductRepository repo) {
+        this.repo = repo;
+    }
+
+    public List<Product> listAll() { return repo.findAll(); }
+    public Product getById(Long id) {
+        return repo.findById(id)
+            .orElseThrow(() -> new ProductNotFoundException(id));
+    }
+    public Product create(Product product) { return repo.save(product); }
+}
+
+// CONTROLLER — handles HTTP requests
+@RestController  // Returns JSON (no view resolution)
+@RequestMapping("/api/v1/products")
+public class ProductController {
+
+    private final ProductService productService;
+
+    public ProductController(ProductService productService) {
+        this.productService = productService;
+    }
+
+    @GetMapping
+    public List<Product> listProducts() {
+        return productService.listAll();
+    }
+
+    @GetMapping("/{id}")
+    public Product getProduct(@PathVariable Long id) {
+        return productService.getById(id);
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public Product createProduct(@Valid @RequestBody Product product) {
+        return productService.create(product);
+    }
+
+    // Exception handling
+    @ExceptionHandler(ProductNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public Map<String, String> handleNotFound(ProductNotFoundException ex) {
+        return Map.of("error", ex.getMessage());
+    }
+}
+
+// VIEW — for server-side rendering (Thymeleaf)
+@Controller  // Returns view names (not @RestController)
+@RequestMapping("/products")
+public class ProductViewController {
+
+    @GetMapping
+    public String listProducts(Model model) {
+        model.addAttribute("products", productService.listAll());
+        return "products/list";  // → templates/products/list.html
+    }
+
+    @GetMapping("/{id}")
+    public String showProduct(@PathVariable Long id, Model model) {
+        model.addAttribute("product", productService.getById(id));
+        return "products/detail";
+    }
+}
+```
+
+### MVC Variants
+
+| Variant | View Layer | Controller Returns | Example |
+|---------|-----------|-------------------|---------|
+| **MVC** (classic) | Server-side templates | View name + Model | Spring MVC + Thymeleaf |
+| **REST API** (no view) | Client (React, mobile) | JSON directly | `@RestController` |
+| **MVP** | Passive view | Updates view directly | Android (legacy) |
+| **MVVM** | Data-bound view | ViewModel + bindings | WPF, Vue.js, SwiftUI |
+
+---
+
+## Q10: What is the CQRS Pattern?
+
+**Answer:**
+
+**Command Query Responsibility Segregation (CQRS)** splits the data model into separate **command** (write) and **query** (read) models. Writes and reads often have different requirements — CQRS lets you optimize each independently.
+
+```{mermaid}
+graph TD
+    CLIENT["Client"]
+    CLIENT -->|"Write (Command)"| CMD["Command Handler<br/>(validates, applies rules)"]
+    CLIENT -->|"Read (Query)"| QUERY["Query Handler<br/>(optimized for reads)"]
+
+    CMD --> WRITE_DB["Write Model<br/>(normalized, consistent)"]
+    QUERY --> READ_DB["Read Model<br/>(denormalized, fast)"]
+
+    WRITE_DB -->|"Events / Sync"| READ_DB
+
+    style CMD fill:#ff7851,stroke:#333,color:#fff
+    style QUERY fill:#56cc9d,stroke:#333,color:#fff
+    style WRITE_DB fill:#6cc3d5,stroke:#333,color:#fff
+    style READ_DB fill:#ffce67,stroke:#333
+```
+
+### Implementation
+
+```python
+from dataclasses import dataclass, field
+from datetime import datetime
+from abc import ABC, abstractmethod
+
+# COMMANDS (writes)
+@dataclass(frozen=True)
+class CreateOrderCommand:
+    user_id: int
+    items: list[dict]
+    shipping_address: str
+
+@dataclass(frozen=True)
+class CancelOrderCommand:
+    order_id: int
+    reason: str
+
+# Command handler — enforces business rules
+class OrderCommandHandler:
+    def __init__(self, write_repo, event_bus):
+        self._repo = write_repo
+        self._events = event_bus
+
+    def handle_create(self, cmd: CreateOrderCommand) -> int:
+        # Validate business rules
+        if not cmd.items:
+            raise ValueError("Order must have at least one item")
+
+        # Create in write model (normalized)
+        order = Order(
+            user_id=cmd.user_id,
+            items=cmd.items,
+            address=cmd.shipping_address,
+            status="pending",
+            created_at=datetime.now(),
+        )
+        self._repo.save(order)
+
+        # Publish event to sync read model
+        self._events.publish("order_created", order_id=order.id, data=order.to_dict())
+        return order.id
+
+    def handle_cancel(self, cmd: CancelOrderCommand) -> None:
+        order = self._repo.get(cmd.order_id)
+        if order.status == "shipped":
+            raise ValueError("Cannot cancel shipped order")
+        order.status = "cancelled"
+        order.cancel_reason = cmd.reason
+        self._repo.save(order)
+        self._events.publish("order_cancelled", order_id=order.id)
+
+# QUERIES (reads)
+@dataclass(frozen=True)
+class GetOrderQuery:
+    order_id: int
+
+@dataclass(frozen=True)
+class ListUserOrdersQuery:
+    user_id: int
+    page: int = 1
+    page_size: int = 20
+
+# Query handler — optimized for read performance
+class OrderQueryHandler:
+    def __init__(self, read_repo):
+        self._repo = read_repo  # Denormalized read model
+
+    def handle_get(self, query: GetOrderQuery) -> dict:
+        # Read from denormalized view (fast, no JOINs)
+        return self._repo.get_order_view(query.order_id)
+
+    def handle_list(self, query: ListUserOrdersQuery) -> dict:
+        orders, total = self._repo.list_user_orders(
+            query.user_id, query.page, query.page_size
+        )
+        return {"items": orders, "total": total, "page": query.page}
+
+# Read model sync (event listener)
+class OrderReadModelUpdater:
+    """Listens to write events and updates the denormalized read model."""
+
+    def __init__(self, read_repo):
+        self._repo = read_repo
+
+    def on_order_created(self, event: dict) -> None:
+        # Denormalize: pre-join user name, item details, totals
+        self._repo.upsert_order_view({
+            "order_id": event["order_id"],
+            "user_name": user_service.get_name(event["data"]["user_id"]),
+            "items_summary": summarize_items(event["data"]["items"]),
+            "total": calculate_total(event["data"]["items"]),
+            "status": "pending",
+            "created_at": event["data"]["created_at"],
+        })
+
+# API layer
+@app.post("/api/v1/orders", status_code=201)
+async def create_order(cmd: CreateOrderCommand):
+    order_id = command_handler.handle_create(cmd)
+    return {"order_id": order_id}
+
+@app.get("/api/v1/orders/{order_id}")
+async def get_order(order_id: int):
+    return query_handler.handle_get(GetOrderQuery(order_id))
+```
+
+### Spring CQRS with Separate Models
+
+```java
+// Write model — normalized, validated
+@Entity
+@Table(name = "orders")
+public class Order {
+    @Id @GeneratedValue
+    private Long id;
+    private Long userId;
+    @OneToMany(cascade = CascadeType.ALL)
+    private List<OrderItem> items;
+    private String status;
+    private LocalDateTime createdAt;
+}
+
+// Read model — denormalized for fast queries
+@Entity
+@Table(name = "order_views")
+public class OrderView {
+    @Id
+    private Long orderId;
+    private String userName;       // Pre-joined
+    private String itemsSummary;   // Pre-computed
+    private BigDecimal total;      // Pre-calculated
+    private String status;
+    private LocalDateTime createdAt;
+}
+
+// Separate repositories
+@Repository
+public interface OrderRepository extends JpaRepository<Order, Long> { }
+
+@Repository
+public interface OrderViewRepository extends JpaRepository<OrderView, Long> {
+    Page<OrderView> findByUserNameContaining(String name, Pageable pageable);
+}
+```
+
+### When to Use CQRS
+
+| Use CQRS | Don't Use CQRS |
+|----------|----------------|
+| Read and write workloads differ significantly | Simple CRUD applications |
+| Read model needs denormalization | Reads and writes have same shape |
+| Scaling reads and writes independently | Small teams / simple domains |
+| Event sourcing architecture | When eventual consistency is unacceptable |
+| Complex reporting / search requirements | When added complexity isn't justified |
+
+---
+
+## Summary Table
+
+| # | Pattern | Category | Key Idea |
+|---|---------|----------|----------|
+| 1 | **Spring DI** | IoC / Creational | Container injects dependencies via `@Autowired` / constructor |
+| 2 | **Inversion of Control** | Principle | Framework controls object creation and flow |
+| 3 | **Template Method** | Behavioral | Algorithm skeleton in base class, steps in subclasses |
+| 4 | **State** | Behavioral | Object behavior changes with internal state transitions |
+| 5 | **Facade** | Structural | Simplified interface to a complex subsystem |
+| 6 | **Flyweight** | Structural | Share common state across many objects to save memory |
+| 7 | **Mediator** | Behavioral | Central hub reduces N² dependencies to N |
+| 8 | **Repository** | Data Access | Collection-like interface isolating domain from persistence |
+| 9 | **MVC** | Architectural | Separate Model, View, Controller concerns |
+| 10 | **CQRS** | Architectural | Separate read and write models for independent optimization |
+
+---
+
+## What's Next?
+
+This article covered enterprise and framework-level patterns. For related content:
+
+- **Core GoF patterns:** [Design Pattern Interview QA - 1](/posts/design-pattern/Design-Pattern-Interview-QA-1.html)
+- **Python design patterns (Pythonic style):** [Python SWE Interview QA - 3](/posts/swe-interview/Python-SWE-Interview-QA-3.html)
+- **Production API patterns:** [Python SWE Interview QA - 4](/posts/swe-interview/Python-SWE-Interview-QA-4.html)
+- **Python fundamentals:** [Python SWE Interview QA - 1](/posts/swe-interview/Python-SWE-Interview-QA-1.html)
+- **LLM architecture:** [LLM Interview QA - 1](/posts/llm-interview/LLM-Interview-QA-1.html)

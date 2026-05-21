@@ -1,0 +1,871 @@
+---
+title: "System Design Interview QA - 3"
+description: "10 most-asked system design interview questions covering URL shortener, rate limiter, chat system, social media feed, file storage, video streaming, notification system, search autocomplete, key-value store, and API gateway."
+image: /images/system-design/thumb_system_design_interview_qa_300.png
+date: "2026-05-21"
+keywords:
+  - "system design interview"
+  - "design URL shortener"
+  - "design rate limiter"
+  - "design chat system"
+  - "design Twitter feed"
+  - "design Dropbox"
+  - "design YouTube"
+  - "design notification system"
+  - "CAP theorem"
+  - "load balancing"
+  - "database sharding"
+  - "distributed systems"
+  - "FAANG interview"
+---
+
+## Introduction
+
+This is **Part 3** of our System Design Interview QA series, covering the **10 most frequently asked system design questions** at FAANG+ companies. Each question follows the proven 4-step framework: **Requirements → High-Level Design → Deep Dive → Trade-offs**.
+
+> For foundational concepts, see [System Design Interview QA - 1](/posts/system-design/System-Design-Interview-QA-1.html). For infrastructure deep dives, see [System Design Interview QA - 2](/posts/system-design/System-Design-Interview-QA-2.html). For design patterns, see [Design Pattern Interview QA - 1](/posts/design-pattern/Design-Pattern-Interview-QA-1.html).
+
+---
+
+## Q1: Design a URL Shortener (TinyURL)
+
+**Answer:**
+
+A URL shortener maps long URLs to short, unique aliases (e.g., `https://tiny.url/a1b2c3`) and redirects users to the original URL.
+
+```{mermaid}
+graph TD
+    USER["User"]
+    USER -->|"POST /shorten<br/>{url: 'https://very-long-url.com/...'}"| API["API Service"]
+    API --> KEYGEN["Key Generator<br/>(Base62 encoding)"]
+    API --> DB["Database<br/>(short_code → original_url)"]
+    API -->|"Returns: tiny.url/a1b2c3"| USER
+
+    USER2["Visitor"]
+    USER2 -->|"GET /a1b2c3"| LB["Load Balancer"]
+    LB --> CACHE["Cache (Redis)<br/>(hot URLs)"]
+    CACHE -->|"miss"| DB
+    LB -->|"301 Redirect"| USER2
+
+    style API fill:#56cc9d,stroke:#333,color:#fff
+    style CACHE fill:#ffce67,stroke:#333
+    style DB fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Requirements
+
+| Type | Requirement |
+|------|-------------|
+| **Functional** | Shorten a URL → return short link; Redirect short link → original URL; Optional: custom aliases, expiration, analytics |
+| **Non-functional** | Low latency redirects (<100ms); High availability (99.99%); 100M URLs/day write, 10:1 read-to-write ratio |
+| **Capacity** | ~1B URLs/year; ~1KB per record → ~1TB storage/year; ~100K reads/sec peak |
+
+### Key Design Decisions
+
+```
+Short Code Generation:
+  Option A: Hash (MD5/SHA256) → take first 7 chars → collision check
+  Option B: Pre-generated key service (counter-based, Base62 encoded)
+  Option C: Snowflake ID → Base62 encode
+
+  Recommended: Counter-based with Base62 encoding
+    - 7 chars of Base62 = 62^7 = ~3.5 trillion unique codes
+    - No collision checking needed
+    - Monotonically increasing → good for DB indexing
+```
+
+### Database Schema
+
+```sql
+-- URLs table
+CREATE TABLE urls (
+    short_code  VARCHAR(7) PRIMARY KEY,  -- Base62 encoded
+    original_url TEXT NOT NULL,
+    user_id     BIGINT,
+    created_at  TIMESTAMP DEFAULT NOW(),
+    expires_at  TIMESTAMP,
+    click_count BIGINT DEFAULT 0
+);
+
+-- Analytics (separate table for write performance)
+CREATE TABLE clicks (
+    id          BIGSERIAL PRIMARY KEY,
+    short_code  VARCHAR(7),
+    clicked_at  TIMESTAMP DEFAULT NOW(),
+    user_agent  TEXT,
+    ip_address  INET,
+    referrer    TEXT
+);
+```
+
+### Trade-offs
+
+| Decision | Option A | Option B | Recommendation |
+|----------|----------|----------|----------------|
+| **Storage** | SQL (PostgreSQL) | NoSQL (DynamoDB) | NoSQL for scale — simple key-value access pattern |
+| **Redirect** | 301 (permanent) | 302 (temporary) | 302 if you need analytics; 301 for caching |
+| **Caching** | Cache all | Cache hot URLs only | Cache hot URLs in Redis (80/20 rule) |
+| **ID generation** | Centralized counter | Distributed (Snowflake) | Distributed for multi-region |
+
+---
+
+## Q2: Design a Rate Limiter
+
+**Answer:**
+
+A rate limiter controls the rate of requests a client can send to an API, protecting against abuse, DDoS attacks, and resource exhaustion.
+
+```{mermaid}
+graph TD
+    CLIENT["Client"]
+    CLIENT --> RL["Rate Limiter<br/>(middleware / API gateway)"]
+    RL -->|"Under limit"| API["API Servers"]
+    RL -->|"Over limit"| REJECT["429 Too Many Requests<br/>Retry-After: 30"]
+    RL --> STORE["Rules & Counter Store<br/>(Redis)"]
+
+    subgraph Algorithms
+        A1["Fixed Window"]
+        A2["Sliding Window Log"]
+        A3["Sliding Window Counter"]
+        A4["Token Bucket"]
+        A5["Leaky Bucket"]
+    end
+
+    style RL fill:#56cc9d,stroke:#333,color:#fff
+    style REJECT fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Requirements
+
+| Type | Requirement |
+|------|-------------|
+| **Functional** | Limit requests per client (IP, user ID, API key); Return rate limit headers; Support different limits per endpoint |
+| **Non-functional** | Ultra-low latency (<1ms overhead); Distributed (works across multiple servers); Highly available; Accurate counting |
+
+### Algorithm Comparison
+
+| Algorithm | How It Works | Pros | Cons |
+|-----------|-------------|------|------|
+| **Fixed Window** | Count requests in fixed time windows (e.g., per minute) | Simple, low memory | Burst at window boundaries (2x allowed) |
+| **Sliding Window Log** | Store timestamp of each request, count in sliding window | Accurate | High memory (stores all timestamps) |
+| **Sliding Window Counter** | Weighted count across current + previous window | Accurate + low memory | Approximate |
+| **Token Bucket** | Tokens added at fixed rate, each request consumes one | Allows controlled bursts | Slightly complex |
+| **Leaky Bucket** | Requests queue and process at fixed rate | Smooth output rate | Doesn't allow bursts |
+
+### Token Bucket Design (Recommended)
+
+```python
+# Redis-based Token Bucket (distributed)
+# Key: rate_limit:{client_id}
+# Fields: tokens (float), last_refill (timestamp)
+
+async def is_allowed(redis, client_id: str, max_tokens: int, refill_rate: float) -> bool:
+    """
+    max_tokens: bucket capacity (e.g., 100)
+    refill_rate: tokens per second (e.g., 10)
+    """
+    key = f"rate_limit:{client_id}"
+    now = time.time()
+
+    # Lua script for atomicity (no race conditions)
+    lua_script = """
+    local tokens = tonumber(redis.call('hget', KEYS[1], 'tokens') or ARGV[1])
+    local last_refill = tonumber(redis.call('hget', KEYS[1], 'last_refill') or ARGV[3])
+    local now = tonumber(ARGV[3])
+    local max_tokens = tonumber(ARGV[1])
+    local refill_rate = tonumber(ARGV[2])
+
+    -- Refill tokens based on elapsed time
+    local elapsed = now - last_refill
+    tokens = math.min(max_tokens, tokens + elapsed * refill_rate)
+
+    if tokens >= 1 then
+        tokens = tokens - 1
+        redis.call('hset', KEYS[1], 'tokens', tokens, 'last_refill', now)
+        redis.call('expire', KEYS[1], 3600)
+        return 1  -- Allowed
+    else
+        redis.call('hset', KEYS[1], 'tokens', tokens, 'last_refill', now)
+        return 0  -- Rejected
+    end
+    """
+    result = await redis.eval(lua_script, 1, key, max_tokens, refill_rate, now)
+    return result == 1
+```
+
+### Where to Place the Rate Limiter
+
+| Location | Pros | Cons |
+|----------|------|------|
+| **API Gateway** (recommended) | Centralized, handles all services | Single point of failure |
+| **Middleware** (per service) | Fine-grained, service-specific rules | Each service must implement |
+| **Client-side** | Reduces unnecessary requests | Can be bypassed |
+| **CDN/Edge** | Stops attacks before reaching origin | Limited rule flexibility |
+
+---
+
+## Q3: Design a Chat/Messaging System (WhatsApp)
+
+**Answer:**
+
+A real-time messaging system supports 1-on-1 and group messaging with delivery guarantees, presence tracking, and message persistence.
+
+```{mermaid}
+graph TD
+    SENDER["Sender (Alice)"]
+    SENDER -->|"WebSocket"| GW1["Chat Gateway<br/>(maintains connections)"]
+    GW1 --> MQ["Message Queue<br/>(Kafka)"]
+    MQ --> ROUTER["Message Router<br/>(fan-out service)"]
+    ROUTER --> GW2["Chat Gateway<br/>(Bob's server)"]
+    GW2 -->|"WebSocket"| RECEIVER["Receiver (Bob)"]
+
+    MQ --> DB["Message Store<br/>(Cassandra)"]
+    ROUTER -.->|"Bob offline"| PUSH["Push Notification<br/>(APNs / FCM)"]
+
+    style GW1 fill:#56cc9d,stroke:#333,color:#fff
+    style MQ fill:#ffce67,stroke:#333
+    style DB fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Requirements
+
+| Type | Requirement |
+|------|-------------|
+| **Functional** | 1-on-1 messaging; Group chat (up to 500 members); Sent/Delivered/Read receipts; Online/offline presence; Message history |
+| **Non-functional** | Low latency (<300ms end-to-end); High availability (99.99%); Eventual consistency acceptable; 50B messages/day |
+| **Capacity** | 500M DAU; 100 messages/user/day; ~100 bytes/message → ~5TB/day |
+
+### Key Components
+
+| Component | Technology | Purpose |
+|-----------|-----------|---------|
+| **Connection layer** | WebSocket servers | Persistent bidirectional connections |
+| **Message queue** | Kafka | Decouple send/receive, handle spikes |
+| **Message store** | Cassandra | Write-heavy, append-only, partitioned by chat_id |
+| **User presence** | Redis | Track online/offline status with TTL |
+| **Push notifications** | APNs/FCM | Deliver to offline users |
+| **Media storage** | S3 + CDN | Images, videos, voice notes |
+
+### Message Delivery Flow
+
+```
+1. Alice sends message via WebSocket → Chat Gateway
+2. Gateway publishes to Kafka topic (partitioned by chat_id)
+3. Message Router consumes from Kafka:
+   a. Persist message to Cassandra (status: "sent")
+   b. Look up Bob's connection in Session Store (Redis)
+   c. If online → push via WebSocket → update status: "delivered"
+   d. If offline → send push notification
+4. Bob opens app → fetch undelivered messages → update: "delivered"
+5. Bob reads message → client sends ACK → update: "read"
+```
+
+### Group Messaging Fan-out
+
+| Strategy | How It Works | Best For |
+|----------|-------------|----------|
+| **Fan-out on write** | Copy message to each member's inbox at send time | Small groups (<100 members) |
+| **Fan-out on read** | Store once, recipients pull on connect | Large groups / channels |
+| **Hybrid** | Fan-out on write for small groups, on read for large | Production systems (WhatsApp) |
+
+---
+
+## Q4: Design a Social Media News Feed (Twitter/Instagram)
+
+**Answer:**
+
+A news feed system aggregates and ranks posts from users you follow, delivering a personalized, near real-time content stream.
+
+```{mermaid}
+graph TD
+    POSTER["User Posts Tweet"]
+    POSTER --> PS["Post Service"]
+    PS --> DB["Post Store"]
+    PS --> FANOUT["Fan-out Service"]
+    FANOUT --> CACHE["Feed Cache<br/>(per user, Redis)"]
+
+    READER["User Opens Feed"]
+    READER --> FS["Feed Service"]
+    FS --> CACHE
+    FS --> RANK["Ranking Service<br/>(ML model)"]
+    RANK --> FEED["Merged &<br/>Ranked Feed"]
+
+    style FANOUT fill:#56cc9d,stroke:#333,color:#fff
+    style CACHE fill:#ffce67,stroke:#333
+    style RANK fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Requirements
+
+| Type | Requirement |
+|------|-------------|
+| **Functional** | Create posts (text, images, video); Follow/unfollow users; View personalized news feed; Like, comment, share |
+| **Non-functional** | Feed generation <500ms; High availability; 500M DAU; Eventual consistency acceptable |
+| **Capacity** | 2 posts/user/day → 1B posts/day; Average 300 followers; Feed shows top 20 posts |
+
+### Fan-out Strategy: The Core Decision
+
+```{mermaid}
+graph LR
+    subgraph FanOutWrite["Fan-out on Write (Push)"]
+        POST1["New Post"] --> COPY["Copy to all<br/>followers' feeds"]
+        COPY --> F1["Alice's Feed Cache"]
+        COPY --> F2["Bob's Feed Cache"]
+        COPY --> F3["Carol's Feed Cache"]
+    end
+
+    subgraph FanOutRead["Fan-out on Read (Pull)"]
+        OPEN["Open Feed"] --> FETCH["Fetch posts from<br/>all followed users"]
+        FETCH --> M1["User A's posts"]
+        FETCH --> M2["User B's posts"]
+        FETCH --> M3["User C's posts"]
+    end
+
+    style FanOutWrite fill:#56cc9d,stroke:#333,color:#fff
+    style FanOutRead fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+| Aspect | Fan-out on Write (Push) | Fan-out on Read (Pull) |
+|--------|------------------------|----------------------|
+| **When** | At post creation time | At feed request time |
+| **Latency** | Fast reads (pre-computed) | Slow reads (compute on demand) |
+| **Write cost** | High (copy to all followers) | Low (store once) |
+| **Hot users** | Celebrity with 50M followers → 50M writes | No write amplification |
+| **Best for** | Normal users (<10K followers) | Celebrities / high-follower users |
+
+### Hybrid Approach (Twitter/Instagram's Actual Design)
+
+```
+Normal users (<10K followers):
+  → Fan-out on write: pre-compute feed for all followers
+  → Feed is ready when they open the app
+
+Celebrity users (>10K followers):
+  → Fan-out on read: don't pre-compute
+  → When user opens feed, merge:
+      - Pre-computed feed (from normal users they follow)
+      - On-demand fetch (from celebrities they follow)
+  → Rank the merged result
+```
+
+### Feed Ranking
+
+| Signal | Weight | Source |
+|--------|--------|--------|
+| Recency | High | Post timestamp |
+| Engagement | High | Likes, comments, shares on the post |
+| Relationship | Medium | Interaction history with poster |
+| Content type | Medium | User preference (video vs text) |
+| Diversity | Low | Avoid showing too many posts from one user |
+
+---
+
+## Q5: Design a File Storage System (Dropbox/Google Drive)
+
+**Answer:**
+
+A cloud file storage system lets users upload, download, and sync files across devices with high reliability and global availability.
+
+```{mermaid}
+graph TD
+    CLIENT["Desktop / Mobile Client"]
+    CLIENT -->|"Upload (chunked)"| API["API Gateway"]
+    API --> META["Metadata Service"]
+    META --> METADB["Metadata DB<br/>(MySQL)"]
+    API --> UPLOAD["Upload Service"]
+    UPLOAD --> QUEUE["Upload Queue"]
+    QUEUE --> STORE["Object Storage<br/>(S3)"]
+
+    CLIENT2["Another Device"]
+    CLIENT2 --> SYNC["Sync Service"]
+    SYNC --> NOTIFY["Notification Service<br/>(WebSocket / Long Poll)"]
+    SYNC --> CDN["CDN<br/>(Download cache)"]
+
+    style API fill:#56cc9d,stroke:#333,color:#fff
+    style STORE fill:#6cc3d5,stroke:#333,color:#fff
+    style NOTIFY fill:#ffce67,stroke:#333
+```
+
+### Requirements
+
+| Type | Requirement |
+|------|-------------|
+| **Functional** | Upload/download files; Sync across devices; File versioning; Share files/folders |
+| **Non-functional** | High reliability (no data loss); Low latency downloads; Support files up to 10GB; 100M users, 1M DAU |
+| **Capacity** | 1 file/user/day, avg 5MB → 5TB/day; Total storage: ~1.5PB |
+
+### Chunked Upload Design
+
+```
+Why chunking?
+  - Resume interrupted uploads (mobile networks)
+  - Deduplicate at chunk level (save storage)
+  - Parallel upload of chunks (faster)
+  - Delta sync: only upload changed chunks
+
+Chunk size: 4MB (balance between overhead and resume granularity)
+
+Upload flow:
+  1. Client splits file into 4MB chunks
+  2. Client computes SHA-256 hash per chunk
+  3. Client asks server: "Do you have chunk with hash X?"
+     - Yes → skip (deduplication)
+     - No → upload chunk
+  4. After all chunks uploaded → server assembles file
+  5. Server updates metadata DB with file record
+  6. Notification service alerts other devices to sync
+```
+
+### Data Model
+
+```sql
+-- Files metadata
+CREATE TABLE files (
+    file_id     UUID PRIMARY KEY,
+    user_id     BIGINT NOT NULL,
+    filename    VARCHAR(255),
+    path        TEXT,
+    size_bytes  BIGINT,
+    checksum    VARCHAR(64),
+    version     INT DEFAULT 1,
+    created_at  TIMESTAMP,
+    updated_at  TIMESTAMP
+);
+
+-- File chunks (for dedup and resume)
+CREATE TABLE chunks (
+    chunk_hash  VARCHAR(64) PRIMARY KEY,  -- SHA-256
+    size_bytes  INT,
+    s3_location TEXT,
+    ref_count   INT DEFAULT 1  -- for garbage collection
+);
+
+-- File-to-chunk mapping
+CREATE TABLE file_chunks (
+    file_id     UUID,
+    chunk_index INT,
+    chunk_hash  VARCHAR(64),
+    PRIMARY KEY (file_id, chunk_index)
+);
+```
+
+### Sync and Conflict Resolution
+
+| Scenario | Resolution Strategy |
+|----------|-------------------|
+| Same file edited on 2 devices | Create conflict copy with timestamp |
+| File deleted on one device, edited on another | Keep the edited version, log deletion |
+| Concurrent uploads of same new file | Last-write-wins or merge (depends on file type) |
+| Offline edits | Queue changes locally, sync when online |
+
+---
+
+## Q6: Design a Video Streaming Platform (YouTube/Netflix)
+
+**Answer:**
+
+A video streaming platform handles upload, transcoding, storage, and adaptive delivery of video content to millions of concurrent viewers.
+
+```{mermaid}
+graph TD
+    CREATOR["Content Creator"]
+    CREATOR -->|"Upload video"| UPLOAD["Upload Service"]
+    UPLOAD --> QUEUE["Transcoding Queue<br/>(SQS/Kafka)"]
+    QUEUE --> TRANSCODE["Transcoding Workers<br/>(multiple resolutions)"]
+    TRANSCODE --> STORE["Object Storage<br/>(S3 / GCS)"]
+    STORE --> CDN["CDN<br/>(Edge servers worldwide)"]
+
+    VIEWER["Viewer"]
+    VIEWER -->|"Adaptive bitrate"| CDN
+    VIEWER --> API["API Service<br/>(metadata, search, recommendations)"]
+    API --> METADB["Metadata DB"]
+
+    style TRANSCODE fill:#56cc9d,stroke:#333,color:#fff
+    style CDN fill:#ffce67,stroke:#333
+    style STORE fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Requirements
+
+| Type | Requirement |
+|------|-------------|
+| **Functional** | Upload videos; Stream videos (adaptive bitrate); Search and browse; Like, comment, subscribe |
+| **Non-functional** | Low startup latency (<2s); Smooth playback (no buffering); Global availability; 1B DAU, 5M videos uploaded/day |
+| **Capacity** | Avg video: 200MB raw → 500MB transcoded (multiple resolutions); ~1PB new storage/day |
+
+### Video Processing Pipeline
+
+```
+Upload → Original Storage → Transcoding → CDN Distribution
+
+Transcoding outputs (per video):
+  ┌────────────────────────────────────────┐
+  │ Resolution   Bitrate    File Size      │
+  │ 360p         800 kbps   ~50MB          │
+  │ 480p         1.5 Mbps   ~100MB         │
+  │ 720p         3 Mbps     ~200MB         │
+  │ 1080p        6 Mbps     ~400MB         │
+  │ 4K           20 Mbps    ~1.5GB         │
+  └────────────────────────────────────────┘
+  + Audio tracks (multiple languages)
+  + Subtitles (multiple languages)
+  + Thumbnail generation (every 10s for preview)
+```
+
+### Adaptive Bitrate Streaming (ABR)
+
+```{mermaid}
+graph LR
+    CLIENT["Video Player"]
+    CLIENT -->|"Measures bandwidth"| ABR["ABR Algorithm<br/>(DASH / HLS)"]
+    ABR -->|"Good network"| HD["1080p chunks"]
+    ABR -->|"Poor network"| SD["480p chunks"]
+    ABR -->|"Very poor"| LOW["360p chunks"]
+
+    style ABR fill:#56cc9d,stroke:#333,color:#fff
+```
+
+| Protocol | Used By | Segment Size |
+|----------|---------|-------------|
+| **HLS** (HTTP Live Streaming) | Apple, most platforms | 2-10s segments |
+| **DASH** (Dynamic Adaptive Streaming) | YouTube, Netflix | 2-10s segments |
+
+### CDN Strategy
+
+| Approach | Description |
+|----------|-------------|
+| **Push popular content** | Pre-load trending videos to edge servers |
+| **Pull on demand** | Edge fetches from origin on first request, then caches |
+| **Regional origin** | Multiple origin servers in different regions |
+| **Long tail** | Less popular content served from fewer / central CDN nodes |
+
+---
+
+## Q7: Design a Notification System
+
+**Answer:**
+
+A notification system delivers timely, relevant notifications across multiple channels (push, SMS, email) to billions of users.
+
+```{mermaid}
+graph TD
+    TRIGGER["Event Triggers<br/>(order shipped, new follower, etc.)"]
+    TRIGGER --> NS["Notification Service"]
+    NS --> PREF["User Preferences<br/>(channels, frequency, opt-outs)"]
+    NS --> TEMPLATE["Template Service<br/>(personalize message)"]
+    NS --> QUEUE["Priority Queues<br/>(Kafka / SQS)"]
+
+    QUEUE --> PUSH["Push Worker<br/>(APNs / FCM)"]
+    QUEUE --> SMS["SMS Worker<br/>(Twilio)"]
+    QUEUE --> EMAIL["Email Worker<br/>(SES / SendGrid)"]
+
+    PUSH --> USER["User Device"]
+    SMS --> USER
+    EMAIL --> USER
+
+    style NS fill:#56cc9d,stroke:#333,color:#fff
+    style QUEUE fill:#ffce67,stroke:#333
+```
+
+### Requirements
+
+| Type | Requirement |
+|------|-------------|
+| **Functional** | Multi-channel: push, SMS, email, in-app; User preferences and opt-out; Notification templates; Rate limiting per user |
+| **Non-functional** | Soft real-time (<30s for push, minutes for email); At-least-once delivery; 10B notifications/day; Pluggable providers |
+
+### Architecture Deep Dive
+
+```
+Event flow:
+  1. Service emits event: {"type": "order_shipped", "user_id": 123, "data": {...}}
+  2. Notification Service:
+     a. Check user preferences (opted-in channels, quiet hours)
+     b. Check rate limits (max 5 push/hour per user)
+     c. Render template with user data
+     d. Enqueue to channel-specific queues with priority
+  3. Channel workers:
+     a. Dequeue message
+     b. Call provider API (APNs, Twilio, SES)
+     c. Handle retries with exponential backoff
+     d. Log delivery status
+  4. Analytics:
+     - Track: sent, delivered, opened, clicked, unsubscribed
+```
+
+### Handling Scale and Reliability
+
+| Challenge | Solution |
+|-----------|---------|
+| Provider failures | Retry with exponential backoff + fallback providers |
+| Duplicate notifications | Idempotency key per notification (dedup in Redis) |
+| Quiet hours / time zones | Store user timezone, schedule delivery accordingly |
+| Notification fatigue | Rate limiting + batching (digest emails) |
+| Provider rate limits | Queue with controlled concurrency per provider |
+| Delivery tracking | Webhook callbacks from providers + polling |
+
+---
+
+## Q8: Design a Search Autocomplete System
+
+**Answer:**
+
+An autocomplete system suggests query completions in real time as users type, based on popularity, personalization, and recency.
+
+```{mermaid}
+graph TD
+    USER["User types: 'syst'"]
+    USER --> API["Autocomplete API<br/>(<100ms response)"]
+    API --> CACHE["Local Cache<br/>(per server)"]
+    CACHE -->|"miss"| TRIE["Trie Service<br/>(in-memory)"]
+    TRIE --> RESULTS["Top-K results:<br/>1. system design<br/>2. systems programming<br/>3. systematic review"]
+
+    subgraph Offline["Offline Pipeline (hourly)"]
+        LOGS["Search Logs"] --> AGG["Aggregation<br/>(MapReduce)"]
+        AGG --> BUILD["Build Trie<br/>(top queries)"]
+        BUILD --> DEPLOY["Deploy to<br/>Trie Servers"]
+    end
+
+    style API fill:#56cc9d,stroke:#333,color:#fff
+    style TRIE fill:#6cc3d5,stroke:#333,color:#fff
+    style Offline fill:#ffce67,stroke:#333
+```
+
+### Requirements
+
+| Type | Requirement |
+|------|-------------|
+| **Functional** | Return top 5-10 suggestions per prefix; Rank by popularity / recency / personalization; Handle misspellings (fuzzy match) |
+| **Non-functional** | P99 latency <100ms; Support 100K QPS; Update suggestions without downtime |
+
+### Trie Data Structure
+
+```
+Trie for ["system", "systems", "syslog", "syntax"]:
+
+         root
+          |
+          s
+          |
+          y
+         / \
+        s    n
+        |    |
+        t    t
+        |    |
+        e    a
+        |    |
+        m    x
+       /
+      s
+
+Each node stores:
+  - Character
+  - Top-K queries passing through this prefix
+  - Frequency / score for ranking
+```
+
+### Two-Phase Architecture
+
+| Phase | Component | Latency | Frequency |
+|-------|-----------|---------|-----------|
+| **Online** (serve) | Trie servers + cache | <100ms | Per keystroke |
+| **Offline** (build) | MapReduce + Trie builder | Minutes | Every 15-60 min |
+
+### Ranking Signals
+
+| Signal | Description | Weight |
+|--------|-------------|--------|
+| Query frequency | How often this query is searched | High |
+| Recency | Trending queries weighted higher | Medium |
+| Personalization | User's past search history | Medium |
+| Freshness | New events (e.g., breaking news) | Variable |
+
+---
+
+## Q9: Design a Distributed Key-Value Store
+
+**Answer:**
+
+A distributed key-value store provides fast, reliable storage and retrieval of data across a cluster of machines, handling partitioning, replication, and failure recovery.
+
+```{mermaid}
+graph TD
+    CLIENT["Client"]
+    CLIENT --> COORD["Coordinator Node<br/>(routes to correct partition)"]
+    COORD --> N1["Node 1<br/>(keys A-H)"]
+    COORD --> N2["Node 2<br/>(keys I-P)"]
+    COORD --> N3["Node 3<br/>(keys Q-Z)"]
+
+    N1 --> R1["Replica 1a"]
+    N1 --> R2["Replica 1b"]
+
+    subgraph Ring["Consistent Hashing Ring"]
+        H1["Hash(key) →<br/>walk clockwise →<br/>find node"]
+    end
+
+    style COORD fill:#56cc9d,stroke:#333,color:#fff
+    style Ring fill:#ffce67,stroke:#333
+```
+
+### Requirements
+
+| Type | Requirement |
+|------|-------------|
+| **Functional** | `get(key) → value`; `put(key, value)`; `delete(key)`; Support arbitrary value sizes (up to 1MB) |
+| **Non-functional** | High availability (AP system); Tunable consistency; Low latency (<10ms P99); Horizontal scaling (add nodes without downtime) |
+
+### CAP Theorem Trade-offs
+
+```{mermaid}
+graph TD
+    CAP["CAP Theorem:<br/>Pick 2 of 3"]
+    CAP --> C["Consistency<br/>(every read gets latest write)"]
+    CAP --> A["Availability<br/>(every request gets a response)"]
+    CAP --> P["Partition Tolerance<br/>(works despite network failures)"]
+
+    C --- CP["CP Systems:<br/>MongoDB, HBase, Redis Cluster"]
+    A --- AP["AP Systems:<br/>Cassandra, DynamoDB, CouchDB"]
+
+    style CAP fill:#56cc9d,stroke:#333,color:#fff
+    style CP fill:#6cc3d5,stroke:#333,color:#fff
+    style AP fill:#ffce67,stroke:#333
+```
+
+### Key Design Components
+
+| Component | Design Choice | Rationale |
+|-----------|--------------|-----------|
+| **Partitioning** | Consistent hashing with virtual nodes | Even distribution, minimal reshuffling when nodes join/leave |
+| **Replication** | Replicate to N=3 clockwise neighbors | Fault tolerance |
+| **Consistency** | Quorum: W + R > N (configurable) | Tunable: W=1,R=3 (fast writes) or W=2,R=2 (balanced) |
+| **Conflict resolution** | Vector clocks + last-write-wins | Handle concurrent writes during partitions |
+| **Failure detection** | Gossip protocol | Decentralized, scalable node health checks |
+| **Write path** | Write-ahead log → MemTable → SSTable | Fast writes, durable, efficient reads |
+
+### Consistency Levels (DynamoDB/Cassandra Style)
+
+| Setting | Write (W) | Read (R) | Behavior |
+|---------|-----------|----------|----------|
+| **Strong** | W=N | R=1 or W=1, R=N | Always latest value |
+| **Quorum** | W=2, R=2 (N=3) | | Latest value if no concurrent writes |
+| **Eventual** | W=1 | R=1 | Fastest, may read stale |
+
+---
+
+## Q10: Design an API Gateway and Load Balancer
+
+**Answer:**
+
+An API Gateway is the single entry point for all client requests, handling routing, authentication, rate limiting, and protocol translation. A Load Balancer distributes traffic across backend servers for high availability and throughput.
+
+```{mermaid}
+graph TD
+    CLIENTS["Clients<br/>(Web, Mobile, Partners)"]
+    CLIENTS --> GW["API Gateway"]
+    GW --> AUTH["Auth Plugin<br/>(JWT / OAuth)"]
+    GW --> RL["Rate Limiter"]
+    GW --> ROUTE["Request Router"]
+    GW --> TRANSFORM["Protocol Translation<br/>(REST ↔ gRPC)"]
+
+    ROUTE --> LB1["Load Balancer<br/>(User Service)"]
+    ROUTE --> LB2["Load Balancer<br/>(Order Service)"]
+    ROUTE --> LB3["Load Balancer<br/>(Search Service)"]
+
+    LB1 --> US1["User Svc 1"]
+    LB1 --> US2["User Svc 2"]
+    LB1 --> US3["User Svc 3"]
+
+    style GW fill:#56cc9d,stroke:#333,color:#fff
+    style LB1 fill:#ffce67,stroke:#333
+```
+
+### API Gateway Responsibilities
+
+| Function | Description |
+|----------|-------------|
+| **Routing** | Route `/api/users/*` → User Service, `/api/orders/*` → Order Service |
+| **Authentication** | Validate JWT/OAuth tokens before forwarding |
+| **Rate limiting** | Per-client, per-endpoint throttling |
+| **Request transformation** | REST ↔ gRPC, request/response rewriting |
+| **Circuit breaker** | Stop forwarding to unhealthy services |
+| **Caching** | Cache GET responses for static/semi-static data |
+| **Logging & metrics** | Centralized request logging, latency tracking |
+| **SSL termination** | Handle HTTPS at the edge |
+
+### Load Balancing Algorithms
+
+| Algorithm | How It Works | Best For |
+|-----------|-------------|----------|
+| **Round Robin** | Distribute sequentially to each server | Equal-capacity servers |
+| **Weighted Round Robin** | Higher-capacity servers get more requests | Mixed hardware |
+| **Least Connections** | Route to server with fewest active connections | Variable request duration |
+| **IP Hash** | Hash client IP → always same server | Session affinity |
+| **Consistent Hashing** | Hash-ring-based routing | Cache servers, stateful services |
+
+### Health Checks
+
+```
+Active health checks:
+  - Gateway pings /health on each backend every 5-10s
+  - Unhealthy after 3 consecutive failures
+  - Healthy after 2 consecutive successes
+  - Remove unhealthy servers from rotation
+
+Passive health checks:
+  - Monitor response codes and latency
+  - If >50% of requests to a server fail → mark unhealthy
+  - Automatic recovery when success rate improves
+```
+
+### High Availability Design
+
+| Layer | Redundancy Strategy |
+|-------|-------------------|
+| **API Gateway** | Multiple instances behind DNS round-robin or network LB |
+| **Load Balancer** | Active-passive pair with virtual IP failover |
+| **Backend services** | Minimum 3 instances per service, across availability zones |
+| **Database** | Primary-replica with automatic failover |
+| **Cache** | Redis Cluster with replication |
+
+---
+
+## Summary Table
+
+| # | System | Key Concepts |
+|---|--------|-------------|
+| 1 | **URL Shortener** | Base62 encoding, key generation, read-heavy caching, 301 vs 302 |
+| 2 | **Rate Limiter** | Token bucket, sliding window, Redis counters, API gateway placement |
+| 3 | **Chat System** | WebSocket, message queues, Cassandra, fan-out, delivery receipts |
+| 4 | **News Feed** | Fan-out on write vs read, hybrid approach, feed ranking |
+| 5 | **File Storage** | Chunked upload, deduplication, delta sync, conflict resolution |
+| 6 | **Video Streaming** | Transcoding pipeline, adaptive bitrate, CDN, HLS/DASH |
+| 7 | **Notification System** | Multi-channel, priority queues, rate limiting, template rendering |
+| 8 | **Search Autocomplete** | Trie, offline pipeline, top-K ranking, two-phase architecture |
+| 9 | **Key-Value Store** | Consistent hashing, CAP theorem, quorum reads/writes, vector clocks |
+| 10 | **API Gateway** | Routing, auth, rate limiting, load balancing algorithms, circuit breaker |
+
+---
+
+## System Design Interview Framework
+
+Use this framework for **any** system design question:
+
+| Step | Duration | What to Do |
+|------|----------|-----------|
+| **1. Requirements** | 5 min | Clarify functional + non-functional; estimate scale (QPS, storage) |
+| **2. High-Level Design** | 10-15 min | Draw core components; define APIs; identify data flow |
+| **3. Deep Dive** | 15-20 min | Database schema; algorithm choices; scaling strategies |
+| **4. Wrap Up** | 5 min | Review requirements; discuss bottlenecks; suggest improvements |
+
+---
+
+## What's Next?
+
+This article covered the top 10 system design interview questions. For related content:
+
+- **Foundational concepts:** [System Design Interview QA - 1](/posts/system-design/System-Design-Interview-QA-1.html)
+- **Infrastructure deep dives:** [System Design Interview QA - 2](/posts/system-design/System-Design-Interview-QA-2.html)
+- **Design patterns:** [Design Pattern Interview QA - 1](/posts/design-pattern/Design-Pattern-Interview-QA-1.html)
+- **Enterprise patterns (Spring, CQRS, MVC):** [Design Pattern Interview QA - 2](/posts/design-pattern/Design-Pattern-Interview-QA-2.html)
+- **Production API design:** [Python SWE Interview QA - 4](/posts/swe-interview/Python-SWE-Interview-QA-4.html)

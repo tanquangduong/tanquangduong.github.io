@@ -1,0 +1,1212 @@
+---
+title: "MLOps Interview QA - 3"
+description: "10 GCP MLOps interview questions covering Vertex AI platform, Vertex AI Pipelines, online/batch predictions, model registry, Vertex AI Feature Store, model monitoring, BigQuery ML, Cloud Build CI/CD, experiment tracking, and security governance."
+image: /images/aiops/thumb_mlops_interview_qa_300.png
+date: "2026-05-21"
+keywords:
+  - "GCP MLOps"
+  - "Vertex AI"
+  - "Vertex AI Pipelines"
+  - "Vertex AI Feature Store"
+  - "model monitoring"
+  - "BigQuery ML"
+  - "Cloud Build"
+  - "Vertex AI Experiments"
+  - "Vertex AI Model Registry"
+  - "online predictions"
+  - "batch predictions"
+  - "Kubeflow"
+---
+
+## Introduction
+
+This is **Part 3** of our MLOps Interview QA series, focused on **Google Cloud Platform (GCP) services** for operationalizing ML. Vertex AI is GCP's unified ML platform that brings together AutoML, custom training, pipelines, feature store, model monitoring, and deployment — all integrated with BigQuery, Cloud Storage, and GCP's security infrastructure.
+
+> For general MLOps concepts, see [MLOps Interview QA - 1](/posts/aiops-interview/MLOps-Interview-QA-1.html). For Azure MLOps, see [MLOps Interview QA - 2](/posts/aiops-interview/MLOps-Interview-QA-2.html). For DevOps foundations, see [DevOps Interview QA - 1](/posts/aiops-interview/DevOps-Interview-QA-1.html).
+
+---
+
+## Q1: What Is the Vertex AI Platform Architecture?
+
+**Answer:**
+
+**Vertex AI** is Google Cloud's unified ML platform that consolidates all ML services under a single API and UI. It covers the entire ML lifecycle — from data preparation and experiment tracking to model training, deployment, and monitoring. Vertex AI eliminates the fragmentation of earlier GCP ML services (AI Platform, AutoML) into one cohesive platform.
+
+```{mermaid}
+graph TD
+    subgraph VertexAI["Vertex AI Platform"]
+        WORKBENCH["Workbench<br/>(managed notebooks)"]
+        DATASETS["Datasets<br/>(managed data)"]
+        TRAINING["Training<br/>(AutoML, Custom, HyperTune)"]
+        EXPERIMENTS["Experiments<br/>(tracking & comparison)"]
+        PIPELINES["Pipelines<br/>(Kubeflow, TFX)"]
+        REGISTRY["Model Registry<br/>(versioned models)"]
+        ENDPOINTS["Endpoints<br/>(online & batch)"]
+        MONITOR["Model Monitoring<br/>(drift, skew)"]
+        FEATURESTORE["Feature Store<br/>(offline & online)"]
+    end
+
+    subgraph GCPIntegrations["GCP Ecosystem"]
+        BQ["BigQuery<br/>(data warehouse)"]
+        GCS["Cloud Storage<br/>(artifacts, data)"]
+        CLOUDBUILD["Cloud Build<br/>(CI/CD)"]
+        PUBSUB["Pub/Sub<br/>(events)"]
+        IAM["Cloud IAM<br/>(access control)"]
+        DATAFLOW["Dataflow<br/>(stream/batch ETL)"]
+    end
+
+    VertexAI --> BQ
+    VertexAI --> GCS
+    VertexAI --> CLOUDBUILD
+    VertexAI --> IAM
+
+    style VertexAI fill:#6cc3d5,stroke:#333,color:#fff
+    style GCPIntegrations fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Vertex AI Core Components
+
+| Component | Purpose | Key Feature |
+|-----------|---------|-------------|
+| **Workbench** | Managed Jupyter notebooks for experimentation | Pre-configured VMs with GPU, integrated with GCS/BQ |
+| **Datasets** | Managed data resources with metadata | Supports tabular, image, text, video |
+| **Training** | Model training (AutoML + custom) | Serverless, distributed, GPU/TPU |
+| **Experiments** | Track runs, metrics, parameters | MLflow-compatible, comparison UI |
+| **Pipelines** | Orchestrated ML workflows (DAGs) | Kubeflow Pipelines SDK, serverless |
+| **Model Registry** | Versioned model management | Lifecycle stages, lineage tracking |
+| **Endpoints** | Model serving (online/batch) | Autoscaling, traffic splitting |
+| **Feature Store** | Centralized feature management | Online + offline serving |
+| **Model Monitoring** | Drift & skew detection | Automatic alerting |
+| **Metadata** | Artifact lineage & tracking | Full pipeline provenance |
+
+### GCP vs AWS vs Azure ML Platform Comparison
+
+| Feature | GCP (Vertex AI) | AWS (SageMaker) | Azure (Azure ML) |
+|---------|----------------|-----------------|-----------------|
+| **Unified platform** | Vertex AI | SageMaker | Azure ML Studio |
+| **AutoML** | Vertex AI AutoML | SageMaker Autopilot | Azure AutoML |
+| **Pipelines** | Vertex AI Pipelines (KFP) | SageMaker Pipelines | Azure ML Pipelines |
+| **Feature store** | Vertex AI Feature Store | SageMaker Feature Store | Azure ML Feature Store |
+| **Notebooks** | Vertex AI Workbench | SageMaker Studio | Compute Instances |
+| **Experiment tracking** | Vertex AI Experiments | SageMaker Experiments | MLflow + Azure ML |
+| **Model registry** | Vertex AI Model Registry | SageMaker Model Registry | Azure ML Model Registry |
+| **Monitoring** | Vertex AI Model Monitoring | SageMaker Model Monitor | Azure ML Monitoring |
+| **Data integration** | BigQuery (native) | Athena/Redshift | Synapse/ADLS |
+| **Unique strength** | BigQuery ML, TPU access | Largest service catalog | Enterprise AD integration |
+
+### Vertex AI SDK Example
+
+```python
+from google.cloud import aiplatform
+
+# Initialize Vertex AI
+aiplatform.init(
+    project="my-ml-project",
+    location="us-central1",
+    staging_bucket="gs://my-staging-bucket",
+    experiment="churn-prediction-exp",
+)
+```
+
+---
+
+## Q2: How Do Vertex AI Pipelines Orchestrate ML Workflows?
+
+**Answer:**
+
+**Vertex AI Pipelines** is a serverless orchestration service for running ML workflows as directed acyclic graphs (DAGs). It uses the **Kubeflow Pipelines (KFP) SDK** or **TensorFlow Extended (TFX)** to define pipelines, then executes them on fully managed infrastructure — no cluster provisioning required.
+
+```{mermaid}
+graph LR
+    subgraph Pipeline["Vertex AI Pipeline (KFP)"]
+        INGEST["Data Ingestion<br/>(BigQuery/GCS)"]
+        PREP["Data Preparation<br/>(Dataflow/pandas)"]
+        TRAIN["Custom Training<br/>(GPU/TPU)"]
+        EVAL["Model Evaluation<br/>(metrics comparison)"]
+        COND{"Metrics pass<br/>threshold?"}
+        REG["Register Model<br/>(Model Registry)"]
+        DEPLOY["Deploy to<br/>Endpoint"]
+    end
+
+    INGEST --> PREP --> TRAIN --> EVAL --> COND
+    COND -->|"Yes"| REG --> DEPLOY
+    COND -->|"No"| ALERT["Alert Team<br/>(Pub/Sub)"]
+
+    SCHEDULE["Cloud Scheduler<br/>(cron trigger)"]
+    SCHEDULE --> Pipeline
+
+    style Pipeline fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Pipeline Authoring with KFP SDK v2
+
+```python
+from kfp import dsl
+from kfp.dsl import Input, Output, Dataset, Model, Metrics
+from google.cloud import aiplatform
+
+# Define a reusable component
+@dsl.component(
+    base_image="python:3.10",
+    packages_to_install=["pandas", "scikit-learn", "google-cloud-bigquery"],
+)
+def train_model(
+    training_data: Input[Dataset],
+    model: Output[Model],
+    metrics: Output[Metrics],
+    n_estimators: int = 100,
+    max_depth: int = 10,
+):
+    import pandas as pd
+    from sklearn.ensemble import GradientBoostingClassifier
+    from sklearn.metrics import accuracy_score, f1_score
+    import joblib
+
+    df = pd.read_csv(training_data.path)
+    X_train, y_train = df.drop("target", axis=1), df["target"]
+
+    clf = GradientBoostingClassifier(
+        n_estimators=n_estimators, max_depth=max_depth
+    )
+    clf.fit(X_train, y_train)
+
+    accuracy = accuracy_score(y_train, clf.predict(X_train))
+    metrics.log_metric("accuracy", accuracy)
+    metrics.log_metric("n_estimators", n_estimators)
+
+    joblib.dump(clf, model.path + ".joblib")
+
+# Define the pipeline
+@dsl.pipeline(
+    name="training-pipeline",
+    description="End-to-end model training pipeline",
+)
+def training_pipeline(
+    project: str,
+    bq_source: str,
+    n_estimators: int = 200,
+):
+    data_op = extract_data(project=project, bq_source=bq_source)
+    prep_op = prepare_data(raw_data=data_op.outputs["output_data"])
+    train_op = train_model(
+        training_data=prep_op.outputs["processed_data"],
+        n_estimators=n_estimators,
+    )
+    eval_op = evaluate_model(
+        model=train_op.outputs["model"],
+        test_data=prep_op.outputs["test_data"],
+    )
+    with dsl.Condition(eval_op.outputs["deploy_decision"] == "yes"):
+        deploy_model(model=train_op.outputs["model"])
+
+# Compile and submit
+from kfp import compiler
+compiler.Compiler().compile(
+    pipeline_func=training_pipeline,
+    package_path="pipeline.yaml",
+)
+
+# Submit to Vertex AI
+aiplatform.init(project="my-project", location="us-central1")
+job = aiplatform.PipelineJob(
+    display_name="training-run-v1",
+    template_path="pipeline.yaml",
+    parameter_values={
+        "project": "my-project",
+        "bq_source": "dataset.training_table",
+        "n_estimators": 300,
+    },
+    pipeline_root="gs://my-bucket/pipeline-root",
+)
+job.run(service_account="ml-pipeline-sa@my-project.iam.gserviceaccount.com")
+```
+
+### Pipeline Features Comparison
+
+| Feature | Vertex AI Pipelines | Kubeflow Pipelines (self-managed) | Cloud Composer (Airflow) |
+|---------|--------------------|---------------------------------|--------------------------|
+| **Infrastructure** | Fully serverless | Self-managed K8s cluster | Managed Airflow cluster |
+| **Pipeline SDK** | KFP v2, TFX | KFP v1/v2 | Airflow DAGs (Python) |
+| **ML-native** | Yes (Vertex AI integration) | Yes (ML-aware) | No (generic orchestrator) |
+| **Caching** | Automatic step caching | Configurable | Manual |
+| **Cost** | Pay per pipeline run | Cluster cost (always-on) | Always-on cluster |
+| **Artifact tracking** | Vertex ML Metadata | MLMD | External (e.g., MLflow) |
+| **Best for** | GCP-native ML teams | Multi-cloud/on-prem ML | General data/ML orchestration |
+
+### Pipeline Scheduling
+
+| Method | How | Use Case |
+|--------|-----|----------|
+| **Cloud Scheduler + Pub/Sub** | Cron → Pub/Sub → Cloud Function → Pipeline | Nightly retraining |
+| **Pipeline schedule (native)** | `pipeline_job.create_schedule(cron="...")` | Recurring executions |
+| **Event-driven (Eventarc)** | GCS object created → trigger pipeline | New data arrival |
+| **Manual (SDK/Console)** | `job.run()` or Console UI | Ad-hoc experiments |
+
+---
+
+## Q3: How Does Vertex AI Handle Online Predictions?
+
+**Answer:**
+
+Vertex AI **online predictions** deploy models as low-latency REST endpoints with automatic scaling, traffic splitting for A/B testing, and built-in monitoring. You upload a model to the Model Registry, create an endpoint, and deploy one or more model versions with configurable traffic allocation.
+
+```{mermaid}
+graph TD
+    CLIENT["Client<br/>(REST/gRPC)"]
+    CLIENT --> ENDPOINT["Vertex AI Endpoint<br/>(stable URL, auth)"]
+
+    subgraph Deployments["Model Deployments"]
+        V1["Model v1<br/>(70% traffic)"]
+        V2["Model v2<br/>(20% traffic)"]
+        V3["Model v3<br/>(10% traffic)"]
+    end
+
+    ENDPOINT --> V1
+    ENDPOINT --> V2
+    ENDPOINT --> V3
+
+    V1 --> AUTOSCALE["Autoscaling<br/>(min/max replicas)"]
+    V1 --> LOGGING["Prediction Logging<br/>(BigQuery / GCS)"]
+    V1 --> MONITORING["Model Monitoring<br/>(drift detection)"]
+
+    style Deployments fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Deployment Options
+
+| Option | Description | Use Case |
+|--------|-------------|----------|
+| **Pre-built containers** | Google-provided containers for TF, PyTorch, sklearn, XGBoost | Standard framework models |
+| **Custom containers** | Bring your own Docker image with serving logic | Non-standard models, custom preprocessing |
+| **Model Garden** | Deploy foundation models (Gemini, Llama, etc.) | LLM serving |
+| **AutoML models** | One-click deploy for AutoML-trained models | No-code deployment |
+
+### Machine Types for Serving
+
+| Machine Type | vCPUs | RAM | GPU | Best For |
+|-------------|-------|-----|-----|----------|
+| `n1-standard-2` | 2 | 7.5 GB | Optional | Small models, low traffic |
+| `n1-standard-8` | 8 | 30 GB | Optional | Medium models |
+| `n1-highmem-8` | 8 | 52 GB | Optional | Large sklearn/XGBoost models |
+| `n1-standard-4` + T4 | 4 | 15 GB | NVIDIA T4 | GPU inference (cost-effective) |
+| `a2-highgpu-1g` | 12 | 85 GB | NVIDIA A100 | Large deep learning models |
+| `g2-standard-4` + L4 | 4 | 16 GB | NVIDIA L4 | Balanced GPU inference |
+
+### Online Prediction SDK Example
+
+```python
+from google.cloud import aiplatform
+
+# Upload model to registry
+model = aiplatform.Model.upload(
+    display_name="churn-classifier-v3",
+    artifact_uri="gs://my-bucket/models/churn_v3/",
+    serving_container_image_uri="us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-3:latest",
+    labels={"team": "data-science", "version": "3"},
+)
+
+# Create endpoint
+endpoint = aiplatform.Endpoint.create(
+    display_name="churn-prediction-endpoint",
+    labels={"env": "production"},
+)
+
+# Deploy model with traffic split
+model.deploy(
+    endpoint=endpoint,
+    deployed_model_display_name="churn-v3-deployment",
+    machine_type="n1-standard-4",
+    min_replica_count=2,
+    max_replica_count=10,
+    traffic_percentage=100,
+    autoscaling_target_cpu_utilization=60,
+)
+
+# Make predictions
+instances = [
+    {"age": 35, "tenure": 24, "monthly_charges": 79.50},
+    {"age": 42, "tenure": 6, "monthly_charges": 105.00},
+]
+predictions = endpoint.predict(instances=instances)
+print(predictions.predictions)
+```
+
+### Traffic Splitting for Safe Rollout
+
+```python
+# Deploy new model version with 10% canary traffic
+new_model = aiplatform.Model.upload(
+    display_name="churn-classifier-v4",
+    artifact_uri="gs://my-bucket/models/churn_v4/",
+    serving_container_image_uri="us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-3:latest",
+)
+
+# Deploy to same endpoint with 10% traffic
+new_model.deploy(
+    endpoint=endpoint,
+    deployed_model_display_name="churn-v4-canary",
+    machine_type="n1-standard-4",
+    min_replica_count=1,
+    max_replica_count=5,
+    traffic_percentage=10,  # 10% canary
+)
+
+# After validation, shift traffic
+endpoint.undeploy(deployed_model_id=old_deployment_id)
+# Remaining model gets 100% automatically
+```
+
+---
+
+## Q4: How Do Vertex AI Batch Predictions Work?
+
+**Answer:**
+
+Vertex AI **batch predictions** process large datasets asynchronously, reading input from BigQuery or Cloud Storage and writing results back. Unlike online predictions (always-on endpoints), batch predictions spin up compute only for the job duration — making them cost-effective for scoring millions of records.
+
+```{mermaid}
+graph LR
+    subgraph Input["Input Sources"]
+        BQ_IN["BigQuery Table"]
+        GCS_IN["Cloud Storage<br/>(JSONL, CSV, TFRecord)"]
+    end
+
+    subgraph BatchJob["Batch Prediction Job"]
+        SPLIT["Split Input<br/>(parallel shards)"]
+        PREDICT["Run Predictions<br/>(N workers)"]
+        MERGE["Merge Results"]
+    end
+
+    subgraph Output["Output Destinations"]
+        BQ_OUT["BigQuery Table"]
+        GCS_OUT["Cloud Storage<br/>(JSONL)"]
+    end
+
+    BQ_IN --> SPLIT
+    GCS_IN --> SPLIT
+    SPLIT --> PREDICT --> MERGE
+    MERGE --> BQ_OUT
+    MERGE --> GCS_OUT
+
+    style BatchJob fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Batch vs Online Predictions
+
+| Aspect | Online Predictions | Batch Predictions |
+|--------|-------------------|-------------------|
+| **Latency** | Milliseconds (real-time) | Minutes to hours |
+| **Input** | Single instances via REST/gRPC | BigQuery table or GCS files |
+| **Output** | Immediate response | Written to BigQuery/GCS |
+| **Compute** | Always-on endpoint (pay while provisioned) | Ephemeral (pay per job) |
+| **Scaling** | Autoscale replicas | Configure worker count |
+| **Use case** | Interactive apps, APIs | Nightly scoring, bulk processing |
+| **Accelerators** | GPU for real-time | GPU for large-scale inference |
+| **Cost efficiency** | Higher (always running) | Lower (scale-to-zero between jobs) |
+
+### Batch Prediction Configuration
+
+```python
+from google.cloud import aiplatform
+
+# Get the registered model
+model = aiplatform.Model("projects/my-project/locations/us-central1/models/123456")
+
+# Submit batch prediction job with BigQuery input/output
+batch_job = model.batch_predict(
+    job_display_name="monthly-churn-scoring",
+    # Input from BigQuery
+    bigquery_source="bq://my-project.dataset.customer_features",
+    # Output to BigQuery
+    bigquery_destination_prefix="bq://my-project.predictions",
+    # Compute configuration
+    machine_type="n1-standard-4",
+    starting_replica_count=5,
+    max_replica_count=20,
+    # Optional: use GPUs
+    accelerator_type="NVIDIA_TESLA_T4",
+    accelerator_count=1,
+    # Job settings
+    sync=False,  # Non-blocking
+)
+
+# Check job status
+batch_job.wait()
+print(f"Output: {batch_job.output_info}")
+```
+
+### When to Use Batch Predictions
+
+```
+Use batch predictions when:
+  ✓ Scoring entire customer base (millions of records)
+  ✓ Generating recommendations overnight
+  ✓ Creating embeddings for a document corpus
+  ✓ Running periodic model evaluation on new data
+  ✓ Cost matters more than latency
+  ✓ Input data is already in BigQuery or GCS
+
+Use online predictions when:
+  ✓ Real-time response needed (e.g., fraud detection)
+  ✓ Serving user-facing applications
+  ✓ Low-latency API required
+  ✓ Individual predictions on demand
+```
+
+---
+
+## Q5: How Does the Vertex AI Model Registry Manage Model Lifecycle?
+
+**Answer:**
+
+The **Vertex AI Model Registry** provides a centralized repository for organizing, versioning, and deploying ML models. It supports model lineage (linking models to training jobs, datasets, and experiments), lifecycle management, and integration with Vertex AI Experiments for tracking which experiments produced which models.
+
+```{mermaid}
+graph TD
+    subgraph Sources["Model Sources"]
+        CUSTOM["Custom Training<br/>(Vertex AI Training)"]
+        AUTOML["AutoML Training"]
+        BQML["BigQuery ML"]
+        EXTERNAL["External Models<br/>(uploaded artifacts)"]
+    end
+
+    subgraph Registry["Vertex AI Model Registry"]
+        MODEL["Model Resource<br/>(name, description)"]
+        VERSION["Model Versions<br/>(v1, v2, v3...)"]
+        LABELS["Labels & Aliases<br/>(champion, challenger)"]
+        LINEAGE["Lineage<br/>(dataset → training → model)"]
+    end
+
+    subgraph Deployment["Deployment Targets"]
+        ONLINE["Online Endpoint<br/>(real-time serving)"]
+        BATCH["Batch Prediction<br/>(large-scale scoring)"]
+        EXPORT["Export<br/>(edge, mobile)"]
+    end
+
+    CUSTOM --> MODEL
+    AUTOML --> MODEL
+    BQML --> MODEL
+    EXTERNAL --> MODEL
+
+    MODEL --> VERSION --> LABELS
+    VERSION --> LINEAGE
+
+    LABELS --> ONLINE
+    LABELS --> BATCH
+    LABELS --> EXPORT
+
+    style Registry fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Model Registry Features
+
+| Feature | Description |
+|---------|-------------|
+| **Versioning** | Automatic version numbering; each upload creates new version |
+| **Aliases** | Human-readable pointers (e.g., "champion", "staging") that can be reassigned |
+| **Labels** | Key-value metadata for filtering and organization |
+| **Lineage** | Track which dataset, pipeline, experiment produced the model |
+| **Artifact URI** | GCS path to model artifacts (SavedModel, .pkl, ONNX, etc.) |
+| **Container spec** | Pre-built or custom serving container linked to model |
+| **Evaluation metrics** | Attach evaluation results for model comparison |
+| **IAM** | Per-model access control via Cloud IAM |
+
+### Model Management Operations
+
+```python
+from google.cloud import aiplatform
+
+# Upload a new model (creates new resource or new version)
+model = aiplatform.Model.upload(
+    display_name="fraud-detector",
+    artifact_uri="gs://models/fraud_v2/",
+    serving_container_image_uri=(
+        "us-docker.pkg.dev/vertex-ai/prediction/tf2-cpu.2-14:latest"
+    ),
+    version_aliases=["challenger"],
+    version_description="Added transaction velocity features",
+    labels={"team": "fraud", "framework": "tensorflow"},
+)
+
+# List model versions
+model_registry = aiplatform.Model(model.resource_name)
+versions = model_registry.versioning_registry.list_versions()
+
+# Promote model: change alias from "challenger" to "champion"
+model_registry.versioning_registry.add_version_aliases(
+    version="2", aliases=["champion"]
+)
+model_registry.versioning_registry.remove_version_aliases(
+    version="1", aliases=["champion"]
+)
+
+# Get model by alias
+champion = aiplatform.Model(
+    model_name="fraud-detector@champion",
+    project="my-project",
+    location="us-central1",
+)
+
+# Deploy champion
+champion.deploy(
+    endpoint=endpoint,
+    machine_type="n1-standard-4",
+    traffic_percentage=100,
+)
+```
+
+### Model Evaluation Integration
+
+| Metric Category | Metrics | Supported Model Types |
+|----------------|---------|----------------------|
+| **Classification** | AUC-ROC, AUC-PR, F1, precision, recall, confusion matrix | Binary, multi-class |
+| **Regression** | MAE, RMSE, R², MAPE | Regression |
+| **Forecasting** | MAPE, wMAPE, RMSE | Time-series |
+| **Object detection** | mAP, IoU, precision/recall by class | Vision |
+| **Custom** | Any metric logged via Experiments | All |
+
+---
+
+## Q6: How Does Vertex AI Feature Store Work?
+
+**Answer:**
+
+**Vertex AI Feature Store** is a managed service for organizing, storing, and serving ML features. It ensures consistency between training and serving (eliminating training-serving skew), provides point-in-time correct feature retrieval for training, and low-latency online serving for real-time predictions.
+
+```{mermaid}
+graph TD
+    subgraph Ingestion["Feature Ingestion"]
+        BQ["BigQuery<br/>(SQL transforms)"]
+        STREAM["Streaming<br/>(Pub/Sub, Dataflow)"]
+        BATCH_LOAD["Batch Import<br/>(GCS, BigQuery)"]
+    end
+
+    subgraph FeatureStore["Vertex AI Feature Store"]
+        FG["Feature Groups<br/>(logical grouping)"]
+        FEATURES["Features<br/>(versioned definitions)"]
+        OFFLINE["Offline Store<br/>(BigQuery - historical)"]
+        ONLINE["Online Store<br/>(Bigtable - low latency)"]
+    end
+
+    subgraph Serving["Feature Serving"]
+        TRAINING["Training<br/>(point-in-time join)"]
+        PREDICTION["Online Prediction<br/>(< 10ms lookup)"]
+        BATCH_SERVE["Batch Serving<br/>(bulk retrieval)"]
+    end
+
+    BQ --> FG
+    STREAM --> FG
+    BATCH_LOAD --> FG
+
+    FG --> FEATURES
+    FEATURES --> OFFLINE
+    FEATURES --> ONLINE
+
+    OFFLINE --> TRAINING
+    OFFLINE --> BATCH_SERVE
+    ONLINE --> PREDICTION
+
+    style FeatureStore fill:#6cc3d5,stroke:#333,color:#fff
+    style Serving fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Feature Store Concepts
+
+| Concept | Description | Example |
+|---------|-------------|---------|
+| **Feature Group** | Collection of related features for an entity type | `customer_features`, `product_features` |
+| **Feature** | Individual computed attribute with metadata | `avg_spend_30d`, `purchase_count_7d` |
+| **Entity Type** | The subject features describe (join key) | `customer_id`, `merchant_id` |
+| **Feature View** | Defines what features to serve together | Combine features from multiple groups |
+| **Offline Store** | BigQuery-backed historical store for training | Full history with timestamps |
+| **Online Store** | Bigtable-backed low-latency store for serving | Latest values, < 10ms reads |
+| **Point-in-time lookup** | Retrieve feature values as of a specific timestamp | Prevent data leakage in training |
+
+### Feature Store SDK Example
+
+```python
+from google.cloud import aiplatform
+from vertexai.resources.preview import feature_store
+
+# Create Feature Group (backed by BigQuery)
+fg = feature_store.FeatureGroup.create(
+    name="customer_spending",
+    source=feature_store.utils.FeatureGroupBigQuerySource(
+        uri="bq://project.dataset.customer_features_table",
+        entity_id_columns=["customer_id"],
+    ),
+)
+
+# Create Feature View for online serving
+fv = feature_store.FeatureOnlineStore.create_feature_view(
+    name="customer_realtime_features",
+    source=feature_store.utils.FeatureViewBigQuerySource(
+        uri="bq://project.dataset.customer_features_table",
+        entity_id_columns=["customer_id"],
+    ),
+    sync_config=feature_store.utils.FeatureViewSyncConfig(cron="0 */4 * * *"),
+)
+
+# Online serving (low-latency lookup)
+online_store = feature_store.FeatureOnlineStore("my-online-store")
+features = online_store.fetch_feature_values(
+    feature_view="customer_realtime_features",
+    entity_ids=["customer_123", "customer_456"],
+)
+
+# Offline serving for training (point-in-time correct)
+training_data = fg.read(
+    entity_ids=entity_df,  # DataFrame with entity_id + timestamp
+    feature_ids=["avg_spend_30d", "purchase_count_7d", "days_since_last_purchase"],
+)
+```
+
+### Feature Store Architecture Decisions
+
+| Decision | Option A | Option B | Recommendation |
+|----------|----------|----------|----------------|
+| **Offline store** | BigQuery (native) | GCS (Parquet) | BigQuery for SQL-centric teams |
+| **Online store** | Bigtable (managed) | Redis (custom) | Bigtable for GCP-native |
+| **Sync frequency** | Batch (hourly/daily) | Streaming (real-time) | Batch for most; streaming for fraud |
+| **Feature compute** | BigQuery SQL | Dataflow (Java/Python) | BigQuery for simplicity |
+| **Feature discovery** | Feature Store metadata | Data catalog | Feature Store for ML-specific |
+
+### Training-Serving Skew Prevention
+
+| Risk | Cause | Feature Store Solution |
+|------|-------|-----------------------|
+| **Feature definition skew** | Different code for training vs serving | Single feature definition serves both |
+| **Data leakage** | Using future data during training | Point-in-time correct joins |
+| **Stale features** | Online store not updated | Scheduled sync (cron materialization) |
+| **Missing features** | Feature not available at serving time | Feature View validates availability |
+
+---
+
+## Q7: How Does Vertex AI Model Monitoring Detect Drift and Skew?
+
+**Answer:**
+
+**Vertex AI Model Monitoring** automatically detects **training-serving skew** (difference between training data and live data) and **prediction drift** (change in model inputs/outputs over time). It samples production traffic, computes statistical distances, and alerts when thresholds are breached.
+
+```{mermaid}
+graph TD
+    subgraph Production["Production Traffic"]
+        REQUEST["Inference Requests<br/>(feature values)"]
+        RESPONSE["Model Predictions<br/>(outputs)"]
+    end
+
+    subgraph Monitoring["Vertex AI Model Monitoring"]
+        SAMPLE["Traffic Sampling<br/>(configurable rate)"]
+        SKEW["Training-Serving Skew<br/>(training data vs live)"]
+        DRIFT["Prediction Drift<br/>(time window comparison)"]
+        ATTRIBUTION["Feature Attribution<br/>(importance shift)"]
+    end
+
+    subgraph Alerting["Alerting & Response"]
+        EMAIL["Email Alerts"]
+        LOGGING["Cloud Logging"]
+        PUBSUB_ALERT["Pub/Sub<br/>(trigger retraining)"]
+    end
+
+    REQUEST --> SAMPLE
+    RESPONSE --> SAMPLE
+    SAMPLE --> SKEW
+    SAMPLE --> DRIFT
+    SAMPLE --> ATTRIBUTION
+
+    SKEW --> EMAIL
+    DRIFT --> LOGGING
+    ATTRIBUTION --> PUBSUB_ALERT
+
+    style Monitoring fill:#6cc3d5,stroke:#333,color:#fff
+    style Alerting fill:#ff6b6b,stroke:#333,color:#fff
+```
+
+### Monitoring Signal Types
+
+| Signal | What It Detects | Baseline | Statistical Test |
+|--------|----------------|----------|-----------------|
+| **Training-serving skew** | Live features ≠ training data distribution | Training dataset | Jensen-Shannon divergence |
+| **Prediction drift** | Model outputs shifting over time | Recent time window | Jensen-Shannon divergence |
+| **Feature attribution skew** | Feature importance changed vs training | Training feature attributions | Normalized absolute difference |
+| **Feature attribution drift** | Feature importance shifting over time | Recent attribution window | Normalized absolute difference |
+
+### Monitoring Configuration
+
+```python
+from google.cloud import aiplatform
+from google.cloud.aiplatform import model_monitoring
+
+# Define monitoring objective
+skew_config = model_monitoring.SkewDetectionConfig(
+    data_source="bq://project.dataset.training_data",
+    skew_thresholds={
+        "age": model_monitoring.ThresholdConfig(value=0.3),
+        "income": model_monitoring.ThresholdConfig(value=0.3),
+        "tenure": model_monitoring.ThresholdConfig(value=0.3),
+    },
+    attribute_skew_thresholds={
+        "age": model_monitoring.ThresholdConfig(value=0.3),
+    },
+)
+
+drift_config = model_monitoring.DriftDetectionConfig(
+    drift_thresholds={
+        "age": model_monitoring.ThresholdConfig(value=0.3),
+        "income": model_monitoring.ThresholdConfig(value=0.3),
+    },
+)
+
+# Create monitoring job
+monitoring_job = aiplatform.ModelDeploymentMonitoringJob.create(
+    display_name="churn-model-monitoring",
+    endpoint=endpoint,
+    logging_sampling_strategy=(
+        model_monitoring.RandomSampleConfig(sample_rate=0.1)  # 10% sampling
+    ),
+    schedule_config=model_monitoring.ScheduleConfig(
+        monitor_interval={"seconds": 3600}  # Hourly checks
+    ),
+    alert_config=model_monitoring.EmailAlertConfig(
+        user_emails=["ml-team@company.com"]
+    ),
+    objective_configs={
+        deployed_model_id: model_monitoring.ObjectiveConfig(
+            training_dataset=training_dataset,
+            training_prediction_skew_detection_config=skew_config,
+            prediction_drift_detection_config=drift_config,
+        )
+    },
+)
+```
+
+### Drift Threshold Guidelines
+
+| Feature Type | Metric | Low Sensitivity | Medium | High Sensitivity |
+|-------------|--------|----------------|--------|-----------------|
+| **Numerical** | Jensen-Shannon | > 0.3 | > 0.2 | > 0.1 |
+| **Categorical** | Jensen-Shannon | > 0.3 | > 0.2 | > 0.1 |
+| **Attribution** | Normalized diff | > 0.5 | > 0.3 | > 0.1 |
+
+### Monitoring Best Practices
+
+| Practice | Description |
+|----------|-------------|
+| **Set per-feature thresholds** | Critical features (e.g., income) need tighter thresholds |
+| **Sample appropriately** | 10% sampling balances cost and detection accuracy |
+| **Monitor hourly initially** | Reduce frequency once stable patterns are established |
+| **Use attribution monitoring** | Detects subtle model behavior changes even without label data |
+| **Automate retraining** | Alert → Pub/Sub → Cloud Function → trigger pipeline |
+| **Baseline regularly** | Update training baseline after successful retraining |
+| **Monitor data quality** | Complement drift detection with data validation (TFDV) |
+
+---
+
+## Q8: How Does BigQuery ML Enable In-Database Machine Learning?
+
+**Answer:**
+
+**BigQuery ML (BQML)** lets you create, train, evaluate, and predict with ML models using standard SQL queries — directly in BigQuery without moving data or learning a new framework. It's ideal for analysts who know SQL and want to build models quickly, and for teams that want to avoid data export overhead for large datasets.
+
+```{mermaid}
+graph LR
+    subgraph BigQuery["BigQuery"]
+        DATA["Training Data<br/>(tables, views)"]
+        DATA --> CREATE["CREATE MODEL<br/>(SQL statement)"]
+        CREATE --> MODEL["Trained Model<br/>(stored in BQ)"]
+        MODEL --> EVAL["ML.EVALUATE<br/>(metrics)"]
+        MODEL --> PREDICT["ML.PREDICT<br/>(scoring)"]
+        MODEL --> EXPLAIN["ML.EXPLAIN<br/>(feature importance)"]
+    end
+
+    subgraph Export["Integration"]
+        REGISTRY["Export to<br/>Vertex AI Registry"]
+        ENDPOINT["Deploy to<br/>Vertex AI Endpoint"]
+    end
+
+    MODEL --> REGISTRY --> ENDPOINT
+
+    style BigQuery fill:#6cc3d5,stroke:#333,color:#fff
+    style Export fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Supported Model Types
+
+| Model Type | SQL Keyword | Use Case |
+|-----------|-------------|----------|
+| **Linear regression** | `LINEAR_REG` | Predicting continuous values |
+| **Logistic regression** | `LOGISTIC_REG` | Binary/multi-class classification |
+| **K-means clustering** | `KMEANS` | Customer segmentation |
+| **XGBoost** | `BOOSTED_TREE_CLASSIFIER/REGRESSOR` | High-performance tabular models |
+| **Random Forest** | `RANDOM_FOREST_CLASSIFIER/REGRESSOR` | Ensemble models |
+| **DNN** | `DNN_CLASSIFIER/REGRESSOR` | Deep neural networks |
+| **AutoML Tables** | `AUTOML_CLASSIFIER/REGRESSOR` | Automated model selection |
+| **Time-series (ARIMA+)** | `ARIMA_PLUS` | Forecasting |
+| **Matrix factorization** | `MATRIX_FACTORIZATION` | Recommendations |
+| **PCA** | `PCA` | Dimensionality reduction |
+| **Imported TensorFlow** | `TENSORFLOW` | Deploy TF models in BQ |
+| **Remote model (Vertex AI)** | `REMOTE` | Call Vertex AI endpoints from SQL |
+
+### BigQuery ML Workflow Example
+
+```sql
+-- Step 1: Create and train a model
+CREATE OR REPLACE MODEL `project.dataset.churn_model`
+OPTIONS(
+  model_type='BOOSTED_TREE_CLASSIFIER',
+  input_label_cols=['churned'],
+  max_iterations=50,
+  learn_rate=0.1,
+  data_split_method='AUTO_SPLIT',
+  enable_global_explain=TRUE
+) AS
+SELECT
+  age,
+  tenure_months,
+  monthly_charges,
+  total_charges,
+  contract_type,
+  payment_method,
+  churned
+FROM `project.dataset.customer_data`
+WHERE signup_date < '2026-01-01';
+
+-- Step 2: Evaluate the model
+SELECT *
+FROM ML.EVALUATE(MODEL `project.dataset.churn_model`);
+
+-- Step 3: Get feature importance
+SELECT *
+FROM ML.GLOBAL_EXPLAIN(MODEL `project.dataset.churn_model`);
+
+-- Step 4: Make predictions
+SELECT
+  customer_id,
+  predicted_churned,
+  predicted_churned_probs
+FROM ML.PREDICT(
+  MODEL `project.dataset.churn_model`,
+  (SELECT * FROM `project.dataset.new_customers`)
+);
+
+-- Step 5: Export to Vertex AI Model Registry
+EXPORT MODEL `project.dataset.churn_model`
+OPTIONS(uri='gs://my-bucket/exported-models/churn_v1/');
+```
+
+### BQML vs Vertex AI Custom Training
+
+| Aspect | BigQuery ML | Vertex AI Custom Training |
+|--------|-------------|--------------------------|
+| **Language** | SQL | Python (TF, PyTorch, sklearn) |
+| **Target users** | Data analysts, SQL practitioners | ML engineers, data scientists |
+| **Data movement** | None (in-place) | Export to GCS or use BigQuery connector |
+| **Model types** | Supported subset (see table above) | Any framework, any architecture |
+| **GPU/TPU** | Limited (DNN, AutoML) | Full access to all accelerators |
+| **Hyperparameter tuning** | Limited (some models) | Vertex AI Vizier (Bayesian optimization) |
+| **Deployment** | BQ predictions + export to Vertex AI | Native Vertex AI endpoints |
+| **Best for** | Quick prototyping, SQL-first teams | Production-grade custom models |
+
+---
+
+## Q9: How Do You Set Up CI/CD for ML on GCP with Cloud Build?
+
+**Answer:**
+
+GCP's MLOps CI/CD combines **Cloud Build** (CI/CD service), **Cloud Source Repositories** (or GitHub/GitLab), and **Vertex AI Pipelines** to automate the full ML lifecycle. Google's recommended architecture follows the three MLOps maturity levels — from manual (Level 0) to full CI/CD/CT automation (Level 2).
+
+```{mermaid}
+graph TD
+    subgraph CI["Continuous Integration (Cloud Build)"]
+        PUSH["Code Push<br/>(GitHub/CSR)"]
+        TEST["Unit Tests<br/>(pytest)"]
+        BUILD["Build Components<br/>(Docker images)"]
+        VALIDATE["Validate Pipeline<br/>(compile KFP YAML)"]
+    end
+
+    subgraph CD["Continuous Delivery"]
+        DEPLOY_PIPE["Deploy Pipeline<br/>(to Vertex AI)"]
+        RUN_PIPE["Run Pipeline<br/>(training job)"]
+        EVAL_GATE["Evaluation Gate<br/>(metrics threshold)"]
+        REGISTER["Register Model<br/>(Model Registry)"]
+    end
+
+    subgraph CT["Continuous Training"]
+        SCHEDULE["Cloud Scheduler<br/>(cron)"]
+        DATA_TRIGGER["Data Trigger<br/>(Eventarc / Pub/Sub)"]
+        DRIFT_TRIGGER["Drift Alert<br/>(Model Monitoring)"]
+    end
+
+    subgraph CServing["Model Serving"]
+        DEPLOY_EP["Deploy to Endpoint<br/>(traffic split)"]
+        CANARY["Canary Validation"]
+        PROMOTE["Promote to 100%"]
+    end
+
+    PUSH --> TEST --> BUILD --> VALIDATE
+    VALIDATE --> DEPLOY_PIPE --> RUN_PIPE --> EVAL_GATE --> REGISTER
+    REGISTER --> DEPLOY_EP --> CANARY --> PROMOTE
+
+    SCHEDULE --> RUN_PIPE
+    DATA_TRIGGER --> RUN_PIPE
+    DRIFT_TRIGGER --> RUN_PIPE
+
+    style CI fill:#6cc3d5,stroke:#333,color:#fff
+    style CD fill:#56cc9d,stroke:#333,color:#fff
+    style CT fill:#ffce67,stroke:#333
+```
+
+### Cloud Build Configuration
+
+```yaml
+# cloudbuild.yaml - MLOps CI/CD Pipeline
+steps:
+  # Step 1: Install dependencies and run tests
+  - name: 'python:3.10'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        pip install -r requirements.txt
+        pytest tests/ -v --junitxml=results.xml
+        flake8 src/
+    id: 'unit-tests'
+
+  # Step 2: Build custom training container
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/ml-images/trainer:$SHORT_SHA'
+      - '-f'
+      - 'Dockerfile.training'
+      - '.'
+    id: 'build-training-image'
+    waitFor: ['unit-tests']
+
+  # Step 3: Push training image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/ml-images/trainer:$SHORT_SHA'
+    id: 'push-training-image'
+    waitFor: ['build-training-image']
+
+  # Step 4: Compile the Vertex AI Pipeline
+  - name: 'python:3.10'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        pip install kfp google-cloud-aiplatform
+        python pipelines/compile_pipeline.py \
+          --image-tag=$SHORT_SHA \
+          --output=pipeline.yaml
+    id: 'compile-pipeline'
+    waitFor: ['push-training-image']
+
+  # Step 5: Submit pipeline to Vertex AI
+  - name: 'python:3.10'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        pip install google-cloud-aiplatform
+        python scripts/submit_pipeline.py \
+          --template=pipeline.yaml \
+          --project=$PROJECT_ID \
+          --region=us-central1 \
+          --pipeline-root=gs://${PROJECT_ID}-pipeline-root
+    id: 'submit-pipeline'
+    waitFor: ['compile-pipeline']
+
+  # Step 6: Deploy model (triggered after pipeline success)
+  - name: 'python:3.10'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        python scripts/deploy_model.py \
+          --project=$PROJECT_ID \
+          --endpoint=churn-endpoint \
+          --traffic-split='{"new": 10, "current": 90}'
+    id: 'deploy-canary'
+    waitFor: ['submit-pipeline']
+
+# Build triggers
+triggers:
+  - name: 'ml-ci-trigger'
+    github:
+      owner: 'my-org'
+      name: 'ml-project'
+      push:
+        branch: '^main$'
+    filename: 'cloudbuild.yaml'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+```
+
+### MLOps Maturity Levels (Google's Framework)
+
+| Level | Description | CI/CD | Retraining | Deploy |
+|-------|-------------|-------|-----------|--------|
+| **Level 0** | Manual process | None | Manual, ad-hoc | Manual model push |
+| **Level 1** | ML pipeline automation | Pipeline code tested | Automated (CT) via triggers | Automated from pipeline |
+| **Level 2** | CI/CD pipeline automation | Full CI/CD for pipeline code | Automated + triggered by drift | Canary → full rollout |
+
+### GCP CI/CD Tools for ML
+
+| Tool | Role | Integration |
+|------|------|-------------|
+| **Cloud Build** | CI/CD execution engine | Builds containers, runs tests, triggers pipelines |
+| **Artifact Registry** | Container image + artifact storage | Stores training/serving Docker images |
+| **Cloud Source Repos / GitHub** | Source control | Triggers Cloud Build on push |
+| **Cloud Scheduler** | Cron-based triggers | Schedule pipeline runs |
+| **Eventarc** | Event-driven triggers | React to GCS uploads, BQ inserts |
+| **Pub/Sub** | Messaging/events | Decouple monitoring alerts from actions |
+| **Secret Manager** | Secrets storage | API keys, service account keys |
+| **Terraform** | Infrastructure as Code | Provision Vertex AI resources |
+
+---
+
+## Q10: How Do You Secure and Govern ML Workloads on GCP?
+
+**Answer:**
+
+GCP security for ML workloads spans network isolation, identity management, data protection, and organizational policies. Vertex AI integrates with GCP's security fabric — Cloud IAM, VPC Service Controls, CMEK, and organization policies — to enforce enterprise governance while enabling data science teams.
+
+```{mermaid}
+graph TD
+    subgraph Network["Network Security"]
+        VPC["VPC Network<br/>(private endpoints)"]
+        VPCSC["VPC Service Controls<br/>(data perimeter)"]
+        PSC["Private Service Connect<br/>(private Google APIs)"]
+    end
+
+    subgraph Identity["Identity & Access"]
+        IAM["Cloud IAM<br/>(roles & permissions)"]
+        SA["Service Accounts<br/>(workload identity)"]
+        WIF["Workload Identity<br/>Federation"]
+    end
+
+    subgraph Data["Data Protection"]
+        CMEK["Customer-Managed<br/>Encryption Keys (CMEK)"]
+        DLP_TOOL["Cloud DLP<br/>(sensitive data detection)"]
+        RETENTION["Data Retention<br/>Policies"]
+    end
+
+    subgraph Governance["Governance"]
+        ORG_POLICY["Organization Policies<br/>(guardrails)"]
+        AUDIT["Cloud Audit Logs<br/>(who did what)"]
+        RAI["Responsible AI<br/>(Vertex AI Explainability)"]
+    end
+
+    style Network fill:#6cc3d5,stroke:#333,color:#fff
+    style Identity fill:#56cc9d,stroke:#333,color:#fff
+    style Data fill:#ffce67,stroke:#333
+    style Governance fill:#ff6b6b,stroke:#333,color:#fff
+```
+
+### IAM Roles for Vertex AI
+
+| Role | Scope | Permissions |
+|------|-------|-------------|
+| **Vertex AI Admin** | Full access | Create/delete all Vertex AI resources |
+| **Vertex AI User** | Standard ML work | Submit jobs, deploy models, use endpoints |
+| **Vertex AI Viewer** | Read-only | View models, jobs, endpoints |
+| **Vertex AI Feature Store Admin** | Feature Store | Manage feature groups, online stores |
+| **ML Engine Developer** | Training | Submit training jobs, read models |
+| **Service Account** | Automation | Pipeline execution, deployment |
+| **Custom roles** | Granular | Combine specific permissions |
+
+### VPC Service Controls for ML
+
+| Concept | Description | ML Relevance |
+|---------|-------------|-------------|
+| **Service Perimeter** | Logical boundary around GCP resources | Prevent data exfiltration from ML workspace |
+| **Access Levels** | Conditions for accessing perimeter | Allow only corporate IP ranges |
+| **Ingress Rules** | Who can send data into perimeter | Allow Cloud Build to trigger pipelines |
+| **Egress Rules** | What data can leave perimeter | Allow model serving to external clients |
+| **Bridge** | Connect two perimeters | Share datasets between teams |
+
+### Data Protection
+
+| Layer | Mechanism | GCP Service |
+|-------|-----------|-------------|
+| **At rest** | AES-256 encryption (default) or CMEK | Cloud KMS + Vertex AI |
+| **In transit** | TLS 1.3 for all API calls | Built-in |
+| **Data classification** | Detect PII/PHI in training data | Cloud DLP |
+| **Access logging** | All data access audited | Cloud Audit Logs |
+| **Retention** | Automatic deletion after TTL | Object lifecycle policies |
+| **Residency** | Data stays in specified region | Region-locked resources |
+
+### Security Best Practices for Vertex AI
+
+```
+Identity & Access:
+  ☐ Use dedicated service accounts per pipeline/endpoint
+  ☐ Apply least-privilege IAM roles (Vertex AI User, not Admin)
+  ☐ Enable Workload Identity for GKE-based workloads
+  ☐ Use short-lived credentials (impersonation over keys)
+  ☐ Regular access reviews with IAM Recommender
+
+Network:
+  ☐ Deploy Vertex AI in VPC with peering to Vertex services
+  ☐ Enable VPC Service Controls perimeter around ML project
+  ☐ Use Private Service Connect for private API access
+  ☐ Restrict egress from training VMs (no internet access)
+
+Data:
+  ☐ Enable CMEK for Vertex AI, GCS, and BigQuery
+  ☐ Run Cloud DLP on training datasets for PII detection
+  ☐ Enable Cloud Audit Logs (Data Access logs)
+  ☐ Use dataset-level IAM (not project-wide access)
+
+Governance:
+  ☐ Organization policies: restrict machine types, GPU quotas
+  ☐ Labels on all resources (team, env, cost-center)
+  ☐ Model cards for production models (Vertex AI Model Cards)
+  ☐ Explainability enabled for deployed models (Vertex Explainable AI)
+```
+
+### Responsible AI on Vertex AI
+
+| Component | Purpose |
+|-----------|---------|
+| **Vertex Explainable AI** | Feature attribution (Shapley values) for predictions |
+| **Model Cards** | Document model purpose, limitations, ethical considerations |
+| **Fairness indicators** | Assess model performance across demographic groups |
+| **What-If Tool** | Interactive model exploration and counterfactual analysis |
+| **Model Armor** | Runtime safety layer for generative AI (prompt injection, toxicity) |
+| **Data validation (TFDV)** | Detect anomalies and bias in training data |
+
+---
+
+## Summary Table
+
+| # | Topic | Key GCP Services |
+|---|-------|-----------------|
+| 1 | **Vertex AI Architecture** | Vertex AI (Workbench, Training, Endpoints, Pipelines) |
+| 2 | **ML Pipelines** | Vertex AI Pipelines (KFP SDK v2), Cloud Scheduler |
+| 3 | **Online Predictions** | Vertex AI Endpoints, autoscaling, traffic splitting |
+| 4 | **Batch Predictions** | Vertex AI Batch Predict, BigQuery I/O |
+| 5 | **Model Registry** | Vertex AI Model Registry, versioning, aliases |
+| 6 | **Feature Store** | Vertex AI Feature Store (Bigtable online, BigQuery offline) |
+| 7 | **Model Monitoring** | Vertex AI Model Monitoring (skew, drift, attribution) |
+| 8 | **BigQuery ML** | BQML (in-database training, SQL-based ML) |
+| 9 | **CI/CD for ML** | Cloud Build, Artifact Registry, Eventarc |
+| 10 | **Security & Governance** | Cloud IAM, VPC-SC, CMEK, Vertex Explainable AI |
+
+---
+
+## What's Next?
+
+This article covered GCP-specific MLOps services. For related content:
+
+- **General MLOps concepts:** [MLOps Interview QA - 1](/posts/aiops-interview/MLOps-Interview-QA-1.html)
+- **Azure MLOps:** [MLOps Interview QA - 2](/posts/aiops-interview/MLOps-Interview-QA-2.html)
+- **LLMOps:** [LLMOps Interview QA - 1](/posts/aiops-interview/LLMOps-Interview-QA-1.html)
+- **DevOps foundations:** [DevOps Interview QA - 1](/posts/aiops-interview/DevOps-Interview-QA-1.html)
+- **System design:** [System Design Interview QA - 1](/posts/system-design/System-Design-Interview-QA-1.html)

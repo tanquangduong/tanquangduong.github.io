@@ -1,0 +1,3617 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.36">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Vectoring AI">
+<meta name="dcterms.date" content="2026-05-21">
+<meta name="keywords" content="system design interview, load balancing, caching strategies, message queues, microservices, Kubernetes, CI/CD pipeline, monitoring observability, event-driven architecture, database replication, service mesh, Kafka, Redis">
+<meta name="description" content="10 system design interview questions on infrastructure components: load balancing, caching, message queues, microservices, database internals, Kubernetes, CI/CD, monitoring, event-driven architecture, and service mesh.">
+
+<title>System Design Interview QA - 2 – Vectoring AI</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../..//images/favicon.ico" rel="icon">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dbc92dda8186f57fa2e333fbb71d6a9d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-b981e3f33a8ad6ba97cc0b6118e04959.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/all.css" rel="stylesheet">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/latex-fontsize.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-Q4RQ337R0F"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-Q4RQ337R0F', { 'anonymize_ip': true});
+</script>
+<script async="" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9738638303661485" crossorigin="anonymous"></script>
+<!-- Cookie Consent Banner (GDPR compliant) -->
+<style>
+#cookie-consent-banner {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #1d1d1d !important;
+  color: #ffffff !important;
+  padding: 16px 24px;
+  z-index: 9999;
+  font-size: 14px;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+}
+#cookie-consent-banner p {
+  margin: 0 0 12px 0;
+  line-height: 1.5;
+  color: #ffffff !important;
+}
+#cookie-consent-banner a {
+  color: #78b9ff;
+  text-decoration: underline;
+}
+#cookie-consent-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+#cookie-consent-buttons button {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+#btn-accept-all {
+  background: #3B70FE;
+  color: #fff;
+}
+#btn-accept-essential {
+  background: #555;
+  color: #fff;
+}
+#btn-deny {
+  background: transparent;
+  color: #ccc;
+  border: 1px solid #666 !important;
+}
+</style>
+
+<meta property="og:title" content="System Design Interview QA - 2 – Vectoring AI">
+<meta property="og:description" content="10 system design interview questions on infrastructure components: load balancing, caching, message queues, microservices, database internals, Kubernetes, CI/CD, monitoring, event-driven architecture, and service mesh.">
+<meta property="og:image" content="https://vectoringai.com/images/system-design/thumb_system_design_interview_qa_300.png">
+<meta property="og:site_name" content="Vectoring AI">
+<meta property="og:image:height" content="200">
+<meta property="og:image:width" content="300">
+<meta name="twitter:title" content="System Design Interview QA - 2 – Vectoring AI">
+<meta name="twitter:description" content="10 system design interview questions on infrastructure components: load balancing, caching, message queues, microservices, database internals, Kubernetes, CI/CD, monitoring, event-driven architecture, and service mesh.">
+<meta name="twitter:image" content="https://vectoringai.com/images/system-design/thumb_system_design_interview_qa_300.png">
+<meta name="twitter:image-height" content="200">
+<meta name="twitter:image-width" content="300">
+<meta name="twitter:card" content="summary_large_image">
+</head><body class="nav-sidebar docked quarto-light"><div id="cookie-consent-banner">
+  <p>We use cookies to improve your browsing experience, support the operation of this site, and understand how visitors use our content.
+    You can accept all cookies, accept only essential cookies, or deny non-essential cookies.
+    <a href="../../pages/privacy.html">Privacy Policy</a>
+  </p>
+  <div id="cookie-consent-buttons">
+    <button id="btn-accept-all">Accept All</button>
+    <button id="btn-accept-essential">Essential Only</button>
+    <button id="btn-deny">Deny</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  var consent = localStorage.getItem("cookie_consent");
+
+  function loadAdSense() {
+    if (document.querySelector('script[src*="adsbygoogle"]')) return;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9738638303661485";
+    s.crossOrigin = "anonymous";
+    document.head.appendChild(s);
+  }
+
+  function showBanner() {
+    document.getElementById("cookie-consent-banner").style.display = "block";
+  }
+
+  function hideBanner() {
+    document.getElementById("cookie-consent-banner").style.display = "none";
+  }
+
+  if (consent === "all") {
+    loadAdSense();
+  } else if (consent === "essential" || consent === "denied") {
+    // Do not load AdSense
+  } else {
+    // No choice made yet — show banner, do not load AdSense
+    window.addEventListener("DOMContentLoaded", showBanner);
+  }
+
+  window.addEventListener("DOMContentLoaded", function() {
+    document.getElementById("btn-accept-all").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "all");
+      hideBanner();
+      loadAdSense();
+    });
+    document.getElementById("btn-accept-essential").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "essential");
+      hideBanner();
+    });
+    document.getElementById("btn-deny").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "denied");
+      hideBanner();
+    });
+  });
+})();
+</script>
+<script>
+// Inject missing Open Graph tags that Facebook requires for proper link sharing
+(function () {
+  if (!document.querySelector('meta[property="og:url"]')) {
+    var m = document.createElement("meta");
+    m.setAttribute("property", "og:url");
+    m.setAttribute("content", window.location.href);
+    document.head.appendChild(m);
+  }
+  if (!document.querySelector('meta[property="og:type"]')) {
+    var t = document.createElement("meta");
+    t.setAttribute("property", "og:type");
+    t.setAttribute("content", "article");
+    document.head.appendChild(t);
+  }
+  // Fix double-slash in og:image (site-url trailing slash + /images/...)
+  var ogImg = document.querySelector('meta[property="og:image"]');
+  if (ogImg) {
+    ogImg.setAttribute("content", ogImg.getAttribute("content").replace(/([^:])\/\//g, "$1/"));
+  }
+  var twImg = document.querySelector('meta[name="twitter:image"]');
+  if (twImg) {
+    twImg.setAttribute("content", twImg.getAttribute("content").replace(/([^:])\/\//g, "$1/"));
+  }
+})();
+</script>
+<style>
+.share-widget {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0.8rem 0 1.2rem 0;
+  padding: 0.5rem 0;
+}
+.share-widget .share-icon {
+  width: 20px;
+  height: 20px;
+  fill: #555;
+}
+.share-widget .share-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #555;
+}
+.share-widget .share-divider {
+  width: 1px;
+  height: 22px;
+  background: #ddd;
+}
+.share-widget a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  transition: transform 0.2s, box-shadow 0.2s;
+  text-decoration: none !important;
+}
+.share-widget a:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.share-widget a svg {
+  width: 20px;
+  height: 20px;
+}
+.notebook-widget {
+  margin: 0 0 1rem 0;
+}
+.notebook-widget a {
+  display: inline-block;
+  transition: transform 0.2s;
+}
+.notebook-widget a:hover {
+  transform: scale(1.05);
+}
+</style>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  if (!window.location.pathname.includes("/posts/")) return;
+
+  var rawTitle = document.title;
+  var rawUrl = window.location.href;
+  var title = encodeURIComponent(rawTitle);
+  var url = encodeURIComponent(rawUrl);
+
+  var widget = document.createElement("div");
+  widget.className = "share-widget";
+  widget.innerHTML =
+    '<svg class="share-icon" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>' +
+    '<span class="share-label">Share</span>' +
+    '<div class="share-divider"></div>' +
+    '<a href="https://twitter.com/intent/tweet?text=' + title + '&url=' + url + '" target="_blank" rel="noopener" title="Share on X"><svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>' +
+    '<a href="https://www.facebook.com/sharer/sharer.php?u=' + url + '" target="_blank" rel="noopener" title="Share on Facebook"><svg viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>' +
+    '<a href="https://www.linkedin.com/shareArticle?mini=true&url=' + url + '&title=' + title + '" target="_blank" rel="noopener" title="Share on LinkedIn"><svg viewBox="0 0 24 24" fill="#0A66C2"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>';
+
+  // Desktop: open a centered popup (standard share UX).
+  // Mobile: let the default target="_blank" navigate so the OS can
+  //         route to the native app (Facebook, LinkedIn, etc.).
+  var isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+  if (!isMobile) {
+    widget.querySelectorAll("a").forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        var w = 600, h = 500;
+        var left = (screen.width - w) / 2;
+        var top = (screen.height - h) / 2;
+        window.open(
+          this.href, "share",
+          "width=" + w + ",height=" + h + ",left=" + left + ",top=" + top + ",noopener,noreferrer"
+        );
+      });
+    });
+  }
+
+  // Insert right after the title-block header, before Keywords
+  var header = document.querySelector("header#title-block-header");
+  if (header && header.nextSibling) {
+    header.parentNode.insertBefore(widget, header.nextSibling);
+  }
+
+  // Add Colab / notebook button if the page has a notebook-link element
+  var nbEl = document.getElementById("notebook-link");
+  if (nbEl && nbEl.dataset.url) {
+    var nbWidget = document.createElement("div");
+    nbWidget.className = "notebook-widget";
+    nbWidget.innerHTML =
+      '<a href="' + nbEl.dataset.url + '" target="_blank" rel="noopener" title="Open notebook in Google Colab">' +
+      '<img src="/images/colab.png" alt="Open in Colab" style="height:28px">' +
+      '</a>';
+    // Insert right after the share widget
+    if (widget.nextSibling) {
+      widget.parentNode.insertBefore(nbWidget, widget.nextSibling);
+    } else if (widget.parentNode) {
+      widget.parentNode.appendChild(nbWidget);
+    }
+  }
+});
+</script>
+<script>
+  var link = document.createElement('link');
+  link.rel = 'canonical';
+  var path = window.location.pathname.replace(/index\.html$/, '');
+  link.href = 'https://vectoringai.com' + path;
+  document.head.appendChild(link);
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var ogTitle = document.querySelector('meta[property="og:title"]');
+  var ogDesc = document.querySelector('meta[property="og:description"]');
+  var ogImage = document.querySelector('meta[property="og:image"]');
+  var dcDate = document.querySelector('meta[name="dcterms.date"]');
+
+  if (!ogTitle) return;
+
+  var isArticle = !!dcDate;
+  var jsonld = {
+    "@context": "https://schema.org",
+    "@type": isArticle ? "Article" : "WebPage",
+    "headline": ogTitle.content.replace(/ – Vectoring AI$/, ''),
+    "description": ogDesc ? ogDesc.content : "",
+    "url": window.location.href,
+    "author": {
+      "@type": "Organization",
+      "name": "Vectoring AI",
+      "url": "https://vectoringai.com/pages/about.html"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Vectoring AI",
+      "url": "https://vectoringai.com",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://vectoringai.com/images/favicon_io/android-chrome-512x512.png"
+      }
+    }
+  };
+
+  if (ogImage) jsonld.image = ogImage.content;
+  if (dcDate) jsonld.datePublished = dcDate.content;
+
+  var el = document.createElement('script');
+  el.type = 'application/ld+json';
+  el.textContent = JSON.stringify(jsonld);
+  document.head.appendChild(el);
+});
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var title = document.querySelector(".sidebar-title");
+  if (title && !title.querySelector(".sidebar-logo-link")) {
+    var a = document.createElement("a");
+    a.href = "/";
+    a.className = "sidebar-logo-link";
+    var img = document.createElement("img");
+    img.src = "/images/logo_vectoringai_180.png";
+    img.alt = "Vectoring AI Home";
+    a.appendChild(img);
+    title.prepend(a);
+  }
+});
+</script>
+<!-- <script src="https://quge5.com/88/tag.min.js" data-zone="238344" async data-cfasync="false"></script> -->
+
+<!-- Reserve space at top of TOC so ad tag doesn't cover it -->
+<style>
+nav[role="doc-toc"] {
+  padding-top: 150px !important;
+}
+@media (min-width: 992px) {
+  nav[role="doc-toc"] {
+    padding-top: 180px !important;
+  }
+}
+</style>
+
+<script>
+(function(s){s.dataset.zone='10992645';s.src='https://nap5k.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')));
+</script>
+
+<!-- <script>(function(s){s.dataset.zone='10992714',s.src='https://n6wxm.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script> -->
+<script src="../../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="../../styles.css">
+
+
+
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">
+      Vectoring AI
+      </li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../../">Vectoring AI</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://github.com/VectoringAI" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+    <a href="https://www.youtube.com/@vectoringai" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-youtube"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><strong>Home</strong></span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>AI Engineering</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/llm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">LLMs</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/agent.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Agents</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/rag.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">RAG</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/benchmark.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Benchmarks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/milestone.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Milestones</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>AI Interview</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/ml-interview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ML Interview</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/llm-interview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">LLM Interview</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/swe-interview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">SWE Interview</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/aiops-interview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">AIOps Interview</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/design-pattern.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Design Pattern</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/system-design.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">System Design</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/ai-architect.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">AI Architect</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>Made by VAI</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/vaitalk.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">VaiTalk</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/about.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><strong>About</strong></span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title"><strong>Sections</strong></h2>
+   
+  <ul class="collapse">
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#q1-how-does-load-balancing-work-and-how-do-you-design-a-load-balancer" id="toc-q1-how-does-load-balancing-work-and-how-do-you-design-a-load-balancer" class="nav-link" data-scroll-target="#q1-how-does-load-balancing-work-and-how-do-you-design-a-load-balancer">Q1: How Does Load Balancing Work and How Do You Design a Load Balancer?</a></li>
+  <li><a href="#q2-how-do-you-design-a-caching-system-and-what-caching-strategies-exist" id="toc-q2-how-do-you-design-a-caching-system-and-what-caching-strategies-exist" class="nav-link" data-scroll-target="#q2-how-do-you-design-a-caching-system-and-what-caching-strategies-exist">Q2: How Do You Design a Caching System and What Caching Strategies Exist?</a></li>
+  <li><a href="#q3-how-do-message-queues-work-and-when-should-you-use-them" id="toc-q3-how-do-message-queues-work-and-when-should-you-use-them" class="nav-link" data-scroll-target="#q3-how-do-message-queues-work-and-when-should-you-use-them">Q3: How Do Message Queues Work and When Should You Use Them?</a></li>
+  <li><a href="#q4-how-do-you-design-a-microservices-architecture" id="toc-q4-how-do-you-design-a-microservices-architecture" class="nav-link" data-scroll-target="#q4-how-do-you-design-a-microservices-architecture">Q4: How Do You Design a Microservices Architecture?</a></li>
+  <li><a href="#q5-what-are-database-replication-and-partitioning-strategies" id="toc-q5-what-are-database-replication-and-partitioning-strategies" class="nav-link" data-scroll-target="#q5-what-are-database-replication-and-partitioning-strategies">Q5: What Are Database Replication and Partitioning Strategies?</a></li>
+  <li><a href="#q6-how-does-kubernetes-work-and-how-do-you-design-for-container-orchestration" id="toc-q6-how-does-kubernetes-work-and-how-do-you-design-for-container-orchestration" class="nav-link" data-scroll-target="#q6-how-does-kubernetes-work-and-how-do-you-design-for-container-orchestration">Q6: How Does Kubernetes Work and How Do You Design for Container Orchestration?</a></li>
+  <li><a href="#q7-how-do-you-design-a-cicd-pipeline" id="toc-q7-how-do-you-design-a-cicd-pipeline" class="nav-link" data-scroll-target="#q7-how-do-you-design-a-cicd-pipeline">Q7: How Do You Design a CI/CD Pipeline?</a></li>
+  <li><a href="#q8-how-do-you-design-a-monitoring-and-observability-system" id="toc-q8-how-do-you-design-a-monitoring-and-observability-system" class="nav-link" data-scroll-target="#q8-how-do-you-design-a-monitoring-and-observability-system">Q8: How Do You Design a Monitoring and Observability System?</a></li>
+  <li><a href="#q9-how-does-event-driven-architecture-work" id="toc-q9-how-does-event-driven-architecture-work" class="nav-link" data-scroll-target="#q9-how-does-event-driven-architecture-work">Q9: How Does Event-Driven Architecture Work?</a></li>
+  <li><a href="#q10-how-do-you-design-for-service-mesh-and-inter-service-communication" id="toc-q10-how-do-you-design-for-service-mesh-and-inter-service-communication" class="nav-link" data-scroll-target="#q10-how-do-you-design-for-service-mesh-and-inter-service-communication">Q10: How Do You Design for Service Mesh and Inter-Service Communication?</a></li>
+  <li><a href="#summary-table" id="toc-summary-table" class="nav-link" data-scroll-target="#summary-table">Summary Table</a></li>
+  <li><a href="#whats-next" id="toc-whats-next" class="nav-link" data-scroll-target="#whats-next">What’s Next?</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">System Design Interview QA - 2</h1>
+</div>
+
+<div>
+  <div class="description">
+    10 system design interview questions on infrastructure components: load balancing, caching, message queues, microservices, database internals, Kubernetes, CI/CD, monitoring, event-driven architecture, and service mesh.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://vectoringai.com/pages/about.html">Vectoring AI</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">21 May 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+<div>
+  <div class="keywords">
+    <div class="block-title">Keywords</div>
+    <p>system design interview, load balancing, caching strategies, message queues, microservices, Kubernetes, CI/CD pipeline, monitoring observability, event-driven architecture, database replication, service mesh, Kafka, Redis</p>
+  </div>
+</div>
+
+</header>
+
+
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>This is <strong>Part 2</strong> of our System Design Interview QA series, focusing on <strong>infrastructure components and operational systems</strong> that power production-grade architectures. While Part 1 covered foundational concepts (scalability, CAP theorem, etc.), this article dives deep into <strong>how specific infrastructure components work</strong> and how to design them.</p>
+<blockquote class="blockquote">
+<p>For foundational concepts (scalability, CAP theorem, APIs), see <a href="../../posts/system-design/System-Design-Interview-QA-1.html">System Design Interview QA - 1</a>. For hands-on design problems (URL shortener, chat system), see <a href="../../posts/system-design/System-Design-Interview-QA-3.html">System Design Interview QA - 3</a>.</p>
+</blockquote>
+<hr>
+</section>
+<section id="q1-how-does-load-balancing-work-and-how-do-you-design-a-load-balancer" class="level2">
+<h2 class="anchored" data-anchor-id="q1-how-does-load-balancing-work-and-how-do-you-design-a-load-balancer">Q1: How Does Load Balancing Work and How Do You Design a Load Balancer?</h2>
+<p><strong>Answer:</strong></p>
+<p>A load balancer distributes incoming network traffic across multiple backend servers to ensure no single server is overwhelmed, improving availability, throughput, and fault tolerance.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    CLIENTS["Clients"]
+    CLIENTS --&gt; DNS["DNS (Round Robin)&lt;br/&gt;→ multiple LB IPs"]
+    DNS --&gt; LB_A["Load Balancer (Active)"]
+    DNS --&gt; LB_S["Load Balancer (Standby)&lt;br/&gt;heartbeat monitoring"]
+
+    LB_A --&gt; S1["Server 1 ✅"]
+    LB_A --&gt; S2["Server 2 ✅"]
+    LB_A --&gt; S3["Server 3 ❌ (unhealthy)"]
+    LB_A --&gt; S4["Server 4 ✅"]
+
+    LB_A -.-&gt;|"Health check fails"| S3
+
+    style LB_A fill:#56cc9d,stroke:#333,color:#fff
+    style LB_S fill:#ffce67,stroke:#333
+    style S3 fill:#ff7851,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="layer-4-vs-layer-7-load-balancing" class="level3">
+<h3 class="anchored" data-anchor-id="layer-4-vs-layer-7-load-balancing">Layer 4 vs Layer 7 Load Balancing</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 15%">
+<col style="width: 39%">
+<col style="width: 45%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Aspect</th>
+<th>Layer 4 (Transport)</th>
+<th>Layer 7 (Application)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Operates on</strong></td>
+<td>TCP/UDP packets (IP + port)</td>
+<td>HTTP headers, URL path, cookies</td>
+</tr>
+<tr class="even">
+<td><strong>Speed</strong></td>
+<td>Very fast (no content inspection)</td>
+<td>Slower (must parse HTTP)</td>
+</tr>
+<tr class="odd">
+<td><strong>Routing decisions</strong></td>
+<td>IP hash, round robin, least connections</td>
+<td>URL path, headers, content type</td>
+</tr>
+<tr class="even">
+<td><strong>SSL termination</strong></td>
+<td>Passes through (or terminates)</td>
+<td>Terminates SSL, inspects content</td>
+</tr>
+<tr class="odd">
+<td><strong>Use case</strong></td>
+<td>TCP services, databases, gaming</td>
+<td>Web APIs, microservice routing</td>
+</tr>
+<tr class="even">
+<td><strong>Examples</strong></td>
+<td>AWS NLB, HAProxy (TCP mode)</td>
+<td>AWS ALB, Nginx, Envoy</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="load-balancing-algorithms-deep-dive" class="level3">
+<h3 class="anchored" data-anchor-id="load-balancing-algorithms-deep-dive">Load Balancing Algorithms Deep Dive</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph RR["Round Robin"]
+        RR1["Request 1 → Server A"]
+        RR2["Request 2 → Server B"]
+        RR3["Request 3 → Server C"]
+        RR4["Request 4 → Server A"]
+    end
+
+    subgraph LC["Least Connections"]
+        LC1["Server A: 5 active"]
+        LC2["Server B: 2 active ← next request"]
+        LC3["Server C: 8 active"]
+    end
+
+    subgraph WRR["Weighted Round Robin"]
+        WRR1["Server A (weight 5): gets 5 of every 8"]
+        WRR2["Server B (weight 2): gets 2 of every 8"]
+        WRR3["Server C (weight 1): gets 1 of every 8"]
+    end
+
+    style RR fill:#56cc9d,stroke:#333,color:#fff
+    style LC fill:#ffce67,stroke:#333
+    style WRR fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 35%">
+<col style="width: 32%">
+<col style="width: 32%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Algorithm</th>
+<th>Best For</th>
+<th>Weakness</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Round Robin</strong></td>
+<td>Equal-capacity servers, stateless services</td>
+<td>Ignores server load</td>
+</tr>
+<tr class="even">
+<td><strong>Weighted Round Robin</strong></td>
+<td>Mixed hardware capacities</td>
+<td>Static weights, doesn’t adapt</td>
+</tr>
+<tr class="odd">
+<td><strong>Least Connections</strong></td>
+<td>Long-lived connections (WebSocket, DB)</td>
+<td>May route to slow servers</td>
+</tr>
+<tr class="even">
+<td><strong>Least Response Time</strong></td>
+<td>Latency-sensitive services</td>
+<td>Requires constant measurement</td>
+</tr>
+<tr class="odd">
+<td><strong>IP Hash</strong></td>
+<td>Session affinity without sticky cookies</td>
+<td>Uneven with few clients</td>
+</tr>
+<tr class="even">
+<td><strong>Consistent Hashing</strong></td>
+<td>Cache distribution (Redis Cluster)</td>
+<td>Complex implementation</td>
+</tr>
+<tr class="odd">
+<td><strong>Random</strong></td>
+<td>Large server pools, simplicity</td>
+<td>Variance with few servers</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="session-persistence-sticky-sessions" class="level3">
+<h3 class="anchored" data-anchor-id="session-persistence-sticky-sessions">Session Persistence (Sticky Sessions)</h3>
+<pre><code>Problem: User state (shopping cart, login session) lives on one server.
+         If next request goes to different server → state lost.
+
+Solutions (from worst to best):
+  1. Sticky sessions (cookie/IP-based routing to same server)
+     - Simple but defeats load balancing purpose
+     - Server failure = lost sessions
+
+  2. Session replication (broadcast sessions to all servers)
+     - Network overhead grows O(n²)
+     - Memory wasted on every server
+
+  3. Centralized session store (Redis/Memcached) ← RECOMMENDED
+     - Any server can handle any request
+     - Session stored in Redis with TTL
+     - Server failure has zero impact on sessions
+     - Scales independently</code></pre>
+</section>
+<section id="health-check-design" class="level3">
+<h3 class="anchored" data-anchor-id="health-check-design">Health Check Design</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 29%">
+<col style="width: 27%">
+<col style="width: 27%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Type</th>
+<th>Mechanism</th>
+<th>Interval</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>TCP check</strong></td>
+<td>Can connect to port?</td>
+<td>5-10s</td>
+<td>Basic availability</td>
+</tr>
+<tr class="even">
+<td><strong>HTTP check</strong></td>
+<td><code>GET /health</code> returns 200?</td>
+<td>5-10s</td>
+<td>Application-level health</td>
+</tr>
+<tr class="odd">
+<td><strong>Deep health check</strong></td>
+<td>Checks DB connectivity, disk space, dependencies</td>
+<td>30s</td>
+<td>Comprehensive readiness</td>
+</tr>
+</tbody>
+</table>
+<pre><code>Health check state machine:
+  HEALTHY → 3 consecutive failures → UNHEALTHY (remove from pool)
+  UNHEALTHY → 2 consecutive successes → HEALTHY (add back to pool)
+  
+  Drain mode: stop sending new requests, wait for active to complete</code></pre>
+<hr>
+</section>
+</section>
+<section id="q2-how-do-you-design-a-caching-system-and-what-caching-strategies-exist" class="level2">
+<h2 class="anchored" data-anchor-id="q2-how-do-you-design-a-caching-system-and-what-caching-strategies-exist">Q2: How Do You Design a Caching System and What Caching Strategies Exist?</h2>
+<p><strong>Answer:</strong></p>
+<p>Caching stores frequently accessed data in fast storage (memory) to reduce latency and database load. A well-designed caching strategy can reduce P99 latency from 100ms to &lt;1ms.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph Layers["Multi-Layer Caching"]
+        CLIENT["Browser Cache&lt;br/&gt;(HTTP cache headers)"]
+        CDN["CDN Cache&lt;br/&gt;(static assets, edge)"]
+        APP["Application Cache&lt;br/&gt;(Redis / Memcached)"]
+        DB_CACHE["Database Cache&lt;br/&gt;(query cache, buffer pool)"]
+    end
+
+    CLIENT --&gt; CDN --&gt; APP --&gt; DB_CACHE --&gt; DB["Database"]
+
+    style CLIENT fill:#56cc9d,stroke:#333,color:#fff
+    style CDN fill:#ffce67,stroke:#333
+    style APP fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="caching-patterns-implementation-detail" class="level3">
+<h3 class="anchored" data-anchor-id="caching-patterns-implementation-detail">Caching Patterns (Implementation Detail)</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph CacheAside["Cache-Aside (Lazy Loading)"]
+        A1["App checks cache"]
+        A1 --&gt;|"miss"| A2["App queries DB"]
+        A2 --&gt; A3["App writes to cache"]
+    end
+
+    subgraph WriteThrough["Write-Through"]
+        B1["App writes to cache"]
+        B1 --&gt; B2["Cache writes to DB"]
+        B2 --&gt; B3["Confirm to app"]
+    end
+
+    subgraph WriteBehind["Write-Behind (Write-Back)"]
+        C1["App writes to cache"]
+        C1 --&gt; C2["Return immediately"]
+        C2 -.-&gt;|"async"| C3["Cache writes to DB later"]
+    end
+
+    style CacheAside fill:#56cc9d,stroke:#333,color:#fff
+    style WriteThrough fill:#ffce67,stroke:#333
+    style WriteBehind fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 29%">
+<col style="width: 13%">
+<col style="width: 13%">
+<col style="width: 22%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Pattern</th>
+<th>How It Works</th>
+<th>Pros</th>
+<th>Cons</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Cache-aside</strong></td>
+<td>App manages cache manually; check cache → miss → query DB → populate cache</td>
+<td>Only caches hot data; cache failure non-fatal</td>
+<td>Initial requests are slow (cold cache); possible stale data</td>
+<td>General purpose, read-heavy</td>
+</tr>
+<tr class="even">
+<td><strong>Write-through</strong></td>
+<td>Every write goes to cache AND DB synchronously</td>
+<td>Cache always has latest data</td>
+<td>Write latency increases (2 writes); caches data that may never be read</td>
+<td>Read-after-write consistency</td>
+</tr>
+<tr class="odd">
+<td><strong>Write-behind</strong></td>
+<td>Write to cache, async flush to DB</td>
+<td>Very fast writes; batch DB writes</td>
+<td>Data loss risk if cache crashes before flush</td>
+<td>Write-heavy workloads</td>
+</tr>
+<tr class="even">
+<td><strong>Read-through</strong></td>
+<td>Cache fetches from DB on miss (cache is the data interface)</td>
+<td>Simpler app code</td>
+<td>Cache library must support it</td>
+<td>When using cache frameworks</td>
+</tr>
+<tr class="odd">
+<td><strong>Refresh-ahead</strong></td>
+<td>Proactively refresh cache before TTL expires</td>
+<td>No cache miss latency</td>
+<td>Wastes resources on rarely accessed keys</td>
+<td>Predictable access patterns</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="cache-eviction-policies" class="level3">
+<h3 class="anchored" data-anchor-id="cache-eviction-policies">Cache Eviction Policies</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 30%">
+<col style="width: 30%">
+<col style="width: 38%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Policy</th>
+<th>Evicts</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>LRU</strong> (Least Recently Used)</td>
+<td>Item not accessed longest</td>
+<td>General purpose (most common)</td>
+</tr>
+<tr class="even">
+<td><strong>LFU</strong> (Least Frequently Used)</td>
+<td>Item accessed fewest times</td>
+<td>Frequency-based workloads</td>
+</tr>
+<tr class="odd">
+<td><strong>FIFO</strong> (First In First Out)</td>
+<td>Oldest inserted item</td>
+<td>Simple, time-based freshness</td>
+</tr>
+<tr class="even">
+<td><strong>TTL</strong> (Time-To-Live)</td>
+<td>Items past expiration time</td>
+<td>Data with known freshness window</td>
+</tr>
+<tr class="odd">
+<td><strong>Random</strong></td>
+<td>Random item</td>
+<td>When access patterns are uniform</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="redis-vs-memcached" class="level3">
+<h3 class="anchored" data-anchor-id="redis-vs-memcached">Redis vs Memcached</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 25%">
+<col style="width: 40%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Feature</th>
+<th>Redis</th>
+<th>Memcached</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Data structures</strong></td>
+<td>Strings, hashes, lists, sets, sorted sets, streams</td>
+<td>Strings only</td>
+</tr>
+<tr class="even">
+<td><strong>Persistence</strong></td>
+<td>RDB snapshots + AOF (append-only file)</td>
+<td>None (pure cache)</td>
+</tr>
+<tr class="odd">
+<td><strong>Replication</strong></td>
+<td>Built-in master-replica</td>
+<td>None (client-side)</td>
+</tr>
+<tr class="even">
+<td><strong>Clustering</strong></td>
+<td>Redis Cluster (automatic sharding)</td>
+<td>Client-side sharding</td>
+</tr>
+<tr class="odd">
+<td><strong>Pub/Sub</strong></td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><strong>Lua scripting</strong></td>
+<td>Yes (atomic operations)</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><strong>Memory efficiency</strong></td>
+<td>Moderate (overhead per key)</td>
+<td>Slab allocator (efficient for uniform sizes)</td>
+</tr>
+<tr class="even">
+<td><strong>Threads</strong></td>
+<td>Single-threaded (6.0+ has I/O threads)</td>
+<td>Multi-threaded</td>
+</tr>
+<tr class="odd">
+<td><strong>Best for</strong></td>
+<td>Complex data, pub/sub, leaderboards, sessions</td>
+<td>Simple high-throughput caching</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="cache-stampede-prevention" class="level3">
+<h3 class="anchored" data-anchor-id="cache-stampede-prevention">Cache Stampede Prevention</h3>
+<pre><code>Problem: Cache key expires → hundreds of requests simultaneously hit DB → DB overload
+
+Solutions:
+  1. Lock/mutex: Only one request fetches from DB, others wait
+     cache_key = "user:123"
+     lock_key = f"lock:{cache_key}"
+     if not redis.get(cache_key):
+         if redis.set(lock_key, "1", nx=True, ex=5):  # acquire lock
+             data = db.query(...)
+             redis.set(cache_key, data, ex=300)
+             redis.delete(lock_key)
+         else:
+             wait_for_cache()  # spin until cache populated
+
+  2. Probabilistic early recomputation:
+     - Each read checks: should I refresh? (probability increases near TTL)
+     - Spreads refresh across time window
+
+  3. Background refresh (refresh-ahead):
+     - Background job refreshes popular keys before expiry
+     - No stampede possible</code></pre>
+<hr>
+</section>
+</section>
+<section id="q3-how-do-message-queues-work-and-when-should-you-use-them" class="level2">
+<h2 class="anchored" data-anchor-id="q3-how-do-message-queues-work-and-when-should-you-use-them">Q3: How Do Message Queues Work and When Should You Use Them?</h2>
+<p><strong>Answer:</strong></p>
+<p>Message queues enable asynchronous communication between services by decoupling producers (senders) from consumers (receivers). They provide buffering, load leveling, and guaranteed delivery.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    P1["Producer A&lt;br/&gt;(Order Service)"]
+    P2["Producer B&lt;br/&gt;(Payment Service)"]
+    P1 --&gt; Q["Message Queue&lt;br/&gt;(Kafka / RabbitMQ / SQS)"]
+    P2 --&gt; Q
+    Q --&gt; C1["Consumer 1&lt;br/&gt;(Email Service)"]
+    Q --&gt; C2["Consumer 2&lt;br/&gt;(Analytics Service)"]
+    Q --&gt; C3["Consumer 3&lt;br/&gt;(Inventory Service)"]
+
+    style Q fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="when-to-use-a-message-queue" class="level3">
+<h3 class="anchored" data-anchor-id="when-to-use-a-message-queue">When to Use a Message Queue</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 29%">
+<col style="width: 38%">
+<col style="width: 32%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Use Case</th>
+<th>Without Queue</th>
+<th>With Queue</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Async processing</strong></td>
+<td>User waits for email to send (slow)</td>
+<td>Return immediately, email sends in background</td>
+</tr>
+<tr class="even">
+<td><strong>Load leveling</strong></td>
+<td>Traffic spike crashes service</td>
+<td>Queue absorbs spike, consumers process at their pace</td>
+</tr>
+<tr class="odd">
+<td><strong>Decoupling</strong></td>
+<td>Service A calls Service B directly (tight coupling)</td>
+<td>Service A publishes event, B consumes when ready</td>
+</tr>
+<tr class="even">
+<td><strong>Retry/DLQ</strong></td>
+<td>Failed requests are lost</td>
+<td>Failed messages retry with backoff, go to dead-letter queue</td>
+</tr>
+<tr class="odd">
+<td><strong>Fan-out</strong></td>
+<td>One service calls 5 downstream services</td>
+<td>Publish once, 5 consumers process independently</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="kafka-vs-rabbitmq-vs-sqs" class="level3">
+<h3 class="anchored" data-anchor-id="kafka-vs-rabbitmq-vs-sqs">Kafka vs RabbitMQ vs SQS</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 21%">
+<col style="width: 31%">
+<col style="width: 24%">
+<col style="width: 21%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Feature</th>
+<th>Apache Kafka</th>
+<th>RabbitMQ</th>
+<th>AWS SQS</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Model</strong></td>
+<td>Distributed log (pub/sub + streaming)</td>
+<td>Message broker (queues + exchanges)</td>
+<td>Managed queue service</td>
+</tr>
+<tr class="even">
+<td><strong>Ordering</strong></td>
+<td>Per partition (guaranteed)</td>
+<td>Per queue (FIFO mode)</td>
+<td>FIFO queues (limited throughput)</td>
+</tr>
+<tr class="odd">
+<td><strong>Throughput</strong></td>
+<td>Millions msgs/sec</td>
+<td>Tens of thousands msgs/sec</td>
+<td>Thousands msgs/sec</td>
+</tr>
+<tr class="even">
+<td><strong>Retention</strong></td>
+<td>Configurable (days/weeks/forever)</td>
+<td>Until consumed/TTL</td>
+<td>14 days max</td>
+</tr>
+<tr class="odd">
+<td><strong>Consumer model</strong></td>
+<td>Pull (consumers poll partitions)</td>
+<td>Push (broker delivers to consumers)</td>
+<td>Pull (long polling)</td>
+</tr>
+<tr class="even">
+<td><strong>Replay</strong></td>
+<td>Yes (consumers can re-read from any offset)</td>
+<td>No (message gone after ACK)</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><strong>Use case</strong></td>
+<td>Event streaming, logs, analytics pipeline</td>
+<td>Task queues, RPC, routing</td>
+<td>Simple async tasks, serverless</td>
+</tr>
+<tr class="even">
+<td><strong>Complexity</strong></td>
+<td>High (ZooKeeper/KRaft, partitions, offsets)</td>
+<td>Medium (exchanges, bindings)</td>
+<td>Low (fully managed)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="kafka-architecture-deep-dive" class="level3">
+<h3 class="anchored" data-anchor-id="kafka-architecture-deep-dive">Kafka Architecture Deep Dive</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph Producers
+        P1["Producer 1"]
+        P2["Producer 2"]
+    end
+
+    subgraph Kafka["Kafka Cluster"]
+        subgraph Topic["Topic: orders (3 partitions)"]
+            PART0["Partition 0&lt;br/&gt;[msg1, msg4, msg7...]"]
+            PART1["Partition 1&lt;br/&gt;[msg2, msg5, msg8...]"]
+            PART2["Partition 2&lt;br/&gt;[msg3, msg6, msg9...]"]
+        end
+    end
+
+    subgraph ConsumerGroup["Consumer Group: order-processors"]
+        C1["Consumer 1&lt;br/&gt;← Partition 0"]
+        C2["Consumer 2&lt;br/&gt;← Partition 1"]
+        C3["Consumer 3&lt;br/&gt;← Partition 2"]
+    end
+
+    P1 --&gt; PART0
+    P2 --&gt; PART1
+    PART0 --&gt; C1
+    PART1 --&gt; C2
+    PART2 --&gt; C3
+
+    style Kafka fill:#56cc9d,stroke:#333,color:#fff
+    style ConsumerGroup fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="delivery-guarantees" class="level3">
+<h3 class="anchored" data-anchor-id="delivery-guarantees">Delivery Guarantees</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 22%">
+<col style="width: 24%">
+<col style="width: 32%">
+<col style="width: 22%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Guarantee</th>
+<th>Description</th>
+<th>How to Achieve</th>
+<th>Trade-off</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>At-most-once</strong></td>
+<td>Message delivered 0 or 1 times</td>
+<td>No retries, fire and forget</td>
+<td>May lose messages</td>
+</tr>
+<tr class="even">
+<td><strong>At-least-once</strong></td>
+<td>Message delivered 1 or more times</td>
+<td>Retry on failure, ACK after processing</td>
+<td>May have duplicates</td>
+</tr>
+<tr class="odd">
+<td><strong>Exactly-once</strong></td>
+<td>Message delivered exactly 1 time</td>
+<td>Idempotent consumers + transactional writes</td>
+<td>Complex, slower</td>
+</tr>
+</tbody>
+</table>
+<pre><code>Exactly-once in practice:
+  - Kafka: Idempotent producer + transactions + consumer offset commit
+  - Application-level: Idempotency key in each message
+    → Consumer checks: "Have I processed message with ID X?"
+    → If yes → skip (dedup)
+    → If no → process + record ID in DB (same transaction)</code></pre>
+</section>
+<section id="dead-letter-queue-dlq" class="level3">
+<h3 class="anchored" data-anchor-id="dead-letter-queue-dlq">Dead Letter Queue (DLQ)</h3>
+<pre><code>Message processing flow:
+  1. Consumer picks up message
+  2. Processing fails → retry (exponential backoff: 1s, 5s, 30s, 5min)
+  3. After max retries (e.g., 5 attempts) → move to Dead Letter Queue
+  4. DLQ messages are inspected manually or by automated systems
+  5. Fix the bug → replay DLQ messages back to original queue
+
+Why DLQ matters:
+  - Prevents poison messages from blocking the queue
+  - Preserves failed messages for debugging
+  - Allows retry after fix is deployed</code></pre>
+<hr>
+</section>
+</section>
+<section id="q4-how-do-you-design-a-microservices-architecture" class="level2">
+<h2 class="anchored" data-anchor-id="q4-how-do-you-design-a-microservices-architecture">Q4: How Do You Design a Microservices Architecture?</h2>
+<p><strong>Answer:</strong></p>
+<p>Microservices architecture structures an application as a collection of loosely coupled, independently deployable services, each owning its own data and business logic.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    CLIENT["Client"]
+    CLIENT --&gt; GW["API Gateway"]
+    GW --&gt; US["User Service&lt;br/&gt;(PostgreSQL)"]
+    GW --&gt; OS["Order Service&lt;br/&gt;(MySQL)"]
+    GW --&gt; PS["Payment Service&lt;br/&gt;(MongoDB)"]
+    GW --&gt; NS["Notification Service&lt;br/&gt;(Redis)"]
+
+    OS --&gt;|"Event: order_created"| MQ["Message Bus&lt;br/&gt;(Kafka)"]
+    MQ --&gt; PS
+    MQ --&gt; NS
+    OS --&gt;|"gRPC"| US
+
+    subgraph SD["Service Discovery"]
+        REG["Service Registry&lt;br/&gt;(Consul / Eureka)"]
+    end
+
+    US --&gt; REG
+    OS --&gt; REG
+    PS --&gt; REG
+
+    style GW fill:#56cc9d,stroke:#333,color:#fff
+    style MQ fill:#ffce67,stroke:#333
+    style SD fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="microservices-design-principles" class="level3">
+<h3 class="anchored" data-anchor-id="microservices-design-principles">Microservices Design Principles</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 39%">
+<col style="width: 27%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Principle</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Single responsibility</strong></td>
+<td>Each service does one thing well</td>
+<td>User Service only handles user CRUD + auth</td>
+</tr>
+<tr class="even">
+<td><strong>Database per service</strong></td>
+<td>No shared databases</td>
+<td>Order Service has its own MySQL instance</td>
+</tr>
+<tr class="odd">
+<td><strong>API-first</strong></td>
+<td>Define contracts before implementation</td>
+<td>OpenAPI spec agreed before coding</td>
+</tr>
+<tr class="even">
+<td><strong>Decentralized governance</strong></td>
+<td>Teams choose their own tech stack</td>
+<td>User svc in Go, Analytics in Python</td>
+</tr>
+<tr class="odd">
+<td><strong>Design for failure</strong></td>
+<td>Assume any service can fail</td>
+<td>Circuit breakers, retries, fallbacks</td>
+</tr>
+<tr class="even">
+<td><strong>Smart endpoints, dumb pipes</strong></td>
+<td>Logic in services, not in the message bus</td>
+<td>Services process events, Kafka just delivers</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="service-communication-patterns" class="level3">
+<h3 class="anchored" data-anchor-id="service-communication-patterns">Service Communication Patterns</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 26%">
+<col style="width: 17%">
+<col style="width: 29%">
+<col style="width: 26%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Pattern</th>
+<th>Type</th>
+<th>Use Case</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>REST/HTTP</strong></td>
+<td>Synchronous</td>
+<td>Simple CRUD operations</td>
+<td>GET /users/123</td>
+</tr>
+<tr class="even">
+<td><strong>gRPC</strong></td>
+<td>Synchronous</td>
+<td>Low-latency internal calls</td>
+<td>Service-to-service with protobuf</td>
+</tr>
+<tr class="odd">
+<td><strong>Event-driven (async)</strong></td>
+<td>Asynchronous</td>
+<td>Decouple services, eventual consistency</td>
+<td>OrderCreated event → Payment, Notification</td>
+</tr>
+<tr class="even">
+<td><strong>Saga</strong></td>
+<td>Choreography/Orchestration</td>
+<td>Distributed transactions</td>
+<td>Order → Payment → Inventory (compensating on failure)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="saga-pattern-for-distributed-transactions" class="level3">
+<h3 class="anchored" data-anchor-id="saga-pattern-for-distributed-transactions">Saga Pattern for Distributed Transactions</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph Happy["Happy Path"]
+        O1["Create Order&lt;br/&gt;(PENDING)"] --&gt; P1["Reserve Payment"]
+        P1 --&gt; I1["Reserve Inventory"]
+        I1 --&gt; O2["Confirm Order&lt;br/&gt;(CONFIRMED)"]
+    end
+
+    subgraph Compensate["Compensation (on failure)"]
+        I_FAIL["Inventory fails"] --&gt; P_COMP["Refund Payment"]
+        P_COMP --&gt; O_COMP["Cancel Order"]
+    end
+
+    style Happy fill:#56cc9d,stroke:#333,color:#fff
+    style Compensate fill:#ff7851,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 30%">
+<col style="width: 36%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Saga Type</th>
+<th>Coordination</th>
+<th>Pros</th>
+<th>Cons</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Choreography</strong></td>
+<td>Each service listens to events and acts</td>
+<td>Decoupled, no central coordinator</td>
+<td>Hard to track overall flow, debugging complex</td>
+</tr>
+<tr class="even">
+<td><strong>Orchestration</strong></td>
+<td>Central orchestrator directs the workflow</td>
+<td>Easy to understand and monitor</td>
+<td>Orchestrator is a single point of failure</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="service-discovery" class="level3">
+<h3 class="anchored" data-anchor-id="service-discovery">Service Discovery</h3>
+<pre><code>Problem: Services scale dynamically (pods come and go).
+         How does Service A find Service B's current address?
+
+Solution: Service Registry
+  1. Service starts → registers itself (IP:port) with registry
+  2. Service wants to call another → queries registry for addresses
+  3. Registry health-checks registered services, removes dead ones
+  4. Client-side load balancing across returned addresses
+
+Tools:
+  - Consul (HashiCorp) — service mesh + KV store + health checks
+  - Eureka (Netflix) — Java-focused, Spring Cloud native
+  - Kubernetes DNS — built-in (service-name.namespace.svc.cluster.local)
+  - etcd — distributed KV store (used by Kubernetes internally)</code></pre>
+<hr>
+</section>
+</section>
+<section id="q5-what-are-database-replication-and-partitioning-strategies" class="level2">
+<h2 class="anchored" data-anchor-id="q5-what-are-database-replication-and-partitioning-strategies">Q5: What Are Database Replication and Partitioning Strategies?</h2>
+<p><strong>Answer:</strong></p>
+<p>Replication and partitioning are the two fundamental mechanisms for scaling databases beyond a single machine, addressing read throughput, write throughput, storage capacity, and availability.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph Replication["Replication (copies of same data)"]
+        PRIMARY["Primary (writes)"]
+        PRIMARY --&gt;|"Async/Sync replication"| REP1["Replica 1 (reads)"]
+        PRIMARY --&gt;|"Async/Sync replication"| REP2["Replica 2 (reads)"]
+        PRIMARY --&gt;|"Async/Sync replication"| REP3["Replica 3 (reads)"]
+    end
+
+    subgraph Partitioning["Partitioning / Sharding (split data)"]
+        ROUTER["Router"]
+        ROUTER --&gt; SHARD1["Shard 1&lt;br/&gt;Users A-H"]
+        ROUTER --&gt; SHARD2["Shard 2&lt;br/&gt;Users I-P"]
+        ROUTER --&gt; SHARD3["Shard 3&lt;br/&gt;Users Q-Z"]
+    end
+
+    style PRIMARY fill:#56cc9d,stroke:#333,color:#fff
+    style ROUTER fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="replication-strategies" class="level3">
+<h3 class="anchored" data-anchor-id="replication-strategies">Replication Strategies</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 18%">
+<col style="width: 23%">
+<col style="width: 23%">
+<col style="width: 16%">
+<col style="width: 18%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Strategy</th>
+<th>How It Works</th>
+<th>Consistency</th>
+<th>Latency</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Synchronous</strong></td>
+<td>Primary waits for all replicas to ACK</td>
+<td>Strong</td>
+<td>High (slowest replica)</td>
+<td>Financial transactions</td>
+</tr>
+<tr class="even">
+<td><strong>Semi-synchronous</strong></td>
+<td>Primary waits for at least 1 replica ACK</td>
+<td>Strong (with 1 replica)</td>
+<td>Medium</td>
+<td>Critical data with some tolerance</td>
+</tr>
+<tr class="odd">
+<td><strong>Asynchronous</strong></td>
+<td>Primary doesn’t wait, replicas catch up</td>
+<td>Eventual</td>
+<td>Low</td>
+<td>Read-heavy workloads, analytics</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="replication-topologies" class="level3">
+<h3 class="anchored" data-anchor-id="replication-topologies">Replication Topologies</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 28%">
+<col style="width: 37%">
+<col style="width: 17%">
+<col style="width: 17%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Topology</th>
+<th>Description</th>
+<th>Pros</th>
+<th>Cons</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Single-leader</strong></td>
+<td>One primary (writes), N replicas (reads)</td>
+<td>Simple, no conflicts</td>
+<td>Write bottleneck on primary</td>
+</tr>
+<tr class="even">
+<td><strong>Multi-leader</strong></td>
+<td>Multiple primaries, each accepts writes</td>
+<td>Write scaling, geo-distributed</td>
+<td>Conflict resolution needed</td>
+</tr>
+<tr class="odd">
+<td><strong>Leaderless</strong></td>
+<td>Any node accepts reads/writes (quorum)</td>
+<td>High availability, no failover</td>
+<td>Complex, conflict resolution</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="replication-lag-problems" class="level3">
+<h3 class="anchored" data-anchor-id="replication-lag-problems">Replication Lag Problems</h3>
+<pre><code>Scenario: User updates profile (write to primary), immediately reads (from replica)
+Problem: Replica hasn't received the update yet → shows stale data
+
+Solutions:
+  1. Read-your-writes consistency:
+     → After write, read from primary for N seconds
+     → Or track last-write timestamp, read from replica only if up-to-date
+
+  2. Monotonic reads:
+     → Always route same user to same replica (sticky reads)
+     → Prevents seeing data go "backward"
+
+  3. Causal consistency:
+     → Track dependencies between writes
+     → Replica only serves reads after all causal dependencies are applied</code></pre>
+</section>
+<section id="sharding-partitioning-deep-dive" class="level3">
+<h3 class="anchored" data-anchor-id="sharding-partitioning-deep-dive">Sharding (Partitioning) Deep Dive</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 47%">
+<col style="width: 22%">
+<col style="width: 15%">
+<col style="width: 15%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Shard Key Strategy</th>
+<th>Example</th>
+<th>Pros</th>
+<th>Cons</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Hash-based</strong></td>
+<td><code>shard = hash(user_id) % 4</code></td>
+<td>Even distribution</td>
+<td>Range queries span all shards</td>
+</tr>
+<tr class="even">
+<td><strong>Range-based</strong></td>
+<td><code>shard1: dates Jan-Mar</code></td>
+<td>Efficient range scans</td>
+<td>Hot shards (recent data accessed most)</td>
+</tr>
+<tr class="odd">
+<td><strong>Geographic</strong></td>
+<td><code>shard_us, shard_eu, shard_asia</code></td>
+<td>Data locality, compliance</td>
+<td>Uneven if one region dominates</td>
+</tr>
+<tr class="even">
+<td><strong>Directory</strong></td>
+<td>Lookup table: <code>user123 → shard2</code></td>
+<td>Maximum flexibility</td>
+<td>Directory is bottleneck/SPOF</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="cross-shard-operations" class="level3">
+<h3 class="anchored" data-anchor-id="cross-shard-operations">Cross-Shard Operations</h3>
+<pre><code>Challenge: Query that spans multiple shards (e.g., "all orders &gt; $100")
+
+Approaches:
+  1. Scatter-gather: Query all shards, merge results (expensive)
+  2. Denormalize: Copy needed data into each shard (storage trade-off)
+  3. Global index: Secondary index service spans all shards
+  4. Avoid: Design schema so most queries hit single shard
+     → Shard by user_id, and most queries are user-scoped</code></pre>
+<hr>
+</section>
+</section>
+<section id="q6-how-does-kubernetes-work-and-how-do-you-design-for-container-orchestration" class="level2">
+<h2 class="anchored" data-anchor-id="q6-how-does-kubernetes-work-and-how-do-you-design-for-container-orchestration">Q6: How Does Kubernetes Work and How Do You Design for Container Orchestration?</h2>
+<p><strong>Answer:</strong></p>
+<p>Kubernetes (K8s) is a container orchestration platform that automates deployment, scaling, and management of containerized applications. It’s the de facto standard for running microservices in production.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph ControlPlane["Control Plane"]
+        API["API Server&lt;br/&gt;(kube-apiserver)"]
+        SCHED["Scheduler&lt;br/&gt;(kube-scheduler)"]
+        CM["Controller Manager"]
+        ETCD["etcd&lt;br/&gt;(cluster state store)"]
+    end
+
+    subgraph WorkerNode["Worker Node 1"]
+        KUBELET["kubelet"]
+        PROXY["kube-proxy"]
+        POD1["Pod A&lt;br/&gt;(Container 1)"]
+        POD2["Pod B&lt;br/&gt;(Container 2, Container 3)"]
+    end
+
+    subgraph WorkerNode2["Worker Node 2"]
+        KUBELET2["kubelet"]
+        POD3["Pod C"]
+        POD4["Pod D"]
+    end
+
+    API --&gt; SCHED
+    API --&gt; CM
+    API --&gt; ETCD
+    API --&gt; KUBELET
+    API --&gt; KUBELET2
+
+    style ControlPlane fill:#56cc9d,stroke:#333,color:#fff
+    style WorkerNode fill:#ffce67,stroke:#333
+    style WorkerNode2 fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="core-kubernetes-objects" class="level3">
+<h3 class="anchored" data-anchor-id="core-kubernetes-objects">Core Kubernetes Objects</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 30%">
+<col style="width: 34%">
+<col style="width: 34%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Object</th>
+<th>Purpose</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Pod</strong></td>
+<td>Smallest deployable unit (1+ containers)</td>
+<td>Single instance of your app</td>
+</tr>
+<tr class="even">
+<td><strong>Deployment</strong></td>
+<td>Manages desired state of Pods (replicas, rolling updates)</td>
+<td>“Run 3 replicas of user-service v2”</td>
+</tr>
+<tr class="odd">
+<td><strong>Service</strong></td>
+<td>Stable network endpoint for a set of Pods</td>
+<td>Load-balanced IP for user-service Pods</td>
+</tr>
+<tr class="even">
+<td><strong>Ingress</strong></td>
+<td>External HTTP routing to services</td>
+<td><code>api.example.com/users → user-service</code></td>
+</tr>
+<tr class="odd">
+<td><strong>ConfigMap</strong></td>
+<td>Non-sensitive configuration</td>
+<td>Database host, feature flags</td>
+</tr>
+<tr class="even">
+<td><strong>Secret</strong></td>
+<td>Sensitive data (encrypted at rest)</td>
+<td>DB passwords, API keys</td>
+</tr>
+<tr class="odd">
+<td><strong>HPA</strong></td>
+<td>Horizontal Pod Autoscaler</td>
+<td>Scale Pods based on CPU/memory/custom metrics</td>
+</tr>
+<tr class="even">
+<td><strong>PVC</strong></td>
+<td>Persistent Volume Claim</td>
+<td>Attach storage to stateful Pods</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="deployment-strategies-in-kubernetes" class="level3">
+<h3 class="anchored" data-anchor-id="deployment-strategies-in-kubernetes">Deployment Strategies in Kubernetes</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph Rolling["Rolling Update (default)"]
+        R1["v1 v1 v1"] --&gt; R2["v2 v1 v1"] --&gt; R3["v2 v2 v1"] --&gt; R4["v2 v2 v2"]
+    end
+
+    subgraph BlueGreen["Blue-Green"]
+        BG1["Blue (v1) ← traffic"] --&gt; BG2["Green (v2) ← traffic"]
+    end
+
+    subgraph Canary["Canary"]
+        CAN1["v1: 90% traffic&lt;br/&gt;v2: 10% traffic"] --&gt; CAN2["v1: 0%&lt;br/&gt;v2: 100%"]
+    end
+
+    style Rolling fill:#56cc9d,stroke:#333,color:#fff
+    style BlueGreen fill:#ffce67,stroke:#333
+    style Canary fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 33%">
+<col style="width: 25%">
+<col style="width: 15%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Strategy</th>
+<th>How It Works</th>
+<th>Rollback</th>
+<th>Risk</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Rolling update</strong></td>
+<td>Replace Pods one by one</td>
+<td>Automatic rollback on failure</td>
+<td>Brief period with mixed versions</td>
+</tr>
+<tr class="even">
+<td><strong>Blue-Green</strong></td>
+<td>Run two full environments, switch traffic</td>
+<td>Instant (switch back to blue)</td>
+<td>2x resources during deployment</td>
+</tr>
+<tr class="odd">
+<td><strong>Canary</strong></td>
+<td>Route small % of traffic to new version</td>
+<td>Instant (route all to old)</td>
+<td>Complex routing rules</td>
+</tr>
+<tr class="even">
+<td><strong>A/B testing</strong></td>
+<td>Route by user attributes (region, ID)</td>
+<td>Instant</td>
+<td>Requires feature flag infrastructure</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="resource-management" class="level3">
+<h3 class="anchored" data-anchor-id="resource-management">Resource Management</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Pod resource specification</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">resources</span><span class="kw">:</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">requests</span><span class="kw">:</span><span class="co">           # Guaranteed minimum</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">cpu</span><span class="kw">:</span><span class="at"> </span><span class="st">"250m"</span><span class="co">       # 0.25 CPU cores</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">memory</span><span class="kw">:</span><span class="at"> </span><span class="st">"256Mi"</span><span class="co">   # 256 MB RAM</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">limits</span><span class="kw">:</span><span class="co">             # Maximum allowed</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">cpu</span><span class="kw">:</span><span class="at"> </span><span class="st">"1000m"</span><span class="co">      # 1 CPU core</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">memory</span><span class="kw">:</span><span class="at"> </span><span class="st">"512Mi"</span><span class="co">   # 512 MB RAM</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="co"># HPA (Horizontal Pod Autoscaler)</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Scale between 3-10 pods when CPU &gt; 70%</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a><span class="fu">minReplicas</span><span class="kw">:</span><span class="at"> </span><span class="dv">3</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a><span class="fu">maxReplicas</span><span class="kw">:</span><span class="at"> </span><span class="dv">10</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a><span class="fu">targetCPUUtilizationPercentage</span><span class="kw">:</span><span class="at"> </span><span class="dv">70</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="kubernetes-networking" class="level3">
+<h3 class="anchored" data-anchor-id="kubernetes-networking">Kubernetes Networking</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Concept</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>ClusterIP</strong></td>
+<td>Internal service (only within cluster)</td>
+</tr>
+<tr class="even">
+<td><strong>NodePort</strong></td>
+<td>Expose service on each node’s IP at a static port</td>
+</tr>
+<tr class="odd">
+<td><strong>LoadBalancer</strong></td>
+<td>Provision cloud LB (AWS ALB/NLB) for external traffic</td>
+</tr>
+<tr class="even">
+<td><strong>Ingress</strong></td>
+<td>L7 routing rules (path-based, host-based)</td>
+</tr>
+<tr class="odd">
+<td><strong>Network Policy</strong></td>
+<td>Firewall rules between Pods (default: all-open)</td>
+</tr>
+<tr class="even">
+<td><strong>Service Mesh</strong></td>
+<td>Sidecar proxy for mTLS, observability, traffic control</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+</section>
+<section id="q7-how-do-you-design-a-cicd-pipeline" class="level2">
+<h2 class="anchored" data-anchor-id="q7-how-do-you-design-a-cicd-pipeline">Q7: How Do You Design a CI/CD Pipeline?</h2>
+<p><strong>Answer:</strong></p>
+<p>CI/CD (Continuous Integration / Continuous Delivery) automates the process of building, testing, and deploying software. A well-designed pipeline ensures rapid, reliable releases with minimal manual intervention.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    DEV["Developer&lt;br/&gt;pushes code"]
+    DEV --&gt; CI["CI Pipeline"]
+
+    subgraph CI["Continuous Integration"]
+        BUILD["Build&lt;br/&gt;(compile, deps)"]
+        LINT["Lint &amp;&lt;br/&gt;Static Analysis"]
+        TEST["Unit Tests"]
+        INT["Integration Tests"]
+        SEC["Security Scan&lt;br/&gt;(SAST, deps)"]
+        IMG["Build Container&lt;br/&gt;Image"]
+    end
+
+    CI --&gt; CD["CD Pipeline"]
+
+    subgraph CD["Continuous Delivery"]
+        STAGE["Deploy to&lt;br/&gt;Staging"]
+        E2E["E2E Tests&lt;br/&gt;(staging)"]
+        APPROVE["Manual Approval&lt;br/&gt;(optional)"]
+        PROD["Deploy to&lt;br/&gt;Production"]
+        SMOKE["Smoke Tests&lt;br/&gt;(production)"]
+    end
+
+    style CI fill:#56cc9d,stroke:#333,color:#fff
+    style CD fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="cicd-pipeline-stages" class="level3">
+<h3 class="anchored" data-anchor-id="cicd-pipeline-stages">CI/CD Pipeline Stages</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 18%">
+<col style="width: 23%">
+<col style="width: 18%">
+<col style="width: 39%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Stage</th>
+<th>Purpose</th>
+<th>Tools</th>
+<th>Feedback Time</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Lint / Format</strong></td>
+<td>Code style consistency</td>
+<td>ESLint, Black, gofmt</td>
+<td>&lt; 30s</td>
+</tr>
+<tr class="even">
+<td><strong>Unit Tests</strong></td>
+<td>Test individual functions/classes</td>
+<td>pytest, JUnit, Jest</td>
+<td>1-5 min</td>
+</tr>
+<tr class="odd">
+<td><strong>Build</strong></td>
+<td>Compile code, resolve dependencies</td>
+<td>Maven, npm, pip</td>
+<td>1-3 min</td>
+</tr>
+<tr class="even">
+<td><strong>Integration Tests</strong></td>
+<td>Test service interactions</td>
+<td>Testcontainers, docker-compose</td>
+<td>5-15 min</td>
+</tr>
+<tr class="odd">
+<td><strong>Security Scan (SAST)</strong></td>
+<td>Find vulnerabilities in code</td>
+<td>Snyk, SonarQube, Semgrep</td>
+<td>2-5 min</td>
+</tr>
+<tr class="even">
+<td><strong>Container Build</strong></td>
+<td>Build Docker image, push to registry</td>
+<td>Docker, Buildah, Kaniko</td>
+<td>2-5 min</td>
+</tr>
+<tr class="odd">
+<td><strong>Deploy to Staging</strong></td>
+<td>Deploy to pre-production environment</td>
+<td>ArgoCD, Helm, Terraform</td>
+<td>3-10 min</td>
+</tr>
+<tr class="even">
+<td><strong>E2E Tests</strong></td>
+<td>Full user flow tests in staging</td>
+<td>Playwright, Cypress, Selenium</td>
+<td>10-30 min</td>
+</tr>
+<tr class="odd">
+<td><strong>Deploy to Production</strong></td>
+<td>Rolling update / canary / blue-green</td>
+<td>ArgoCD, Spinnaker, Flux</td>
+<td>5-15 min</td>
+</tr>
+<tr class="even">
+<td><strong>Smoke Tests</strong></td>
+<td>Verify critical paths in production</td>
+<td>Custom health checks, synthetic monitors</td>
+<td>1-3 min</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="cicd-best-practices" class="level3">
+<h3 class="anchored" data-anchor-id="cicd-best-practices">CI/CD Best Practices</h3>
+<pre><code>Pipeline design principles:
+  1. Fast feedback: fail early (lint → unit tests → integration)
+  2. Immutable artifacts: build once, deploy to all environments
+  3. Environment parity: staging mirrors production
+  4. Infrastructure as Code: Terraform/Pulumi for infra changes
+  5. GitOps: desired state in Git, reconciler applies it (ArgoCD)
+  6. Feature flags: decouple deployment from release
+  7. Rollback plan: every deployment has automated rollback trigger
+
+Branch strategy:
+  - Trunk-based development (preferred for fast teams):
+    → Short-lived feature branches (&lt; 1 day)
+    → Merge to main frequently
+    → Feature flags hide incomplete work
+    → Main is always deployable
+
+  - GitFlow (for teams needing release management):
+    → develop → feature branches → release branches → main
+    → More overhead, longer release cycles</code></pre>
+</section>
+<section id="gitops-with-argocd" class="level3">
+<h3 class="anchored" data-anchor-id="gitops-with-argocd">GitOps with ArgoCD</h3>
+<pre><code>GitOps workflow:
+  1. Developer merges PR → main branch
+  2. CI pipeline builds image → pushes to registry (e.g., v1.2.3)
+  3. CI updates manifest repo (Helm values / kustomize with new image tag)
+  4. ArgoCD detects drift between Git manifest and cluster state
+  5. ArgoCD applies changes to Kubernetes cluster
+  6. If deployment fails health checks → ArgoCD auto-rollback
+
+Benefits:
+  - Git is single source of truth
+  - Full audit trail (who changed what, when)
+  - Easy rollback (git revert)
+  - Declarative (describe desired state, not imperative steps)</code></pre>
+<hr>
+</section>
+</section>
+<section id="q8-how-do-you-design-a-monitoring-and-observability-system" class="level2">
+<h2 class="anchored" data-anchor-id="q8-how-do-you-design-a-monitoring-and-observability-system">Q8: How Do You Design a Monitoring and Observability System?</h2>
+<p><strong>Answer:</strong></p>
+<p>Observability is the ability to understand a system’s internal state by examining its external outputs. The three pillars are <strong>metrics</strong>, <strong>logs</strong>, and <strong>traces</strong>. Together they enable debugging, alerting, and performance optimization.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    APPS["Applications / Services"]
+    APPS --&gt;|"Metrics"| PROM["Prometheus&lt;br/&gt;(time-series DB)"]
+    APPS --&gt;|"Logs"| ELK["ELK Stack&lt;br/&gt;(Elasticsearch + Logstash + Kibana)"]
+    APPS --&gt;|"Traces"| JAEGER["Jaeger / Zipkin&lt;br/&gt;(distributed tracing)"]
+
+    PROM --&gt; GRAFANA["Grafana&lt;br/&gt;(dashboards)"]
+    ELK --&gt; GRAFANA
+    PROM --&gt; ALERT["Alertmanager&lt;br/&gt;(PagerDuty, Slack)"]
+
+    style PROM fill:#56cc9d,stroke:#333,color:#fff
+    style ELK fill:#ffce67,stroke:#333
+    style JAEGER fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="three-pillars-of-observability" class="level3">
+<h3 class="anchored" data-anchor-id="three-pillars-of-observability">Three Pillars of Observability</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 30%">
+<col style="width: 23%">
+<col style="width: 19%">
+<col style="width: 26%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Pillar</th>
+<th>What</th>
+<th>Why</th>
+<th>Tools</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Metrics</strong></td>
+<td>Numeric measurements over time (counters, gauges, histograms)</td>
+<td>Alerting, capacity planning, SLOs</td>
+<td>Prometheus, Datadog, CloudWatch</td>
+</tr>
+<tr class="even">
+<td><strong>Logs</strong></td>
+<td>Structured event records</td>
+<td>Debugging specific issues, audit trail</td>
+<td>ELK, Loki, Splunk, CloudWatch Logs</td>
+</tr>
+<tr class="odd">
+<td><strong>Traces</strong></td>
+<td>Request journey across services</td>
+<td>Find latency bottlenecks across microservices</td>
+<td>Jaeger, Zipkin, AWS X-Ray, OpenTelemetry</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="key-metrics-the-four-golden-signals" class="level3">
+<h3 class="anchored" data-anchor-id="key-metrics-the-four-golden-signals">Key Metrics (The Four Golden Signals)</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 33%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Signal</th>
+<th>What to Measure</th>
+<th>Alert Threshold Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Latency</strong></td>
+<td>Time to serve a request (P50, P95, P99)</td>
+<td>P99 &gt; 500ms for 5 minutes</td>
+</tr>
+<tr class="even">
+<td><strong>Traffic</strong></td>
+<td>Requests per second (QPS)</td>
+<td>Sudden drop &gt; 50% (indicates failure)</td>
+</tr>
+<tr class="odd">
+<td><strong>Errors</strong></td>
+<td>Error rate (5xx, timeouts, failed operations)</td>
+<td>Error rate &gt; 1% for 3 minutes</td>
+</tr>
+<tr class="even">
+<td><strong>Saturation</strong></td>
+<td>Resource utilization (CPU, memory, disk, connections)</td>
+<td>CPU &gt; 80% for 10 minutes</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="structured-logging" class="level3">
+<h3 class="anchored" data-anchor-id="structured-logging">Structured Logging</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode json code-with-copy"><code class="sourceCode json"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"timestamp"</span><span class="fu">:</span> <span class="st">"2026-05-21T10:30:45.123Z"</span><span class="fu">,</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"level"</span><span class="fu">:</span> <span class="st">"ERROR"</span><span class="fu">,</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"service"</span><span class="fu">:</span> <span class="st">"order-service"</span><span class="fu">,</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"trace_id"</span><span class="fu">:</span> <span class="st">"abc-123-def-456"</span><span class="fu">,</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"span_id"</span><span class="fu">:</span> <span class="st">"span-789"</span><span class="fu">,</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"user_id"</span><span class="fu">:</span> <span class="st">"user_42"</span><span class="fu">,</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"method"</span><span class="fu">:</span> <span class="st">"POST"</span><span class="fu">,</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"path"</span><span class="fu">:</span> <span class="st">"/api/v1/orders"</span><span class="fu">,</span></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"status_code"</span><span class="fu">:</span> <span class="dv">500</span><span class="fu">,</span></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"duration_ms"</span><span class="fu">:</span> <span class="dv">2345</span><span class="fu">,</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"error"</span><span class="fu">:</span> <span class="st">"ConnectionRefusedError: payment-service:8080"</span><span class="fu">,</span></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>  <span class="dt">"message"</span><span class="fu">:</span> <span class="st">"Failed to process payment for order"</span></span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="distributed-tracing" class="level3">
+<h3 class="anchored" data-anchor-id="distributed-tracing">Distributed Tracing</h3>
+<pre><code>Request: User places order
+  
+  ┌─ API Gateway (12ms) ─────────────────────────────────────┐
+  │  ┌─ Order Service (45ms) ──────────────────────────────┐  │
+  │  │  ┌─ User Service (8ms) ────┐                        │  │
+  │  │  └─────────────────────────┘                        │  │
+  │  │  ┌─ Payment Service (320ms) ← BOTTLENECK ─────────┐│  │
+  │  │  │  ┌─ Stripe API (280ms) ───────────────────────┐││  │
+  │  │  │  └────────────────────────────────────────────┘││  │
+  │  │  └────────────────────────────────────────────────┘│  │
+  │  │  ┌─ Inventory Service (15ms)──┐                     │  │
+  │  │  └────────────────────────────┘                     │  │
+  │  └─────────────────────────────────────────────────────┘  │
+  └────────────────────────────────────────────────────────────┘
+  Total: 392ms (Payment → Stripe is 71% of total time)</code></pre>
+</section>
+<section id="slos-slis-and-slas" class="level3">
+<h3 class="anchored" data-anchor-id="slos-slis-and-slas">SLOs, SLIs, and SLAs</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 23%">
+<col style="width: 42%">
+<col style="width: 34%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Term</th>
+<th>Definition</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>SLI</strong> (Service Level Indicator)</td>
+<td>The metric you measure</td>
+<td>P99 latency, availability %, error rate</td>
+</tr>
+<tr class="even">
+<td><strong>SLO</strong> (Service Level Objective)</td>
+<td>The target for the SLI</td>
+<td>P99 latency &lt; 200ms, 99.9% availability</td>
+</tr>
+<tr class="odd">
+<td><strong>SLA</strong> (Service Level Agreement)</td>
+<td>Contract with consequences if SLO breached</td>
+<td>99.9% uptime or customer gets credits</td>
+</tr>
+<tr class="even">
+<td><strong>Error Budget</strong></td>
+<td>How much failure is allowed before violating SLO</td>
+<td>99.9% = 43 minutes downtime/month budget</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="alerting-strategy" class="level3">
+<h3 class="anchored" data-anchor-id="alerting-strategy">Alerting Strategy</h3>
+<pre><code>Alert design principles:
+  1. Alert on symptoms, not causes
+     ✅ "Error rate &gt; 5% for 3 min"  (symptom)
+     ❌ "CPU &gt; 90%"  (may not impact users)
+
+  2. Severity levels:
+     - P1 (Critical): Revenue impacting, page immediately
+     - P2 (High): Degraded service, page during business hours
+     - P3 (Medium): Non-urgent, ticket in queue
+     - P4 (Low): Informational, dashboard only
+
+  3. Reduce noise:
+     - Group related alerts
+     - Require duration threshold (not single spike)
+     - Suppress during maintenance windows
+     - Escalation: Slack → PagerDuty → phone call</code></pre>
+<hr>
+</section>
+</section>
+<section id="q9-how-does-event-driven-architecture-work" class="level2">
+<h2 class="anchored" data-anchor-id="q9-how-does-event-driven-architecture-work">Q9: How Does Event-Driven Architecture Work?</h2>
+<p><strong>Answer:</strong></p>
+<p>Event-Driven Architecture (EDA) is a design pattern where services communicate by producing and consuming events (facts about something that happened). It enables loose coupling, real-time processing, and scalable async workflows.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph Producers["Event Producers"]
+        US["User Service&lt;br/&gt;→ UserCreated"]
+        OS["Order Service&lt;br/&gt;→ OrderPlaced"]
+        PS["Payment Service&lt;br/&gt;→ PaymentProcessed"]
+    end
+
+    subgraph EventBus["Event Bus / Broker (Kafka)"]
+        T1["Topic: user-events"]
+        T2["Topic: order-events"]
+        T3["Topic: payment-events"]
+    end
+
+    subgraph Consumers["Event Consumers"]
+        EMAIL["Email Service"]
+        ANALYTICS["Analytics Service"]
+        INVENTORY["Inventory Service"]
+        SEARCH["Search Indexer"]
+    end
+
+    US --&gt; T1
+    OS --&gt; T2
+    PS --&gt; T3
+    T1 --&gt; EMAIL
+    T1 --&gt; ANALYTICS
+    T2 --&gt; INVENTORY
+    T2 --&gt; ANALYTICS
+    T3 --&gt; EMAIL
+    T3 --&gt; SEARCH
+
+    style EventBus fill:#56cc9d,stroke:#333,color:#fff
+    style Consumers fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="event-types" class="level3">
+<h3 class="anchored" data-anchor-id="event-types">Event Types</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 17%">
+<col style="width: 38%">
+<col style="width: 26%">
+<col style="width: 17%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Type</th>
+<th>Description</th>
+<th>Example</th>
+<th>Size</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Domain Event</strong></td>
+<td>Something significant happened in the business</td>
+<td><code>OrderPlaced</code>, <code>UserRegistered</code></td>
+<td>Small (metadata + IDs)</td>
+</tr>
+<tr class="even">
+<td><strong>Integration Event</strong></td>
+<td>Event shared between services (bounded contexts)</td>
+<td><code>PaymentCompleted</code> consumed by Order service</td>
+<td>Small</td>
+</tr>
+<tr class="odd">
+<td><strong>Event-Carried State Transfer</strong></td>
+<td>Event contains full state (eliminates need to query source)</td>
+<td><code>OrderPlaced { items: [...], total: 99.50, address: {...} }</code></td>
+<td>Large</td>
+</tr>
+<tr class="even">
+<td><strong>Change Data Capture (CDC)</strong></td>
+<td>Database changes streamed as events</td>
+<td>Debezium captures INSERT/UPDATE/DELETE from DB binlog</td>
+<td>Row-level</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="event-sourcing" class="level3">
+<h3 class="anchored" data-anchor-id="event-sourcing">Event Sourcing</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    CMD["Command:&lt;br/&gt;PlaceOrder"]
+    CMD --&gt; ES["Event Store&lt;br/&gt;(append-only log)"]
+    ES --&gt; E1["OrderCreated"]
+    ES --&gt; E2["ItemAdded (x3)"]
+    ES --&gt; E3["PaymentReceived"]
+    ES --&gt; E4["OrderShipped"]
+
+    ES --&gt;|"Replay events"| STATE["Current State:&lt;br/&gt;Order #123&lt;br/&gt;Status: Shipped&lt;br/&gt;Items: 3&lt;br/&gt;Total: $59.99"]
+
+    style ES fill:#56cc9d,stroke:#333,color:#fff
+    style STATE fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 18%">
+<col style="width: 44%">
+<col style="width: 37%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Aspect</th>
+<th>Traditional (CRUD)</th>
+<th>Event Sourcing</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Storage</strong></td>
+<td>Current state only</td>
+<td>Full history of events</td>
+</tr>
+<tr class="even">
+<td><strong>State</strong></td>
+<td>Mutable (UPDATE/DELETE)</td>
+<td>Immutable (append-only)</td>
+</tr>
+<tr class="odd">
+<td><strong>Audit trail</strong></td>
+<td>Requires separate logging</td>
+<td>Built-in (every change is an event)</td>
+</tr>
+<tr class="even">
+<td><strong>Debugging</strong></td>
+<td>“Why is it in this state?”</td>
+<td>Replay events to see exactly what happened</td>
+</tr>
+<tr class="odd">
+<td><strong>Complexity</strong></td>
+<td>Simple CRUD operations</td>
+<td>Event replay, projections, eventual consistency</td>
+</tr>
+<tr class="even">
+<td><strong>Best for</strong></td>
+<td>Simple domains</td>
+<td>Financial systems, audit-heavy, undo/redo needed</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="cqrs-command-query-responsibility-segregation" class="level3">
+<h3 class="anchored" data-anchor-id="cqrs-command-query-responsibility-segregation">CQRS (Command Query Responsibility Segregation)</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    CLIENT["Client"]
+    CLIENT --&gt;|"Write (Command)"| WRITE["Write Model&lt;br/&gt;(normalized DB)"]
+    CLIENT --&gt;|"Read (Query)"| READ["Read Model&lt;br/&gt;(denormalized views)"]
+
+    WRITE --&gt;|"Events"| PROJ["Projection Service"]
+    PROJ --&gt; READ
+
+    style WRITE fill:#56cc9d,stroke:#333,color:#fff
+    style READ fill:#6cc3d5,stroke:#333,color:#fff
+    style PROJ fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 38%">
+<col style="width: 61%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Aspect</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Why CQRS</strong></td>
+<td>Reads and writes have different performance profiles and scaling needs</td>
+</tr>
+<tr class="even">
+<td><strong>Write side</strong></td>
+<td>Normalized, optimized for consistency and validation</td>
+</tr>
+<tr class="odd">
+<td><strong>Read side</strong></td>
+<td>Denormalized, pre-computed views optimized for queries</td>
+</tr>
+<tr class="even">
+<td><strong>Sync mechanism</strong></td>
+<td>Events from write side update read projections (async)</td>
+</tr>
+<tr class="odd">
+<td><strong>Trade-off</strong></td>
+<td>Eventual consistency between write and read models</td>
+</tr>
+<tr class="even">
+<td><strong>Pairs with</strong></td>
+<td>Event Sourcing (events feed both write log and read projections)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="idempotent-event-processing" class="level3">
+<h3 class="anchored" data-anchor-id="idempotent-event-processing">Idempotent Event Processing</h3>
+<pre><code>Problem: Network failures → events may be delivered multiple times.
+         Consumer must handle duplicates safely.
+
+Solutions:
+  1. Idempotency key in every event:
+     Event: { "id": "evt_abc123", "type": "PaymentReceived", "data": {...} }
+     Consumer: 
+       - Before processing, check: "Have I seen evt_abc123?"
+       - If yes → skip
+       - If no → process + record evt_abc123 in processed_events table
+
+  2. Idempotent operations (naturally safe):
+     - SET operations (overwrite): last write wins
+     - Upsert with same data: same result regardless of count
+
+  3. Transactional outbox pattern:
+     - Write business data + event to same DB (single transaction)
+     - Background process reads outbox table → publishes to Kafka
+     - Guarantees: if data saved, event will eventually publish</code></pre>
+<hr>
+</section>
+</section>
+<section id="q10-how-do-you-design-for-service-mesh-and-inter-service-communication" class="level2">
+<h2 class="anchored" data-anchor-id="q10-how-do-you-design-for-service-mesh-and-inter-service-communication">Q10: How Do You Design for Service Mesh and Inter-Service Communication?</h2>
+<p><strong>Answer:</strong></p>
+<p>A service mesh is an infrastructure layer that handles service-to-service communication, providing observability, security (mTLS), and traffic management without changing application code. It’s typically implemented as sidecar proxies alongside each service.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph PodA["Pod: Order Service"]
+        APP_A["Order Service&lt;br/&gt;(application)"]
+        PROXY_A["Envoy Sidecar&lt;br/&gt;(proxy)"]
+    end
+
+    subgraph PodB["Pod: Payment Service"]
+        APP_B["Payment Service&lt;br/&gt;(application)"]
+        PROXY_B["Envoy Sidecar&lt;br/&gt;(proxy)"]
+    end
+
+    subgraph PodC["Pod: User Service"]
+        APP_C["User Service&lt;br/&gt;(application)"]
+        PROXY_C["Envoy Sidecar&lt;br/&gt;(proxy)"]
+    end
+
+    PROXY_A --&gt;|"mTLS"| PROXY_B
+    PROXY_A --&gt;|"mTLS"| PROXY_C
+
+    CP["Control Plane&lt;br/&gt;(Istio / Linkerd)"]
+    CP --&gt;|"Config, certs"| PROXY_A
+    CP --&gt;|"Config, certs"| PROXY_B
+    CP --&gt;|"Config, certs"| PROXY_C
+
+    style CP fill:#56cc9d,stroke:#333,color:#fff
+    style PodA fill:#ffce67,stroke:#333
+    style PodB fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="what-a-service-mesh-provides" class="level3">
+<h3 class="anchored" data-anchor-id="what-a-service-mesh-provides">What a Service Mesh Provides</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 37%">
+<col style="width: 37%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Feature</th>
+<th>Description</th>
+<th>Without Mesh</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>mTLS</strong></td>
+<td>Automatic encryption + identity between all services</td>
+<td>Each service manages certs manually</td>
+</tr>
+<tr class="even">
+<td><strong>Traffic management</strong></td>
+<td>Canary releases, A/B testing, fault injection</td>
+<td>Custom load balancer config per service</td>
+</tr>
+<tr class="odd">
+<td><strong>Observability</strong></td>
+<td>Automatic metrics, traces, access logs from proxy</td>
+<td>Instrument every service manually</td>
+</tr>
+<tr class="even">
+<td><strong>Retries &amp; timeouts</strong></td>
+<td>Configurable retry policies per route</td>
+<td>Each service implements retry logic</td>
+</tr>
+<tr class="odd">
+<td><strong>Circuit breaking</strong></td>
+<td>Auto-stop traffic to failing services</td>
+<td>Library-based (Hystrix, resilience4j)</td>
+</tr>
+<tr class="even">
+<td><strong>Rate limiting</strong></td>
+<td>Per-service traffic control</td>
+<td>Centralized rate limiter service</td>
+</tr>
+<tr class="odd">
+<td><strong>Access control</strong></td>
+<td>Policy-based authorization (which service can call which)</td>
+<td>Manual firewall rules / code checks</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="service-mesh-comparison" class="level3">
+<h3 class="anchored" data-anchor-id="service-mesh-comparison">Service Mesh Comparison</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 21%">
+<col style="width: 17%">
+<col style="width: 21%">
+<col style="width: 39%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Feature</th>
+<th>Istio</th>
+<th>Linkerd</th>
+<th>Consul Connect</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Proxy</strong></td>
+<td>Envoy</td>
+<td>Linkerd2-proxy (Rust)</td>
+<td>Envoy or built-in</td>
+</tr>
+<tr class="even">
+<td><strong>Complexity</strong></td>
+<td>High (many CRDs)</td>
+<td>Low (lightweight)</td>
+<td>Medium</td>
+</tr>
+<tr class="odd">
+<td><strong>Performance</strong></td>
+<td>Moderate overhead</td>
+<td>Low overhead</td>
+<td>Low overhead</td>
+</tr>
+<tr class="even">
+<td><strong>Features</strong></td>
+<td>Full-featured (traffic, security, observability)</td>
+<td>Core features, simple</td>
+<td>Service discovery + mesh</td>
+</tr>
+<tr class="odd">
+<td><strong>Best for</strong></td>
+<td>Large orgs needing full control</td>
+<td>Teams wanting simplicity</td>
+<td>HashiCorp ecosystem users</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="traffic-management-patterns" class="level3">
+<h3 class="anchored" data-anchor-id="traffic-management-patterns">Traffic Management Patterns</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 27%">
+<col style="width: 27%">
+<col style="width: 45%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Pattern</th>
+<th>Purpose</th>
+<th>Configuration</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Canary</strong></td>
+<td>Route 5% traffic to v2, 95% to v1</td>
+<td>Weight-based routing</td>
+</tr>
+<tr class="even">
+<td><strong>Header-based routing</strong></td>
+<td>Internal testers get v2 via header <code>x-version: canary</code></td>
+<td>Match rules on headers</td>
+</tr>
+<tr class="odd">
+<td><strong>Fault injection</strong></td>
+<td>Inject 500ms delay to test resilience</td>
+<td>Delay/abort rules for testing</td>
+</tr>
+<tr class="even">
+<td><strong>Mirroring</strong></td>
+<td>Copy production traffic to test environment</td>
+<td>Traffic shadowing (no impact to users)</td>
+</tr>
+<tr class="odd">
+<td><strong>Circuit breaking</strong></td>
+<td>Max 100 concurrent requests per service</td>
+<td>Connection pool limits</td>
+</tr>
+<tr class="even">
+<td><strong>Retry budget</strong></td>
+<td>Max 20% additional requests as retries</td>
+<td>Prevent retry storms</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="when-to-use-and-not-use-a-service-mesh" class="level3">
+<h3 class="anchored" data-anchor-id="when-to-use-and-not-use-a-service-mesh">When to Use (and NOT Use) a Service Mesh</h3>
+<pre><code>Use a service mesh when:
+  ✅ Running 10+ microservices in production
+  ✅ Need mTLS between all services (zero trust)
+  ✅ Want consistent observability without code changes
+  ✅ Complex traffic routing (canary, A/B, fault injection)
+  ✅ Need policy-based access control
+
+Do NOT use when:
+  ❌ Fewer than 5 services (overhead not worth it)
+  ❌ Team doesn't have Kubernetes expertise
+  ❌ Simple request-response with no special routing
+  ❌ Latency-critical paths where sidecar overhead matters (~1-3ms)
+  ❌ Monolith or early-stage product</code></pre>
+<hr>
+</section>
+</section>
+<section id="summary-table" class="level2">
+<h2 class="anchored" data-anchor-id="summary-table">Summary Table</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 13%">
+<col style="width: 30%">
+<col style="width: 56%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Topic</th>
+<th>Key Concepts</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td><strong>Load Balancing</strong></td>
+<td>L4 vs L7, algorithms (round robin, least connections, consistent hashing), health checks, sticky sessions</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td><strong>Caching</strong></td>
+<td>Cache-aside, write-through, write-behind, eviction policies, Redis vs Memcached, stampede prevention</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td><strong>Message Queues</strong></td>
+<td>Kafka vs RabbitMQ vs SQS, delivery guarantees, DLQ, partitions, consumer groups</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td><strong>Microservices</strong></td>
+<td>Service communication, Saga pattern, service discovery, database per service</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td><strong>Database Scaling</strong></td>
+<td>Replication (sync/async), sharding strategies, replication lag, cross-shard queries</td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td><strong>Kubernetes</strong></td>
+<td>Pods, Deployments, Services, HPA, rolling/blue-green/canary deploys, resource limits</td>
+</tr>
+<tr class="odd">
+<td>7</td>
+<td><strong>CI/CD</strong></td>
+<td>Pipeline stages, GitOps, ArgoCD, trunk-based development, immutable artifacts</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td><strong>Monitoring</strong></td>
+<td>Metrics/Logs/Traces, four golden signals, SLOs, alerting strategy, distributed tracing</td>
+</tr>
+<tr class="odd">
+<td>9</td>
+<td><strong>Event-Driven Architecture</strong></td>
+<td>Event sourcing, CQRS, CDC, idempotent processing, transactional outbox</td>
+</tr>
+<tr class="even">
+<td>10</td>
+<td><strong>Service Mesh</strong></td>
+<td>Sidecar proxy (Envoy), mTLS, traffic management, Istio vs Linkerd, when to use</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="whats-next" class="level2">
+<h2 class="anchored" data-anchor-id="whats-next">What’s Next?</h2>
+<p>This article covered infrastructure components and operational patterns. Continue with:</p>
+<ul>
+<li><strong>Foundational concepts:</strong> <a href="../../posts/system-design/System-Design-Interview-QA-1.html">System Design Interview QA - 1</a> — scalability, CAP theorem, APIs, networking, security</li>
+<li><strong>Hands-on design problems:</strong> <a href="../../posts/system-design/System-Design-Interview-QA-3.html">System Design Interview QA - 3</a> — URL shortener, chat system, news feed, video streaming</li>
+<li><strong>Design patterns:</strong> <a href="../../posts/design-pattern/Design-Pattern-Interview-QA-1.html">Design Pattern Interview QA - 1</a></li>
+<li><strong>Enterprise patterns (Spring, CQRS):</strong> <a href="../../posts/design-pattern/Design-Pattern-Interview-QA-2.html">Design Pattern Interview QA - 2</a></li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script type="text/javascript">
+var infolinks_pid = 3445432;
+var infolinks_wsid = 0;
+</script>
+<script type="text/javascript" src="https://resources.infolinks.com/js/infolinks_main.js"></script>
+<!-- Floating menu button for mobile -->
+<style>
+#mobile-menu-fab {
+  display: none;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: #4A90D9;
+  color: #fff;
+  border: none;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+  font-size: 22px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+@media (max-width: 767.98px) {
+  #mobile-menu-fab {
+    display: flex;
+  }
+}
+</style>
+<button id="mobile-menu-fab" aria-label="Open menu">☰</button>
+<script>
+document.getElementById('mobile-menu-fab').addEventListener('click', function() {
+  var toggler = document.querySelector('.quarto-btn-toggle[data-bs-target=".quarto-sidebar-collapse-item"]');
+  if (toggler) toggler.click();
+});
+</script>
+<!-- Animated neural network background for title block header -->
+<style>
+/* Background gradient for all title headers */
+#title-block-header, .quarto-title-banner {
+  background: linear-gradient(135deg, #0a0e27 0%, #1a1a3e 40%, #2d1b4e 70%, #0a0e27 100%) !important;
+}
+/* Animation container styles — only on .quarto-title-banner (listing pages) */
+.quarto-title-banner {
+  position: relative;
+  overflow: hidden;
+}
+/* Post pages: clip animation to header bounds without breaking grid */
+#title-block-header:not(:has(.quarto-title-banner)) {
+  clip-path: inset(0);
+}
+/* Mobile: keep animation, fixed top padding, no right padding */
+@media (max-width: 767px) {
+  #title-block-header, .quarto-title-banner {
+    padding-top: 150px !important;
+  }
+  #title-block-header .title,
+  .quarto-title .title {
+    padding-right: 0 !important;
+  }
+  #title-block-header .description,
+  #title-block-header .description p,
+  .quarto-title-banner .quarto-title .description,
+  .quarto-title-banner .quarto-title .description p {
+    padding-right: 0 !important;
+    max-width: 100% !important;
+  }
+  .keywords, .keywords .block-title, .keywords p {
+    padding-right: 0 !important;
+  }
+}
+#title-block-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+.quarto-title-banner > * {
+  position: relative;
+  z-index: 1;
+}
+</style>
+
+<script>
+(function() {
+  function initTitleAnimation() {
+    var target = document.querySelector('.quarto-title-banner') || document.getElementById('title-block-header');
+    if (!target) return;
+
+    var canvas = document.createElement('canvas');
+    canvas.id = 'title-block-canvas';
+    target.insertBefore(canvas, target.firstChild);
+
+    var ctx = canvas.getContext('2d');
+    var particles = [];
+    var particleCount = 60;
+    var connectionDist = 120;
+
+    function resize() {
+      canvas.width = target.offsetWidth;
+      canvas.height = target.offsetHeight;
+    }
+
+    function Particle() {
+      this.x = Math.random() * canvas.width;
+      this.y = Math.random() * canvas.height;
+      this.vx = (Math.random() - 0.5) * 0.4;
+      this.vy = (Math.random() - 0.5) * 0.3;
+      this.r = Math.random() * 2 + 1;
+      this.pulse = Math.random() * Math.PI * 2;
+      this.pulseSpeed = 0.01 + Math.random() * 0.02;
+      var colors = [
+        [120, 194, 173],
+        [130, 170, 255],
+        [180, 140, 255],
+        [255, 180, 200],
+        [100, 220, 220],
+      ];
+      this.color = colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    function init() {
+      particles = [];
+      for (var i = 0; i < particleCount; i++) {
+        particles.push(new Particle());
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (var i = 0; i < particles.length; i++) {
+        for (var j = i + 1; j < particles.length; j++) {
+          var dx = particles[i].x - particles[j].x;
+          var dy = particles[i].y - particles[j].y;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < connectionDist) {
+            var alpha = (1 - dist / connectionDist) * 0.3;
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.strokeStyle = 'rgba(120, 194, 173, ' + alpha + ')';
+            ctx.lineWidth = 0.6;
+            ctx.stroke();
+          }
+        }
+      }
+
+      for (var i = 0; i < particles.length; i++) {
+        var p = particles[i];
+        p.pulse += p.pulseSpeed;
+        var glow = 0.5 + 0.5 * Math.sin(p.pulse);
+        var r = p.r * (0.8 + 0.4 * glow);
+
+        var grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 4);
+        grad.addColorStop(0, 'rgba(' + p.color[0] + ',' + p.color[1] + ',' + p.color[2] + ',' + (0.3 * glow) + ')');
+        grad.addColorStop(1, 'rgba(' + p.color[0] + ',' + p.color[1] + ',' + p.color[2] + ', 0)');
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r * 4, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(' + p.color[0] + ',' + p.color[1] + ',' + p.color[2] + ',' + (0.7 + 0.3 * glow) + ')';
+        ctx.fill();
+
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+        if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    resize();
+    init();
+    draw();
+
+    window.addEventListener('resize', function() {
+      resize();
+      init();
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTitleAnimation);
+  } else {
+    initTitleAnimation();
+  }
+})();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/vectoringai\.com");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> 2025-2026 Vectoring AI. All rights reserved. | <a href="../../pages/privacy.html">Privacy Policy</a></p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

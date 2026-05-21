@@ -1,0 +1,3237 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.36">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Vectoring AI">
+<meta name="dcterms.date" content="2026-05-21">
+<meta name="keywords" content="system design interview, scalability, reliability, distributed systems, load balancing, database sharding, caching, CAP theorem, API design, microservices, networking, security, FAANG interview">
+<meta name="description" content="10 essential system design interview questions on foundational concepts: scalability, reliability, performance, distributed systems, infrastructure, APIs, databases, networking, and security.">
+
+<title>System Design Interview QA - 1 – Vectoring AI</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../..//images/favicon.ico" rel="icon">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dbc92dda8186f57fa2e333fbb71d6a9d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-b981e3f33a8ad6ba97cc0b6118e04959.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/all.css" rel="stylesheet">
+<link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/latex-fontsize.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-Q4RQ337R0F"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-Q4RQ337R0F', { 'anonymize_ip': true});
+</script>
+<script async="" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9738638303661485" crossorigin="anonymous"></script>
+<!-- Cookie Consent Banner (GDPR compliant) -->
+<style>
+#cookie-consent-banner {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #1d1d1d !important;
+  color: #ffffff !important;
+  padding: 16px 24px;
+  z-index: 9999;
+  font-size: 14px;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+}
+#cookie-consent-banner p {
+  margin: 0 0 12px 0;
+  line-height: 1.5;
+  color: #ffffff !important;
+}
+#cookie-consent-banner a {
+  color: #78b9ff;
+  text-decoration: underline;
+}
+#cookie-consent-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+#cookie-consent-buttons button {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+#btn-accept-all {
+  background: #3B70FE;
+  color: #fff;
+}
+#btn-accept-essential {
+  background: #555;
+  color: #fff;
+}
+#btn-deny {
+  background: transparent;
+  color: #ccc;
+  border: 1px solid #666 !important;
+}
+</style>
+
+<meta property="og:title" content="System Design Interview QA - 1 – Vectoring AI">
+<meta property="og:description" content="10 essential system design interview questions on foundational concepts: scalability, reliability, performance, distributed systems, infrastructure, APIs, databases, networking, and security.">
+<meta property="og:image" content="https://vectoringai.com/images/system-design/thumb_system_design_interview_qa_300.png">
+<meta property="og:site_name" content="Vectoring AI">
+<meta property="og:image:height" content="200">
+<meta property="og:image:width" content="300">
+<meta name="twitter:title" content="System Design Interview QA - 1 – Vectoring AI">
+<meta name="twitter:description" content="10 essential system design interview questions on foundational concepts: scalability, reliability, performance, distributed systems, infrastructure, APIs, databases, networking, and security.">
+<meta name="twitter:image" content="https://vectoringai.com/images/system-design/thumb_system_design_interview_qa_300.png">
+<meta name="twitter:image-height" content="200">
+<meta name="twitter:image-width" content="300">
+<meta name="twitter:card" content="summary_large_image">
+</head><body class="nav-sidebar docked quarto-light"><div id="cookie-consent-banner">
+  <p>We use cookies to improve your browsing experience, support the operation of this site, and understand how visitors use our content.
+    You can accept all cookies, accept only essential cookies, or deny non-essential cookies.
+    <a href="../../pages/privacy.html">Privacy Policy</a>
+  </p>
+  <div id="cookie-consent-buttons">
+    <button id="btn-accept-all">Accept All</button>
+    <button id="btn-accept-essential">Essential Only</button>
+    <button id="btn-deny">Deny</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  var consent = localStorage.getItem("cookie_consent");
+
+  function loadAdSense() {
+    if (document.querySelector('script[src*="adsbygoogle"]')) return;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9738638303661485";
+    s.crossOrigin = "anonymous";
+    document.head.appendChild(s);
+  }
+
+  function showBanner() {
+    document.getElementById("cookie-consent-banner").style.display = "block";
+  }
+
+  function hideBanner() {
+    document.getElementById("cookie-consent-banner").style.display = "none";
+  }
+
+  if (consent === "all") {
+    loadAdSense();
+  } else if (consent === "essential" || consent === "denied") {
+    // Do not load AdSense
+  } else {
+    // No choice made yet — show banner, do not load AdSense
+    window.addEventListener("DOMContentLoaded", showBanner);
+  }
+
+  window.addEventListener("DOMContentLoaded", function() {
+    document.getElementById("btn-accept-all").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "all");
+      hideBanner();
+      loadAdSense();
+    });
+    document.getElementById("btn-accept-essential").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "essential");
+      hideBanner();
+    });
+    document.getElementById("btn-deny").addEventListener("click", function() {
+      localStorage.setItem("cookie_consent", "denied");
+      hideBanner();
+    });
+  });
+})();
+</script>
+<script>
+// Inject missing Open Graph tags that Facebook requires for proper link sharing
+(function () {
+  if (!document.querySelector('meta[property="og:url"]')) {
+    var m = document.createElement("meta");
+    m.setAttribute("property", "og:url");
+    m.setAttribute("content", window.location.href);
+    document.head.appendChild(m);
+  }
+  if (!document.querySelector('meta[property="og:type"]')) {
+    var t = document.createElement("meta");
+    t.setAttribute("property", "og:type");
+    t.setAttribute("content", "article");
+    document.head.appendChild(t);
+  }
+  // Fix double-slash in og:image (site-url trailing slash + /images/...)
+  var ogImg = document.querySelector('meta[property="og:image"]');
+  if (ogImg) {
+    ogImg.setAttribute("content", ogImg.getAttribute("content").replace(/([^:])\/\//g, "$1/"));
+  }
+  var twImg = document.querySelector('meta[name="twitter:image"]');
+  if (twImg) {
+    twImg.setAttribute("content", twImg.getAttribute("content").replace(/([^:])\/\//g, "$1/"));
+  }
+})();
+</script>
+<style>
+.share-widget {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0.8rem 0 1.2rem 0;
+  padding: 0.5rem 0;
+}
+.share-widget .share-icon {
+  width: 20px;
+  height: 20px;
+  fill: #555;
+}
+.share-widget .share-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #555;
+}
+.share-widget .share-divider {
+  width: 1px;
+  height: 22px;
+  background: #ddd;
+}
+.share-widget a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  transition: transform 0.2s, box-shadow 0.2s;
+  text-decoration: none !important;
+}
+.share-widget a:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.share-widget a svg {
+  width: 20px;
+  height: 20px;
+}
+.notebook-widget {
+  margin: 0 0 1rem 0;
+}
+.notebook-widget a {
+  display: inline-block;
+  transition: transform 0.2s;
+}
+.notebook-widget a:hover {
+  transform: scale(1.05);
+}
+</style>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  if (!window.location.pathname.includes("/posts/")) return;
+
+  var rawTitle = document.title;
+  var rawUrl = window.location.href;
+  var title = encodeURIComponent(rawTitle);
+  var url = encodeURIComponent(rawUrl);
+
+  var widget = document.createElement("div");
+  widget.className = "share-widget";
+  widget.innerHTML =
+    '<svg class="share-icon" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>' +
+    '<span class="share-label">Share</span>' +
+    '<div class="share-divider"></div>' +
+    '<a href="https://twitter.com/intent/tweet?text=' + title + '&url=' + url + '" target="_blank" rel="noopener" title="Share on X"><svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>' +
+    '<a href="https://www.facebook.com/sharer/sharer.php?u=' + url + '" target="_blank" rel="noopener" title="Share on Facebook"><svg viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg></a>' +
+    '<a href="https://www.linkedin.com/shareArticle?mini=true&url=' + url + '&title=' + title + '" target="_blank" rel="noopener" title="Share on LinkedIn"><svg viewBox="0 0 24 24" fill="#0A66C2"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>';
+
+  // Desktop: open a centered popup (standard share UX).
+  // Mobile: let the default target="_blank" navigate so the OS can
+  //         route to the native app (Facebook, LinkedIn, etc.).
+  var isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+  if (!isMobile) {
+    widget.querySelectorAll("a").forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        var w = 600, h = 500;
+        var left = (screen.width - w) / 2;
+        var top = (screen.height - h) / 2;
+        window.open(
+          this.href, "share",
+          "width=" + w + ",height=" + h + ",left=" + left + ",top=" + top + ",noopener,noreferrer"
+        );
+      });
+    });
+  }
+
+  // Insert right after the title-block header, before Keywords
+  var header = document.querySelector("header#title-block-header");
+  if (header && header.nextSibling) {
+    header.parentNode.insertBefore(widget, header.nextSibling);
+  }
+
+  // Add Colab / notebook button if the page has a notebook-link element
+  var nbEl = document.getElementById("notebook-link");
+  if (nbEl && nbEl.dataset.url) {
+    var nbWidget = document.createElement("div");
+    nbWidget.className = "notebook-widget";
+    nbWidget.innerHTML =
+      '<a href="' + nbEl.dataset.url + '" target="_blank" rel="noopener" title="Open notebook in Google Colab">' +
+      '<img src="/images/colab.png" alt="Open in Colab" style="height:28px">' +
+      '</a>';
+    // Insert right after the share widget
+    if (widget.nextSibling) {
+      widget.parentNode.insertBefore(nbWidget, widget.nextSibling);
+    } else if (widget.parentNode) {
+      widget.parentNode.appendChild(nbWidget);
+    }
+  }
+});
+</script>
+<script>
+  var link = document.createElement('link');
+  link.rel = 'canonical';
+  var path = window.location.pathname.replace(/index\.html$/, '');
+  link.href = 'https://vectoringai.com' + path;
+  document.head.appendChild(link);
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var ogTitle = document.querySelector('meta[property="og:title"]');
+  var ogDesc = document.querySelector('meta[property="og:description"]');
+  var ogImage = document.querySelector('meta[property="og:image"]');
+  var dcDate = document.querySelector('meta[name="dcterms.date"]');
+
+  if (!ogTitle) return;
+
+  var isArticle = !!dcDate;
+  var jsonld = {
+    "@context": "https://schema.org",
+    "@type": isArticle ? "Article" : "WebPage",
+    "headline": ogTitle.content.replace(/ – Vectoring AI$/, ''),
+    "description": ogDesc ? ogDesc.content : "",
+    "url": window.location.href,
+    "author": {
+      "@type": "Organization",
+      "name": "Vectoring AI",
+      "url": "https://vectoringai.com/pages/about.html"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Vectoring AI",
+      "url": "https://vectoringai.com",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://vectoringai.com/images/favicon_io/android-chrome-512x512.png"
+      }
+    }
+  };
+
+  if (ogImage) jsonld.image = ogImage.content;
+  if (dcDate) jsonld.datePublished = dcDate.content;
+
+  var el = document.createElement('script');
+  el.type = 'application/ld+json';
+  el.textContent = JSON.stringify(jsonld);
+  document.head.appendChild(el);
+});
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var title = document.querySelector(".sidebar-title");
+  if (title && !title.querySelector(".sidebar-logo-link")) {
+    var a = document.createElement("a");
+    a.href = "/";
+    a.className = "sidebar-logo-link";
+    var img = document.createElement("img");
+    img.src = "/images/logo_vectoringai_180.png";
+    img.alt = "Vectoring AI Home";
+    a.appendChild(img);
+    title.prepend(a);
+  }
+});
+</script>
+<!-- <script src="https://quge5.com/88/tag.min.js" data-zone="238344" async data-cfasync="false"></script> -->
+
+<!-- Reserve space at top of TOC so ad tag doesn't cover it -->
+<style>
+nav[role="doc-toc"] {
+  padding-top: 150px !important;
+}
+@media (min-width: 992px) {
+  nav[role="doc-toc"] {
+    padding-top: 180px !important;
+  }
+}
+</style>
+
+<script>
+(function(s){s.dataset.zone='10992645';s.src='https://nap5k.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')));
+</script>
+
+<!-- <script>(function(s){s.dataset.zone='10992714',s.src='https://n6wxm.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script> -->
+<script src="../../site_libs/quarto-diagram/mermaid.min.js"></script>
+<script src="../../site_libs/quarto-diagram/mermaid-init.js"></script>
+<link href="../../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="../../styles.css">
+
+
+
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">
+      Vectoring AI
+      </li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation docked overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../../">Vectoring AI</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://github.com/VectoringAI" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-github"></i></a>
+    <a href="https://www.youtube.com/@vectoringai" title="" class="quarto-navigation-tool px-1" aria-label=""><i class="bi bi-youtube"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><strong>Home</strong></span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>AI Engineering</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/llm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">LLMs</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/agent.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Agents</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/rag.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">RAG</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/benchmark.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Benchmarks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/milestone.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Milestones</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>AI Interview</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/ml-interview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">ML Interview</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/llm-interview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">LLM Interview</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/swe-interview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">SWE Interview</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/aiops-interview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">AIOps Interview</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/design-pattern.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Design Pattern</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/system-design.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">System Design</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/ai-architect.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">AI Architect</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text"><strong>Made by VAI</strong></span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/vaitalk.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">VaiTalk</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../../pages/about.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><strong>About</strong></span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title"><strong>Sections</strong></h2>
+   
+  <ul class="collapse">
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#q1-what-is-scalability-and-how-do-you-scale-a-system" id="toc-q1-what-is-scalability-and-how-do-you-scale-a-system" class="nav-link" data-scroll-target="#q1-what-is-scalability-and-how-do-you-scale-a-system">Q1: What Is Scalability and How Do You Scale a System?</a></li>
+  <li><a href="#q2-how-do-you-ensure-reliability-and-fault-tolerance" id="toc-q2-how-do-you-ensure-reliability-and-fault-tolerance" class="nav-link" data-scroll-target="#q2-how-do-you-ensure-reliability-and-fault-tolerance">Q2: How Do You Ensure Reliability and Fault Tolerance?</a></li>
+  <li><a href="#q3-what-are-the-key-performance-optimization-strategies" id="toc-q3-what-are-the-key-performance-optimization-strategies" class="nav-link" data-scroll-target="#q3-what-are-the-key-performance-optimization-strategies">Q3: What Are the Key Performance Optimization Strategies?</a></li>
+  <li><a href="#q4-how-do-distributed-systems-work-and-what-are-the-key-challenges" id="toc-q4-how-do-distributed-systems-work-and-what-are-the-key-challenges" class="nav-link" data-scroll-target="#q4-how-do-distributed-systems-work-and-what-are-the-key-challenges">Q4: How Do Distributed Systems Work and What Are the Key Challenges?</a></li>
+  <li><a href="#q5-what-infrastructure-components-make-up-a-production-system" id="toc-q5-what-infrastructure-components-make-up-a-production-system" class="nav-link" data-scroll-target="#q5-what-infrastructure-components-make-up-a-production-system">Q5: What Infrastructure Components Make Up a Production System?</a></li>
+  <li><a href="#q6-how-do-you-design-restful-apis-and-choose-between-api-styles" id="toc-q6-how-do-you-design-restful-apis-and-choose-between-api-styles" class="nav-link" data-scroll-target="#q6-how-do-you-design-restful-apis-and-choose-between-api-styles">Q6: How Do You Design RESTful APIs and Choose Between API Styles?</a></li>
+  <li><a href="#q7-how-do-you-choose-the-right-database" id="toc-q7-how-do-you-choose-the-right-database" class="nav-link" data-scroll-target="#q7-how-do-you-choose-the-right-database">Q7: How Do You Choose the Right Database?</a></li>
+  <li><a href="#q8-how-does-networking-work-in-distributed-systems" id="toc-q8-how-does-networking-work-in-distributed-systems" class="nav-link" data-scroll-target="#q8-how-does-networking-work-in-distributed-systems">Q8: How Does Networking Work in Distributed Systems?</a></li>
+  <li><a href="#q9-how-do-you-design-for-security-in-distributed-systems" id="toc-q9-how-do-you-design-for-security-in-distributed-systems" class="nav-link" data-scroll-target="#q9-how-do-you-design-for-security-in-distributed-systems">Q9: How Do You Design for Security in Distributed Systems?</a></li>
+  <li><a href="#q10-what-is-back-of-the-envelope-estimation-and-how-do-you-do-it" id="toc-q10-what-is-back-of-the-envelope-estimation-and-how-do-you-do-it" class="nav-link" data-scroll-target="#q10-what-is-back-of-the-envelope-estimation-and-how-do-you-do-it">Q10: What Is Back-of-the-Envelope Estimation and How Do You Do It?</a></li>
+  <li><a href="#summary-table" id="toc-summary-table" class="nav-link" data-scroll-target="#summary-table">Summary Table</a></li>
+  <li><a href="#whats-next" id="toc-whats-next" class="nav-link" data-scroll-target="#whats-next">What’s Next?</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">System Design Interview QA - 1</h1>
+</div>
+
+<div>
+  <div class="description">
+    10 essential system design interview questions on foundational concepts: scalability, reliability, performance, distributed systems, infrastructure, APIs, databases, networking, and security.
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://vectoringai.com/pages/about.html">Vectoring AI</a> </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">21 May 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+<div>
+  <div class="keywords">
+    <div class="block-title">Keywords</div>
+    <p>system design interview, scalability, reliability, distributed systems, load balancing, database sharding, caching, CAP theorem, API design, microservices, networking, security, FAANG interview</p>
+  </div>
+</div>
+
+</header>
+
+
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>This is <strong>Part 1</strong> of our System Design Interview QA series, focusing on the <strong>foundational concepts</strong> that underpin every system design interview. System design is about designing the entire architecture of a software system — understanding how components fit together at scale, how failures are handled, and how trade-offs are made across scalability, reliability, performance, databases, APIs, networking, and security.</p>
+<blockquote class="blockquote">
+<p>For infrastructure deep dives (load balancing, caching, Kubernetes, etc.), see <a href="../../posts/system-design/System-Design-Interview-QA-2.html">System Design Interview QA - 2</a>. For hands-on design problems (URL shortener, chat system, etc.), see <a href="../../posts/system-design/System-Design-Interview-QA-3.html">System Design Interview QA - 3</a>.</p>
+</blockquote>
+<hr>
+</section>
+<section id="q1-what-is-scalability-and-how-do-you-scale-a-system" class="level2">
+<h2 class="anchored" data-anchor-id="q1-what-is-scalability-and-how-do-you-scale-a-system">Q1: What Is Scalability and How Do You Scale a System?</h2>
+<p><strong>Answer:</strong></p>
+<p>Scalability is the ability of a system to handle growing amounts of work by adding resources. There are two fundamental approaches: <strong>vertical scaling</strong> (bigger machines) and <strong>horizontal scaling</strong> (more machines).</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph Vertical["Vertical Scaling (Scale Up)"]
+        V1["Small Server&lt;br/&gt;4 CPU, 16GB RAM"]
+        V1 --&gt;|"Upgrade"| V2["Large Server&lt;br/&gt;64 CPU, 512GB RAM"]
+    end
+
+    subgraph Horizontal["Horizontal Scaling (Scale Out)"]
+        LB["Load Balancer"]
+        LB --&gt; S1["Server 1"]
+        LB --&gt; S2["Server 2"]
+        LB --&gt; S3["Server 3"]
+        LB --&gt; S4["Server N..."]
+    end
+
+    style Vertical fill:#6cc3d5,stroke:#333,color:#fff
+    style Horizontal fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="vertical-vs-horizontal-scaling" class="level3">
+<h3 class="anchored" data-anchor-id="vertical-vs-horizontal-scaling">Vertical vs Horizontal Scaling</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 12%">
+<col style="width: 40%">
+<col style="width: 46%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Aspect</th>
+<th>Vertical Scaling (Scale Up)</th>
+<th>Horizontal Scaling (Scale Out)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Approach</strong></td>
+<td>Add more CPU/RAM/disk to one machine</td>
+<td>Add more machines behind a load balancer</td>
+</tr>
+<tr class="even">
+<td><strong>Complexity</strong></td>
+<td>Simple — no code changes</td>
+<td>Complex — need stateless design, data partitioning</td>
+</tr>
+<tr class="odd">
+<td><strong>Cost</strong></td>
+<td>Exponential cost for high-end hardware</td>
+<td>Linear cost — commodity hardware</td>
+</tr>
+<tr class="even">
+<td><strong>Limit</strong></td>
+<td>Hard ceiling (largest machine available)</td>
+<td>Practically unlimited</td>
+</tr>
+<tr class="odd">
+<td><strong>Downtime</strong></td>
+<td>Requires restart to upgrade</td>
+<td>Zero downtime — add/remove nodes</td>
+</tr>
+<tr class="even">
+<td><strong>Failure</strong></td>
+<td>Single point of failure</td>
+<td>Fault tolerant — one node fails, others serve</td>
+</tr>
+<tr class="odd">
+<td><strong>Example</strong></td>
+<td>Upgrade PostgreSQL server from 32GB to 256GB RAM</td>
+<td>Shard PostgreSQL across 8 nodes</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="key-scaling-strategies" class="level3">
+<h3 class="anchored" data-anchor-id="key-scaling-strategies">Key Scaling Strategies</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    SCALE["Scaling Strategies"]
+    SCALE --&gt; LB["Load Balancing&lt;br/&gt;(distribute traffic)"]
+    SCALE --&gt; CACHE["Caching&lt;br/&gt;(reduce DB load)"]
+    SCALE --&gt; SHARD["Database Sharding&lt;br/&gt;(split data across DBs)"]
+    SCALE --&gt; ASYNC["Async Processing&lt;br/&gt;(message queues)"]
+    SCALE --&gt; CDN["CDN&lt;br/&gt;(serve static content at edge)"]
+    SCALE --&gt; MS["Microservices&lt;br/&gt;(scale services independently)"]
+
+    style SCALE fill:#56cc9d,stroke:#333,color:#fff
+    style LB fill:#ffce67,stroke:#333
+    style CACHE fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 27%">
+<col style="width: 36%">
+<col style="width: 36%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Strategy</th>
+<th>What It Does</th>
+<th>When to Use</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Load balancing</strong></td>
+<td>Distribute requests across servers</td>
+<td>Always, for any multi-server setup</td>
+</tr>
+<tr class="even">
+<td><strong>Caching</strong></td>
+<td>Store frequently accessed data in memory</td>
+<td>Read-heavy workloads (80/20 rule)</td>
+</tr>
+<tr class="odd">
+<td><strong>Database sharding</strong></td>
+<td>Split data across multiple databases</td>
+<td>Data too large for single DB, or write throughput limit hit</td>
+</tr>
+<tr class="even">
+<td><strong>Async processing</strong></td>
+<td>Offload work to background queues</td>
+<td>Long-running tasks (email, video transcoding)</td>
+</tr>
+<tr class="odd">
+<td><strong>CDN</strong></td>
+<td>Cache static assets at edge locations</td>
+<td>Global user base, static content</td>
+</tr>
+<tr class="even">
+<td><strong>Microservices</strong></td>
+<td>Break monolith into independently scalable services</td>
+<td>When different components have different scaling needs</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="stateless-vs-stateful-services" class="level3">
+<h3 class="anchored" data-anchor-id="stateless-vs-stateful-services">Stateless vs Stateful Services</h3>
+<pre><code>Stateless (preferred for horizontal scaling):
+  - Server holds NO user session data
+  - Any server can handle any request
+  - Session stored in external store (Redis, DB)
+  - Easy to add/remove servers
+
+Stateful (harder to scale):
+  - Server holds user session in memory
+  - Requests must be routed to same server (sticky sessions)
+  - Server failure loses user state
+  - Scaling requires state migration</code></pre>
+<hr>
+</section>
+</section>
+<section id="q2-how-do-you-ensure-reliability-and-fault-tolerance" class="level2">
+<h2 class="anchored" data-anchor-id="q2-how-do-you-ensure-reliability-and-fault-tolerance">Q2: How Do You Ensure Reliability and Fault Tolerance?</h2>
+<p><strong>Answer:</strong></p>
+<p>Reliability means a system continues to work correctly even when things go wrong — hardware failures, software bugs, network issues, or traffic spikes. Fault tolerance is achieved through <strong>redundancy</strong>, <strong>replication</strong>, <strong>graceful degradation</strong>, and <strong>automatic recovery</strong>.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph Redundancy["Redundancy at Every Layer"]
+        LB1["Load Balancer&lt;br/&gt;(Active)"]
+        LB2["Load Balancer&lt;br/&gt;(Standby)"]
+        LB1 --&gt; APP1["App Server 1"]
+        LB1 --&gt; APP2["App Server 2"]
+        LB1 --&gt; APP3["App Server 3"]
+        APP1 --&gt; DB_P["DB Primary"]
+        APP2 --&gt; DB_P
+        APP3 --&gt; DB_P
+        DB_P --&gt;|"Replication"| DB_R1["DB Replica 1"]
+        DB_P --&gt;|"Replication"| DB_R2["DB Replica 2"]
+    end
+
+    style LB1 fill:#56cc9d,stroke:#333,color:#fff
+    style DB_P fill:#6cc3d5,stroke:#333,color:#fff
+    style LB2 fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="reliability-patterns" class="level3">
+<h3 class="anchored" data-anchor-id="reliability-patterns">Reliability Patterns</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 29%">
+<col style="width: 41%">
+<col style="width: 29%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Pattern</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Replication</strong></td>
+<td>Keep multiple copies of data/services</td>
+<td>3 DB replicas across availability zones</td>
+</tr>
+<tr class="even">
+<td><strong>Failover</strong></td>
+<td>Automatically switch to backup when primary fails</td>
+<td>Primary DB fails → promote replica</td>
+</tr>
+<tr class="odd">
+<td><strong>Health checks</strong></td>
+<td>Monitor component health, remove unhealthy nodes</td>
+<td>Load balancer pings <code>/health</code> every 5s</td>
+</tr>
+<tr class="even">
+<td><strong>Circuit breaker</strong></td>
+<td>Stop calling a failing service, fail fast</td>
+<td>If payment API errors &gt;50%, stop calling for 30s</td>
+</tr>
+<tr class="odd">
+<td><strong>Retry with backoff</strong></td>
+<td>Retry failed requests with increasing delay</td>
+<td>Retry after 1s, 2s, 4s, 8s (exponential backoff)</td>
+</tr>
+<tr class="even">
+<td><strong>Bulkhead</strong></td>
+<td>Isolate failures to prevent cascading</td>
+<td>Separate thread pools for payment vs catalog</td>
+</tr>
+<tr class="odd">
+<td><strong>Graceful degradation</strong></td>
+<td>Serve partial functionality when subsystems fail</td>
+<td>Show cached feed if recommendation service is down</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="availability-levels" class="level3">
+<h3 class="anchored" data-anchor-id="availability-levels">Availability Levels</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 14%">
+<col style="width: 29%">
+<col style="width: 34%">
+<col style="width: 21%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Level</th>
+<th>Downtime/Year</th>
+<th>Downtime/Month</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>99%</strong> (two 9s)</td>
+<td>3.65 days</td>
+<td>7.3 hours</td>
+<td>Internal tools</td>
+</tr>
+<tr class="even">
+<td><strong>99.9%</strong> (three 9s)</td>
+<td>8.76 hours</td>
+<td>43.8 minutes</td>
+<td>SaaS applications</td>
+</tr>
+<tr class="odd">
+<td><strong>99.99%</strong> (four 9s)</td>
+<td>52.6 minutes</td>
+<td>4.4 minutes</td>
+<td>E-commerce, banking</td>
+</tr>
+<tr class="even">
+<td><strong>99.999%</strong> (five 9s)</td>
+<td>5.26 minutes</td>
+<td>26.3 seconds</td>
+<td>DNS, payment processing</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="failure-handling-flow" class="level3">
+<h3 class="anchored" data-anchor-id="failure-handling-flow">Failure Handling Flow</h3>
+<pre><code>Request comes in:
+  1. Load balancer routes to healthy server
+     - If server unreachable → try next server
+  2. Server processes request
+     - If downstream service fails → circuit breaker
+       - Circuit CLOSED: forward request normally
+       - Circuit OPEN: return cached/fallback response immediately
+       - Circuit HALF-OPEN: try one request, if success → close
+  3. Database write
+     - Write to primary → replicate to replicas
+     - If primary fails → promote replica (automatic failover)
+  4. Return response
+     - If timeout → client retries with exponential backoff
+     - If persistent failure → graceful degradation (partial response)</code></pre>
+<hr>
+</section>
+</section>
+<section id="q3-what-are-the-key-performance-optimization-strategies" class="level2">
+<h2 class="anchored" data-anchor-id="q3-what-are-the-key-performance-optimization-strategies">Q3: What Are the Key Performance Optimization Strategies?</h2>
+<p><strong>Answer:</strong></p>
+<p>Performance optimization reduces <strong>latency</strong> (time to respond) and increases <strong>throughput</strong> (requests handled per second). The key principle is to identify and eliminate bottlenecks at each layer: network, application, and database.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    subgraph Latency["Latency Numbers Every Engineer Should Know"]
+        L1["L1 cache: 0.5 ns"]
+        L2["L2 cache: 7 ns"]
+        L3["RAM access: 100 ns"]
+        L4["SSD read: 150 μs"]
+        L5["HDD seek: 10 ms"]
+        L6["Same datacenter roundtrip: 0.5 ms"]
+        L7["Cross-region roundtrip: 150 ms"]
+    end
+
+    style Latency fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="performance-optimization-by-layer" class="level3">
+<h3 class="anchored" data-anchor-id="performance-optimization-by-layer">Performance Optimization by Layer</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 28%">
+<col style="width: 40%">
+<col style="width: 32%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Layer</th>
+<th>Strategy</th>
+<th>Impact</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Network</strong></td>
+<td>CDN for static assets</td>
+<td>Reduces latency by 10-100x for global users</td>
+</tr>
+<tr class="even">
+<td><strong>Network</strong></td>
+<td>HTTP/2 multiplexing, gzip compression</td>
+<td>Fewer connections, smaller payloads</td>
+</tr>
+<tr class="odd">
+<td><strong>Network</strong></td>
+<td>Connection pooling</td>
+<td>Avoid TCP handshake overhead per request</td>
+</tr>
+<tr class="even">
+<td><strong>Application</strong></td>
+<td>Caching (Redis/Memcached)</td>
+<td>Sub-millisecond reads vs 10-100ms DB queries</td>
+</tr>
+<tr class="odd">
+<td><strong>Application</strong></td>
+<td>Async processing (message queues)</td>
+<td>Don’t block user on slow operations</td>
+</tr>
+<tr class="even">
+<td><strong>Application</strong></td>
+<td>Pagination and lazy loading</td>
+<td>Return only what user needs now</td>
+</tr>
+<tr class="odd">
+<td><strong>Database</strong></td>
+<td>Indexing</td>
+<td>Speed up queries from O(n) to O(log n)</td>
+</tr>
+<tr class="even">
+<td><strong>Database</strong></td>
+<td>Read replicas</td>
+<td>Distribute read load across multiple DBs</td>
+</tr>
+<tr class="odd">
+<td><strong>Database</strong></td>
+<td>Query optimization</td>
+<td>Avoid N+1 queries, use JOINs efficiently</td>
+</tr>
+<tr class="even">
+<td><strong>Database</strong></td>
+<td>Denormalization</td>
+<td>Trade storage for faster reads (avoid JOINs)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="caching-strategy-deep-dive" class="level3">
+<h3 class="anchored" data-anchor-id="caching-strategy-deep-dive">Caching Strategy Deep Dive</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    REQ["Request"]
+    REQ --&gt; APP["Application"]
+    APP --&gt; CHECK{"Cache&lt;br/&gt;hit?"}
+    CHECK --&gt;|"Hit"| RETURN["Return cached data&lt;br/&gt;(&lt; 1ms)"]
+    CHECK --&gt;|"Miss"| DB["Query Database&lt;br/&gt;(10-100ms)"]
+    DB --&gt; UPDATE["Update Cache"]
+    UPDATE --&gt; RETURN2["Return data"]
+
+    style CHECK fill:#ffce67,stroke:#333
+    style RETURN fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 41%">
+<col style="width: 33%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Caching Pattern</th>
+<th>How It Works</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Cache-aside</strong> (lazy loading)</td>
+<td>App checks cache → if miss, query DB → write to cache</td>
+<td>General purpose, read-heavy</td>
+</tr>
+<tr class="even">
+<td><strong>Write-through</strong></td>
+<td>Write to cache AND DB simultaneously</td>
+<td>When reads immediately follow writes</td>
+</tr>
+<tr class="odd">
+<td><strong>Write-behind</strong> (write-back)</td>
+<td>Write to cache first, async write to DB</td>
+<td>Write-heavy, can tolerate brief inconsistency</td>
+</tr>
+<tr class="even">
+<td><strong>Read-through</strong></td>
+<td>Cache itself fetches from DB on miss</td>
+<td>Simpler app code, cache acts as primary interface</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="cache-invalidation-strategies" class="level3">
+<h3 class="anchored" data-anchor-id="cache-invalidation-strategies">Cache Invalidation Strategies</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 29%">
+<col style="width: 38%">
+<col style="width: 32%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Strategy</th>
+<th>Description</th>
+<th>Trade-off</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>TTL (Time-To-Live)</strong></td>
+<td>Cache expires after N seconds</td>
+<td>Simple but may serve stale data</td>
+</tr>
+<tr class="even">
+<td><strong>Event-driven invalidation</strong></td>
+<td>Invalidate on write/update event</td>
+<td>Fresh data but more complex</td>
+</tr>
+<tr class="odd">
+<td><strong>Version-based</strong></td>
+<td>Key includes version number, bump on update</td>
+<td>No stale data, slight overhead</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+</section>
+<section id="q4-how-do-distributed-systems-work-and-what-are-the-key-challenges" class="level2">
+<h2 class="anchored" data-anchor-id="q4-how-do-distributed-systems-work-and-what-are-the-key-challenges">Q4: How Do Distributed Systems Work and What Are the Key Challenges?</h2>
+<p><strong>Answer:</strong></p>
+<p>A distributed system is a collection of independent computers that appear to users as a single coherent system. They are necessary when a single machine cannot handle the load, data, or availability requirements.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph Challenges["8 Fallacies of Distributed Computing"]
+        F1["1. The network is NOT reliable"]
+        F2["2. Latency is NOT zero"]
+        F3["3. Bandwidth is NOT infinite"]
+        F4["4. The network is NOT secure"]
+        F5["5. Topology DOES change"]
+        F6["6. There is NOT one administrator"]
+        F7["7. Transport cost is NOT zero"]
+        F8["8. The network is NOT homogeneous"]
+    end
+
+    style Challenges fill:#ff7851,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="cap-theorem" class="level3">
+<h3 class="anchored" data-anchor-id="cap-theorem">CAP Theorem</h3>
+<p>Every distributed data store can provide at most <strong>two of three</strong> guarantees simultaneously:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 36%">
+<col style="width: 30%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Property</th>
+<th>Definition</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Consistency</strong></td>
+<td>Every read receives the most recent write</td>
+<td>All replicas return the same value</td>
+</tr>
+<tr class="even">
+<td><strong>Availability</strong></td>
+<td>Every request receives a response (success or failure)</td>
+<td>System never refuses a request</td>
+</tr>
+<tr class="odd">
+<td><strong>Partition Tolerance</strong></td>
+<td>System operates despite network failures between nodes</td>
+<td>Nodes can’t communicate but keep serving</td>
+</tr>
+</tbody>
+</table>
+<pre><code>Since network partitions WILL happen, you must choose:
+
+  CP (Consistency + Partition Tolerance):
+    → During partition: reject requests rather than return stale data
+    → Examples: MongoDB, HBase, Redis Cluster, ZooKeeper
+    → Use for: Banking, inventory, leader election
+
+  AP (Availability + Partition Tolerance):
+    → During partition: serve requests even if data might be stale
+    → Examples: Cassandra, DynamoDB, CouchDB
+    → Use for: Social media feeds, shopping carts, analytics</code></pre>
+</section>
+<section id="consensus-algorithms" class="level3">
+<h3 class="anchored" data-anchor-id="consensus-algorithms">Consensus Algorithms</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 26%">
+<col style="width: 21%">
+<col style="width: 30%">
+<col style="width: 21%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Algorithm</th>
+<th>Purpose</th>
+<th>How It Works</th>
+<th>Used In</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Paxos</strong></td>
+<td>Agreement among nodes</td>
+<td>Proposer → Acceptors → Learners; majority quorum</td>
+<td>Google Chubby</td>
+</tr>
+<tr class="even">
+<td><strong>Raft</strong></td>
+<td>Leader-based consensus</td>
+<td>Elect leader → leader replicates log entries; easier to understand</td>
+<td>etcd, CockroachDB</td>
+</tr>
+<tr class="odd">
+<td><strong>Gossip Protocol</strong></td>
+<td>Information dissemination</td>
+<td>Nodes periodically exchange state with random peers</td>
+<td>Cassandra, DynamoDB</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="consistency-models" class="level3">
+<h3 class="anchored" data-anchor-id="consistency-models">Consistency Models</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 19%">
+<col style="width: 27%">
+<col style="width: 25%">
+<col style="width: 27%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Model</th>
+<th>Guarantee</th>
+<th>Latency</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Strong consistency</strong></td>
+<td>Read always returns latest write</td>
+<td>High (synchronous replication)</td>
+<td>Banking transactions</td>
+</tr>
+<tr class="even">
+<td><strong>Eventual consistency</strong></td>
+<td>Reads converge to latest write over time</td>
+<td>Low (async replication)</td>
+<td>Social media likes/counts</td>
+</tr>
+<tr class="odd">
+<td><strong>Causal consistency</strong></td>
+<td>Preserves cause-and-effect ordering</td>
+<td>Medium</td>
+<td>Comment threads, chat</td>
+</tr>
+<tr class="even">
+<td><strong>Read-your-writes</strong></td>
+<td>User sees their own writes immediately</td>
+<td>Medium</td>
+<td>User profile updates</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+</section>
+<section id="q5-what-infrastructure-components-make-up-a-production-system" class="level2">
+<h2 class="anchored" data-anchor-id="q5-what-infrastructure-components-make-up-a-production-system">Q5: What Infrastructure Components Make Up a Production System?</h2>
+<p><strong>Answer:</strong></p>
+<p>A production system is composed of multiple infrastructure layers working together. Understanding each component’s role and how they interact is essential for system design.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    USERS["Users"]
+    USERS --&gt; DNS["DNS&lt;br/&gt;(Route53, Cloudflare)"]
+    DNS --&gt; CDN["CDN&lt;br/&gt;(CloudFront, Akamai)"]
+    CDN --&gt; LB["Load Balancer&lt;br/&gt;(ALB, Nginx)"]
+    LB --&gt; API["API Gateway"]
+    API --&gt; SVC1["Service A"]
+    API --&gt; SVC2["Service B"]
+    API --&gt; SVC3["Service C"]
+    SVC1 --&gt; CACHE["Cache&lt;br/&gt;(Redis / Memcached)"]
+    SVC1 --&gt; DB["Database&lt;br/&gt;(PostgreSQL / MySQL)"]
+    SVC2 --&gt; MQ["Message Queue&lt;br/&gt;(Kafka / RabbitMQ)"]
+    MQ --&gt; WORKER["Background Workers"]
+    WORKER --&gt; STORE["Object Storage&lt;br/&gt;(S3)"]
+    SVC3 --&gt; SEARCH["Search Engine&lt;br/&gt;(Elasticsearch)"]
+
+    subgraph Observability
+        LOG["Logging&lt;br/&gt;(ELK Stack)"]
+        METRIC["Metrics&lt;br/&gt;(Prometheus / Grafana)"]
+        TRACE["Tracing&lt;br/&gt;(Jaeger / Zipkin)"]
+    end
+
+    style LB fill:#56cc9d,stroke:#333,color:#fff
+    style CACHE fill:#ffce67,stroke:#333
+    style DB fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="infrastructure-components-reference" class="level3">
+<h3 class="anchored" data-anchor-id="infrastructure-components-reference">Infrastructure Components Reference</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 20%">
+<col style="width: 23%">
+<col style="width: 30%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Component</th>
+<th>Purpose</th>
+<th>Examples</th>
+<th>When to Use</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>DNS</strong></td>
+<td>Domain → IP resolution, geographic routing</td>
+<td>Route53, Cloudflare DNS</td>
+<td>Always — entry point for all traffic</td>
+</tr>
+<tr class="even">
+<td><strong>CDN</strong></td>
+<td>Cache static content at edge locations globally</td>
+<td>CloudFront, Akamai, Fastly</td>
+<td>Static assets, global user base</td>
+</tr>
+<tr class="odd">
+<td><strong>Load Balancer</strong></td>
+<td>Distribute traffic across servers</td>
+<td>ALB/NLB (AWS), Nginx, HAProxy</td>
+<td>Multiple app servers</td>
+</tr>
+<tr class="even">
+<td><strong>API Gateway</strong></td>
+<td>Routing, auth, rate limiting, protocol translation</td>
+<td>Kong, AWS API Gateway, Envoy</td>
+<td>Microservices architecture</td>
+</tr>
+<tr class="odd">
+<td><strong>Cache</strong></td>
+<td>In-memory store for frequently accessed data</td>
+<td>Redis, Memcached</td>
+<td>Read-heavy workloads</td>
+</tr>
+<tr class="even">
+<td><strong>Message Queue</strong></td>
+<td>Async communication, decouple producers/consumers</td>
+<td>Kafka, RabbitMQ, SQS</td>
+<td>Background processing, event-driven</td>
+</tr>
+<tr class="odd">
+<td><strong>Object Storage</strong></td>
+<td>Store blobs (images, videos, backups)</td>
+<td>S3, GCS, Azure Blob</td>
+<td>Media files, backups, data lake</td>
+</tr>
+<tr class="even">
+<td><strong>Search Engine</strong></td>
+<td>Full-text search, analytics</td>
+<td>Elasticsearch, OpenSearch</td>
+<td>Product search, log analysis</td>
+</tr>
+<tr class="odd">
+<td><strong>Container Orchestration</strong></td>
+<td>Deploy, scale, manage containerized services</td>
+<td>Kubernetes, ECS</td>
+<td>Microservices deployment</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="monolith-vs-microservices" class="level3">
+<h3 class="anchored" data-anchor-id="monolith-vs-microservices">Monolith vs Microservices</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 24%">
+<col style="width: 30%">
+<col style="width: 45%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Aspect</th>
+<th>Monolith</th>
+<th>Microservices</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Deployment</strong></td>
+<td>Single deployable unit</td>
+<td>Independent services, independent deployments</td>
+</tr>
+<tr class="even">
+<td><strong>Scaling</strong></td>
+<td>Scale everything together</td>
+<td>Scale each service independently</td>
+</tr>
+<tr class="odd">
+<td><strong>Complexity</strong></td>
+<td>Simple to develop and deploy initially</td>
+<td>Complex: service discovery, distributed tracing</td>
+</tr>
+<tr class="even">
+<td><strong>Data</strong></td>
+<td>Single shared database</td>
+<td>Database per service (data isolation)</td>
+</tr>
+<tr class="odd">
+<td><strong>Team</strong></td>
+<td>Single team, tight coupling</td>
+<td>Small teams own individual services</td>
+</tr>
+<tr class="even">
+<td><strong>Failure</strong></td>
+<td>One bug can crash entire system</td>
+<td>Failure isolated to one service (with proper design)</td>
+</tr>
+<tr class="odd">
+<td><strong>Best for</strong></td>
+<td>Small teams, early-stage products</td>
+<td>Large teams, complex domains, different scaling needs</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="when-to-move-from-monolith-to-microservices" class="level3">
+<h3 class="anchored" data-anchor-id="when-to-move-from-monolith-to-microservices">When to Move from Monolith to Microservices</h3>
+<pre><code>Start with a monolith. Split when:
+  1. Team size &gt; 10-15 engineers (coordination overhead)
+  2. Different components have vastly different scaling needs
+  3. Deployment of one feature blocks another team
+  4. Different services need different tech stacks
+  5. You need independent failure isolation
+
+Do NOT split prematurely — microservices add operational complexity:
+  - Service discovery
+  - Distributed transactions (Saga pattern)
+  - Network latency between services
+  - Distributed debugging and tracing
+  - Data consistency across service boundaries</code></pre>
+<hr>
+</section>
+</section>
+<section id="q6-how-do-you-design-restful-apis-and-choose-between-api-styles" class="level2">
+<h2 class="anchored" data-anchor-id="q6-how-do-you-design-restful-apis-and-choose-between-api-styles">Q6: How Do You Design RESTful APIs and Choose Between API Styles?</h2>
+<p><strong>Answer:</strong></p>
+<p>APIs are the contracts between system components. Choosing the right API style and designing clean, consistent interfaces is a core system design skill.</p>
+<section id="api-style-comparison" class="level3">
+<h3 class="anchored" data-anchor-id="api-style-comparison">API Style Comparison</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 28%">
+<col style="width: 22%">
+<col style="width: 28%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Style</th>
+<th>Protocol</th>
+<th>Format</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>REST</strong></td>
+<td>HTTP</td>
+<td>JSON</td>
+<td>CRUD web services, public APIs</td>
+</tr>
+<tr class="even">
+<td><strong>GraphQL</strong></td>
+<td>HTTP</td>
+<td>JSON</td>
+<td>Complex queries, frontend-driven data needs</td>
+</tr>
+<tr class="odd">
+<td><strong>gRPC</strong></td>
+<td>HTTP/2</td>
+<td>Protobuf (binary)</td>
+<td>Low-latency microservice communication</td>
+</tr>
+<tr class="even">
+<td><strong>WebSocket</strong></td>
+<td>TCP (upgraded HTTP)</td>
+<td>Any</td>
+<td>Real-time bidirectional (chat, gaming)</td>
+</tr>
+<tr class="odd">
+<td><strong>Webhook</strong></td>
+<td>HTTP (push)</td>
+<td>JSON</td>
+<td>Event notifications (payment processed, build complete)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="rest-api-design-principles" class="level3">
+<h3 class="anchored" data-anchor-id="rest-api-design-principles">REST API Design Principles</h3>
+<pre><code>Good REST API design:
+
+  Resources (nouns, not verbs):
+    ✅ GET    /api/v1/users              → List users
+    ✅ GET    /api/v1/users/123          → Get user 123
+    ✅ POST   /api/v1/users              → Create user
+    ✅ PUT    /api/v1/users/123          → Update user 123
+    ✅ DELETE /api/v1/users/123          → Delete user 123
+    ❌ GET    /api/v1/getUser?id=123     → Verb in URL (bad)
+
+  Nested resources:
+    GET  /api/v1/users/123/orders       → Orders for user 123
+    GET  /api/v1/users/123/orders/456   → Specific order
+
+  Pagination:
+    GET /api/v1/users?page=2&amp;limit=20
+    GET /api/v1/users?cursor=abc123&amp;limit=20  (cursor-based, preferred)
+
+  Filtering and sorting:
+    GET /api/v1/users?role=admin&amp;sort=-created_at
+
+  Versioning:
+    /api/v1/users  → URL path versioning (most common)
+    Accept: application/vnd.api.v1+json  → Header versioning</code></pre>
+</section>
+<section id="http-status-codes" class="level3">
+<h3 class="anchored" data-anchor-id="http-status-codes">HTTP Status Codes</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Code</th>
+<th>Meaning</th>
+<th>When to Use</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>200</strong></td>
+<td>OK</td>
+<td>Successful GET, PUT</td>
+</tr>
+<tr class="even">
+<td><strong>201</strong></td>
+<td>Created</td>
+<td>Successful POST (resource created)</td>
+</tr>
+<tr class="odd">
+<td><strong>204</strong></td>
+<td>No Content</td>
+<td>Successful DELETE</td>
+</tr>
+<tr class="even">
+<td><strong>400</strong></td>
+<td>Bad Request</td>
+<td>Invalid input, validation error</td>
+</tr>
+<tr class="odd">
+<td><strong>401</strong></td>
+<td>Unauthorized</td>
+<td>Missing or invalid authentication</td>
+</tr>
+<tr class="even">
+<td><strong>403</strong></td>
+<td>Forbidden</td>
+<td>Authenticated but insufficient permissions</td>
+</tr>
+<tr class="odd">
+<td><strong>404</strong></td>
+<td>Not Found</td>
+<td>Resource doesn’t exist</td>
+</tr>
+<tr class="even">
+<td><strong>409</strong></td>
+<td>Conflict</td>
+<td>Duplicate resource, version conflict</td>
+</tr>
+<tr class="odd">
+<td><strong>429</strong></td>
+<td>Too Many Requests</td>
+<td>Rate limit exceeded</td>
+</tr>
+<tr class="even">
+<td><strong>500</strong></td>
+<td>Internal Server Error</td>
+<td>Unhandled server error</td>
+</tr>
+<tr class="odd">
+<td><strong>503</strong></td>
+<td>Service Unavailable</td>
+<td>Server overloaded or in maintenance</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="idempotency" class="level3">
+<h3 class="anchored" data-anchor-id="idempotency">Idempotency</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 23%">
+<col style="width: 35%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Idempotent?</th>
+<th>Safe?</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>GET</strong></td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Retrieves data, no side effects</td>
+</tr>
+<tr class="even">
+<td><strong>PUT</strong></td>
+<td>Yes</td>
+<td>No</td>
+<td>Same request produces same result</td>
+</tr>
+<tr class="odd">
+<td><strong>DELETE</strong></td>
+<td>Yes</td>
+<td>No</td>
+<td>Deleting same resource twice = same outcome</td>
+</tr>
+<tr class="even">
+<td><strong>POST</strong></td>
+<td><strong>No</strong></td>
+<td>No</td>
+<td>Use idempotency keys (e.g., <code>Idempotency-Key: uuid</code>)</td>
+</tr>
+<tr class="odd">
+<td><strong>PATCH</strong></td>
+<td>No</td>
+<td>No</td>
+<td>Partial update — result depends on current state</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="pagination-offset-vs-cursor" class="level3">
+<h3 class="anchored" data-anchor-id="pagination-offset-vs-cursor">Pagination: Offset vs Cursor</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 45%">
+<col style="width: 27%">
+<col style="width: 27%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Approach</th>
+<th>Pros</th>
+<th>Cons</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Offset</strong> (<code>?page=5&amp;limit=20</code>)</td>
+<td>Simple, can jump to any page</td>
+<td>Slow on large datasets (OFFSET scans rows); inconsistent with inserts</td>
+</tr>
+<tr class="even">
+<td><strong>Cursor</strong> (<code>?cursor=abc&amp;limit=20</code>)</td>
+<td>Consistent, fast (indexed seek); handles real-time inserts</td>
+<td>Can’t jump to arbitrary page</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+</section>
+<section id="q7-how-do-you-choose-the-right-database" class="level2">
+<h2 class="anchored" data-anchor-id="q7-how-do-you-choose-the-right-database">Q7: How Do You Choose the Right Database?</h2>
+<p><strong>Answer:</strong></p>
+<p>Database selection is one of the most impactful decisions in system design. The choice depends on data structure, access patterns, consistency requirements, and scale.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    CHOOSE["Choose Your Database"]
+    CHOOSE --&gt; REL["Relational (SQL)"]
+    CHOOSE --&gt; DOC["Document Store"]
+    CHOOSE --&gt; KV["Key-Value Store"]
+    CHOOSE --&gt; COL["Wide-Column Store"]
+    CHOOSE --&gt; GRAPH["Graph Database"]
+    CHOOSE --&gt; TS["Time-Series DB"]
+    CHOOSE --&gt; SEARCH["Search Engine"]
+
+    REL --&gt; REL_EX["PostgreSQL, MySQL&lt;br/&gt;ACID, complex queries, JOINs"]
+    DOC --&gt; DOC_EX["MongoDB, CouchDB&lt;br/&gt;Flexible schema, nested data"]
+    KV --&gt; KV_EX["Redis, DynamoDB&lt;br/&gt;Cache, session, simple lookups"]
+    COL --&gt; COL_EX["Cassandra, HBase&lt;br/&gt;Write-heavy, time-series-like"]
+    GRAPH --&gt; GRAPH_EX["Neo4j, Neptune&lt;br/&gt;Relationships, social networks"]
+    TS --&gt; TS_EX["InfluxDB, TimescaleDB&lt;br/&gt;Metrics, IoT, monitoring"]
+    SEARCH --&gt; SEARCH_EX["Elasticsearch&lt;br/&gt;Full-text search, analytics"]
+
+    style CHOOSE fill:#56cc9d,stroke:#333,color:#fff
+    style REL fill:#6cc3d5,stroke:#333,color:#fff
+    style DOC fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="database-selection-guide" class="level3">
+<h3 class="anchored" data-anchor-id="database-selection-guide">Database Selection Guide</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 43%">
+<col style="width: 40%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Requirement</th>
+<th>Best Choice</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Complex relationships, ACID transactions</td>
+<td><strong>PostgreSQL / MySQL</strong></td>
+<td>Strong consistency, JOINs, mature tooling</td>
+</tr>
+<tr class="even">
+<td>Flexible schema, nested documents</td>
+<td><strong>MongoDB</strong></td>
+<td>Schema-less, easy horizontal scaling</td>
+</tr>
+<tr class="odd">
+<td>Ultra-fast key-value lookups, caching</td>
+<td><strong>Redis</strong></td>
+<td>In-memory, sub-millisecond latency</td>
+</tr>
+<tr class="even">
+<td>Massive write throughput, append-only</td>
+<td><strong>Cassandra</strong></td>
+<td>Distributed, tunable consistency, linear scaling</td>
+</tr>
+<tr class="odd">
+<td>Social graph, recommendations</td>
+<td><strong>Neo4j</strong></td>
+<td>Optimized for traversing relationships</td>
+</tr>
+<tr class="even">
+<td>Full-text search, log analytics</td>
+<td><strong>Elasticsearch</strong></td>
+<td>Inverted index, near real-time search</td>
+</tr>
+<tr class="odd">
+<td>Time-series data (metrics, IoT)</td>
+<td><strong>TimescaleDB / InfluxDB</strong></td>
+<td>Optimized for time-bucketed queries</td>
+</tr>
+<tr class="even">
+<td>Globally distributed, strong consistency</td>
+<td><strong>CockroachDB / Spanner</strong></td>
+<td>Distributed SQL, serializable isolation</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="sql-vs-nosql-trade-offs" class="level3">
+<h3 class="anchored" data-anchor-id="sql-vs-nosql-trade-offs">SQL vs NoSQL Trade-offs</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 53%">
+<col style="width: 21%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Aspect</th>
+<th>SQL (Relational)</th>
+<th>NoSQL</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Schema</strong></td>
+<td>Fixed schema, migrations required</td>
+<td>Flexible / schema-less</td>
+</tr>
+<tr class="even">
+<td><strong>Consistency</strong></td>
+<td>ACID (strong by default)</td>
+<td>BASE (eventual, tunable)</td>
+</tr>
+<tr class="odd">
+<td><strong>Scaling</strong></td>
+<td>Vertical (primarily), read replicas</td>
+<td>Horizontal (built-in sharding)</td>
+</tr>
+<tr class="even">
+<td><strong>Queries</strong></td>
+<td>Complex JOINs, aggregations, SQL</td>
+<td>Simple lookups, limited JOINs</td>
+</tr>
+<tr class="odd">
+<td><strong>Transactions</strong></td>
+<td>Multi-table transactions native</td>
+<td>Limited (single-partition or Saga pattern)</td>
+</tr>
+<tr class="even">
+<td><strong>Best for</strong></td>
+<td>Financial, e-commerce, complex relationships</td>
+<td>High-scale, simple access patterns, flexible data</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="database-scaling-strategies" class="level3">
+<h3 class="anchored" data-anchor-id="database-scaling-strategies">Database Scaling Strategies</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    DBSCALE["Database Scaling"]
+    DBSCALE --&gt; RR["Read Replicas&lt;br/&gt;(scale reads)"]
+    DBSCALE --&gt; SHARD["Sharding&lt;br/&gt;(scale writes + storage)"]
+    DBSCALE --&gt; PART["Partitioning&lt;br/&gt;(split tables)"]
+    DBSCALE --&gt; POOL["Connection Pooling&lt;br/&gt;(scale connections)"]
+
+    RR --&gt; RR_D["Primary handles writes&lt;br/&gt;Replicas handle reads&lt;br/&gt;Async replication"]
+    SHARD --&gt; SHARD_D["Split data by key&lt;br/&gt;(user_id % N shards)&lt;br/&gt;Each shard is a full DB"]
+
+    style DBSCALE fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+</section>
+<section id="sharding-strategies" class="level3">
+<h3 class="anchored" data-anchor-id="sharding-strategies">Sharding Strategies</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 28%">
+<col style="width: 37%">
+<col style="width: 17%">
+<col style="width: 17%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Strategy</th>
+<th>How It Works</th>
+<th>Pros</th>
+<th>Cons</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Hash-based</strong></td>
+<td><code>shard = hash(key) % N</code></td>
+<td>Even distribution</td>
+<td>Adding shards requires reshuffling</td>
+</tr>
+<tr class="even">
+<td><strong>Range-based</strong></td>
+<td><code>shard 1: A-M, shard 2: N-Z</code></td>
+<td>Range queries efficient</td>
+<td>Hotspots if data is skewed</td>
+</tr>
+<tr class="odd">
+<td><strong>Directory-based</strong></td>
+<td>Lookup table maps key → shard</td>
+<td>Flexible, no reshuffling</td>
+<td>Lookup table is single point of failure</td>
+</tr>
+<tr class="even">
+<td><strong>Consistent hashing</strong></td>
+<td>Hash ring, minimal key movement on changes</td>
+<td>Add/remove nodes easily</td>
+<td>Slightly uneven with few nodes (use virtual nodes)</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+</section>
+<section id="q8-how-does-networking-work-in-distributed-systems" class="level2">
+<h2 class="anchored" data-anchor-id="q8-how-does-networking-work-in-distributed-systems">Q8: How Does Networking Work in Distributed Systems?</h2>
+<p><strong>Answer:</strong></p>
+<p>Understanding networking fundamentals is essential for system design — from how a request reaches your server to how services communicate internally.</p>
+<section id="how-a-web-request-works-end-to-end" class="level3">
+<h3 class="anchored" data-anchor-id="how-a-web-request-works-end-to-end">How a Web Request Works (End-to-End)</h3>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    BROWSER["Browser"]
+    BROWSER --&gt;|"1. DNS Lookup"| DNS["DNS Server&lt;br/&gt;→ IP address"]
+    DNS --&gt;|"2. TCP Handshake"| LB["Load Balancer"]
+    LB --&gt;|"3. TLS Handshake&lt;br/&gt;(HTTPS)"| APP["App Server"]
+    APP --&gt;|"4. Process Request"| DB["Database"]
+    DB --&gt;|"5. Response"| APP
+    APP --&gt;|"6. HTTP Response"| BROWSER
+
+    style BROWSER fill:#6cc3d5,stroke:#333,color:#fff
+    style LB fill:#56cc9d,stroke:#333,color:#fff
+    style APP fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<pre><code>Step-by-step breakdown:
+  1. DNS resolution: browser.com → 93.184.216.34  (~50ms first time, cached after)
+  2. TCP handshake: SYN → SYN-ACK → ACK           (~1 RTT = 0.5ms same DC, 150ms cross-region)
+  3. TLS handshake: Certificate exchange, key setup (~1-2 RTT additional for HTTPS)
+  4. HTTP request: GET /api/users                   (headers + body)
+  5. Server processes, queries DB, builds response
+  6. HTTP response: 200 OK + JSON payload
+  7. Browser renders response</code></pre>
+</section>
+<section id="communication-protocols" class="level3">
+<h3 class="anchored" data-anchor-id="communication-protocols">Communication Protocols</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 17%">
+<col style="width: 25%">
+<col style="width: 32%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Protocol</th>
+<th>Layer</th>
+<th>Use Case</th>
+<th>Key Property</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>TCP</strong></td>
+<td>Transport</td>
+<td>Most web traffic, databases</td>
+<td>Reliable, ordered delivery</td>
+</tr>
+<tr class="even">
+<td><strong>UDP</strong></td>
+<td>Transport</td>
+<td>Video streaming, gaming, DNS</td>
+<td>Fast, no handshake, unreliable</td>
+</tr>
+<tr class="odd">
+<td><strong>HTTP/1.1</strong></td>
+<td>Application</td>
+<td>Traditional web APIs</td>
+<td>Text-based, one request per connection</td>
+</tr>
+<tr class="even">
+<td><strong>HTTP/2</strong></td>
+<td>Application</td>
+<td>Modern web APIs</td>
+<td>Multiplexing, header compression, binary</td>
+</tr>
+<tr class="odd">
+<td><strong>HTTP/3 (QUIC)</strong></td>
+<td>Application</td>
+<td>Next-gen web</td>
+<td>UDP-based, zero-RTT, faster handshake</td>
+</tr>
+<tr class="even">
+<td><strong>WebSocket</strong></td>
+<td>Application</td>
+<td>Real-time communication</td>
+<td>Full-duplex, persistent connection</td>
+</tr>
+<tr class="odd">
+<td><strong>gRPC</strong></td>
+<td>Application</td>
+<td>Microservice calls</td>
+<td>HTTP/2 + Protobuf, streaming support</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="real-time-communication-patterns" class="level3">
+<h3 class="anchored" data-anchor-id="real-time-communication-patterns">Real-Time Communication Patterns</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 24%">
+<col style="width: 16%">
+<col style="width: 24%">
+<col style="width: 18%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Pattern</th>
+<th>How It Works</th>
+<th>Latency</th>
+<th>Server Load</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Short polling</strong></td>
+<td>Client sends HTTP request every N seconds</td>
+<td>High (N sec delay)</td>
+<td>High (many requests)</td>
+<td>Simple status checks</td>
+</tr>
+<tr class="even">
+<td><strong>Long polling</strong></td>
+<td>Client sends request, server holds until data available</td>
+<td>Medium</td>
+<td>Medium</td>
+<td>Notifications, chat fallback</td>
+</tr>
+<tr class="odd">
+<td><strong>Server-Sent Events (SSE)</strong></td>
+<td>Server pushes events over single HTTP connection</td>
+<td>Low</td>
+<td>Low</td>
+<td>Live feeds, dashboards</td>
+</tr>
+<tr class="even">
+<td><strong>WebSocket</strong></td>
+<td>Full-duplex persistent TCP connection</td>
+<td>Very low</td>
+<td>Low</td>
+<td>Chat, gaming, real-time collaboration</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="dns-and-load-balancing-at-network-level" class="level3">
+<h3 class="anchored" data-anchor-id="dns-and-load-balancing-at-network-level">DNS and Load Balancing at Network Level</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 40%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Level</th>
+<th>Technology</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>DNS-level</strong></td>
+<td>Route53, Cloudflare</td>
+<td>Geographic routing, failover between data centers</td>
+</tr>
+<tr class="even">
+<td><strong>L4 (Transport)</strong></td>
+<td>NLB, HAProxy (TCP mode)</td>
+<td>Route based on IP/port, very fast, no content inspection</td>
+</tr>
+<tr class="odd">
+<td><strong>L7 (Application)</strong></td>
+<td>ALB, Nginx, Envoy</td>
+<td>Route based on URL path, headers, content; SSL termination</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+</section>
+<section id="q9-how-do-you-design-for-security-in-distributed-systems" class="level2">
+<h2 class="anchored" data-anchor-id="q9-how-do-you-design-for-security-in-distributed-systems">Q9: How Do You Design for Security in Distributed Systems?</h2>
+<p><strong>Answer:</strong></p>
+<p>Security must be designed into every layer of a system — from network perimeter to data at rest. In system design interviews, demonstrating security awareness distinguishes senior candidates.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    subgraph Perimeter["Perimeter Security"]
+        FW["Firewall / WAF"]
+        DDOS["DDoS Protection&lt;br/&gt;(Cloudflare, Shield)"]
+    end
+
+    subgraph Network["Network Security"]
+        TLS["TLS / HTTPS&lt;br/&gt;(encryption in transit)"]
+        VPC["VPC / Private Subnets"]
+        SG["Security Groups"]
+    end
+
+    subgraph Application["Application Security"]
+        AUTH["Authentication&lt;br/&gt;(OAuth 2.0, JWT)"]
+        AUTHZ["Authorization&lt;br/&gt;(RBAC, ABAC)"]
+        VALID["Input Validation&lt;br/&gt;(prevent injection)"]
+        RL["Rate Limiting"]
+    end
+
+    subgraph Data["Data Security"]
+        ENC["Encryption at Rest&lt;br/&gt;(AES-256)"]
+        HASH["Password Hashing&lt;br/&gt;(bcrypt, argon2)"]
+        MASK["Data Masking&lt;br/&gt;(PII protection)"]
+    end
+
+    Perimeter --&gt; Network --&gt; Application --&gt; Data
+
+    style Perimeter fill:#ff7851,stroke:#333,color:#fff
+    style Network fill:#ffce67,stroke:#333
+    style Application fill:#56cc9d,stroke:#333,color:#fff
+    style Data fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="authentication-vs-authorization" class="level3">
+<h3 class="anchored" data-anchor-id="authentication-vs-authorization">Authentication vs Authorization</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 23%">
+<col style="width: 25%">
+<col style="width: 28%">
+<col style="width: 23%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Concept</th>
+<th>Question</th>
+<th>Mechanism</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Authentication (AuthN)</strong></td>
+<td>“Who are you?”</td>
+<td>Username/password, OAuth, SSO, MFA</td>
+<td>Login with Google</td>
+</tr>
+<tr class="even">
+<td><strong>Authorization (AuthZ)</strong></td>
+<td>“What can you do?”</td>
+<td>RBAC, ABAC, ACL, policy engines</td>
+<td>Admin can delete users, viewer cannot</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="token-based-authentication-flow-oauth-2.0-jwt" class="level3">
+<h3 class="anchored" data-anchor-id="token-based-authentication-flow-oauth-2.0-jwt">Token-Based Authentication Flow (OAuth 2.0 + JWT)</h3>
+<pre><code>1. User logs in → Auth Server validates credentials
+2. Auth Server issues:
+   - Access token (JWT, short-lived: 15-60 min)
+   - Refresh token (opaque, long-lived: 7-30 days)
+3. Client sends Access token in header: Authorization: Bearer &lt;token&gt;
+4. API Gateway / Service validates JWT:
+   - Verify signature (no DB call needed)
+   - Check expiration
+   - Extract user ID, roles from claims
+5. Token expired → client uses Refresh token to get new Access token
+6. Refresh token expired → user must log in again</code></pre>
+</section>
+<section id="jwt-structure" class="level3">
+<h3 class="anchored" data-anchor-id="jwt-structure">JWT Structure</h3>
+<pre><code>Header.Payload.Signature
+
+Header:  {"alg": "RS256", "typ": "JWT"}
+Payload: {"sub": "user123", "role": "admin", "exp": 1716300000, "iat": 1716296400}
+Signature: HMACSHA256(base64(header) + "." + base64(payload), secret)
+
+Key design decisions:
+  - Use RS256 (asymmetric) for microservices (public key verification, no shared secret)
+  - Keep payload small (don't put entire user profile)
+  - Set short expiration (15 min) + use refresh tokens
+  - Never store sensitive data in JWT (it's base64, not encrypted)</code></pre>
+</section>
+<section id="common-security-threats-and-mitigations" class="level3">
+<h3 class="anchored" data-anchor-id="common-security-threats-and-mitigations">Common Security Threats and Mitigations</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 24%">
+<col style="width: 39%">
+<col style="width: 36%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Threat</th>
+<th>Description</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>SQL injection</strong></td>
+<td>Malicious SQL in user input</td>
+<td>Parameterized queries, ORM</td>
+</tr>
+<tr class="even">
+<td><strong>XSS</strong></td>
+<td>Injecting scripts into web pages</td>
+<td>Input sanitization, CSP headers</td>
+</tr>
+<tr class="odd">
+<td><strong>CSRF</strong></td>
+<td>Forged requests from authenticated browser</td>
+<td>CSRF tokens, SameSite cookies</td>
+</tr>
+<tr class="even">
+<td><strong>DDoS</strong></td>
+<td>Overwhelming system with traffic</td>
+<td>Rate limiting, WAF, CDN, auto-scaling</td>
+</tr>
+<tr class="odd">
+<td><strong>Man-in-the-middle</strong></td>
+<td>Intercepting network traffic</td>
+<td>TLS everywhere, certificate pinning</td>
+</tr>
+<tr class="even">
+<td><strong>Broken authentication</strong></td>
+<td>Weak passwords, no MFA</td>
+<td>bcrypt/argon2 hashing, MFA, account lockout</td>
+</tr>
+<tr class="odd">
+<td><strong>Data breach</strong></td>
+<td>Unauthorized data access</td>
+<td>Encryption at rest, principle of least privilege</td>
+</tr>
+<tr class="even">
+<td><strong>API abuse</strong></td>
+<td>Scraping, brute force</td>
+<td>Rate limiting, API keys, OAuth scopes</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="security-checklist-for-system-design" class="level3">
+<h3 class="anchored" data-anchor-id="security-checklist-for-system-design">Security Checklist for System Design</h3>
+<pre><code>✅ HTTPS/TLS for all communication (internal and external)
+✅ Authentication at the API gateway layer
+✅ Authorization checks at the service level
+✅ Input validation and sanitization at system boundaries
+✅ Rate limiting per client/IP/API key
+✅ Encryption at rest for sensitive data (AES-256)
+✅ Password hashing with bcrypt or argon2 (never plain text or MD5)
+✅ Secrets in vault (HashiCorp Vault, AWS Secrets Manager) — not in code
+✅ Audit logging for security-relevant events
+✅ Principle of least privilege for service accounts
+✅ Network segmentation (private subnets for DBs, no public access)</code></pre>
+<hr>
+</section>
+</section>
+<section id="q10-what-is-back-of-the-envelope-estimation-and-how-do-you-do-it" class="level2">
+<h2 class="anchored" data-anchor-id="q10-what-is-back-of-the-envelope-estimation-and-how-do-you-do-it">Q10: What Is Back-of-the-Envelope Estimation and How Do You Do It?</h2>
+<p><strong>Answer:</strong></p>
+<p>Back-of-the-envelope estimation is a quick calculation technique to estimate system capacity and requirements. Interviewers use it to test whether you can reason about scale and make informed design decisions.</p>
+<section id="power-of-2-reference" class="level3">
+<h3 class="anchored" data-anchor-id="power-of-2-reference">Power of 2 Reference</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Power</th>
+<th>Exact Value</th>
+<th>Approximate</th>
+<th>Name</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>2^10</td>
+<td>1,024</td>
+<td>~1 Thousand</td>
+<td>1 KB</td>
+</tr>
+<tr class="even">
+<td>2^20</td>
+<td>1,048,576</td>
+<td>~1 Million</td>
+<td>1 MB</td>
+</tr>
+<tr class="odd">
+<td>2^30</td>
+<td>1,073,741,824</td>
+<td>~1 Billion</td>
+<td>1 GB</td>
+</tr>
+<tr class="even">
+<td>2^40</td>
+<td>~1.1 × 10^12</td>
+<td>~1 Trillion</td>
+<td>1 TB</td>
+</tr>
+<tr class="odd">
+<td>2^50</td>
+<td>~1.1 × 10^15</td>
+<td>~1 Quadrillion</td>
+<td>1 PB</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="common-data-sizes" class="level3">
+<h3 class="anchored" data-anchor-id="common-data-sizes">Common Data Sizes</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Data Type</th>
+<th>Typical Size</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Character (ASCII)</td>
+<td>1 byte</td>
+</tr>
+<tr class="even">
+<td>Character (UTF-8)</td>
+<td>1-4 bytes</td>
+</tr>
+<tr class="odd">
+<td>Integer</td>
+<td>4-8 bytes</td>
+</tr>
+<tr class="even">
+<td>UUID</td>
+<td>16 bytes</td>
+</tr>
+<tr class="odd">
+<td>Timestamp</td>
+<td>8 bytes</td>
+</tr>
+<tr class="even">
+<td>Short string (name)</td>
+<td>~50 bytes</td>
+</tr>
+<tr class="odd">
+<td>URL</td>
+<td>~100 bytes</td>
+</tr>
+<tr class="even">
+<td>Tweet / SMS</td>
+<td>~200 bytes</td>
+</tr>
+<tr class="odd">
+<td>JSON API response</td>
+<td>~1-10 KB</td>
+</tr>
+<tr class="even">
+<td>Compressed image thumbnail</td>
+<td>~10-50 KB</td>
+</tr>
+<tr class="odd">
+<td>Photo (high quality)</td>
+<td>~2-5 MB</td>
+</tr>
+<tr class="even">
+<td>Short video (1 min)</td>
+<td>~50-100 MB</td>
+</tr>
+<tr class="odd">
+<td>Database row (typical)</td>
+<td>~500 bytes - 2 KB</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="qps-queries-per-second-estimation" class="level3">
+<h3 class="anchored" data-anchor-id="qps-queries-per-second-estimation">QPS (Queries Per Second) Estimation</h3>
+<pre><code>Formula: QPS = DAU × queries_per_user / seconds_per_day
+
+Example: Twitter
+  - 500M DAU
+  - Each user views feed 5 times/day, each feed = 10 API calls
+  - Total queries/day = 500M × 50 = 25B
+  - QPS = 25B / 86,400 ≈ 290,000 QPS
+  - Peak QPS ≈ 2 × average ≈ 580,000 QPS
+
+Quick shortcut:
+  - Seconds in a day ≈ 100,000 (actual: 86,400)
+  - 1M requests/day ≈ 10 QPS
+  - 100M requests/day ≈ 1,000 QPS
+  - 1B requests/day ≈ 10,000 QPS</code></pre>
+</section>
+<section id="storage-estimation" class="level3">
+<h3 class="anchored" data-anchor-id="storage-estimation">Storage Estimation</h3>
+<pre><code>Formula: Storage = records_per_day × record_size × retention_period
+
+Example: Chat application
+  - 500M DAU, 100 messages/user/day
+  - Message size: ~100 bytes (text) + ~100 bytes (metadata) = 200 bytes
+  - Daily: 500M × 100 × 200 bytes = 10TB/day
+  - Yearly: 10TB × 365 = 3.65 PB/year
+  - 5 years with replication (3x): ~55 PB total</code></pre>
+</section>
+<section id="bandwidth-estimation" class="level3">
+<h3 class="anchored" data-anchor-id="bandwidth-estimation">Bandwidth Estimation</h3>
+<pre><code>Formula: Bandwidth = QPS × avg_response_size
+
+Example: Image serving
+  - 100K QPS, average image = 200KB
+  - Bandwidth = 100,000 × 200KB = 20GB/s = 160 Gbps
+  - With CDN absorbing 90%: origin bandwidth ≈ 16 Gbps</code></pre>
+</section>
+<section id="server-estimation" class="level3">
+<h3 class="anchored" data-anchor-id="server-estimation">Server Estimation</h3>
+<pre><code>Rule of thumb:
+  - 1 web server handles ~1,000-10,000 QPS (depends on complexity)
+  - 1 DB server handles ~1,000-5,000 QPS (depends on query complexity)
+  - 1 cache server (Redis): ~100,000-500,000 QPS
+
+Example: 500K QPS API
+  - App servers: 500K / 5,000 = 100 servers (with headroom: 150)
+  - DB (with read replicas): 1 primary + 10 read replicas
+  - Cache: 500K / 200K = 3 Redis nodes (with replication: 6)</code></pre>
+<hr>
+</section>
+</section>
+<section id="summary-table" class="level2">
+<h2 class="anchored" data-anchor-id="summary-table">Summary Table</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 13%">
+<col style="width: 30%">
+<col style="width: 56%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Topic</th>
+<th>Key Concepts</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td><strong>Scalability</strong></td>
+<td>Vertical vs horizontal scaling, stateless design, load balancing, caching, sharding</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td><strong>Reliability</strong></td>
+<td>Replication, failover, circuit breaker, bulkhead, graceful degradation, 99.99% availability</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td><strong>Performance</strong></td>
+<td>Caching strategies, latency numbers, CDN, indexing, read replicas, denormalization</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td><strong>Distributed Systems</strong></td>
+<td>CAP theorem, consistency models, consensus (Raft/Paxos), gossip protocol</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td><strong>Infrastructure</strong></td>
+<td>DNS → CDN → LB → API Gateway → Services → DB; monolith vs microservices</td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td><strong>APIs</strong></td>
+<td>REST vs GraphQL vs gRPC, HTTP status codes, pagination, idempotency, versioning</td>
+</tr>
+<tr class="odd">
+<td>7</td>
+<td><strong>Databases</strong></td>
+<td>SQL vs NoSQL, sharding strategies, read replicas, choosing the right DB</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td><strong>Networking</strong></td>
+<td>TCP/UDP, HTTP/2/3, WebSocket, SSE, DNS, L4 vs L7 load balancing</td>
+</tr>
+<tr class="odd">
+<td>9</td>
+<td><strong>Security</strong></td>
+<td>AuthN/AuthZ, JWT/OAuth, TLS, encryption at rest, OWASP threats, zero trust</td>
+</tr>
+<tr class="even">
+<td>10</td>
+<td><strong>Estimation</strong></td>
+<td>QPS, storage, bandwidth, server count, powers of 2, latency numbers</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="whats-next" class="level2">
+<h2 class="anchored" data-anchor-id="whats-next">What’s Next?</h2>
+<p>This article covered foundational system design concepts. Continue with:</p>
+<ul>
+<li><strong>Infrastructure deep dives:</strong> <a href="../../posts/system-design/System-Design-Interview-QA-2.html">System Design Interview QA - 2</a> — load balancing, caching, message queues, Kubernetes, CI/CD, monitoring</li>
+<li><strong>Hands-on design problems:</strong> <a href="../../posts/system-design/System-Design-Interview-QA-3.html">System Design Interview QA - 3</a> — URL shortener, chat system, news feed, video streaming, and more</li>
+<li><strong>Design patterns:</strong> <a href="../../posts/design-pattern/Design-Pattern-Interview-QA-1.html">Design Pattern Interview QA - 1</a></li>
+<li><strong>Enterprise patterns (Spring, CQRS):</strong> <a href="../../posts/design-pattern/Design-Pattern-Interview-QA-2.html">Design Pattern Interview QA - 2</a></li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script type="text/javascript">
+var infolinks_pid = 3445432;
+var infolinks_wsid = 0;
+</script>
+<script type="text/javascript" src="https://resources.infolinks.com/js/infolinks_main.js"></script>
+<!-- Floating menu button for mobile -->
+<style>
+#mobile-menu-fab {
+  display: none;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: #4A90D9;
+  color: #fff;
+  border: none;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+  font-size: 22px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+@media (max-width: 767.98px) {
+  #mobile-menu-fab {
+    display: flex;
+  }
+}
+</style>
+<button id="mobile-menu-fab" aria-label="Open menu">☰</button>
+<script>
+document.getElementById('mobile-menu-fab').addEventListener('click', function() {
+  var toggler = document.querySelector('.quarto-btn-toggle[data-bs-target=".quarto-sidebar-collapse-item"]');
+  if (toggler) toggler.click();
+});
+</script>
+<!-- Animated neural network background for title block header -->
+<style>
+/* Background gradient for all title headers */
+#title-block-header, .quarto-title-banner {
+  background: linear-gradient(135deg, #0a0e27 0%, #1a1a3e 40%, #2d1b4e 70%, #0a0e27 100%) !important;
+}
+/* Animation container styles — only on .quarto-title-banner (listing pages) */
+.quarto-title-banner {
+  position: relative;
+  overflow: hidden;
+}
+/* Post pages: clip animation to header bounds without breaking grid */
+#title-block-header:not(:has(.quarto-title-banner)) {
+  clip-path: inset(0);
+}
+/* Mobile: keep animation, fixed top padding, no right padding */
+@media (max-width: 767px) {
+  #title-block-header, .quarto-title-banner {
+    padding-top: 150px !important;
+  }
+  #title-block-header .title,
+  .quarto-title .title {
+    padding-right: 0 !important;
+  }
+  #title-block-header .description,
+  #title-block-header .description p,
+  .quarto-title-banner .quarto-title .description,
+  .quarto-title-banner .quarto-title .description p {
+    padding-right: 0 !important;
+    max-width: 100% !important;
+  }
+  .keywords, .keywords .block-title, .keywords p {
+    padding-right: 0 !important;
+  }
+}
+#title-block-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+.quarto-title-banner > * {
+  position: relative;
+  z-index: 1;
+}
+</style>
+
+<script>
+(function() {
+  function initTitleAnimation() {
+    var target = document.querySelector('.quarto-title-banner') || document.getElementById('title-block-header');
+    if (!target) return;
+
+    var canvas = document.createElement('canvas');
+    canvas.id = 'title-block-canvas';
+    target.insertBefore(canvas, target.firstChild);
+
+    var ctx = canvas.getContext('2d');
+    var particles = [];
+    var particleCount = 60;
+    var connectionDist = 120;
+
+    function resize() {
+      canvas.width = target.offsetWidth;
+      canvas.height = target.offsetHeight;
+    }
+
+    function Particle() {
+      this.x = Math.random() * canvas.width;
+      this.y = Math.random() * canvas.height;
+      this.vx = (Math.random() - 0.5) * 0.4;
+      this.vy = (Math.random() - 0.5) * 0.3;
+      this.r = Math.random() * 2 + 1;
+      this.pulse = Math.random() * Math.PI * 2;
+      this.pulseSpeed = 0.01 + Math.random() * 0.02;
+      var colors = [
+        [120, 194, 173],
+        [130, 170, 255],
+        [180, 140, 255],
+        [255, 180, 200],
+        [100, 220, 220],
+      ];
+      this.color = colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    function init() {
+      particles = [];
+      for (var i = 0; i < particleCount; i++) {
+        particles.push(new Particle());
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (var i = 0; i < particles.length; i++) {
+        for (var j = i + 1; j < particles.length; j++) {
+          var dx = particles[i].x - particles[j].x;
+          var dy = particles[i].y - particles[j].y;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < connectionDist) {
+            var alpha = (1 - dist / connectionDist) * 0.3;
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.strokeStyle = 'rgba(120, 194, 173, ' + alpha + ')';
+            ctx.lineWidth = 0.6;
+            ctx.stroke();
+          }
+        }
+      }
+
+      for (var i = 0; i < particles.length; i++) {
+        var p = particles[i];
+        p.pulse += p.pulseSpeed;
+        var glow = 0.5 + 0.5 * Math.sin(p.pulse);
+        var r = p.r * (0.8 + 0.4 * glow);
+
+        var grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 4);
+        grad.addColorStop(0, 'rgba(' + p.color[0] + ',' + p.color[1] + ',' + p.color[2] + ',' + (0.3 * glow) + ')');
+        grad.addColorStop(1, 'rgba(' + p.color[0] + ',' + p.color[1] + ',' + p.color[2] + ', 0)');
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r * 4, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(' + p.color[0] + ',' + p.color[1] + ',' + p.color[2] + ',' + (0.7 + 0.3 * glow) + ')';
+        ctx.fill();
+
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+        if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    resize();
+    init();
+    draw();
+
+    window.addEventListener('resize', function() {
+      resize();
+      init();
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTitleAnimation);
+  } else {
+    initTitleAnimation();
+  }
+})();
+</script>
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/vectoringai\.com");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> 2025-2026 Vectoring AI. All rights reserved. | <a href="../../pages/privacy.html">Privacy Policy</a></p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

@@ -1,0 +1,1102 @@
+---
+title: "System Design Interview QA - 2"
+description: "10 system design interview questions on infrastructure components: load balancing, caching, message queues, microservices, database internals, Kubernetes, CI/CD, monitoring, event-driven architecture, and service mesh."
+image: /images/system-design/thumb_system_design_interview_qa_300.png
+date: "2026-05-21"
+keywords:
+  - "system design interview"
+  - "load balancing"
+  - "caching strategies"
+  - "message queues"
+  - "microservices"
+  - "Kubernetes"
+  - "CI/CD pipeline"
+  - "monitoring observability"
+  - "event-driven architecture"
+  - "database replication"
+  - "service mesh"
+  - "Kafka"
+  - "Redis"
+---
+
+## Introduction
+
+This is **Part 2** of our System Design Interview QA series, focusing on **infrastructure components and operational systems** that power production-grade architectures. While Part 1 covered foundational concepts (scalability, CAP theorem, etc.), this article dives deep into **how specific infrastructure components work** and how to design them.
+
+> For foundational concepts (scalability, CAP theorem, APIs), see [System Design Interview QA - 1](/posts/system-design/System-Design-Interview-QA-1.html). For hands-on design problems (URL shortener, chat system), see [System Design Interview QA - 3](/posts/system-design/System-Design-Interview-QA-3.html).
+
+---
+
+## Q1: How Does Load Balancing Work and How Do You Design a Load Balancer?
+
+**Answer:**
+
+A load balancer distributes incoming network traffic across multiple backend servers to ensure no single server is overwhelmed, improving availability, throughput, and fault tolerance.
+
+```{mermaid}
+graph TD
+    CLIENTS["Clients"]
+    CLIENTS --> DNS["DNS (Round Robin)<br/>→ multiple LB IPs"]
+    DNS --> LB_A["Load Balancer (Active)"]
+    DNS --> LB_S["Load Balancer (Standby)<br/>heartbeat monitoring"]
+
+    LB_A --> S1["Server 1 ✅"]
+    LB_A --> S2["Server 2 ✅"]
+    LB_A --> S3["Server 3 ❌ (unhealthy)"]
+    LB_A --> S4["Server 4 ✅"]
+
+    LB_A -.->|"Health check fails"| S3
+
+    style LB_A fill:#56cc9d,stroke:#333,color:#fff
+    style LB_S fill:#ffce67,stroke:#333
+    style S3 fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Layer 4 vs Layer 7 Load Balancing
+
+| Aspect | Layer 4 (Transport) | Layer 7 (Application) |
+|--------|--------------------|-----------------------|
+| **Operates on** | TCP/UDP packets (IP + port) | HTTP headers, URL path, cookies |
+| **Speed** | Very fast (no content inspection) | Slower (must parse HTTP) |
+| **Routing decisions** | IP hash, round robin, least connections | URL path, headers, content type |
+| **SSL termination** | Passes through (or terminates) | Terminates SSL, inspects content |
+| **Use case** | TCP services, databases, gaming | Web APIs, microservice routing |
+| **Examples** | AWS NLB, HAProxy (TCP mode) | AWS ALB, Nginx, Envoy |
+
+### Load Balancing Algorithms Deep Dive
+
+```{mermaid}
+graph TD
+    subgraph RR["Round Robin"]
+        RR1["Request 1 → Server A"]
+        RR2["Request 2 → Server B"]
+        RR3["Request 3 → Server C"]
+        RR4["Request 4 → Server A"]
+    end
+
+    subgraph LC["Least Connections"]
+        LC1["Server A: 5 active"]
+        LC2["Server B: 2 active ← next request"]
+        LC3["Server C: 8 active"]
+    end
+
+    subgraph WRR["Weighted Round Robin"]
+        WRR1["Server A (weight 5): gets 5 of every 8"]
+        WRR2["Server B (weight 2): gets 2 of every 8"]
+        WRR3["Server C (weight 1): gets 1 of every 8"]
+    end
+
+    style RR fill:#56cc9d,stroke:#333,color:#fff
+    style LC fill:#ffce67,stroke:#333
+    style WRR fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+| Algorithm | Best For | Weakness |
+|-----------|----------|----------|
+| **Round Robin** | Equal-capacity servers, stateless services | Ignores server load |
+| **Weighted Round Robin** | Mixed hardware capacities | Static weights, doesn't adapt |
+| **Least Connections** | Long-lived connections (WebSocket, DB) | May route to slow servers |
+| **Least Response Time** | Latency-sensitive services | Requires constant measurement |
+| **IP Hash** | Session affinity without sticky cookies | Uneven with few clients |
+| **Consistent Hashing** | Cache distribution (Redis Cluster) | Complex implementation |
+| **Random** | Large server pools, simplicity | Variance with few servers |
+
+### Session Persistence (Sticky Sessions)
+
+```
+Problem: User state (shopping cart, login session) lives on one server.
+         If next request goes to different server → state lost.
+
+Solutions (from worst to best):
+  1. Sticky sessions (cookie/IP-based routing to same server)
+     - Simple but defeats load balancing purpose
+     - Server failure = lost sessions
+
+  2. Session replication (broadcast sessions to all servers)
+     - Network overhead grows O(n²)
+     - Memory wasted on every server
+
+  3. Centralized session store (Redis/Memcached) ← RECOMMENDED
+     - Any server can handle any request
+     - Session stored in Redis with TTL
+     - Server failure has zero impact on sessions
+     - Scales independently
+```
+
+### Health Check Design
+
+| Type | Mechanism | Interval | Use Case |
+|------|-----------|----------|----------|
+| **TCP check** | Can connect to port? | 5-10s | Basic availability |
+| **HTTP check** | `GET /health` returns 200? | 5-10s | Application-level health |
+| **Deep health check** | Checks DB connectivity, disk space, dependencies | 30s | Comprehensive readiness |
+
+```
+Health check state machine:
+  HEALTHY → 3 consecutive failures → UNHEALTHY (remove from pool)
+  UNHEALTHY → 2 consecutive successes → HEALTHY (add back to pool)
+  
+  Drain mode: stop sending new requests, wait for active to complete
+```
+
+---
+
+## Q2: How Do You Design a Caching System and What Caching Strategies Exist?
+
+**Answer:**
+
+Caching stores frequently accessed data in fast storage (memory) to reduce latency and database load. A well-designed caching strategy can reduce P99 latency from 100ms to <1ms.
+
+```{mermaid}
+graph TD
+    subgraph Layers["Multi-Layer Caching"]
+        CLIENT["Browser Cache<br/>(HTTP cache headers)"]
+        CDN["CDN Cache<br/>(static assets, edge)"]
+        APP["Application Cache<br/>(Redis / Memcached)"]
+        DB_CACHE["Database Cache<br/>(query cache, buffer pool)"]
+    end
+
+    CLIENT --> CDN --> APP --> DB_CACHE --> DB["Database"]
+
+    style CLIENT fill:#56cc9d,stroke:#333,color:#fff
+    style CDN fill:#ffce67,stroke:#333
+    style APP fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Caching Patterns (Implementation Detail)
+
+```{mermaid}
+graph LR
+    subgraph CacheAside["Cache-Aside (Lazy Loading)"]
+        A1["App checks cache"]
+        A1 -->|"miss"| A2["App queries DB"]
+        A2 --> A3["App writes to cache"]
+    end
+
+    subgraph WriteThrough["Write-Through"]
+        B1["App writes to cache"]
+        B1 --> B2["Cache writes to DB"]
+        B2 --> B3["Confirm to app"]
+    end
+
+    subgraph WriteBehind["Write-Behind (Write-Back)"]
+        C1["App writes to cache"]
+        C1 --> C2["Return immediately"]
+        C2 -.->|"async"| C3["Cache writes to DB later"]
+    end
+
+    style CacheAside fill:#56cc9d,stroke:#333,color:#fff
+    style WriteThrough fill:#ffce67,stroke:#333
+    style WriteBehind fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+| Pattern | How It Works | Pros | Cons | Best For |
+|---------|-------------|------|------|----------|
+| **Cache-aside** | App manages cache manually; check cache → miss → query DB → populate cache | Only caches hot data; cache failure non-fatal | Initial requests are slow (cold cache); possible stale data | General purpose, read-heavy |
+| **Write-through** | Every write goes to cache AND DB synchronously | Cache always has latest data | Write latency increases (2 writes); caches data that may never be read | Read-after-write consistency |
+| **Write-behind** | Write to cache, async flush to DB | Very fast writes; batch DB writes | Data loss risk if cache crashes before flush | Write-heavy workloads |
+| **Read-through** | Cache fetches from DB on miss (cache is the data interface) | Simpler app code | Cache library must support it | When using cache frameworks |
+| **Refresh-ahead** | Proactively refresh cache before TTL expires | No cache miss latency | Wastes resources on rarely accessed keys | Predictable access patterns |
+
+### Cache Eviction Policies
+
+| Policy | Evicts | Best For |
+|--------|--------|----------|
+| **LRU** (Least Recently Used) | Item not accessed longest | General purpose (most common) |
+| **LFU** (Least Frequently Used) | Item accessed fewest times | Frequency-based workloads |
+| **FIFO** (First In First Out) | Oldest inserted item | Simple, time-based freshness |
+| **TTL** (Time-To-Live) | Items past expiration time | Data with known freshness window |
+| **Random** | Random item | When access patterns are uniform |
+
+### Redis vs Memcached
+
+| Feature | Redis | Memcached |
+|---------|-------|-----------|
+| **Data structures** | Strings, hashes, lists, sets, sorted sets, streams | Strings only |
+| **Persistence** | RDB snapshots + AOF (append-only file) | None (pure cache) |
+| **Replication** | Built-in master-replica | None (client-side) |
+| **Clustering** | Redis Cluster (automatic sharding) | Client-side sharding |
+| **Pub/Sub** | Yes | No |
+| **Lua scripting** | Yes (atomic operations) | No |
+| **Memory efficiency** | Moderate (overhead per key) | Slab allocator (efficient for uniform sizes) |
+| **Threads** | Single-threaded (6.0+ has I/O threads) | Multi-threaded |
+| **Best for** | Complex data, pub/sub, leaderboards, sessions | Simple high-throughput caching |
+
+### Cache Stampede Prevention
+
+```
+Problem: Cache key expires → hundreds of requests simultaneously hit DB → DB overload
+
+Solutions:
+  1. Lock/mutex: Only one request fetches from DB, others wait
+     cache_key = "user:123"
+     lock_key = f"lock:{cache_key}"
+     if not redis.get(cache_key):
+         if redis.set(lock_key, "1", nx=True, ex=5):  # acquire lock
+             data = db.query(...)
+             redis.set(cache_key, data, ex=300)
+             redis.delete(lock_key)
+         else:
+             wait_for_cache()  # spin until cache populated
+
+  2. Probabilistic early recomputation:
+     - Each read checks: should I refresh? (probability increases near TTL)
+     - Spreads refresh across time window
+
+  3. Background refresh (refresh-ahead):
+     - Background job refreshes popular keys before expiry
+     - No stampede possible
+```
+
+---
+
+## Q3: How Do Message Queues Work and When Should You Use Them?
+
+**Answer:**
+
+Message queues enable asynchronous communication between services by decoupling producers (senders) from consumers (receivers). They provide buffering, load leveling, and guaranteed delivery.
+
+```{mermaid}
+graph LR
+    P1["Producer A<br/>(Order Service)"]
+    P2["Producer B<br/>(Payment Service)"]
+    P1 --> Q["Message Queue<br/>(Kafka / RabbitMQ / SQS)"]
+    P2 --> Q
+    Q --> C1["Consumer 1<br/>(Email Service)"]
+    Q --> C2["Consumer 2<br/>(Analytics Service)"]
+    Q --> C3["Consumer 3<br/>(Inventory Service)"]
+
+    style Q fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### When to Use a Message Queue
+
+| Use Case | Without Queue | With Queue |
+|----------|-------------|-----------|
+| **Async processing** | User waits for email to send (slow) | Return immediately, email sends in background |
+| **Load leveling** | Traffic spike crashes service | Queue absorbs spike, consumers process at their pace |
+| **Decoupling** | Service A calls Service B directly (tight coupling) | Service A publishes event, B consumes when ready |
+| **Retry/DLQ** | Failed requests are lost | Failed messages retry with backoff, go to dead-letter queue |
+| **Fan-out** | One service calls 5 downstream services | Publish once, 5 consumers process independently |
+
+### Kafka vs RabbitMQ vs SQS
+
+| Feature | Apache Kafka | RabbitMQ | AWS SQS |
+|---------|-------------|----------|---------|
+| **Model** | Distributed log (pub/sub + streaming) | Message broker (queues + exchanges) | Managed queue service |
+| **Ordering** | Per partition (guaranteed) | Per queue (FIFO mode) | FIFO queues (limited throughput) |
+| **Throughput** | Millions msgs/sec | Tens of thousands msgs/sec | Thousands msgs/sec |
+| **Retention** | Configurable (days/weeks/forever) | Until consumed/TTL | 14 days max |
+| **Consumer model** | Pull (consumers poll partitions) | Push (broker delivers to consumers) | Pull (long polling) |
+| **Replay** | Yes (consumers can re-read from any offset) | No (message gone after ACK) | No |
+| **Use case** | Event streaming, logs, analytics pipeline | Task queues, RPC, routing | Simple async tasks, serverless |
+| **Complexity** | High (ZooKeeper/KRaft, partitions, offsets) | Medium (exchanges, bindings) | Low (fully managed) |
+
+### Kafka Architecture Deep Dive
+
+```{mermaid}
+graph TD
+    subgraph Producers
+        P1["Producer 1"]
+        P2["Producer 2"]
+    end
+
+    subgraph Kafka["Kafka Cluster"]
+        subgraph Topic["Topic: orders (3 partitions)"]
+            PART0["Partition 0<br/>[msg1, msg4, msg7...]"]
+            PART1["Partition 1<br/>[msg2, msg5, msg8...]"]
+            PART2["Partition 2<br/>[msg3, msg6, msg9...]"]
+        end
+    end
+
+    subgraph ConsumerGroup["Consumer Group: order-processors"]
+        C1["Consumer 1<br/>← Partition 0"]
+        C2["Consumer 2<br/>← Partition 1"]
+        C3["Consumer 3<br/>← Partition 2"]
+    end
+
+    P1 --> PART0
+    P2 --> PART1
+    PART0 --> C1
+    PART1 --> C2
+    PART2 --> C3
+
+    style Kafka fill:#56cc9d,stroke:#333,color:#fff
+    style ConsumerGroup fill:#ffce67,stroke:#333
+```
+
+### Delivery Guarantees
+
+| Guarantee | Description | How to Achieve | Trade-off |
+|-----------|------------|----------------|-----------|
+| **At-most-once** | Message delivered 0 or 1 times | No retries, fire and forget | May lose messages |
+| **At-least-once** | Message delivered 1 or more times | Retry on failure, ACK after processing | May have duplicates |
+| **Exactly-once** | Message delivered exactly 1 time | Idempotent consumers + transactional writes | Complex, slower |
+
+```
+Exactly-once in practice:
+  - Kafka: Idempotent producer + transactions + consumer offset commit
+  - Application-level: Idempotency key in each message
+    → Consumer checks: "Have I processed message with ID X?"
+    → If yes → skip (dedup)
+    → If no → process + record ID in DB (same transaction)
+```
+
+### Dead Letter Queue (DLQ)
+
+```
+Message processing flow:
+  1. Consumer picks up message
+  2. Processing fails → retry (exponential backoff: 1s, 5s, 30s, 5min)
+  3. After max retries (e.g., 5 attempts) → move to Dead Letter Queue
+  4. DLQ messages are inspected manually or by automated systems
+  5. Fix the bug → replay DLQ messages back to original queue
+
+Why DLQ matters:
+  - Prevents poison messages from blocking the queue
+  - Preserves failed messages for debugging
+  - Allows retry after fix is deployed
+```
+
+---
+
+## Q4: How Do You Design a Microservices Architecture?
+
+**Answer:**
+
+Microservices architecture structures an application as a collection of loosely coupled, independently deployable services, each owning its own data and business logic.
+
+```{mermaid}
+graph TD
+    CLIENT["Client"]
+    CLIENT --> GW["API Gateway"]
+    GW --> US["User Service<br/>(PostgreSQL)"]
+    GW --> OS["Order Service<br/>(MySQL)"]
+    GW --> PS["Payment Service<br/>(MongoDB)"]
+    GW --> NS["Notification Service<br/>(Redis)"]
+
+    OS -->|"Event: order_created"| MQ["Message Bus<br/>(Kafka)"]
+    MQ --> PS
+    MQ --> NS
+    OS -->|"gRPC"| US
+
+    subgraph SD["Service Discovery"]
+        REG["Service Registry<br/>(Consul / Eureka)"]
+    end
+
+    US --> REG
+    OS --> REG
+    PS --> REG
+
+    style GW fill:#56cc9d,stroke:#333,color:#fff
+    style MQ fill:#ffce67,stroke:#333
+    style SD fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Microservices Design Principles
+
+| Principle | Description | Example |
+|-----------|-------------|---------|
+| **Single responsibility** | Each service does one thing well | User Service only handles user CRUD + auth |
+| **Database per service** | No shared databases | Order Service has its own MySQL instance |
+| **API-first** | Define contracts before implementation | OpenAPI spec agreed before coding |
+| **Decentralized governance** | Teams choose their own tech stack | User svc in Go, Analytics in Python |
+| **Design for failure** | Assume any service can fail | Circuit breakers, retries, fallbacks |
+| **Smart endpoints, dumb pipes** | Logic in services, not in the message bus | Services process events, Kafka just delivers |
+
+### Service Communication Patterns
+
+| Pattern | Type | Use Case | Example |
+|---------|------|----------|---------|
+| **REST/HTTP** | Synchronous | Simple CRUD operations | GET /users/123 |
+| **gRPC** | Synchronous | Low-latency internal calls | Service-to-service with protobuf |
+| **Event-driven (async)** | Asynchronous | Decouple services, eventual consistency | OrderCreated event → Payment, Notification |
+| **Saga** | Choreography/Orchestration | Distributed transactions | Order → Payment → Inventory (compensating on failure) |
+
+### Saga Pattern for Distributed Transactions
+
+```{mermaid}
+graph LR
+    subgraph Happy["Happy Path"]
+        O1["Create Order<br/>(PENDING)"] --> P1["Reserve Payment"]
+        P1 --> I1["Reserve Inventory"]
+        I1 --> O2["Confirm Order<br/>(CONFIRMED)"]
+    end
+
+    subgraph Compensate["Compensation (on failure)"]
+        I_FAIL["Inventory fails"] --> P_COMP["Refund Payment"]
+        P_COMP --> O_COMP["Cancel Order"]
+    end
+
+    style Happy fill:#56cc9d,stroke:#333,color:#fff
+    style Compensate fill:#ff7851,stroke:#333,color:#fff
+```
+
+| Saga Type | Coordination | Pros | Cons |
+|-----------|-------------|------|------|
+| **Choreography** | Each service listens to events and acts | Decoupled, no central coordinator | Hard to track overall flow, debugging complex |
+| **Orchestration** | Central orchestrator directs the workflow | Easy to understand and monitor | Orchestrator is a single point of failure |
+
+### Service Discovery
+
+```
+Problem: Services scale dynamically (pods come and go).
+         How does Service A find Service B's current address?
+
+Solution: Service Registry
+  1. Service starts → registers itself (IP:port) with registry
+  2. Service wants to call another → queries registry for addresses
+  3. Registry health-checks registered services, removes dead ones
+  4. Client-side load balancing across returned addresses
+
+Tools:
+  - Consul (HashiCorp) — service mesh + KV store + health checks
+  - Eureka (Netflix) — Java-focused, Spring Cloud native
+  - Kubernetes DNS — built-in (service-name.namespace.svc.cluster.local)
+  - etcd — distributed KV store (used by Kubernetes internally)
+```
+
+---
+
+## Q5: What Are Database Replication and Partitioning Strategies?
+
+**Answer:**
+
+Replication and partitioning are the two fundamental mechanisms for scaling databases beyond a single machine, addressing read throughput, write throughput, storage capacity, and availability.
+
+```{mermaid}
+graph TD
+    subgraph Replication["Replication (copies of same data)"]
+        PRIMARY["Primary (writes)"]
+        PRIMARY -->|"Async/Sync replication"| REP1["Replica 1 (reads)"]
+        PRIMARY -->|"Async/Sync replication"| REP2["Replica 2 (reads)"]
+        PRIMARY -->|"Async/Sync replication"| REP3["Replica 3 (reads)"]
+    end
+
+    subgraph Partitioning["Partitioning / Sharding (split data)"]
+        ROUTER["Router"]
+        ROUTER --> SHARD1["Shard 1<br/>Users A-H"]
+        ROUTER --> SHARD2["Shard 2<br/>Users I-P"]
+        ROUTER --> SHARD3["Shard 3<br/>Users Q-Z"]
+    end
+
+    style PRIMARY fill:#56cc9d,stroke:#333,color:#fff
+    style ROUTER fill:#ffce67,stroke:#333
+```
+
+### Replication Strategies
+
+| Strategy | How It Works | Consistency | Latency | Use Case |
+|----------|-------------|-------------|---------|----------|
+| **Synchronous** | Primary waits for all replicas to ACK | Strong | High (slowest replica) | Financial transactions |
+| **Semi-synchronous** | Primary waits for at least 1 replica ACK | Strong (with 1 replica) | Medium | Critical data with some tolerance |
+| **Asynchronous** | Primary doesn't wait, replicas catch up | Eventual | Low | Read-heavy workloads, analytics |
+
+### Replication Topologies
+
+| Topology | Description | Pros | Cons |
+|----------|-------------|------|------|
+| **Single-leader** | One primary (writes), N replicas (reads) | Simple, no conflicts | Write bottleneck on primary |
+| **Multi-leader** | Multiple primaries, each accepts writes | Write scaling, geo-distributed | Conflict resolution needed |
+| **Leaderless** | Any node accepts reads/writes (quorum) | High availability, no failover | Complex, conflict resolution |
+
+### Replication Lag Problems
+
+```
+Scenario: User updates profile (write to primary), immediately reads (from replica)
+Problem: Replica hasn't received the update yet → shows stale data
+
+Solutions:
+  1. Read-your-writes consistency:
+     → After write, read from primary for N seconds
+     → Or track last-write timestamp, read from replica only if up-to-date
+
+  2. Monotonic reads:
+     → Always route same user to same replica (sticky reads)
+     → Prevents seeing data go "backward"
+
+  3. Causal consistency:
+     → Track dependencies between writes
+     → Replica only serves reads after all causal dependencies are applied
+```
+
+### Sharding (Partitioning) Deep Dive
+
+| Shard Key Strategy | Example | Pros | Cons |
+|-------------------|---------|------|------|
+| **Hash-based** | `shard = hash(user_id) % 4` | Even distribution | Range queries span all shards |
+| **Range-based** | `shard1: dates Jan-Mar` | Efficient range scans | Hot shards (recent data accessed most) |
+| **Geographic** | `shard_us, shard_eu, shard_asia` | Data locality, compliance | Uneven if one region dominates |
+| **Directory** | Lookup table: `user123 → shard2` | Maximum flexibility | Directory is bottleneck/SPOF |
+
+### Cross-Shard Operations
+
+```
+Challenge: Query that spans multiple shards (e.g., "all orders > $100")
+
+Approaches:
+  1. Scatter-gather: Query all shards, merge results (expensive)
+  2. Denormalize: Copy needed data into each shard (storage trade-off)
+  3. Global index: Secondary index service spans all shards
+  4. Avoid: Design schema so most queries hit single shard
+     → Shard by user_id, and most queries are user-scoped
+```
+
+---
+
+## Q6: How Does Kubernetes Work and How Do You Design for Container Orchestration?
+
+**Answer:**
+
+Kubernetes (K8s) is a container orchestration platform that automates deployment, scaling, and management of containerized applications. It's the de facto standard for running microservices in production.
+
+```{mermaid}
+graph TD
+    subgraph ControlPlane["Control Plane"]
+        API["API Server<br/>(kube-apiserver)"]
+        SCHED["Scheduler<br/>(kube-scheduler)"]
+        CM["Controller Manager"]
+        ETCD["etcd<br/>(cluster state store)"]
+    end
+
+    subgraph WorkerNode["Worker Node 1"]
+        KUBELET["kubelet"]
+        PROXY["kube-proxy"]
+        POD1["Pod A<br/>(Container 1)"]
+        POD2["Pod B<br/>(Container 2, Container 3)"]
+    end
+
+    subgraph WorkerNode2["Worker Node 2"]
+        KUBELET2["kubelet"]
+        POD3["Pod C"]
+        POD4["Pod D"]
+    end
+
+    API --> SCHED
+    API --> CM
+    API --> ETCD
+    API --> KUBELET
+    API --> KUBELET2
+
+    style ControlPlane fill:#56cc9d,stroke:#333,color:#fff
+    style WorkerNode fill:#ffce67,stroke:#333
+    style WorkerNode2 fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Core Kubernetes Objects
+
+| Object | Purpose | Example |
+|--------|---------|---------|
+| **Pod** | Smallest deployable unit (1+ containers) | Single instance of your app |
+| **Deployment** | Manages desired state of Pods (replicas, rolling updates) | "Run 3 replicas of user-service v2" |
+| **Service** | Stable network endpoint for a set of Pods | Load-balanced IP for user-service Pods |
+| **Ingress** | External HTTP routing to services | `api.example.com/users → user-service` |
+| **ConfigMap** | Non-sensitive configuration | Database host, feature flags |
+| **Secret** | Sensitive data (encrypted at rest) | DB passwords, API keys |
+| **HPA** | Horizontal Pod Autoscaler | Scale Pods based on CPU/memory/custom metrics |
+| **PVC** | Persistent Volume Claim | Attach storage to stateful Pods |
+
+### Deployment Strategies in Kubernetes
+
+```{mermaid}
+graph LR
+    subgraph Rolling["Rolling Update (default)"]
+        R1["v1 v1 v1"] --> R2["v2 v1 v1"] --> R3["v2 v2 v1"] --> R4["v2 v2 v2"]
+    end
+
+    subgraph BlueGreen["Blue-Green"]
+        BG1["Blue (v1) ← traffic"] --> BG2["Green (v2) ← traffic"]
+    end
+
+    subgraph Canary["Canary"]
+        CAN1["v1: 90% traffic<br/>v2: 10% traffic"] --> CAN2["v1: 0%<br/>v2: 100%"]
+    end
+
+    style Rolling fill:#56cc9d,stroke:#333,color:#fff
+    style BlueGreen fill:#ffce67,stroke:#333
+    style Canary fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+| Strategy | How It Works | Rollback | Risk |
+|----------|-------------|----------|------|
+| **Rolling update** | Replace Pods one by one | Automatic rollback on failure | Brief period with mixed versions |
+| **Blue-Green** | Run two full environments, switch traffic | Instant (switch back to blue) | 2x resources during deployment |
+| **Canary** | Route small % of traffic to new version | Instant (route all to old) | Complex routing rules |
+| **A/B testing** | Route by user attributes (region, ID) | Instant | Requires feature flag infrastructure |
+
+### Resource Management
+
+```yaml
+# Pod resource specification
+resources:
+  requests:           # Guaranteed minimum
+    cpu: "250m"       # 0.25 CPU cores
+    memory: "256Mi"   # 256 MB RAM
+  limits:             # Maximum allowed
+    cpu: "1000m"      # 1 CPU core
+    memory: "512Mi"   # 512 MB RAM
+
+# HPA (Horizontal Pod Autoscaler)
+# Scale between 3-10 pods when CPU > 70%
+minReplicas: 3
+maxReplicas: 10
+targetCPUUtilizationPercentage: 70
+```
+
+### Kubernetes Networking
+
+| Concept | Purpose |
+|---------|---------|
+| **ClusterIP** | Internal service (only within cluster) |
+| **NodePort** | Expose service on each node's IP at a static port |
+| **LoadBalancer** | Provision cloud LB (AWS ALB/NLB) for external traffic |
+| **Ingress** | L7 routing rules (path-based, host-based) |
+| **Network Policy** | Firewall rules between Pods (default: all-open) |
+| **Service Mesh** | Sidecar proxy for mTLS, observability, traffic control |
+
+---
+
+## Q7: How Do You Design a CI/CD Pipeline?
+
+**Answer:**
+
+CI/CD (Continuous Integration / Continuous Delivery) automates the process of building, testing, and deploying software. A well-designed pipeline ensures rapid, reliable releases with minimal manual intervention.
+
+```{mermaid}
+graph LR
+    DEV["Developer<br/>pushes code"]
+    DEV --> CI["CI Pipeline"]
+
+    subgraph CI["Continuous Integration"]
+        BUILD["Build<br/>(compile, deps)"]
+        LINT["Lint &<br/>Static Analysis"]
+        TEST["Unit Tests"]
+        INT["Integration Tests"]
+        SEC["Security Scan<br/>(SAST, deps)"]
+        IMG["Build Container<br/>Image"]
+    end
+
+    CI --> CD["CD Pipeline"]
+
+    subgraph CD["Continuous Delivery"]
+        STAGE["Deploy to<br/>Staging"]
+        E2E["E2E Tests<br/>(staging)"]
+        APPROVE["Manual Approval<br/>(optional)"]
+        PROD["Deploy to<br/>Production"]
+        SMOKE["Smoke Tests<br/>(production)"]
+    end
+
+    style CI fill:#56cc9d,stroke:#333,color:#fff
+    style CD fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### CI/CD Pipeline Stages
+
+| Stage | Purpose | Tools | Feedback Time |
+|-------|---------|-------|---------------|
+| **Lint / Format** | Code style consistency | ESLint, Black, gofmt | < 30s |
+| **Unit Tests** | Test individual functions/classes | pytest, JUnit, Jest | 1-5 min |
+| **Build** | Compile code, resolve dependencies | Maven, npm, pip | 1-3 min |
+| **Integration Tests** | Test service interactions | Testcontainers, docker-compose | 5-15 min |
+| **Security Scan (SAST)** | Find vulnerabilities in code | Snyk, SonarQube, Semgrep | 2-5 min |
+| **Container Build** | Build Docker image, push to registry | Docker, Buildah, Kaniko | 2-5 min |
+| **Deploy to Staging** | Deploy to pre-production environment | ArgoCD, Helm, Terraform | 3-10 min |
+| **E2E Tests** | Full user flow tests in staging | Playwright, Cypress, Selenium | 10-30 min |
+| **Deploy to Production** | Rolling update / canary / blue-green | ArgoCD, Spinnaker, Flux | 5-15 min |
+| **Smoke Tests** | Verify critical paths in production | Custom health checks, synthetic monitors | 1-3 min |
+
+### CI/CD Best Practices
+
+```
+Pipeline design principles:
+  1. Fast feedback: fail early (lint → unit tests → integration)
+  2. Immutable artifacts: build once, deploy to all environments
+  3. Environment parity: staging mirrors production
+  4. Infrastructure as Code: Terraform/Pulumi for infra changes
+  5. GitOps: desired state in Git, reconciler applies it (ArgoCD)
+  6. Feature flags: decouple deployment from release
+  7. Rollback plan: every deployment has automated rollback trigger
+
+Branch strategy:
+  - Trunk-based development (preferred for fast teams):
+    → Short-lived feature branches (< 1 day)
+    → Merge to main frequently
+    → Feature flags hide incomplete work
+    → Main is always deployable
+
+  - GitFlow (for teams needing release management):
+    → develop → feature branches → release branches → main
+    → More overhead, longer release cycles
+```
+
+### GitOps with ArgoCD
+
+```
+GitOps workflow:
+  1. Developer merges PR → main branch
+  2. CI pipeline builds image → pushes to registry (e.g., v1.2.3)
+  3. CI updates manifest repo (Helm values / kustomize with new image tag)
+  4. ArgoCD detects drift between Git manifest and cluster state
+  5. ArgoCD applies changes to Kubernetes cluster
+  6. If deployment fails health checks → ArgoCD auto-rollback
+
+Benefits:
+  - Git is single source of truth
+  - Full audit trail (who changed what, when)
+  - Easy rollback (git revert)
+  - Declarative (describe desired state, not imperative steps)
+```
+
+---
+
+## Q8: How Do You Design a Monitoring and Observability System?
+
+**Answer:**
+
+Observability is the ability to understand a system's internal state by examining its external outputs. The three pillars are **metrics**, **logs**, and **traces**. Together they enable debugging, alerting, and performance optimization.
+
+```{mermaid}
+graph TD
+    APPS["Applications / Services"]
+    APPS -->|"Metrics"| PROM["Prometheus<br/>(time-series DB)"]
+    APPS -->|"Logs"| ELK["ELK Stack<br/>(Elasticsearch + Logstash + Kibana)"]
+    APPS -->|"Traces"| JAEGER["Jaeger / Zipkin<br/>(distributed tracing)"]
+
+    PROM --> GRAFANA["Grafana<br/>(dashboards)"]
+    ELK --> GRAFANA
+    PROM --> ALERT["Alertmanager<br/>(PagerDuty, Slack)"]
+
+    style PROM fill:#56cc9d,stroke:#333,color:#fff
+    style ELK fill:#ffce67,stroke:#333
+    style JAEGER fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Three Pillars of Observability
+
+| Pillar | What | Why | Tools |
+|--------|------|-----|-------|
+| **Metrics** | Numeric measurements over time (counters, gauges, histograms) | Alerting, capacity planning, SLOs | Prometheus, Datadog, CloudWatch |
+| **Logs** | Structured event records | Debugging specific issues, audit trail | ELK, Loki, Splunk, CloudWatch Logs |
+| **Traces** | Request journey across services | Find latency bottlenecks across microservices | Jaeger, Zipkin, AWS X-Ray, OpenTelemetry |
+
+### Key Metrics (The Four Golden Signals)
+
+| Signal | What to Measure | Alert Threshold Example |
+|--------|----------------|------------------------|
+| **Latency** | Time to serve a request (P50, P95, P99) | P99 > 500ms for 5 minutes |
+| **Traffic** | Requests per second (QPS) | Sudden drop > 50% (indicates failure) |
+| **Errors** | Error rate (5xx, timeouts, failed operations) | Error rate > 1% for 3 minutes |
+| **Saturation** | Resource utilization (CPU, memory, disk, connections) | CPU > 80% for 10 minutes |
+
+### Structured Logging
+
+```json
+{
+  "timestamp": "2026-05-21T10:30:45.123Z",
+  "level": "ERROR",
+  "service": "order-service",
+  "trace_id": "abc-123-def-456",
+  "span_id": "span-789",
+  "user_id": "user_42",
+  "method": "POST",
+  "path": "/api/v1/orders",
+  "status_code": 500,
+  "duration_ms": 2345,
+  "error": "ConnectionRefusedError: payment-service:8080",
+  "message": "Failed to process payment for order"
+}
+```
+
+### Distributed Tracing
+
+```
+Request: User places order
+  
+  ┌─ API Gateway (12ms) ─────────────────────────────────────┐
+  │  ┌─ Order Service (45ms) ──────────────────────────────┐  │
+  │  │  ┌─ User Service (8ms) ────┐                        │  │
+  │  │  └─────────────────────────┘                        │  │
+  │  │  ┌─ Payment Service (320ms) ← BOTTLENECK ─────────┐│  │
+  │  │  │  ┌─ Stripe API (280ms) ───────────────────────┐││  │
+  │  │  │  └────────────────────────────────────────────┘││  │
+  │  │  └────────────────────────────────────────────────┘│  │
+  │  │  ┌─ Inventory Service (15ms)──┐                     │  │
+  │  │  └────────────────────────────┘                     │  │
+  │  └─────────────────────────────────────────────────────┘  │
+  └────────────────────────────────────────────────────────────┘
+  Total: 392ms (Payment → Stripe is 71% of total time)
+```
+
+### SLOs, SLIs, and SLAs
+
+| Term | Definition | Example |
+|------|-----------|---------|
+| **SLI** (Service Level Indicator) | The metric you measure | P99 latency, availability %, error rate |
+| **SLO** (Service Level Objective) | The target for the SLI | P99 latency < 200ms, 99.9% availability |
+| **SLA** (Service Level Agreement) | Contract with consequences if SLO breached | 99.9% uptime or customer gets credits |
+| **Error Budget** | How much failure is allowed before violating SLO | 99.9% = 43 minutes downtime/month budget |
+
+### Alerting Strategy
+
+```
+Alert design principles:
+  1. Alert on symptoms, not causes
+     ✅ "Error rate > 5% for 3 min"  (symptom)
+     ❌ "CPU > 90%"  (may not impact users)
+
+  2. Severity levels:
+     - P1 (Critical): Revenue impacting, page immediately
+     - P2 (High): Degraded service, page during business hours
+     - P3 (Medium): Non-urgent, ticket in queue
+     - P4 (Low): Informational, dashboard only
+
+  3. Reduce noise:
+     - Group related alerts
+     - Require duration threshold (not single spike)
+     - Suppress during maintenance windows
+     - Escalation: Slack → PagerDuty → phone call
+```
+
+---
+
+## Q9: How Does Event-Driven Architecture Work?
+
+**Answer:**
+
+Event-Driven Architecture (EDA) is a design pattern where services communicate by producing and consuming events (facts about something that happened). It enables loose coupling, real-time processing, and scalable async workflows.
+
+```{mermaid}
+graph TD
+    subgraph Producers["Event Producers"]
+        US["User Service<br/>→ UserCreated"]
+        OS["Order Service<br/>→ OrderPlaced"]
+        PS["Payment Service<br/>→ PaymentProcessed"]
+    end
+
+    subgraph EventBus["Event Bus / Broker (Kafka)"]
+        T1["Topic: user-events"]
+        T2["Topic: order-events"]
+        T3["Topic: payment-events"]
+    end
+
+    subgraph Consumers["Event Consumers"]
+        EMAIL["Email Service"]
+        ANALYTICS["Analytics Service"]
+        INVENTORY["Inventory Service"]
+        SEARCH["Search Indexer"]
+    end
+
+    US --> T1
+    OS --> T2
+    PS --> T3
+    T1 --> EMAIL
+    T1 --> ANALYTICS
+    T2 --> INVENTORY
+    T2 --> ANALYTICS
+    T3 --> EMAIL
+    T3 --> SEARCH
+
+    style EventBus fill:#56cc9d,stroke:#333,color:#fff
+    style Consumers fill:#ffce67,stroke:#333
+```
+
+### Event Types
+
+| Type | Description | Example | Size |
+|------|-------------|---------|------|
+| **Domain Event** | Something significant happened in the business | `OrderPlaced`, `UserRegistered` | Small (metadata + IDs) |
+| **Integration Event** | Event shared between services (bounded contexts) | `PaymentCompleted` consumed by Order service | Small |
+| **Event-Carried State Transfer** | Event contains full state (eliminates need to query source) | `OrderPlaced { items: [...], total: 99.50, address: {...} }` | Large |
+| **Change Data Capture (CDC)** | Database changes streamed as events | Debezium captures INSERT/UPDATE/DELETE from DB binlog | Row-level |
+
+### Event Sourcing
+
+```{mermaid}
+graph LR
+    CMD["Command:<br/>PlaceOrder"]
+    CMD --> ES["Event Store<br/>(append-only log)"]
+    ES --> E1["OrderCreated"]
+    ES --> E2["ItemAdded (x3)"]
+    ES --> E3["PaymentReceived"]
+    ES --> E4["OrderShipped"]
+
+    ES -->|"Replay events"| STATE["Current State:<br/>Order #123<br/>Status: Shipped<br/>Items: 3<br/>Total: $59.99"]
+
+    style ES fill:#56cc9d,stroke:#333,color:#fff
+    style STATE fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+| Aspect | Traditional (CRUD) | Event Sourcing |
+|--------|-------------------|----------------|
+| **Storage** | Current state only | Full history of events |
+| **State** | Mutable (UPDATE/DELETE) | Immutable (append-only) |
+| **Audit trail** | Requires separate logging | Built-in (every change is an event) |
+| **Debugging** | "Why is it in this state?" | Replay events to see exactly what happened |
+| **Complexity** | Simple CRUD operations | Event replay, projections, eventual consistency |
+| **Best for** | Simple domains | Financial systems, audit-heavy, undo/redo needed |
+
+### CQRS (Command Query Responsibility Segregation)
+
+```{mermaid}
+graph TD
+    CLIENT["Client"]
+    CLIENT -->|"Write (Command)"| WRITE["Write Model<br/>(normalized DB)"]
+    CLIENT -->|"Read (Query)"| READ["Read Model<br/>(denormalized views)"]
+
+    WRITE -->|"Events"| PROJ["Projection Service"]
+    PROJ --> READ
+
+    style WRITE fill:#56cc9d,stroke:#333,color:#fff
+    style READ fill:#6cc3d5,stroke:#333,color:#fff
+    style PROJ fill:#ffce67,stroke:#333
+```
+
+| Aspect | Description |
+|--------|-------------|
+| **Why CQRS** | Reads and writes have different performance profiles and scaling needs |
+| **Write side** | Normalized, optimized for consistency and validation |
+| **Read side** | Denormalized, pre-computed views optimized for queries |
+| **Sync mechanism** | Events from write side update read projections (async) |
+| **Trade-off** | Eventual consistency between write and read models |
+| **Pairs with** | Event Sourcing (events feed both write log and read projections) |
+
+### Idempotent Event Processing
+
+```
+Problem: Network failures → events may be delivered multiple times.
+         Consumer must handle duplicates safely.
+
+Solutions:
+  1. Idempotency key in every event:
+     Event: { "id": "evt_abc123", "type": "PaymentReceived", "data": {...} }
+     Consumer: 
+       - Before processing, check: "Have I seen evt_abc123?"
+       - If yes → skip
+       - If no → process + record evt_abc123 in processed_events table
+
+  2. Idempotent operations (naturally safe):
+     - SET operations (overwrite): last write wins
+     - Upsert with same data: same result regardless of count
+
+  3. Transactional outbox pattern:
+     - Write business data + event to same DB (single transaction)
+     - Background process reads outbox table → publishes to Kafka
+     - Guarantees: if data saved, event will eventually publish
+```
+
+---
+
+## Q10: How Do You Design for Service Mesh and Inter-Service Communication?
+
+**Answer:**
+
+A service mesh is an infrastructure layer that handles service-to-service communication, providing observability, security (mTLS), and traffic management without changing application code. It's typically implemented as sidecar proxies alongside each service.
+
+```{mermaid}
+graph TD
+    subgraph PodA["Pod: Order Service"]
+        APP_A["Order Service<br/>(application)"]
+        PROXY_A["Envoy Sidecar<br/>(proxy)"]
+    end
+
+    subgraph PodB["Pod: Payment Service"]
+        APP_B["Payment Service<br/>(application)"]
+        PROXY_B["Envoy Sidecar<br/>(proxy)"]
+    end
+
+    subgraph PodC["Pod: User Service"]
+        APP_C["User Service<br/>(application)"]
+        PROXY_C["Envoy Sidecar<br/>(proxy)"]
+    end
+
+    PROXY_A -->|"mTLS"| PROXY_B
+    PROXY_A -->|"mTLS"| PROXY_C
+
+    CP["Control Plane<br/>(Istio / Linkerd)"]
+    CP -->|"Config, certs"| PROXY_A
+    CP -->|"Config, certs"| PROXY_B
+    CP -->|"Config, certs"| PROXY_C
+
+    style CP fill:#56cc9d,stroke:#333,color:#fff
+    style PodA fill:#ffce67,stroke:#333
+    style PodB fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### What a Service Mesh Provides
+
+| Feature | Description | Without Mesh |
+|---------|-------------|-------------|
+| **mTLS** | Automatic encryption + identity between all services | Each service manages certs manually |
+| **Traffic management** | Canary releases, A/B testing, fault injection | Custom load balancer config per service |
+| **Observability** | Automatic metrics, traces, access logs from proxy | Instrument every service manually |
+| **Retries & timeouts** | Configurable retry policies per route | Each service implements retry logic |
+| **Circuit breaking** | Auto-stop traffic to failing services | Library-based (Hystrix, resilience4j) |
+| **Rate limiting** | Per-service traffic control | Centralized rate limiter service |
+| **Access control** | Policy-based authorization (which service can call which) | Manual firewall rules / code checks |
+
+### Service Mesh Comparison
+
+| Feature | Istio | Linkerd | Consul Connect |
+|---------|-------|---------|----------------|
+| **Proxy** | Envoy | Linkerd2-proxy (Rust) | Envoy or built-in |
+| **Complexity** | High (many CRDs) | Low (lightweight) | Medium |
+| **Performance** | Moderate overhead | Low overhead | Low overhead |
+| **Features** | Full-featured (traffic, security, observability) | Core features, simple | Service discovery + mesh |
+| **Best for** | Large orgs needing full control | Teams wanting simplicity | HashiCorp ecosystem users |
+
+### Traffic Management Patterns
+
+| Pattern | Purpose | Configuration |
+|---------|---------|---------------|
+| **Canary** | Route 5% traffic to v2, 95% to v1 | Weight-based routing |
+| **Header-based routing** | Internal testers get v2 via header `x-version: canary` | Match rules on headers |
+| **Fault injection** | Inject 500ms delay to test resilience | Delay/abort rules for testing |
+| **Mirroring** | Copy production traffic to test environment | Traffic shadowing (no impact to users) |
+| **Circuit breaking** | Max 100 concurrent requests per service | Connection pool limits |
+| **Retry budget** | Max 20% additional requests as retries | Prevent retry storms |
+
+### When to Use (and NOT Use) a Service Mesh
+
+```
+Use a service mesh when:
+  ✅ Running 10+ microservices in production
+  ✅ Need mTLS between all services (zero trust)
+  ✅ Want consistent observability without code changes
+  ✅ Complex traffic routing (canary, A/B, fault injection)
+  ✅ Need policy-based access control
+
+Do NOT use when:
+  ❌ Fewer than 5 services (overhead not worth it)
+  ❌ Team doesn't have Kubernetes expertise
+  ❌ Simple request-response with no special routing
+  ❌ Latency-critical paths where sidecar overhead matters (~1-3ms)
+  ❌ Monolith or early-stage product
+```
+
+---
+
+## Summary Table
+
+| # | Topic | Key Concepts |
+|---|-------|-------------|
+| 1 | **Load Balancing** | L4 vs L7, algorithms (round robin, least connections, consistent hashing), health checks, sticky sessions |
+| 2 | **Caching** | Cache-aside, write-through, write-behind, eviction policies, Redis vs Memcached, stampede prevention |
+| 3 | **Message Queues** | Kafka vs RabbitMQ vs SQS, delivery guarantees, DLQ, partitions, consumer groups |
+| 4 | **Microservices** | Service communication, Saga pattern, service discovery, database per service |
+| 5 | **Database Scaling** | Replication (sync/async), sharding strategies, replication lag, cross-shard queries |
+| 6 | **Kubernetes** | Pods, Deployments, Services, HPA, rolling/blue-green/canary deploys, resource limits |
+| 7 | **CI/CD** | Pipeline stages, GitOps, ArgoCD, trunk-based development, immutable artifacts |
+| 8 | **Monitoring** | Metrics/Logs/Traces, four golden signals, SLOs, alerting strategy, distributed tracing |
+| 9 | **Event-Driven Architecture** | Event sourcing, CQRS, CDC, idempotent processing, transactional outbox |
+| 10 | **Service Mesh** | Sidecar proxy (Envoy), mTLS, traffic management, Istio vs Linkerd, when to use |
+
+---
+
+## What's Next?
+
+This article covered infrastructure components and operational patterns. Continue with:
+
+- **Foundational concepts:** [System Design Interview QA - 1](/posts/system-design/System-Design-Interview-QA-1.html) — scalability, CAP theorem, APIs, networking, security
+- **Hands-on design problems:** [System Design Interview QA - 3](/posts/system-design/System-Design-Interview-QA-3.html) — URL shortener, chat system, news feed, video streaming
+- **Design patterns:** [Design Pattern Interview QA - 1](/posts/design-pattern/Design-Pattern-Interview-QA-1.html)
+- **Enterprise patterns (Spring, CQRS):** [Design Pattern Interview QA - 2](/posts/design-pattern/Design-Pattern-Interview-QA-2.html)

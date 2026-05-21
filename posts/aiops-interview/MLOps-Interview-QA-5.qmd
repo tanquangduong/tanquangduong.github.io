@@ -1,0 +1,1656 @@
+---
+title: "MLOps Interview QA - 5"
+description: "10 cloud-agnostic MLOps interview questions covering open-source and third-party tools — MLflow, Kubeflow, DVC, Weights & Biases, Feast, Seldon Core, BentoML, Great Expectations, Apache Airflow, and Terraform/Pulumi for ML infrastructure."
+image: /images/aiops/thumb_mlops_interview_qa_300.png
+date: "2026-05-21"
+keywords:
+  - "MLOps open source"
+  - "MLflow"
+  - "Kubeflow"
+  - "DVC"
+  - "Weights and Biases"
+  - "Feast feature store"
+  - "Seldon Core"
+  - "BentoML"
+  - "Great Expectations"
+  - "Apache Airflow ML"
+  - "Terraform ML"
+  - "cloud-agnostic MLOps"
+---
+
+## Introduction
+
+This is **Part 5** of our MLOps Interview QA series, focused on **cloud-agnostic and third-party MLOps tools**. While cloud providers offer integrated platforms (Azure ML, Vertex AI, SageMaker), many teams prefer open-source or vendor-neutral tools to avoid lock-in, support multi-cloud strategies, or leverage best-of-breed capabilities. This article covers the most widely adopted tools across the MLOps lifecycle — experiment tracking, pipeline orchestration, data/model versioning, feature stores, model serving, data validation, and infrastructure as code.
+
+> For cloud-specific MLOps, see [MLOps Interview QA - 2 (Azure)](/posts/aiops-interview/MLOps-Interview-QA-2.html), [MLOps Interview QA - 3 (GCP)](/posts/aiops-interview/MLOps-Interview-QA-3.html), [MLOps Interview QA - 4 (AWS)](/posts/aiops-interview/MLOps-Interview-QA-4.html). For general MLOps concepts, see [MLOps Interview QA - 1](/posts/aiops-interview/MLOps-Interview-QA-1.html).
+
+---
+
+## Q1: How Does MLflow Provide End-to-End Experiment Tracking and Model Management?
+
+**Answer:**
+
+**MLflow** is the most widely adopted open-source ML lifecycle platform. It provides four core components: **Tracking** (log experiments), **Projects** (reproducible runs), **Models** (packaging standard), and **Model Registry** (versioning + staging). It runs anywhere — locally, on-prem, or on any cloud — and integrates with all major ML frameworks.
+
+```{mermaid}
+graph TD
+    subgraph MLflow["MLflow Platform"]
+        TRACKING["MLflow Tracking<br/>(experiments, metrics, params)"]
+        PROJECTS["MLflow Projects<br/>(reproducible packaging)"]
+        MODELS["MLflow Models<br/>(multi-flavor packaging)"]
+        REGISTRY["MLflow Model Registry<br/>(versioning, staging)"]
+    end
+
+    subgraph Backends["Backend Options"]
+        LOCAL["Local filesystem"]
+        DB["Database<br/>(PostgreSQL, MySQL)"]
+        S3_ART["Artifact Store<br/>(S3, GCS, ADLS, HDFS)"]
+        MANAGED["Managed<br/>(Databricks, AWS, Azure)"]
+    end
+
+    subgraph Serve["Serving"]
+        REST["MLflow serve<br/>(REST API)"]
+        DOCKER["Docker container"]
+        CLOUD["Cloud deploy<br/>(SageMaker, AzureML)"]
+        SPARK_S["Spark UDF"]
+    end
+
+    TRACKING --> DB
+    TRACKING --> S3_ART
+    MODELS --> REST
+    MODELS --> DOCKER
+    MODELS --> CLOUD
+    MODELS --> SPARK_S
+    REGISTRY --> MODELS
+
+    style MLflow fill:#6cc3d5,stroke:#333,color:#fff
+    style Backends fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### MLflow Components
+
+| Component | Purpose | Key Features |
+|-----------|---------|--------------|
+| **Tracking** | Log parameters, metrics, artifacts per run | UI comparison, search API, autolog |
+| **Projects** | Package ML code for reproducibility | `MLproject` file, conda/docker envs |
+| **Models** | Standard model packaging format | Multi-flavor (sklearn, pytorch, tf, custom) |
+| **Model Registry** | Centralized model versioning & lifecycle | Stages (None → Staging → Production → Archived) |
+| **Evaluate** | Automated model evaluation | Built-in metrics, LLM evaluation |
+| **Recipes** | Opinionated ML workflow templates | Regression, classification pipelines |
+
+### Experiment Tracking Example
+
+```python
+import mlflow
+import mlflow.sklearn
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, f1_score
+
+# Configure tracking server (self-hosted or managed)
+mlflow.set_tracking_uri("http://mlflow-server:5000")
+mlflow.set_experiment("churn-prediction")
+
+with mlflow.start_run(run_name="rf-baseline"):
+    # Log parameters
+    params = {"n_estimators": 200, "max_depth": 10, "min_samples_split": 5}
+    mlflow.log_params(params)
+    mlflow.log_param("feature_version", "v3")
+
+    # Train
+    model = RandomForestClassifier(**params)
+    model.fit(X_train, y_train)
+
+    # Log metrics
+    y_pred = model.predict(X_test)
+    mlflow.log_metric("accuracy", accuracy_score(y_test, y_pred))
+    mlflow.log_metric("f1_score", f1_score(y_test, y_pred))
+
+    # Log model with signature
+    from mlflow.models import infer_signature
+    signature = infer_signature(X_test, y_pred)
+    mlflow.sklearn.log_model(model, "model", signature=signature)
+
+    # Log artifacts
+    mlflow.log_artifact("feature_importance.png")
+```
+
+### Model Registry Workflow
+
+```python
+import mlflow
+from mlflow import MlflowClient
+
+client = MlflowClient()
+
+# Register model from a run
+model_uri = f"runs:/{run_id}/model"
+mv = mlflow.register_model(model_uri, "churn-classifier")
+
+# Transition to staging
+client.transition_model_version_stage(
+    name="churn-classifier",
+    version=mv.version,
+    stage="Staging",
+)
+
+# After validation, promote to production
+client.transition_model_version_stage(
+    name="churn-classifier",
+    version=mv.version,
+    stage="Production",
+    archive_existing_versions=True,  # Archive previous production version
+)
+
+# Load production model for serving
+model = mlflow.pyfunc.load_model("models:/churn-classifier/Production")
+predictions = model.predict(new_data)
+```
+
+### MLflow Deployment Options
+
+| Deployment | Command | Use Case |
+|-----------|---------|----------|
+| **Local REST API** | `mlflow models serve -m models:/model/Production -p 5001` | Development/testing |
+| **Docker** | `mlflow models build-docker -m models:/model/1 -n my-model` | Container orchestration |
+| **SageMaker** | `mlflow deployments create -t sagemaker` | AWS production |
+| **Azure ML** | `mlflow deployments create -t azureml` | Azure production |
+| **Spark UDF** | `mlflow.pyfunc.spark_udf(spark, model_uri)` | Batch inference on Spark |
+| **Kubernetes** | Seldon/KServe with MLflow format | K8s-native serving |
+
+---
+
+## Q2: How Does Kubeflow Enable ML Pipelines on Kubernetes?
+
+**Answer:**
+
+**Kubeflow** is a Kubernetes-native ML platform that provides pipeline orchestration, distributed training, model serving, and notebook environments. Its pipeline system (Kubeflow Pipelines / KFP) defines ML workflows as DAGs of containerized steps, running on any Kubernetes cluster (on-prem, GKE, EKS, AKS).
+
+```{mermaid}
+graph TD
+    subgraph Kubeflow["Kubeflow Platform"]
+        KFP["Kubeflow Pipelines<br/>(DAG orchestration)"]
+        NOTEBOOKS["Jupyter Notebooks<br/>(multi-user)"]
+        KATIB["Katib<br/>(hyperparameter tuning)"]
+        TRAINING_OP["Training Operators<br/>(TF, PyTorch, MPI)"]
+        KSERVE["KServe<br/>(model serving)"]
+    end
+
+    subgraph K8S["Kubernetes"]
+        PODS["Pods<br/>(pipeline steps)"]
+        PV["Persistent Volumes<br/>(data)"]
+        GPU["GPU Nodes<br/>(training)"]
+        ISTIO["Istio<br/>(networking, auth)"]
+    end
+
+    subgraph Storage["External Storage"]
+        MINIO["MinIO / S3<br/>(artifacts)"]
+        MYSQL["MySQL<br/>(metadata)"]
+        REG["Container Registry<br/>(images)"]
+    end
+
+    KFP --> PODS
+    TRAINING_OP --> GPU
+    KSERVE --> PODS
+    KFP --> MINIO
+    KFP --> MYSQL
+
+    style Kubeflow fill:#6cc3d5,stroke:#333,color:#fff
+    style K8S fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Kubeflow Components
+
+| Component | Purpose | Key Feature |
+|-----------|---------|-------------|
+| **Kubeflow Pipelines (KFP)** | ML workflow orchestration as DAGs | Caching, lineage, UI, versioning |
+| **Katib** | Hyperparameter optimization | Bayesian, grid, random, NAS |
+| **Training Operators** | Distributed training on K8s | TFJob, PyTorchJob, MPIJob, XGBoostJob |
+| **KServe** | Serverless model serving on K8s | Autoscale-to-zero, canary, A/B |
+| **Notebooks** | Multi-user Jupyter environments | GPU support, custom images |
+| **Central Dashboard** | Unified access to all components | Multi-tenancy support |
+
+### KFP v2 Pipeline Example
+
+```python
+from kfp import dsl, compiler
+from kfp.dsl import Input, Output, Dataset, Model, Metrics
+
+@dsl.component(base_image="python:3.10", packages_to_install=["pandas", "scikit-learn"])
+def preprocess_data(
+    raw_data: Input[Dataset],
+    processed_data: Output[Dataset],
+    test_split: float = 0.2,
+):
+    import pandas as pd
+    from sklearn.model_selection import train_test_split
+
+    df = pd.read_csv(raw_data.path)
+    # ... preprocessing logic ...
+    df_processed.to_csv(processed_data.path, index=False)
+
+
+@dsl.component(base_image="python:3.10", packages_to_install=["scikit-learn", "joblib"])
+def train_model(
+    training_data: Input[Dataset],
+    model_output: Output[Model],
+    metrics_output: Output[Metrics],
+    n_estimators: int = 100,
+):
+    import joblib
+    from sklearn.ensemble import GradientBoostingClassifier
+    from sklearn.metrics import accuracy_score
+
+    # Train model
+    clf = GradientBoostingClassifier(n_estimators=n_estimators)
+    clf.fit(X_train, y_train)
+
+    # Log metrics
+    accuracy = accuracy_score(y_test, y_pred)
+    metrics_output.log_metric("accuracy", accuracy)
+
+    # Save model
+    joblib.dump(clf, model_output.path)
+
+
+@dsl.component(base_image="python:3.10")
+def deploy_model(model: Input[Model], endpoint_name: str):
+    # Deploy to KServe or other serving infrastructure
+    pass
+
+
+@dsl.pipeline(name="churn-training-pipeline")
+def training_pipeline(data_path: str, n_estimators: int = 200):
+    preprocess_task = preprocess_data(raw_data=data_path)
+    train_task = train_model(
+        training_data=preprocess_task.outputs["processed_data"],
+        n_estimators=n_estimators,
+    )
+    deploy_task = deploy_model(
+        model=train_task.outputs["model_output"],
+        endpoint_name="churn-model",
+    )
+
+# Compile pipeline
+compiler.Compiler().compile(training_pipeline, "pipeline.yaml")
+
+# Submit to KFP cluster
+from kfp.client import Client
+client = Client(host="https://kubeflow.example.com/pipeline")
+client.create_run_from_pipeline_package("pipeline.yaml", arguments={"data_path": "s3://bucket/data/"})
+```
+
+### Kubeflow vs Managed Platforms
+
+| Aspect | Kubeflow | SageMaker Pipelines | Vertex AI Pipelines |
+|--------|----------|--------------------|--------------------|
+| **Infrastructure** | Self-managed K8s | Fully managed | Fully managed |
+| **Lock-in** | None (portable) | AWS | GCP |
+| **Setup complexity** | High (K8s expertise needed) | Low | Low |
+| **Customization** | Full (custom operators) | Limited to step types | Moderate (KFP-based) |
+| **Cost** | K8s cluster + ops | Pay per job | Pay per job |
+| **Multi-cloud** | Yes (any K8s) | No | No |
+| **Best for** | Teams with K8s expertise, multi-cloud | AWS-native teams | GCP-native teams |
+
+---
+
+## Q3: How Does DVC Handle Data and Model Versioning?
+
+**Answer:**
+
+**DVC (Data Version Control)** extends Git to handle large files, datasets, and ML models. It tracks data/model versions using lightweight `.dvc` metafiles in Git while storing actual data in remote storage (S3, GCS, Azure Blob, NFS). Combined with DVC Pipelines, it enables reproducible ML experiments tracked alongside code.
+
+```{mermaid}
+graph TD
+    subgraph Git["Git Repository"]
+        CODE["Source Code"]
+        DVC_FILES[".dvc files<br/>(pointers to data)"]
+        DVC_YAML["dvc.yaml<br/>(pipeline definition)"]
+        DVC_LOCK["dvc.lock<br/>(exact versions)"]
+    end
+
+    subgraph Remote["DVC Remote Storage"]
+        S3_R["S3 / GCS / Azure Blob"]
+        NFS_R["NFS / SSH / HDFS"]
+        LOCAL_R["Local cache"]
+    end
+
+    subgraph Workflow["DVC Workflow"]
+        ADD["dvc add<br/>(track data)"]
+        PUSH["dvc push<br/>(upload to remote)"]
+        PULL["dvc pull<br/>(download data)"]
+        REPRO["dvc repro<br/>(reproduce pipeline)"]
+        METRICS["dvc metrics<br/>(compare experiments)"]
+    end
+
+    DVC_FILES --> Remote
+    CODE --> Git
+    ADD --> DVC_FILES
+    PUSH --> Remote
+    PULL --> Remote
+    DVC_YAML --> REPRO
+    REPRO --> DVC_LOCK
+
+    style Git fill:#6cc3d5,stroke:#333,color:#fff
+    style Remote fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### DVC Core Features
+
+| Feature | Description | Command |
+|---------|-------------|---------|
+| **Data tracking** | Version large files without storing in Git | `dvc add data/training.csv` |
+| **Remote storage** | Push/pull data to cloud or shared storage | `dvc push` / `dvc pull` |
+| **Pipelines** | Define reproducible ML workflows (DAG) | `dvc repro` |
+| **Experiments** | Branch/compare experiments efficiently | `dvc exp run` / `dvc exp diff` |
+| **Metrics** | Track & compare metrics across experiments | `dvc metrics show` / `dvc metrics diff` |
+| **Plots** | Visualize metrics (ROC, loss curves) | `dvc plots show` |
+| **Data registry** | Share datasets across projects | `dvc import` / `dvc get` |
+
+### DVC Pipeline Definition
+
+```yaml
+# dvc.yaml - ML pipeline stages
+stages:
+  prepare:
+    cmd: python src/prepare.py
+    deps:
+      - src/prepare.py
+      - data/raw/
+    params:
+      - prepare.split_ratio
+      - prepare.seed
+    outs:
+      - data/processed/train.csv
+      - data/processed/test.csv
+
+  train:
+    cmd: python src/train.py
+    deps:
+      - src/train.py
+      - data/processed/train.csv
+    params:
+      - train.n_estimators
+      - train.max_depth
+      - train.learning_rate
+    outs:
+      - models/model.pkl
+    metrics:
+      - metrics/train_metrics.json:
+          cache: false
+    plots:
+      - plots/loss_curve.csv:
+          x: epoch
+          y: loss
+
+  evaluate:
+    cmd: python src/evaluate.py
+    deps:
+      - src/evaluate.py
+      - models/model.pkl
+      - data/processed/test.csv
+    metrics:
+      - metrics/eval_metrics.json:
+          cache: false
+    plots:
+      - plots/confusion_matrix.csv:
+          template: confusion
+          x: predicted
+          y: actual
+```
+
+### DVC Experiment Workflow
+
+```bash
+# Initialize DVC in a Git repo
+git init && dvc init
+
+# Configure remote storage
+dvc remote add -d myremote s3://my-bucket/dvc-store
+
+# Track a large dataset
+dvc add data/training_data.parquet
+git add data/training_data.parquet.dvc data/.gitignore
+git commit -m "Add training data v1"
+dvc push
+
+# Define parameters (params.yaml)
+cat > params.yaml << EOF
+prepare:
+  split_ratio: 0.2
+  seed: 42
+train:
+  n_estimators: 200
+  max_depth: 10
+  learning_rate: 0.05
+EOF
+
+# Run pipeline (only re-runs changed stages)
+dvc repro
+
+# Run experiment with modified params
+dvc exp run --set-param train.n_estimators=300 --set-param train.max_depth=12
+
+# Compare experiments
+dvc exp diff
+dvc metrics diff
+
+# Apply best experiment to workspace
+dvc exp apply exp-abc123
+git add . && git commit -m "Best model: 300 estimators"
+dvc push
+```
+
+### DVC vs Git LFS vs Lakehouse
+
+| Aspect | DVC | Git LFS | Delta Lake / Lakehouse |
+|--------|-----|---------|----------------------|
+| **Versioning** | Content-addressable (hash) | Pointer files in Git | Table versioning (time travel) |
+| **Storage** | Any remote (S3, GCS, NFS) | Git server (GitHub LFS) | Cloud storage (S3, ADLS) |
+| **Pipeline support** | Yes (dvc.yaml) | No | No (needs orchestrator) |
+| **Experiment tracking** | Built-in (dvc exp) | No | No |
+| **File types** | Any (data, models, artifacts) | Any (but no dedup) | Tabular data (Parquet) |
+| **Deduplication** | Yes (content-addressable cache) | No | Partial (file-level) |
+| **Best for** | ML data/model versioning + pipelines | Large files in Git | Data lake versioning |
+
+---
+
+## Q4: How Does Weights & Biases (W&B) Support ML Experiment Management?
+
+**Answer:**
+
+**Weights & Biases (W&B)** is a developer-focused ML platform providing experiment tracking, dataset versioning, hyperparameter sweeps, model evaluation, and collaboration. It's known for its rich visualizations, real-time dashboards, and seamless framework integration. W&B can run as SaaS or self-hosted (on-prem / private cloud).
+
+```{mermaid}
+graph TD
+    subgraph WandB["Weights & Biases"]
+        EXPERIMENTS["Experiments<br/>(runs, groups, projects)"]
+        SWEEPS["Sweeps<br/>(hyperparameter optimization)"]
+        ARTIFACTS["Artifacts<br/>(data & model versioning)"]
+        TABLES["Tables<br/>(dataset visualization)"]
+        REPORTS["Reports<br/>(collaborative docs)"]
+        LAUNCH["Launch<br/>(job scheduling)"]
+    end
+
+    subgraph Integrations["Framework Integrations"]
+        PYTORCH["PyTorch / Lightning"]
+        TF_INT["TensorFlow / Keras"]
+        HF["HuggingFace Transformers"]
+        SKLEARN_INT["scikit-learn"]
+        LANGCHAIN["LangChain / LLMs"]
+    end
+
+    subgraph Deploy_Options["Deployment"]
+        SAAS["W&B Cloud (SaaS)"]
+        SELF["Self-Hosted (Docker)"]
+        DEDICATED["Dedicated Cloud"]
+    end
+
+    Integrations --> WandB
+    WandB --> SAAS
+    WandB --> SELF
+
+    style WandB fill:#6cc3d5,stroke:#333,color:#fff
+    style Integrations fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### W&B Core Products
+
+| Product | Purpose | Key Feature |
+|---------|---------|-------------|
+| **Experiments** | Track & compare ML runs | Real-time dashboards, custom charts |
+| **Sweeps** | Automated hyperparameter search | Bayesian, grid, random; early stopping |
+| **Artifacts** | Version datasets, models, results | Lineage graph, deduplication |
+| **Tables** | Interactive data exploration | Filter, group, visualize predictions |
+| **Reports** | Collaborative experiment documentation | Embed charts, share findings |
+| **Launch** | Job scheduling on any compute | Queue jobs to K8s, Slurm, cloud |
+| **Weave** | LLM observability and evaluation | Trace chains, evaluate outputs |
+| **Models** | Model registry with lineage | Link artifacts to model versions |
+
+### W&B Experiment Tracking Example
+
+```python
+import wandb
+from wandb.integration.sklearn import plot_precision_recall
+
+# Initialize W&B run
+wandb.init(
+    project="churn-prediction",
+    name="gbm-v3-velocity-features",
+    config={
+        "model": "GradientBoosting",
+        "n_estimators": 200,
+        "max_depth": 8,
+        "learning_rate": 0.05,
+        "feature_set": "v3-velocity",
+    },
+    tags=["production-candidate", "velocity-features"],
+)
+
+# Train with live metric logging
+for epoch in range(epochs):
+    train_loss = train_one_epoch(model, train_loader)
+    val_loss, val_acc = evaluate(model, val_loader)
+    wandb.log({
+        "epoch": epoch,
+        "train/loss": train_loss,
+        "val/loss": val_loss,
+        "val/accuracy": val_acc,
+    })
+
+# Log evaluation results
+wandb.log({
+    "test/accuracy": accuracy,
+    "test/f1": f1,
+    "test/auc_roc": auc,
+    "confusion_matrix": wandb.plot.confusion_matrix(
+        y_true=y_test, preds=y_pred, class_names=["retain", "churn"]
+    ),
+})
+
+# Log model as artifact
+artifact = wandb.Artifact("churn-model", type="model")
+artifact.add_file("model.pkl")
+wandb.log_artifact(artifact)
+
+wandb.finish()
+```
+
+### W&B Sweeps (Hyperparameter Optimization)
+
+```python
+import wandb
+
+# Define sweep configuration
+sweep_config = {
+    "method": "bayes",  # bayesian optimization
+    "metric": {"name": "val/f1", "goal": "maximize"},
+    "parameters": {
+        "n_estimators": {"min": 50, "max": 500},
+        "max_depth": {"values": [4, 6, 8, 10, 12]},
+        "learning_rate": {"distribution": "log_uniform_values", "min": 0.001, "max": 0.3},
+        "subsample": {"min": 0.6, "max": 1.0},
+    },
+    "early_terminate": {"type": "hyperband", "min_iter": 10},
+}
+
+# Create sweep
+sweep_id = wandb.sweep(sweep_config, project="churn-prediction")
+
+# Define training function
+def train():
+    wandb.init()
+    config = wandb.config
+    model = GradientBoostingClassifier(
+        n_estimators=config.n_estimators,
+        max_depth=config.max_depth,
+        learning_rate=config.learning_rate,
+    )
+    model.fit(X_train, y_train)
+    wandb.log({"val/f1": f1_score(y_val, model.predict(X_val))})
+
+# Run sweep (distributed across agents)
+wandb.agent(sweep_id, function=train, count=50)
+```
+
+### W&B vs MLflow Comparison
+
+| Feature | W&B | MLflow |
+|---------|-----|--------|
+| **Hosting** | SaaS (default) + self-hosted | Self-hosted (default) + managed |
+| **UI/Visualization** | Rich, interactive dashboards | Basic comparison UI |
+| **Hyperparameter sweeps** | Built-in (Bayesian, early stop) | Not built-in (use Optuna etc.) |
+| **Collaboration** | Reports, team dashboards | Basic sharing |
+| **Dataset versioning** | Artifacts with lineage | Basic artifact logging |
+| **Cost** | Free tier → paid per user | Free (open-source) |
+| **LLM support** | Weave (tracing, eval) | MLflow Evaluate |
+| **Model serving** | No (registry only) | Yes (mlflow serve) |
+| **Best for** | Teams wanting rich UI + managed service | Teams wanting open-source + flexibility |
+
+---
+
+## Q5: How Does Feast Provide a Cloud-Agnostic Feature Store?
+
+**Answer:**
+
+**Feast (Feature Store)** is an open-source feature store that manages ML features from ingestion to serving. It provides a consistent interface for feature retrieval across training (offline: batch) and inference (online: low-latency), with support for multiple backends (Redis, DynamoDB, BigQuery, PostgreSQL, Snowflake). Feast prevents training-serving skew and enables feature reuse across teams.
+
+```{mermaid}
+graph TD
+    subgraph FeastCore["Feast"]
+        REGISTRY_F["Feature Registry<br/>(definitions in code)"]
+        OFFLINE_F["Offline Store<br/>(historical features)"]
+        ONLINE_F["Online Store<br/>(low-latency serving)"]
+        MATERIALIZE["Materialization<br/>(offline → online)"]
+    end
+
+    subgraph OfflineBackends["Offline Backends"]
+        BQ["BigQuery"]
+        SNOWFLAKE["Snowflake"]
+        REDSHIFT["Redshift"]
+        SPARK_OFF["Spark / Parquet"]
+        PG_OFF["PostgreSQL"]
+    end
+
+    subgraph OnlineBackends["Online Backends"]
+        REDIS["Redis"]
+        DYNAMO["DynamoDB"]
+        PG_ON["PostgreSQL"]
+        SQLITE["SQLite"]
+        DATASTORE["Datastore"]
+    end
+
+    subgraph Consumers_F["Consumers"]
+        TRAIN_F["Training<br/>(get_historical_features)"]
+        SERVE_F["Inference<br/>(get_online_features)"]
+    end
+
+    REGISTRY_F --> OFFLINE_F
+    REGISTRY_F --> ONLINE_F
+    MATERIALIZE --> ONLINE_F
+    OFFLINE_F --> OfflineBackends
+    ONLINE_F --> OnlineBackends
+    OFFLINE_F --> TRAIN_F
+    ONLINE_F --> SERVE_F
+
+    style FeastCore fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Feast Architecture
+
+| Component | Role | Example Backends |
+|-----------|------|-----------------|
+| **Feature Repository** | Git repo with feature definitions (Python) | Any Git provider |
+| **Registry** | Metadata about features, entities, data sources | File (S3/GCS), SQL, Snowflake |
+| **Offline Store** | Historical feature retrieval for training | BigQuery, Snowflake, Redshift, Spark, file |
+| **Online Store** | Low-latency feature retrieval for serving | Redis, DynamoDB, PostgreSQL, SQLite |
+| **Materialization** | Sync latest feature values to online store | `feast materialize` (scheduled) |
+| **Feature Server** | REST/gRPC API for online feature serving | `feast serve` (Go or Python) |
+
+### Feast Feature Definitions
+
+```python
+# feature_repo/features.py
+from feast import Entity, FeatureView, Field, FileSource, PushSource
+from feast.types import Float32, Int64, String
+from datetime import timedelta
+
+# Entity (primary key)
+customer = Entity(
+    name="customer_id",
+    join_keys=["customer_id"],
+    description="Unique customer identifier",
+)
+
+# Offline data source (batch)
+customer_spending_source = FileSource(
+    path="s3://bucket/features/customer_spending.parquet",
+    timestamp_field="event_timestamp",
+    created_timestamp_column="created_timestamp",
+)
+
+# Feature view (defines features + source + TTL)
+customer_spending_fv = FeatureView(
+    name="customer_spending_features",
+    entities=[customer],
+    ttl=timedelta(days=90),
+    schema=[
+        Field(name="avg_spend_30d", dtype=Float32),
+        Field(name="transaction_count_7d", dtype=Int64),
+        Field(name="days_since_last_purchase", dtype=Int64),
+        Field(name="preferred_category", dtype=String),
+    ],
+    source=customer_spending_source,
+    online=True,  # Materialize to online store
+    tags={"team": "data-science", "version": "v3"},
+)
+
+# Push source for real-time features
+realtime_source = PushSource(
+    name="realtime_spending_push",
+    batch_source=customer_spending_source,
+)
+
+realtime_spending_fv = FeatureView(
+    name="realtime_spending",
+    entities=[customer],
+    ttl=timedelta(hours=1),
+    schema=[
+        Field(name="current_session_spend", dtype=Float32),
+        Field(name="items_in_cart", dtype=Int64),
+    ],
+    source=realtime_source,
+    online=True,
+)
+```
+
+### Feast Usage (Training & Serving)
+
+```python
+from feast import FeatureStore
+import pandas as pd
+
+store = FeatureStore(repo_path="feature_repo/")
+
+# Training: Get historical features (point-in-time join)
+entity_df = pd.DataFrame({
+    "customer_id": ["c001", "c002", "c003"],
+    "event_timestamp": pd.to_datetime(["2026-01-15", "2026-01-16", "2026-01-17"]),
+})
+
+training_df = store.get_historical_features(
+    entity_df=entity_df,
+    features=[
+        "customer_spending_features:avg_spend_30d",
+        "customer_spending_features:transaction_count_7d",
+        "customer_spending_features:days_since_last_purchase",
+    ],
+).to_df()
+
+# Serving: Get online features (latest values, low latency)
+online_features = store.get_online_features(
+    features=[
+        "customer_spending_features:avg_spend_30d",
+        "customer_spending_features:transaction_count_7d",
+        "realtime_spending:current_session_spend",
+    ],
+    entity_rows=[{"customer_id": "c001"}, {"customer_id": "c002"}],
+).to_dict()
+
+# Materialize offline → online (run on schedule)
+# feast materialize 2026-01-01T00:00:00 2026-05-21T00:00:00
+store.materialize(
+    start_date=datetime(2026, 1, 1),
+    end_date=datetime(2026, 5, 21),
+)
+```
+
+### Feast vs Managed Feature Stores
+
+| Aspect | Feast | SageMaker Feature Store | Vertex AI Feature Store |
+|--------|-------|------------------------|------------------------|
+| **Open-source** | Yes | No | No |
+| **Cloud lock-in** | None | AWS | GCP |
+| **Online backends** | Redis, DynamoDB, PG, etc. | DynamoDB (managed) | Bigtable (managed) |
+| **Offline backends** | BigQuery, Snowflake, Spark, etc. | S3 + Athena | BigQuery |
+| **Setup** | Self-managed | Fully managed | Fully managed |
+| **Point-in-time joins** | Yes | Yes (via Athena) | Yes |
+| **Real-time ingestion** | Push source API | PutRecord API | Streaming import |
+| **Best for** | Multi-cloud, custom infra | AWS-native teams | GCP-native teams |
+
+---
+
+## Q6: How Do Seldon Core and KServe Serve Models on Kubernetes?
+
+**Answer:**
+
+**Seldon Core** and **KServe** (formerly KFServing) are Kubernetes-native model serving frameworks. They provide inference graphs, canary deployments, autoscaling (including scale-to-zero), A/B testing, multi-model serving, and model explainability — running on any K8s cluster with support for all major ML frameworks.
+
+```{mermaid}
+graph TD
+    subgraph Serving["K8s Model Serving"]
+        SELDON["Seldon Core<br/>(inference graphs)"]
+        KSERVE["KServe<br/>(serverless inference)"]
+    end
+
+    subgraph Features["Capabilities"]
+        CANARY["Canary / A/B<br/>Deployments"]
+        AUTOSCALE["Autoscaling<br/>(HPA + scale-to-zero)"]
+        GRAPH["Inference Graphs<br/>(pre/post processing)"]
+        MULTI["Multi-Model Serving<br/>(1000s of models)"]
+        EXPLAIN["Explainability<br/>(SHAP, Anchors)"]
+        MONITOR_S["Monitoring<br/>(Prometheus + Grafana)"]
+    end
+
+    subgraph Frameworks["Supported Frameworks"]
+        SKLEARN_S["scikit-learn"]
+        TF_S["TensorFlow"]
+        PYTORCH_S["PyTorch (TorchServe)"]
+        XGBOOST_S["XGBoost / LightGBM"]
+        TRITON["NVIDIA Triton"]
+        CUSTOM_S["Custom (any language)"]
+        MLFLOW_S["MLflow format"]
+    end
+
+    Serving --> Features
+    Frameworks --> Serving
+
+    style Serving fill:#6cc3d5,stroke:#333,color:#fff
+    style Features fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Seldon Core vs KServe
+
+| Feature | Seldon Core | KServe |
+|---------|-------------|--------|
+| **Architecture** | Custom CRD (SeldonDeployment) | Knative-based (InferenceService) |
+| **Scale-to-zero** | With KEDA addon | Native (Knative serverless) |
+| **Inference graph** | Rich (router, combiner, transformer) | Basic (transformer + predictor) |
+| **Multi-model** | Yes (Triton integration) | Yes (ModelMesh) |
+| **Protocol** | REST + gRPC (v2 protocol) | REST + gRPC (v2 protocol) |
+| **Canary** | Traffic splitting in CRD | Canary via revision routing |
+| **Explainability** | Built-in (Alibi Explain) | Explainer component |
+| **Monitoring** | Prometheus metrics + drift (Alibi Detect) | Prometheus metrics |
+| **Best for** | Complex inference pipelines | Serverless, simple deployments |
+
+### Seldon Core Deployment
+
+```yaml
+# seldon-deployment.yaml
+apiVersion: machinelearning.seldon.io/v1
+kind: SeldonDeployment
+metadata:
+  name: churn-classifier
+  namespace: ml-serving
+spec:
+  predictors:
+    - name: default
+      replicas: 2
+      graph:
+        name: classifier
+        implementation: SKLEARN_SERVER
+        modelUri: s3://models/churn/v3
+        envSecretRefName: s3-credentials
+        children: []
+      componentSpecs:
+        - spec:
+            containers:
+              - name: classifier
+                resources:
+                  requests: { cpu: "500m", memory: "1Gi" }
+                  limits: { cpu: "2", memory: "4Gi" }
+      traffic: 90
+      labels:
+        version: v3
+
+    - name: canary
+      replicas: 1
+      graph:
+        name: classifier
+        implementation: SKLEARN_SERVER
+        modelUri: s3://models/churn/v4-candidate
+      traffic: 10
+      labels:
+        version: v4-candidate
+```
+
+### KServe InferenceService
+
+```yaml
+# kserve-inference.yaml
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: churn-classifier
+  namespace: ml-serving
+spec:
+  predictor:
+    model:
+      modelFormat:
+        name: sklearn
+      storageUri: s3://models/churn/v3
+      resources:
+        requests: { cpu: "500m", memory: "1Gi" }
+        limits: { cpu: "2", memory: "4Gi" }
+    minReplicas: 1
+    maxReplicas: 10
+    scaleTarget: 10  # Requests per pod before scaling
+  transformer:
+    containers:
+      - name: feature-transformer
+        image: myregistry/feature-transformer:v1
+        resources:
+          requests: { cpu: "200m", memory: "512Mi" }
+  explainer:
+    containers:
+      - name: shap-explainer
+        image: myregistry/shap-explainer:v1
+```
+
+### BentoML Alternative
+
+**BentoML** is a simpler model serving framework focused on developer experience — package models as "Bentos" (containers) and deploy anywhere:
+
+```python
+import bentoml
+from bentoml.io import JSON, NumpyNdarray
+
+# Save model to BentoML model store
+bentoml.sklearn.save_model("churn_classifier", model)
+
+# Define service
+@bentoml.service(resources={"cpu": "2", "memory": "4Gi"})
+class ChurnClassifier:
+    model_ref = bentoml.models.get("churn_classifier:latest")
+
+    def __init__(self):
+        self.model = bentoml.sklearn.load_model(self.model_ref)
+
+    @bentoml.api
+    def predict(self, input_data: dict) -> dict:
+        features = preprocess(input_data)
+        prediction = self.model.predict([features])[0]
+        probability = self.model.predict_proba([features])[0]
+        return {"prediction": int(prediction), "probability": float(probability[1])}
+
+# Build & containerize: bentoml build && bentoml containerize churn_classifier:latest
+# Deploy: docker run -p 3000:3000 churn_classifier:latest
+```
+
+---
+
+## Q7: How Does Great Expectations Validate ML Data Quality?
+
+**Answer:**
+
+**Great Expectations (GX)** is an open-source data validation framework that defines, tests, and documents data quality expectations. In MLOps, it validates training data, feature pipelines, and inference inputs — catching data issues before they degrade model performance. Expectations are defined as code and integrated into CI/CD and pipeline steps.
+
+```{mermaid}
+graph TD
+    subgraph GX["Great Expectations"]
+        SUITE["Expectation Suite<br/>(set of validation rules)"]
+        CHECKPOINT["Checkpoint<br/>(run validations)"]
+        DATASOURCE["Data Source<br/>(Pandas, Spark, SQL)"]
+        DOCS["Data Docs<br/>(HTML reports)"]
+        PROFILER["Profiler<br/>(auto-generate expectations)"]
+    end
+
+    subgraph Pipeline_GX["ML Pipeline Integration"]
+        TRAIN_DATA["Training Data<br/>(validate before training)"]
+        FEATURE_DATA["Feature Pipeline<br/>(validate transforms)"]
+        INFERENCE_DATA["Inference Input<br/>(validate at serving)"]
+    end
+
+    subgraph Actions["On Failure"]
+        BLOCK["Block Pipeline<br/>(fail step)"]
+        ALERT["Alert Team<br/>(Slack, email)"]
+        LOG_GX["Log to Monitoring"]
+    end
+
+    DATASOURCE --> SUITE
+    SUITE --> CHECKPOINT
+    CHECKPOINT --> DOCS
+    CHECKPOINT -->|"Fail"| Actions
+
+    TRAIN_DATA --> CHECKPOINT
+    FEATURE_DATA --> CHECKPOINT
+    INFERENCE_DATA --> CHECKPOINT
+
+    style GX fill:#6cc3d5,stroke:#333,color:#fff
+    style Actions fill:#ff6b6b,stroke:#333,color:#fff
+```
+
+### Great Expectations Core Concepts
+
+| Concept | Description | Example |
+|---------|-------------|---------|
+| **Expectation** | Single data assertion (like a unit test for data) | `expect_column_values_to_not_be_null("age")` |
+| **Expectation Suite** | Collection of expectations for a dataset | "training_data_suite" with 50 rules |
+| **Validator** | Applies expectations to a batch of data | Runs suite against DataFrame |
+| **Checkpoint** | Orchestrates validation + actions on results | Run suite, generate docs, alert on failure |
+| **Data Source** | Connection to data (Pandas, Spark, SQL, file) | PostgreSQL, S3 Parquet, BigQuery |
+| **Data Docs** | Auto-generated HTML documentation of results | Hosted on S3/GCS for team access |
+| **Profiler** | Auto-generates expectations from sample data | Bootstraps initial suite |
+
+### Defining Expectations
+
+```python
+import great_expectations as gx
+
+# Connect to data context
+context = gx.get_context()
+
+# Add data source
+datasource = context.data_sources.add_pandas_filesystem(
+    name="training_data",
+    base_directory="data/processed/",
+)
+data_asset = datasource.add_csv_asset(name="train_csv", batching_regex=r"train_(?P<year>\d{4}).csv")
+batch = data_asset.get_batch()
+
+# Create expectation suite
+suite = context.suites.add(gx.ExpectationSuite(name="training_data_quality"))
+
+# Define expectations
+suite.add_expectation(gx.expectations.ExpectColumnValuesToNotBeNull(column="customer_id"))
+suite.add_expectation(gx.expectations.ExpectColumnValuesToNotBeNull(column="target"))
+suite.add_expectation(gx.expectations.ExpectColumnValuesToBeBetween(
+    column="age", min_value=18, max_value=120
+))
+suite.add_expectation(gx.expectations.ExpectColumnValuesToBeBetween(
+    column="monthly_spend", min_value=0, max_value=50000
+))
+suite.add_expectation(gx.expectations.ExpectColumnValuesToBeInSet(
+    column="contract_type", value_set=["month-to-month", "one_year", "two_year"]
+))
+suite.add_expectation(gx.expectations.ExpectColumnMeanToBeBetween(
+    column="tenure_months", min_value=10, max_value=40
+))
+suite.add_expectation(gx.expectations.ExpectTableRowCountToBeBetween(
+    min_value=10000, max_value=1000000
+))
+suite.add_expectation(gx.expectations.ExpectColumnProportionOfUniqueValuesToBeBetween(
+    column="customer_id", min_value=0.99, max_value=1.0
+))
+
+# Save suite
+suite.save()
+```
+
+### Running Validations in Pipelines
+
+```python
+# Run checkpoint (in pipeline step)
+checkpoint = context.checkpoints.add(
+    gx.Checkpoint(
+        name="training_data_checkpoint",
+        validation_definitions=[
+            gx.ValidationDefinition(
+                name="validate_training",
+                data=batch,
+                suite=suite,
+            )
+        ],
+        actions=[
+            gx.checkpoint.UpdateDataDocsAction(name="update_docs"),
+        ],
+    )
+)
+result = checkpoint.run()
+
+# Check result in pipeline
+if not result.success:
+    failed_expectations = [
+        r.expectation_config.type
+        for r in result.run_results.values()
+        for r in r.results
+        if not r.success
+    ]
+    raise ValueError(f"Data validation failed: {failed_expectations}")
+```
+
+### Common ML Data Expectations
+
+| Category | Expectations | Purpose |
+|----------|-------------|---------|
+| **Completeness** | No nulls in critical columns | Prevent training on missing data |
+| **Range validity** | Values within expected bounds | Catch data pipeline errors |
+| **Schema** | Column types, names, count match | Detect schema drift |
+| **Distribution** | Mean, stddev, quantiles within range | Detect distribution shift |
+| **Uniqueness** | ID columns are unique | Prevent duplicate records |
+| **Freshness** | Max timestamp within expected window | Ensure data is recent |
+| **Referential** | Foreign keys exist in reference table | Data integrity |
+| **Volume** | Row count within expected range | Detect data loss/explosion |
+
+---
+
+## Q8: How Does Apache Airflow Orchestrate ML Workflows?
+
+**Answer:**
+
+**Apache Airflow** is the most widely used open-source workflow orchestrator. While not ML-specific, it's commonly used for ML pipeline orchestration — scheduling data ingestion, feature engineering, model training, evaluation, and deployment as DAGs (Directed Acyclic Graphs). Airflow provides rich scheduling, retry logic, SLA monitoring, and integrations with every major ML tool and cloud service.
+
+```{mermaid}
+graph TD
+    subgraph Airflow["Apache Airflow"]
+        SCHEDULER["Scheduler<br/>(trigger DAGs on schedule)"]
+        WEBSERVER["Web UI<br/>(monitor, trigger, debug)"]
+        EXECUTOR["Executor<br/>(run tasks)"]
+        META["Metadata DB<br/>(PostgreSQL)"]
+    end
+
+    subgraph Executors["Executor Types"]
+        LOCAL["Local Executor<br/>(single machine)"]
+        CELERY["Celery Executor<br/>(distributed workers)"]
+        K8S_EX["Kubernetes Executor<br/>(pod per task)"]
+    end
+
+    subgraph ML_DAG["ML DAG"]
+        INGEST["Ingest Data"]
+        VALIDATE["Validate (GX)"]
+        FEATURE["Feature Engineering"]
+        TRAIN_AF["Train Model"]
+        EVAL_AF["Evaluate"]
+        DEPLOY_AF["Deploy"]
+    end
+
+    SCHEDULER --> EXECUTOR --> ML_DAG
+    EXECUTOR --> Executors
+
+    style Airflow fill:#6cc3d5,stroke:#333,color:#fff
+    style ML_DAG fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Airflow for ML — Key Concepts
+
+| Concept | Description | ML Use |
+|---------|-------------|--------|
+| **DAG** | Directed Acyclic Graph of tasks | ML pipeline (train → eval → deploy) |
+| **Operator** | Template for a task type | BashOperator, PythonOperator, KubernetesPodOperator |
+| **Sensor** | Wait for external condition | S3KeySensor (new data arrival) |
+| **XCom** | Pass data between tasks | Model metrics, S3 paths |
+| **Connections** | Store external service credentials | AWS, GCP, database connections |
+| **Variables** | Store configuration values | Model thresholds, feature versions |
+| **Pools** | Limit concurrent tasks | GPU pool (max 4 concurrent training) |
+| **TaskGroup** | Organize related tasks visually | Group all feature engineering tasks |
+
+### ML Training DAG Example
+
+```python
+from airflow import DAG
+from airflow.operators.python import PythonOperator, BranchPythonOperator
+from airflow.providers.amazon.aws.operators.sagemaker import (
+    SageMakerTrainingOperator,
+    SageMakerEndpointOperator,
+)
+from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
+from airflow.sensors.s3_key_sensor import S3KeySensor
+from datetime import datetime, timedelta
+
+default_args = {
+    "owner": "ml-team",
+    "retries": 2,
+    "retry_delay": timedelta(minutes=10),
+    "email_on_failure": True,
+    "email": ["ml-team@company.com"],
+}
+
+with DAG(
+    dag_id="churn_model_training",
+    default_args=default_args,
+    schedule_interval="@weekly",
+    start_date=datetime(2026, 1, 1),
+    catchup=False,
+    tags=["ml", "churn", "production"],
+) as dag:
+
+    # Wait for new data
+    wait_for_data = S3KeySensor(
+        task_id="wait_for_data",
+        bucket_name="data-lake",
+        bucket_key="churn/weekly/{{ ds }}/_SUCCESS",
+        timeout=3600,
+    )
+
+    # Validate data quality
+    validate_data = KubernetesPodOperator(
+        task_id="validate_data",
+        image="myregistry/data-validator:v2",
+        cmds=["python", "validate.py"],
+        arguments=["--date={{ ds }}", "--suite=training_quality"],
+        namespace="ml-pipelines",
+        get_logs=True,
+    )
+
+    # Feature engineering
+    build_features = KubernetesPodOperator(
+        task_id="build_features",
+        image="myregistry/feature-builder:v3",
+        cmds=["python", "build_features.py"],
+        arguments=["--date={{ ds }}", "--output=s3://features/churn/{{ ds }}/"],
+        namespace="ml-pipelines",
+        resources={"request_memory": "8Gi", "request_cpu": "4"},
+    )
+
+    # Train model
+    train_model = SageMakerTrainingOperator(
+        task_id="train_model",
+        config={
+            "TrainingJobName": "churn-{{ ds_nodash }}",
+            "AlgorithmSpecification": {"TrainingImage": "...", "TrainingInputMode": "File"},
+            "InputDataConfig": [{"ChannelName": "train", "DataSource": {...}}],
+            "OutputDataConfig": {"S3OutputPath": "s3://models/churn/"},
+            "ResourceConfig": {"InstanceType": "ml.p3.2xlarge", "InstanceCount": 1},
+        },
+    )
+
+    # Evaluate model
+    evaluate = PythonOperator(
+        task_id="evaluate_model",
+        python_callable=evaluate_model,
+        op_kwargs={"model_path": "s3://models/churn/{{ ds_nodash }}/"},
+    )
+
+    # Branch: deploy or alert
+    def check_metrics(**context):
+        metrics = context["ti"].xcom_pull(task_ids="evaluate_model")
+        if metrics["f1_score"] >= 0.85:
+            return "deploy_model"
+        return "alert_team"
+
+    branch = BranchPythonOperator(
+        task_id="check_metrics",
+        python_callable=check_metrics,
+    )
+
+    deploy = SageMakerEndpointOperator(
+        task_id="deploy_model",
+        operation="update",
+        config={...},
+    )
+
+    alert = PythonOperator(
+        task_id="alert_team",
+        python_callable=send_slack_alert,
+    )
+
+    # DAG dependencies
+    wait_for_data >> validate_data >> build_features >> train_model >> evaluate >> branch
+    branch >> [deploy, alert]
+```
+
+### Airflow ML Provider Packages
+
+| Provider | Operators | Use Case |
+|----------|-----------|----------|
+| **amazon** | SageMaker (Training, Endpoint, Transform) | AWS ML jobs |
+| **google** | Vertex AI (Training, Prediction, AutoML) | GCP ML jobs |
+| **microsoft.azure** | AzureML (Run, Endpoint) | Azure ML jobs |
+| **cncf.kubernetes** | KubernetesPodOperator | Any containerized task |
+| **databricks** | DatabricksRunNow, DatabricksSubmitRun | Spark/ML on Databricks |
+| **dbt** | DbtCloudRunJob, DbtRunOperator | Data transformation |
+
+### Airflow vs ML-Specific Orchestrators
+
+| Feature | Apache Airflow | Kubeflow Pipelines | SageMaker Pipelines |
+|---------|---------------|-------------------|---------------------|
+| **Scope** | General workflow orchestration | ML-specific on K8s | ML-specific on AWS |
+| **Scheduling** | Rich (cron, sensors, data-aware) | Basic (cron, manual) | EventBridge, API |
+| **ML integration** | Via operators/providers | Native (KFP components) | Native (step types) |
+| **Caching** | Manual (check before run) | Built-in (step-level) | Built-in (step-level) |
+| **Data lineage** | Via plugins (OpenLineage) | Built-in artifacts | Built-in |
+| **Learning curve** | Moderate | High (K8s + KFP) | Low (SDK) |
+| **Best for** | Mixed workloads (data + ML) | K8s-native ML teams | AWS-native ML teams |
+
+---
+
+## Q9: How Do You Use Terraform/Pulumi for ML Infrastructure as Code?
+
+**Answer:**
+
+**Infrastructure as Code (IaC)** for ML ensures reproducible, version-controlled environments across development, staging, and production. **Terraform** (HCL) and **Pulumi** (Python/TypeScript) define ML infrastructure — compute clusters, model endpoints, feature stores, networking, IAM — as code that's reviewed, tested, and deployed through CI/CD.
+
+```{mermaid}
+graph TD
+    subgraph IaC["Infrastructure as Code"]
+        TF["Terraform<br/>(HCL, declarative)"]
+        PULUMI["Pulumi<br/>(Python/TS, imperative)"]
+        CDK["AWS CDK / Bicep<br/>(cloud-specific)"]
+    end
+
+    subgraph MLInfra["ML Infrastructure"]
+        COMPUTE["Compute<br/>(GPU clusters, K8s, VMs)"]
+        STORAGE_I["Storage<br/>(S3, GCS, ADLS)"]
+        NETWORK["Networking<br/>(VPC, subnets, endpoints)"]
+        SERVE_I["Serving<br/>(endpoints, load balancers)"]
+        MONITOR_I["Monitoring<br/>(CloudWatch, Prometheus)"]
+        IAM_I["IAM<br/>(roles, policies)"]
+    end
+
+    subgraph Workflow_IaC["IaC Workflow"]
+        CODE_I["Write Code<br/>(tf / pulumi)"]
+        PLAN["Plan<br/>(preview changes)"]
+        REVIEW["Code Review<br/>(PR approval)"]
+        APPLY["Apply<br/>(provision infra)"]
+    end
+
+    IaC --> MLInfra
+    CODE_I --> PLAN --> REVIEW --> APPLY
+
+    style IaC fill:#6cc3d5,stroke:#333,color:#fff
+    style MLInfra fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Why IaC for ML?
+
+| Challenge | Without IaC | With IaC |
+|-----------|------------|----------|
+| **Environment drift** | Manual setup differs between envs | Identical infrastructure everywhere |
+| **Audit trail** | Who changed what? | Git history tracks all changes |
+| **Disaster recovery** | Manual rebuild | `terraform apply` recreates everything |
+| **Team onboarding** | Undocumented setup steps | Self-documenting code |
+| **Cost control** | Forgotten resources running | Destroy unused envs: `terraform destroy` |
+| **Compliance** | Manual security checks | Policy-as-code (Sentinel, OPA) |
+
+### Terraform for SageMaker
+
+```hcl
+# main.tf - SageMaker ML infrastructure
+terraform {
+  required_providers {
+    aws = { source = "hashicorp/aws", version = "~> 5.0" }
+  }
+  backend "s3" {
+    bucket = "terraform-state-ml"
+    key    = "ml-platform/terraform.tfstate"
+    region = "us-east-1"
+  }
+}
+
+# IAM Role for SageMaker
+resource "aws_iam_role" "sagemaker_execution" {
+  name = "sagemaker-execution-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = { Service = "sagemaker.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "sagemaker_full" {
+  role       = aws_iam_role.sagemaker_execution.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSageMakerFullAccess"
+}
+
+# S3 bucket for ML artifacts
+resource "aws_s3_bucket" "ml_artifacts" {
+  bucket = "ml-artifacts-${var.environment}"
+  tags   = { Environment = var.environment, Team = "ml-platform" }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "ml_artifacts" {
+  bucket = aws_s3_bucket.ml_artifacts.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.ml_key.arn
+    }
+  }
+}
+
+# SageMaker Domain (Studio)
+resource "aws_sagemaker_domain" "ml_studio" {
+  domain_name = "ml-studio-${var.environment}"
+  auth_mode   = "IAM"
+  vpc_id      = var.vpc_id
+  subnet_ids  = var.private_subnet_ids
+
+  default_user_settings {
+    execution_role = aws_iam_role.sagemaker_execution.arn
+    security_groups = [aws_security_group.sagemaker.id]
+  }
+}
+
+# SageMaker Model (for endpoint)
+resource "aws_sagemaker_model" "churn" {
+  name               = "churn-model-${var.model_version}"
+  execution_role_arn = aws_iam_role.sagemaker_execution.arn
+
+  primary_container {
+    image          = var.inference_image
+    model_data_url = "s3://${aws_s3_bucket.ml_artifacts.id}/models/churn/${var.model_version}/model.tar.gz"
+  }
+
+  vpc_config {
+    subnets            = var.private_subnet_ids
+    security_group_ids = [aws_security_group.sagemaker.id]
+  }
+}
+
+# SageMaker Endpoint
+resource "aws_sagemaker_endpoint_configuration" "churn" {
+  name = "churn-endpoint-config-${var.model_version}"
+
+  production_variants {
+    variant_name           = "primary"
+    model_name             = aws_sagemaker_model.churn.name
+    initial_instance_count = var.endpoint_instance_count
+    instance_type          = var.endpoint_instance_type
+  }
+
+  data_capture_config {
+    enable_capture              = true
+    initial_sampling_percentage = 20
+    destination_s3_uri          = "s3://${aws_s3_bucket.ml_artifacts.id}/data-capture/"
+    capture_options { capture_mode = "Input" }
+    capture_options { capture_mode = "Output" }
+  }
+}
+
+resource "aws_sagemaker_endpoint" "churn" {
+  name                 = "churn-prediction-${var.environment}"
+  endpoint_config_name = aws_sagemaker_endpoint_configuration.churn.name
+  tags                 = { Environment = var.environment }
+}
+
+# Auto-scaling
+resource "aws_appautoscaling_target" "endpoint" {
+  max_capacity       = 10
+  min_capacity       = var.environment == "production" ? 2 : 1
+  resource_id        = "endpoint/${aws_sagemaker_endpoint.churn.name}/variant/primary"
+  scalable_dimension = "sagemaker:variant:DesiredInstanceCount"
+  service_namespace  = "sagemaker"
+}
+```
+
+### Pulumi for ML (Python)
+
+```python
+import pulumi
+import pulumi_aws as aws
+import pulumi_kubernetes as k8s
+
+# Configuration
+config = pulumi.Config()
+environment = config.require("environment")
+
+# S3 bucket for ML artifacts
+ml_bucket = aws.s3.Bucket(
+    f"ml-artifacts-{environment}",
+    bucket=f"ml-artifacts-{environment}",
+    server_side_encryption_configuration={
+        "rule": {"apply_server_side_encryption_by_default": {"sse_algorithm": "aws:kms"}}
+    },
+    tags={"Environment": environment, "Team": "ml-platform"},
+)
+
+# Kubernetes namespace for ML workloads
+ml_namespace = k8s.core.v1.Namespace(
+    "ml-serving",
+    metadata={"name": f"ml-serving-{environment}"},
+)
+
+# Deploy KServe InferenceService via Pulumi K8s
+inference_service = k8s.apiextensions.CustomResource(
+    "churn-model",
+    api_version="serving.kserve.io/v1beta1",
+    kind="InferenceService",
+    metadata={"name": "churn-classifier", "namespace": ml_namespace.metadata.name},
+    spec={
+        "predictor": {
+            "model": {
+                "modelFormat": {"name": "sklearn"},
+                "storageUri": pulumi.Output.concat("s3://", ml_bucket.id, "/models/churn/latest"),
+            },
+            "minReplicas": 1 if environment == "dev" else 2,
+            "maxReplicas": 10,
+        }
+    },
+)
+
+pulumi.export("endpoint_url", inference_service.metadata.name)
+pulumi.export("bucket_name", ml_bucket.id)
+```
+
+### IaC Best Practices for ML
+
+| Practice | Implementation |
+|----------|---------------|
+| **Module per component** | `modules/sagemaker-endpoint/`, `modules/feature-store/` |
+| **Environment separation** | `envs/dev/`, `envs/staging/`, `envs/prod/` (different tfvars) |
+| **State locking** | S3 + DynamoDB (Terraform) or Pulumi Cloud |
+| **Policy-as-code** | OPA/Sentinel to enforce security (no public endpoints, encryption required) |
+| **Cost estimation** | `infracost` in CI to preview cost changes |
+| **Drift detection** | Scheduled `terraform plan` to detect manual changes |
+| **Secrets management** | AWS Secrets Manager / Vault (never in state) |
+
+---
+
+## Q10: How Do You Build a Best-of-Breed Cloud-Agnostic MLOps Stack?
+
+**Answer:**
+
+A **cloud-agnostic MLOps stack** combines best-of-breed open-source tools to cover the full ML lifecycle — avoiding vendor lock-in while maintaining production-grade capabilities. The key is choosing tools that integrate well, have active communities, and support your deployment targets (cloud, on-prem, hybrid).
+
+```{mermaid}
+graph TD
+    subgraph Stack["Cloud-Agnostic MLOps Stack"]
+        subgraph Versioning["Versioning & Tracking"]
+            DVC_S["DVC<br/>(data/model versioning)"]
+            MLFLOW_S["MLflow / W&B<br/>(experiment tracking)"]
+        end
+
+        subgraph Orchestration["Orchestration"]
+            AIRFLOW_S["Airflow / Prefect<br/>(workflow scheduling)"]
+            KFP_S["Kubeflow Pipelines<br/>(ML DAGs on K8s)"]
+        end
+
+        subgraph Data["Data Quality & Features"]
+            GX_S["Great Expectations<br/>(data validation)"]
+            FEAST_S["Feast<br/>(feature store)"]
+        end
+
+        subgraph Serving_S["Model Serving"]
+            SELDON_S["Seldon / KServe<br/>(K8s inference)"]
+            BENTO_S["BentoML<br/>(model packaging)"]
+        end
+
+        subgraph Monitoring_S["Monitoring"]
+            EVIDENTLY["Evidently AI<br/>(drift detection)"]
+            PROM["Prometheus + Grafana<br/>(metrics & dashboards)"]
+        end
+
+        subgraph Infra_S["Infrastructure"]
+            TF_S["Terraform / Pulumi<br/>(IaC)"]
+            K8S_S["Kubernetes<br/>(runtime platform)"]
+        end
+    end
+
+    style Stack fill:#f8f9fa,stroke:#333
+    style Versioning fill:#6cc3d5,stroke:#333,color:#fff
+    style Orchestration fill:#56cc9d,stroke:#333,color:#fff
+    style Data fill:#ffce67,stroke:#333
+    style Serving_S fill:#ff6b6b,stroke:#333,color:#fff
+    style Monitoring_S fill:#c3aed6,stroke:#333
+    style Infra_S fill:#78c2ad,stroke:#333,color:#fff
+```
+
+### Reference Stack by MLOps Stage
+
+| Stage | Open-Source Tool | Alternative | Purpose |
+|-------|-----------------|-------------|---------|
+| **Data versioning** | DVC | LakeFS, Delta Lake | Track data/model versions alongside code |
+| **Experiment tracking** | MLflow | W&B, Neptune, CometML | Log metrics, params, compare runs |
+| **Pipeline orchestration** | Apache Airflow | Prefect, Dagster, Flyte | Schedule and orchestrate workflows |
+| **ML pipelines** | Kubeflow Pipelines | Metaflow, ZenML | ML-specific DAGs with caching |
+| **Data validation** | Great Expectations | Pandera, Deequ, TFDV | Validate data quality |
+| **Feature store** | Feast | Hopsworks, Tecton | Consistent feature serving |
+| **Model serving** | Seldon Core / KServe | BentoML, Ray Serve, Triton | Low-latency inference on K8s |
+| **Monitoring** | Evidently AI | NannyML, Whylabs, Arize | Drift detection, model quality |
+| **Infrastructure** | Terraform | Pulumi, Crossplane | Provision and manage infra |
+| **Container runtime** | Kubernetes | Nomad, Docker Swarm | Run all workloads |
+| **CI/CD** | GitHub Actions | GitLab CI, Jenkins, Argo CD | Build, test, deploy |
+| **Secrets** | HashiCorp Vault | Sealed Secrets, SOPS | Manage credentials |
+
+### Example Integration Architecture
+
+```yaml
+# docker-compose.yml - Local MLOps development stack
+version: "3.8"
+services:
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:2.15.0
+    ports: ["5000:5000"]
+    command: >
+      mlflow server --host 0.0.0.0
+      --backend-store-uri postgresql://mlflow:mlflow@postgres:5432/mlflow
+      --default-artifact-root s3://mlflow-artifacts/
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+
+  feast:
+    image: feastdev/feature-server:0.38.0
+    ports: ["6566:6566"]
+    volumes: ["./feature_repo:/feature_repo"]
+    command: feast serve --host 0.0.0.0
+
+  great-expectations:
+    image: greatexpectations/great_expectations:latest
+    volumes: ["./gx:/gx"]
+
+  grafana:
+    image: grafana/grafana:latest
+    ports: ["3000:3000"]
+    volumes: ["./grafana/dashboards:/var/lib/grafana/dashboards"]
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports: ["9090:9090"]
+    volumes: ["./prometheus.yml:/etc/prometheus/prometheus.yml"]
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: mlflow
+      POSTGRES_USER: mlflow
+      POSTGRES_PASSWORD: mlflow
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+```
+
+### Decision Framework: When to Use What
+
+| Scenario | Recommended Stack | Why |
+|----------|-------------------|-----|
+| **Startup, AWS-only** | SageMaker (managed) | Fastest to production, no ops overhead |
+| **Enterprise, multi-cloud** | Kubeflow + MLflow + Feast + Seldon | Portable, no lock-in |
+| **Small team, quick iteration** | MLflow + DVC + BentoML + GitHub Actions | Simple, low overhead |
+| **Regulated industry** | Cloud-managed + Terraform + OPA | Compliance, audit trail |
+| **On-prem/hybrid** | Kubeflow + Feast + Airflow + Terraform | Full control, any environment |
+| **Large org, many teams** | W&B + Feast + Airflow + KServe + Terraform | Collaboration, governance |
+
+### Migration Strategy (Cloud → Agnostic)
+
+| Step | Action | Risk Mitigation |
+|------|--------|-----------------|
+| 1 | **Abstract model packaging** — use MLflow model format | Standard format works everywhere |
+| 2 | **Adopt Feast** — decouple feature serving from cloud feature store | Dual-write during transition |
+| 3 | **Containerize training** — Docker + KFP components | Runs on any K8s cluster |
+| 4 | **IaC everything** — Terraform modules per provider | Swap providers by changing modules |
+| 5 | **Portable CI/CD** — GitHub Actions with provider-agnostic steps | Same workflow, different targets |
+| 6 | **Monitoring abstraction** — Evidently + Prometheus (cloud-agnostic) | Consistent metrics everywhere |
+
+---
+
+## Summary Table
+
+| # | Topic | Key Tools |
+|---|-------|-----------|
+| 1 | **Experiment Tracking** | MLflow (Tracking, Registry, Projects, Models) |
+| 2 | **ML Pipelines on K8s** | Kubeflow Pipelines (KFP), Katib, KServe |
+| 3 | **Data & Model Versioning** | DVC (dvc add, dvc repro, dvc exp) |
+| 4 | **Experiment Management** | Weights & Biases (Experiments, Sweeps, Artifacts) |
+| 5 | **Feature Store** | Feast (online/offline stores, point-in-time joins) |
+| 6 | **Model Serving on K8s** | Seldon Core, KServe, BentoML |
+| 7 | **Data Validation** | Great Expectations (suites, checkpoints, Data Docs) |
+| 8 | **Workflow Orchestration** | Apache Airflow (DAGs, operators, sensors) |
+| 9 | **ML Infrastructure as Code** | Terraform, Pulumi (multi-cloud IaC) |
+| 10 | **Best-of-Breed Stack** | Reference architecture combining all tools |
+
+---
+
+## What's Next?
+
+This article covered cloud-agnostic MLOps tools. For related content:
+
+- **General MLOps concepts:** [MLOps Interview QA - 1](/posts/aiops-interview/MLOps-Interview-QA-1.html)
+- **Azure MLOps:** [MLOps Interview QA - 2](/posts/aiops-interview/MLOps-Interview-QA-2.html)
+- **GCP MLOps:** [MLOps Interview QA - 3](/posts/aiops-interview/MLOps-Interview-QA-3.html)
+- **AWS MLOps:** [MLOps Interview QA - 4](/posts/aiops-interview/MLOps-Interview-QA-4.html)
+- **LLMOps:** [LLMOps Interview QA - 1](/posts/aiops-interview/LLMOps-Interview-QA-1.html)
+- **DevOps foundations:** [DevOps Interview QA - 1](/posts/aiops-interview/DevOps-Interview-QA-1.html)

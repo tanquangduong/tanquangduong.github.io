@@ -1,0 +1,1150 @@
+---
+title: "MLOps Interview QA - 2"
+description: "10 Azure MLOps interview questions covering Azure Machine Learning workspace, pipelines, managed endpoints, batch endpoints, model registry, compute options, feature store, monitoring, CI/CD with Azure DevOps, and security governance."
+image: /images/aiops/thumb_mlops_interview_qa_300.png
+date: "2026-05-21"
+keywords:
+  - "Azure MLOps"
+  - "Azure Machine Learning"
+  - "Azure ML pipelines"
+  - "managed online endpoints"
+  - "batch endpoints"
+  - "model registry"
+  - "Azure ML compute"
+  - "Azure feature store"
+  - "data drift"
+  - "Azure DevOps ML"
+  - "MLflow Azure"
+  - "responsible AI"
+---
+
+## Introduction
+
+This is **Part 2** of our MLOps Interview QA series, focused on **Azure Machine Learning services** for operationalizing ML at scale. Azure ML provides an end-to-end platform covering experiment tracking, pipeline orchestration, model deployment, monitoring, and governance — all integrated with the broader Azure ecosystem.
+
+> For general MLOps concepts, see [MLOps Interview QA - 1](/posts/aiops-interview/MLOps-Interview-QA-1.html). For LLMOps, see [LLMOps Interview QA - 1](/posts/aiops-interview/LLMOps-Interview-QA-1.html). For DevOps foundations, see [DevOps Interview QA - 1](/posts/aiops-interview/DevOps-Interview-QA-1.html).
+
+---
+
+## Q1: What Is the Azure Machine Learning Workspace Architecture?
+
+**Answer:**
+
+The Azure Machine Learning **workspace** is the top-level resource for organizing all ML activities. It acts as a centralized hub for experiments, data, compute, models, and endpoints. Every Azure ML resource (pipelines, models, endpoints) lives within a workspace.
+
+```{mermaid}
+graph TD
+    subgraph Workspace["Azure ML Workspace"]
+        EXPERIMENTS["Experiments<br/>(jobs & runs)"]
+        MODELS["Model Registry<br/>(versioned models)"]
+        DATA["Data Assets<br/>(URIs, tables)"]
+        COMPUTE["Compute<br/>(clusters, instances)"]
+        ENDPOINTS["Endpoints<br/>(online & batch)"]
+        ENVS["Environments<br/>(Docker + conda)"]
+        PIPELINES["Pipelines<br/>(training & inference)"]
+    end
+
+    subgraph Associated["Associated Azure Resources"]
+        STORAGE["Azure Storage<br/>(Blob, ADLS Gen2)"]
+        KV["Azure Key Vault<br/>(secrets)"]
+        ACR["Azure Container<br/>Registry (images)"]
+        AI["Application<br/>Insights (telemetry)"]
+    end
+
+    Workspace --> STORAGE
+    Workspace --> KV
+    Workspace --> ACR
+    Workspace --> AI
+
+    style Workspace fill:#6cc3d5,stroke:#333,color:#fff
+    style Associated fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Workspace Components
+
+| Component | Purpose | Key Details |
+|-----------|---------|-------------|
+| **Workspace** | Top-level container for all ML assets | Region-specific, RBAC-controlled |
+| **Azure Storage** | Default datastore for datasets, logs, outputs | Blob or ADLS Gen2 |
+| **Azure Key Vault** | Stores secrets (connection strings, API keys) | Auto-integrated, used by compute |
+| **Azure Container Registry** | Stores Docker images for environments | Shared across workspace |
+| **Application Insights** | Monitors deployed endpoints (latency, errors) | Optional but recommended |
+| **Azure Event Grid** | Event-driven automation (model registered, drift detected) | Trigger pipelines on events |
+
+### Workspace Hierarchy
+
+| Level | Scope | Example |
+|-------|-------|---------|
+| **Subscription** | Billing boundary | Enterprise Azure subscription |
+| **Resource Group** | Logical grouping of related resources | `rg-ml-production` |
+| **Workspace** | ML project boundary | `ws-recommendation-engine` |
+| **Experiment** | Logical grouping of related jobs | `experiment-churn-prediction` |
+| **Job (Run)** | Single training or evaluation execution | `job-2026-05-21-v3` |
+
+### SDK v2 Example: Create Workspace
+
+```python
+from azure.ai.ml import MLClient
+from azure.ai.ml.entities import Workspace
+from azure.identity import DefaultAzureCredential
+
+# Authenticate
+credential = DefaultAzureCredential()
+
+# Create workspace
+ws = Workspace(
+    name="ws-production-ml",
+    location="eastus",
+    display_name="Production ML Workspace",
+    description="Workspace for production ML models",
+    tags={"team": "data-science", "env": "production"},
+)
+
+# Create or update
+ml_client = MLClient(credential, subscription_id="xxx", resource_group_name="rg-ml")
+ml_client.workspaces.begin_create(ws).result()
+```
+
+---
+
+## Q2: How Do Azure ML Pipelines Work for Training Orchestration?
+
+**Answer:**
+
+Azure ML **pipelines** are reusable, multi-step workflows that orchestrate data preparation, training, evaluation, and registration as a directed acyclic graph (DAG). Each step runs independently on specified compute, with automatic data passing between steps. Pipelines are essential for reproducible, automated ML workflows.
+
+```{mermaid}
+graph LR
+    subgraph Pipeline["Azure ML Pipeline"]
+        PREP["Data Preparation<br/>(pandas, Spark)"]
+        FEAT["Feature Engineering<br/>(transformations)"]
+        TRAIN["Model Training<br/>(PyTorch, sklearn)"]
+        EVAL["Model Evaluation<br/>(metrics, thresholds)"]
+        REG["Register Model<br/>(if metrics pass)"]
+    end
+
+    PREP --> FEAT --> TRAIN --> EVAL --> REG
+
+    SCHEDULE["Schedule<br/>(cron, recurrence)"]
+    TRIGGER["Event Trigger<br/>(data change, API)"]
+
+    SCHEDULE --> Pipeline
+    TRIGGER --> Pipeline
+
+    style Pipeline fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Pipeline Step Types
+
+| Step Type | Purpose | Example |
+|-----------|---------|---------|
+| **Command** | Run any script (Python, R, bash) on compute | Training script, data processing |
+| **Sweep** | Hyperparameter tuning (grid, random, Bayesian) | Optimize learning rate, batch size |
+| **AutoML** | Automated model selection and tuning | Find best algorithm for tabular data |
+| **Pipeline** | Nested sub-pipeline (reusable components) | Shared data prep across projects |
+| **Parallel** | Run same step in parallel on data partitions | Batch scoring, per-store forecasting |
+| **Spark** | Run PySpark jobs on serverless or attached Spark | Large-scale feature engineering |
+
+### Pipeline SDK v2 Example
+
+```python
+from azure.ai.ml import MLClient, Input, Output, command, dsl
+from azure.ai.ml.constants import AssetTypes
+
+# Define a reusable component
+@command(
+    name="train_model",
+    display_name="Train XGBoost Model",
+    environment="AzureML-sklearn-1.5-ubuntu22.04-py39-cpu@latest",
+    compute="gpu-cluster",
+)
+def train_component(
+    training_data: Input(type=AssetTypes.URI_FOLDER),
+    learning_rate: float = 0.1,
+    n_estimators: int = 100,
+    model_output: Output(type=AssetTypes.URI_FOLDER) = None,
+):
+    pass  # Actual logic in separate script
+
+# Build the pipeline
+@dsl.pipeline(
+    compute="cpu-cluster",
+    description="End-to-end training pipeline",
+)
+def training_pipeline(raw_data: Input):
+    prep_step = prep_component(input_data=raw_data)
+    train_step = train_component(
+        training_data=prep_step.outputs.processed_data,
+        learning_rate=0.05,
+        n_estimators=200,
+    )
+    eval_step = eval_component(
+        model=train_step.outputs.model_output,
+        test_data=prep_step.outputs.test_data,
+    )
+    return {"trained_model": train_step.outputs.model_output}
+
+# Submit the pipeline
+pipeline_job = training_pipeline(
+    raw_data=Input(type=AssetTypes.URI_FOLDER, path="azureml://datastores/...")
+)
+ml_client.jobs.create_or_update(pipeline_job)
+```
+
+### Pipeline Scheduling Options
+
+| Trigger | Description | Use Case |
+|---------|-------------|----------|
+| **Cron schedule** | Run on fixed schedule (e.g., daily 2am) | Nightly retraining |
+| **Recurrence** | Run every N hours/days/weeks | Weekly model evaluation |
+| **On-demand** | Triggered via REST API or SDK | Ad-hoc experiments |
+| **Event-driven** | Data arrival, model registration event | Retrain when new data lands |
+
+### Pipelines vs Other Orchestrators
+
+| Feature | Azure ML Pipelines | Apache Airflow | Kubeflow Pipelines |
+|---------|-------------------|----------------|-------------------|
+| **Native Azure integration** | Full (compute, data, endpoints) | Via providers | Via custom operators |
+| **ML-specific features** | AutoML steps, sweep, metrics | Generic tasks | ML-aware |
+| **Compute management** | Managed (serverless, clusters) | Self-managed | Kubernetes |
+| **UI/Visualization** | Azure ML Studio (graph view) | Airflow UI | KFP UI |
+| **Scheduling** | Built-in cron + event triggers | Built-in | Requires external |
+| **Best for** | Azure-native ML teams | Multi-cloud orchestration | K8s-native ML |
+
+---
+
+## Q3: How Do Managed Online Endpoints Work for Real-Time Inference?
+
+**Answer:**
+
+Azure ML **managed online endpoints** provide a fully managed, scalable infrastructure for deploying models as real-time REST APIs. Azure handles compute provisioning, OS patching, scaling, networking, and monitoring. You describe what you want (model, environment, instance type) and Azure makes it happen.
+
+```{mermaid}
+graph TD
+    CLIENT["Client Request<br/>(REST API)"]
+    CLIENT --> ENDPOINT["Managed Online Endpoint<br/>(stable URL + auth)"]
+
+    subgraph Deployments["Traffic Routing"]
+        BLUE["Blue Deployment<br/>(v1 model, 90% traffic)"]
+        GREEN["Green Deployment<br/>(v2 model, 10% traffic)"]
+    end
+
+    ENDPOINT --> BLUE
+    ENDPOINT --> GREEN
+
+    BLUE --> MONITOR["Azure Monitor<br/>(metrics, logs)"]
+    GREEN --> MONITOR
+
+    style Deployments fill:#6cc3d5,stroke:#333,color:#fff
+    style MONITOR fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Endpoint Types Comparison
+
+| Feature | Managed Online Endpoint | Kubernetes Online Endpoint | Batch Endpoint |
+|---------|------------------------|---------------------------|----------------|
+| **Use case** | Real-time, low latency | Real-time, custom infra | Large-scale async |
+| **Compute** | Managed by Azure | User-managed K8s cluster | Managed compute cluster |
+| **Scaling** | Autoscale (Azure Monitor rules) | K8s HPA | Parallel job instances |
+| **Response** | Synchronous (ms-seconds) | Synchronous | Asynchronous (minutes-hours) |
+| **Traffic splitting** | Yes (blue/green, canary) | Yes | N/A |
+| **Cost model** | Pay per VM hours (provisioned) | Cluster cost | Pay per job compute |
+| **Infrastructure** | Zero server management | Full K8s management | Minimal |
+
+### Deployment Configuration
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| **Model** | Registered model or local path | `azureml:churn-model:3` |
+| **Environment** | Docker image + conda dependencies | `AzureML-sklearn-1.5-ubuntu22.04` |
+| **Scoring script** | `init()` and `run()` functions | `score.py` |
+| **Instance type** | VM SKU for inference | `Standard_DS3_v2` |
+| **Instance count** | Number of replicas | `3` (min for HA) |
+| **Request settings** | Timeout, max batch size | `request_timeout_ms=5000` |
+| **Liveness probe** | Health check configuration | Path: `/`, period: 10s |
+| **Readiness probe** | Readiness to serve traffic | Initial delay: 30s |
+
+### Safe Rollout Pattern
+
+```python
+from azure.ai.ml.entities import (
+    ManagedOnlineEndpoint,
+    ManagedOnlineDeployment,
+)
+
+# 1. Create endpoint
+endpoint = ManagedOnlineEndpoint(
+    name="churn-prediction-endpoint",
+    auth_mode="key",
+)
+ml_client.online_endpoints.begin_create_or_update(endpoint).result()
+
+# 2. Deploy v1 (blue) with 100% traffic
+blue_deployment = ManagedOnlineDeployment(
+    name="blue",
+    endpoint_name="churn-prediction-endpoint",
+    model="azureml:churn-model:2",
+    instance_type="Standard_DS3_v2",
+    instance_count=3,
+)
+ml_client.online_deployments.begin_create_or_update(blue_deployment).result()
+
+# 3. Deploy v2 (green) with 0% traffic initially
+green_deployment = ManagedOnlineDeployment(
+    name="green",
+    endpoint_name="churn-prediction-endpoint",
+    model="azureml:churn-model:3",
+    instance_type="Standard_DS3_v2",
+    instance_count=3,
+)
+ml_client.online_deployments.begin_create_or_update(green_deployment).result()
+
+# 4. Gradually shift traffic: 10% → green
+endpoint.traffic = {"blue": 90, "green": 10}
+ml_client.online_endpoints.begin_create_or_update(endpoint).result()
+
+# 5. After validation, shift 100% → green
+endpoint.traffic = {"blue": 0, "green": 100}
+ml_client.online_endpoints.begin_create_or_update(endpoint).result()
+
+# 6. Delete old deployment
+ml_client.online_deployments.begin_delete(
+    name="blue", endpoint_name="churn-prediction-endpoint"
+).result()
+```
+
+### No-Code Deployment Options
+
+| Approach | Scoring Script | Environment | Best For |
+|----------|---------------|-------------|----------|
+| **MLflow model** | Auto-generated | Auto-generated | MLflow-logged models |
+| **Triton model** | Auto-generated | NVIDIA Triton | High-perf GPU inference |
+| **Custom container (BYOC)** | Included in container | Custom Docker | Full control |
+| **Low-code (curated env)** | User provides | Curated image | Quick deployment |
+
+---
+
+## Q4: How Do Batch Endpoints Handle Large-Scale Scoring?
+
+**Answer:**
+
+Azure ML **batch endpoints** process large volumes of data asynchronously by splitting input data into mini-batches and running them in parallel across a compute cluster. They're ideal for scenarios where latency isn't critical but throughput is — like scoring millions of records nightly or generating recommendations in bulk.
+
+```{mermaid}
+graph TD
+    INPUT["Input Data<br/>(Blob, ADLS, datastore)"]
+    INPUT --> ENDPOINT["Batch Endpoint<br/>(stable URL)"]
+    ENDPOINT --> DEPLOY["Batch Deployment<br/>(model + config)"]
+
+    subgraph Parallel["Parallel Execution"]
+        MINI1["Mini-batch 1<br/>(1000 records)"]
+        MINI2["Mini-batch 2<br/>(1000 records)"]
+        MINI3["Mini-batch 3<br/>(1000 records)"]
+        MINI_N["Mini-batch N<br/>(1000 records)"]
+    end
+
+    DEPLOY --> MINI1
+    DEPLOY --> MINI2
+    DEPLOY --> MINI3
+    DEPLOY --> MINI_N
+
+    MINI1 --> OUTPUT["Output<br/>(predictions to Blob/ADLS)"]
+    MINI2 --> OUTPUT
+    MINI3 --> OUTPUT
+    MINI_N --> OUTPUT
+
+    style Parallel fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Batch Endpoint Configuration
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| **Compute cluster** | Pool of VMs for processing | `cpu-cluster` (Standard_DS3_v2, 0-10 nodes) |
+| **Mini-batch size** | Records per mini-batch | 1000 files or rows |
+| **Max concurrency** | Parallel mini-batches per node | 4 (matches CPU cores) |
+| **Output action** | What to do with predictions | `append_row` or `summary_only` |
+| **Error threshold** | Max failed mini-batches allowed | 5 (before job fails) |
+| **Retry settings** | Retries for failed mini-batches | `max_retries=3, timeout=300` |
+| **Logging level** | Verbosity for debugging | `info` or `debug` |
+
+### Batch vs Online Endpoints
+
+| Aspect | Online Endpoint | Batch Endpoint |
+|--------|----------------|----------------|
+| **Latency** | Milliseconds (real-time) | Minutes to hours |
+| **Input** | Single request (JSON payload) | Large dataset (files, folders) |
+| **Scaling** | Autoscale replicas (always-on) | Scale-to-zero compute cluster |
+| **Cost** | Pay for provisioned VMs 24/7 | Pay only during job execution |
+| **Use case** | API serving, interactive apps | Nightly scoring, bulk inference |
+| **Output** | Immediate HTTP response | Written to storage |
+| **SLA** | Low-latency guaranteed | Throughput-focused |
+
+### When to Use Batch Endpoints
+
+```
+Use batch endpoints when:
+  ✓ Scoring millions/billions of records
+  ✓ Latency is not critical (hours acceptable)
+  ✓ Input data is in storage (Blob, ADLS)
+  ✓ Cost optimization needed (scale-to-zero)
+  ✓ Running scheduled scoring pipelines
+  ✓ Generating recommendations, reports, or embeddings in bulk
+
+Use online endpoints instead when:
+  ✓ Real-time response needed (< 1 second)
+  ✓ Serving user-facing applications
+  ✓ Individual prediction requests
+  ✓ Low-latency decision making
+```
+
+---
+
+## Q5: How Does Azure ML Model Registry Work with MLflow?
+
+**Answer:**
+
+The Azure ML **model registry** is a centralized repository for managing model versions, metadata, lineage, and lifecycle stages. It integrates natively with **MLflow**, enabling teams to log experiments, track metrics, and register models using a familiar open-source API while leveraging Azure's enterprise features (RBAC, lineage, deployment).
+
+```{mermaid}
+graph TD
+    subgraph Experiment["Experiment Tracking (MLflow)"]
+        LOG["Log Metrics, Params,<br/>Artifacts"]
+        COMPARE["Compare Runs<br/>(UI / API)"]
+    end
+
+    subgraph Registry["Azure ML Model Registry"]
+        REGISTER["Register Model<br/>(name:version)"]
+        META["Metadata<br/>(tags, description, lineage)"]
+        STAGE["Lifecycle Stage<br/>(None → Staging → Production → Archived)"]
+    end
+
+    subgraph Deploy["Deployment"]
+        ONLINE["Online Endpoint"]
+        BATCH["Batch Endpoint"]
+        EDGE["Edge (IoT Hub)"]
+    end
+
+    LOG --> REGISTER
+    COMPARE --> REGISTER
+    REGISTER --> META
+    META --> STAGE
+    STAGE --> ONLINE
+    STAGE --> BATCH
+    STAGE --> EDGE
+
+    style Experiment fill:#6cc3d5,stroke:#333,color:#fff
+    style Registry fill:#56cc9d,stroke:#333,color:#fff
+    style Deploy fill:#ffce67,stroke:#333
+```
+
+### MLflow Integration with Azure ML
+
+| Feature | Description |
+|---------|-------------|
+| **Tracking URI** | Point MLflow to Azure ML workspace as backend (`azureml://...`) |
+| **Experiment logging** | `mlflow.log_metric()`, `mlflow.log_param()`, `mlflow.log_artifact()` |
+| **Auto-logging** | `mlflow.autolog()` captures params, metrics, model for sklearn/PyTorch/TF |
+| **Model registry** | `mlflow.register_model()` stores in Azure ML registry |
+| **Model flavors** | sklearn, pytorch, tensorflow, onnx, custom pyfunc |
+| **No-code deployment** | MLflow models deploy without scoring scripts |
+| **Run comparison** | Azure ML Studio UI compares MLflow runs |
+
+### MLflow Tracking Example
+
+```python
+import mlflow
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, f1_score
+
+# Set tracking URI to Azure ML workspace
+mlflow.set_tracking_uri("azureml://eastus.api.azureml.ms/mlflow/v2.0/subscriptions/...")
+mlflow.set_experiment("churn-prediction")
+
+# Start a run
+with mlflow.start_run(run_name="rf-baseline"):
+    # Log parameters
+    mlflow.log_param("n_estimators", 100)
+    mlflow.log_param("max_depth", 10)
+    mlflow.log_param("dataset_version", "v2.3")
+
+    # Train model
+    model = RandomForestClassifier(n_estimators=100, max_depth=10)
+    model.fit(X_train, y_train)
+
+    # Log metrics
+    preds = model.predict(X_test)
+    mlflow.log_metric("accuracy", accuracy_score(y_test, preds))
+    mlflow.log_metric("f1_score", f1_score(y_test, preds))
+
+    # Log model to registry
+    mlflow.sklearn.log_model(
+        model,
+        artifact_path="model",
+        registered_model_name="churn-classifier",
+    )
+```
+
+### Model Registry Operations
+
+| Operation | SDK v2 | MLflow API |
+|-----------|--------|-----------|
+| **Register model** | `ml_client.models.create_or_update()` | `mlflow.register_model()` |
+| **List versions** | `ml_client.models.list(name="...")` | `client.search_model_versions()` |
+| **Get model** | `ml_client.models.get(name, version)` | `client.get_model_version()` |
+| **Update tags** | `model.tags = {...}; ml_client.models.create_or_update(model)` | `client.set_model_version_tag()` |
+| **Archive model** | `ml_client.models.archive(name, version)` | `client.transition_model_version_stage()` |
+| **Download** | `ml_client.models.download(name, version)` | `mlflow.artifacts.download_artifacts()` |
+
+### Model Lineage Tracking
+
+| Tracked Information | Source |
+|--------------------|--------|
+| **Training job** | Which pipeline/job produced the model |
+| **Dataset version** | What data was used for training |
+| **Environment** | Docker image + conda dependencies |
+| **Code snapshot** | Git commit or code snapshot |
+| **Metrics** | Accuracy, loss, custom metrics at registration time |
+| **Creator** | Who registered the model (Azure AD identity) |
+| **Deployment** | Which endpoints serve this model version |
+
+---
+
+## Q6: What Are the Azure ML Compute Options and When to Use Each?
+
+**Answer:**
+
+Azure ML offers multiple compute types optimized for different workloads — from interactive development to large-scale distributed training to cost-efficient batch scoring. Choosing the right compute impacts cost, performance, and operational complexity.
+
+```{mermaid}
+graph TD
+    subgraph Development["Development & Experimentation"]
+        CI["Compute Instance<br/>(single VM, notebooks)"]
+        SERVERLESS["Serverless Compute<br/>(on-demand, no setup)"]
+    end
+
+    subgraph Training["Training at Scale"]
+        CC["Compute Cluster<br/>(auto-scaling, multi-node)"]
+        SPARK["Serverless Spark<br/>(PySpark, large data)"]
+        ARC["Attached Compute<br/>(AKS, Arc, DSVM)"]
+    end
+
+    subgraph Inference["Inference"]
+        MOE["Managed Online<br/>Endpoint (real-time)"]
+        BE["Batch Endpoint<br/>(async scoring)"]
+        K8S["Kubernetes<br/>Online Endpoint"]
+    end
+
+    style Development fill:#6cc3d5,stroke:#333,color:#fff
+    style Training fill:#56cc9d,stroke:#333,color:#fff
+    style Inference fill:#ffce67,stroke:#333
+```
+
+### Compute Types Comparison
+
+| Compute Type | Use Case | Scaling | Cost Model | GPU Support |
+|-------------|----------|---------|-----------|-------------|
+| **Compute Instance** | Notebooks, IDE, experiments | Single VM (manual) | Pay while running | Yes |
+| **Compute Cluster** | Training jobs, hyperparameter tuning | 0 → N nodes (auto) | Pay per job (scale-to-zero) | Yes |
+| **Serverless Compute** | Quick jobs, no cluster management | Auto-provisioned | Pay per job | Yes |
+| **Serverless Spark** | Large-scale data prep, Spark jobs | Auto-provisioned | Pay per job | No |
+| **Managed Online Endpoint** | Real-time inference | Autoscale (rules-based) | Pay while provisioned | Yes |
+| **Batch Endpoint** | Bulk scoring | Cluster (scale-to-zero) | Pay per job | Yes |
+| **Kubernetes (AKS/Arc)** | Custom infra, multi-cloud, edge | K8s autoscaling | Cluster cost | Yes |
+
+### Cost Optimization Strategies
+
+| Strategy | How | Savings |
+|----------|-----|---------|
+| **Scale-to-zero** | Compute clusters with `min_instances=0` | Pay nothing when idle |
+| **Low-priority VMs** | Use spot instances for training | Up to 80% cheaper |
+| **Right-size instances** | Match VM SKU to workload needs | Avoid over-provisioning |
+| **Auto-shutdown** | Schedule compute instance stop (evenings/weekends) | ~60% savings |
+| **Serverless compute** | No cluster management, auto-provisioned | No idle cost |
+| **Batch over real-time** | Use batch endpoints for non-urgent scoring | Scale-to-zero between runs |
+| **Reserved instances** | 1-year or 3-year commitment for always-on compute | 30-60% discount |
+
+### Compute Cluster Configuration
+
+```python
+from azure.ai.ml.entities import AmlCompute
+
+# GPU training cluster with scale-to-zero
+gpu_cluster = AmlCompute(
+    name="gpu-training-cluster",
+    type="amlcompute",
+    size="Standard_NC6s_v3",       # NVIDIA V100
+    min_instances=0,                # Scale to zero when idle
+    max_instances=8,                # Max 8 nodes
+    idle_time_before_scale_down=120,  # 2 min idle → scale down
+    tier="low_priority",            # Use spot VMs for savings
+    tags={"team": "ml-training"},
+)
+ml_client.compute.begin_create_or_update(gpu_cluster).result()
+```
+
+---
+
+## Q7: How Does Azure ML Feature Store Work?
+
+**Answer:**
+
+Azure ML **managed feature store** enables teams to discover, share, and reuse ML features across projects. It solves the common problem of duplicated feature engineering logic by providing a centralized store with versioning, point-in-time lookups, and both offline (training) and online (inference) serving capabilities.
+
+```{mermaid}
+graph TD
+    subgraph Sources["Data Sources"]
+        BLOB["Azure Blob Storage"]
+        ADLS["ADLS Gen2"]
+        SQL["Azure SQL / Synapse"]
+    end
+
+    subgraph FeatureStore["Azure ML Feature Store"]
+        FSET["Feature Sets<br/>(versioned definitions)"]
+        MAT["Materialization<br/>(scheduled compute)"]
+        OFFLINE["Offline Store<br/>(historical, training)"]
+        ONLINE["Online Store<br/>(low-latency, Redis)"]
+    end
+
+    subgraph Consumers["Consumers"]
+        TRAINING["Training Pipelines<br/>(point-in-time join)"]
+        SERVING["Online Endpoints<br/>(real-time lookup)"]
+    end
+
+    Sources --> FSET
+    FSET --> MAT
+    MAT --> OFFLINE
+    MAT --> ONLINE
+    OFFLINE --> TRAINING
+    ONLINE --> SERVING
+
+    style FeatureStore fill:#6cc3d5,stroke:#333,color:#fff
+    style Consumers fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Feature Store Concepts
+
+| Concept | Description | Example |
+|---------|-------------|---------|
+| **Feature Store** | Workspace-like resource for managing features | `fs-production-features` |
+| **Feature Set** | Versioned collection of related features + transformation logic | `customer-spending-features:v2` |
+| **Entity** | Business object that features describe (join key) | `customer_id`, `product_id` |
+| **Feature** | Individual computed attribute | `avg_spend_30d`, `login_count_7d` |
+| **Materialization** | Pre-computing and storing feature values | Scheduled Spark job |
+| **Offline store** | Historical feature values for training (ADLS/Blob) | Point-in-time correct joins |
+| **Online store** | Low-latency current values for inference (Redis) | < 10ms lookup |
+
+### Feature Store vs Ad-Hoc Feature Engineering
+
+| Aspect | Ad-Hoc Feature Engineering | Feature Store |
+|--------|---------------------------|---------------|
+| **Reusability** | Copy-paste across notebooks | Discover and reuse shared features |
+| **Consistency** | Training/serving skew risk | Same definition for train & serve |
+| **Versioning** | Manual tracking | Automatic versioning |
+| **Point-in-time** | Error-prone manual joins | Built-in time-travel queries |
+| **Discovery** | Ask team members | Searchable catalog |
+| **Freshness** | Manual refresh | Scheduled materialization |
+| **Online serving** | Build custom cache | Managed Redis-backed store |
+
+### Feature Set Definition
+
+```python
+from azure.ai.ml.entities import (
+    FeatureSet,
+    FeatureSetSpecification,
+)
+
+# Define feature set with transformation logic
+customer_features = FeatureSet(
+    name="customer-transaction-features",
+    version="1",
+    description="Aggregated customer spending features",
+    entities=["azureml:customer:1"],
+    specification=FeatureSetSpecification(path="./feature_transform/"),
+    materialization_settings=MaterializationSettings(
+        offline_enabled=True,
+        online_enabled=True,
+        schedule=RecurrenceTrigger(frequency="Day", interval=1),
+    ),
+    tags={"domain": "payments", "owner": "data-eng"},
+)
+fs_client.feature_sets.begin_create_or_update(customer_features).result()
+```
+
+### Feature Retrieval for Training
+
+```python
+from azure.ai.ml.entities import FeatureStoreEntity
+from azureml.featurestore import FeatureStoreClient
+
+# Get features for training with point-in-time correctness
+training_data = fs_client.resolve_feature_retrieval(
+    feature_references=[
+        "customer-transaction-features:1:avg_spend_30d",
+        "customer-transaction-features:1:transaction_count_7d",
+        "customer-profile-features:2:account_age_days",
+    ],
+    observation_data=events_df,  # DataFrame with entity keys + timestamps
+)
+```
+
+---
+
+## Q8: How Does Azure ML Monitor Models for Data Drift and Performance Decay?
+
+**Answer:**
+
+Azure ML **model monitoring** continuously tracks deployed models for data drift, prediction drift, data quality issues, and performance degradation. It compares incoming production data against a reference baseline (training data or a recent window) and raises alerts when statistical divergence exceeds thresholds.
+
+```{mermaid}
+graph TD
+    subgraph Production["Production Traffic"]
+        INPUT["Inference Requests<br/>(feature values)"]
+        PRED["Model Predictions<br/>(outputs)"]
+        GT["Ground Truth<br/>(delayed labels)"]
+    end
+
+    subgraph Monitoring["Azure ML Model Monitoring"]
+        COLLECT["Data Collector<br/>(sample production data)"]
+        DRIFT["Data Drift<br/>(feature distribution shift)"]
+        PRED_DRIFT["Prediction Drift<br/>(output distribution shift)"]
+        QUALITY["Data Quality<br/>(nulls, type errors, outliers)"]
+        PERF["Performance<br/>(accuracy, F1 vs baseline)"]
+    end
+
+    subgraph Actions["Automated Actions"]
+        ALERT["Alert<br/>(email, Teams, PagerDuty)"]
+        RETRAIN["Trigger Retraining<br/>(pipeline)"]
+        ROLLBACK["Rollback Model<br/>(traffic shift)"]
+    end
+
+    INPUT --> COLLECT
+    PRED --> COLLECT
+    GT --> PERF
+
+    COLLECT --> DRIFT
+    COLLECT --> PRED_DRIFT
+    COLLECT --> QUALITY
+    COLLECT --> PERF
+
+    DRIFT --> ALERT
+    PERF --> RETRAIN
+    QUALITY --> ROLLBACK
+
+    style Monitoring fill:#6cc3d5,stroke:#333,color:#fff
+    style Actions fill:#ff6b6b,stroke:#333,color:#fff
+```
+
+### Monitoring Signal Types
+
+| Signal | What It Detects | Method | Baseline |
+|--------|----------------|--------|----------|
+| **Data drift** | Feature distribution shift from training | PSI, KL divergence, Wasserstein | Training dataset |
+| **Prediction drift** | Output distribution shift | Same statistical tests | Recent production window |
+| **Data quality** | Nulls, type mismatches, out-of-range values | Rule-based checks | Schema from training data |
+| **Feature attribution drift** | Change in feature importance | SHAP value comparison | Training feature importances |
+| **Performance (with labels)** | Accuracy/F1/AUC degradation | Metric comparison | Baseline performance |
+
+### Drift Detection Metrics
+
+| Metric | For | Interpretation |
+|--------|-----|---------------|
+| **Population Stability Index (PSI)** | Categorical & numerical | < 0.1 no drift, 0.1-0.25 moderate, > 0.25 significant |
+| **KL Divergence** | Probability distributions | Higher = more divergence |
+| **Wasserstein Distance** | Numerical distributions | Earth-mover distance between distributions |
+| **Jensen-Shannon Divergence** | Symmetric KL alternative | 0 = identical, 1 = maximally different |
+| **Chi-squared test** | Categorical variables | p-value < 0.05 = significant drift |
+
+### Monitoring Configuration
+
+```python
+from azure.ai.ml.entities import (
+    MonitorDefinition,
+    MonitoringTarget,
+    DataDriftSignal,
+    DataQualitySignal,
+    AlertNotification,
+)
+
+# Configure model monitor
+monitor = MonitorDefinition(
+    compute=ServerlessSparkCompute(instance_type="Standard_E4s_v3"),
+    monitoring_target=MonitoringTarget(
+        endpoint_deployment_id="azureml:churn-endpoint:blue",
+    ),
+    monitoring_signals={
+        "data_drift": DataDriftSignal(
+            reference_data=ReferenceData(
+                input_data=Input(path="azureml:training-data:1"),
+                data_context=DataContext.TRAINING,
+            ),
+            metric_thresholds=[
+                DataDriftMetricThreshold(
+                    numerical=NumericalDriftMetrics(
+                        population_stability_index=0.25
+                    )
+                )
+            ],
+        ),
+        "data_quality": DataQualitySignal(
+            metric_thresholds=[
+                DataQualityMetricThreshold(
+                    null_value_rate=0.05,
+                    out_of_bounds_rate=0.1,
+                )
+            ],
+        ),
+    },
+    alert_notification=AlertNotification(
+        emails=["ml-team@company.com"]
+    ),
+)
+ml_client.schedule.begin_create_or_update(monitor)
+```
+
+### Monitoring Best Practices
+
+| Practice | Description |
+|----------|-------------|
+| **Set meaningful thresholds** | Use PSI > 0.25 for significant drift, not overly sensitive |
+| **Monitor per-feature** | Identify which specific features are drifting |
+| **Use sliding windows** | Compare recent 7 days vs training baseline |
+| **Collect ground truth** | Enable performance monitoring with delayed labels |
+| **Automate response** | Trigger retraining pipeline when drift exceeds threshold |
+| **Monitor data quality first** | Data issues often explain drift before model issues |
+| **Sample production data** | Use data collector to capture representative sample |
+| **Dashboard visibility** | Azure ML Studio shows drift over time with drill-down |
+
+---
+
+## Q9: How Do You Set Up CI/CD for ML with Azure DevOps or GitHub Actions?
+
+**Answer:**
+
+CI/CD for ML on Azure combines **Azure DevOps Pipelines** (or GitHub Actions) with Azure ML to automate the full lifecycle: code validation → training → evaluation → model registration → deployment → monitoring. Unlike traditional CI/CD, ML pipelines must handle data dependencies, experiment tracking, model comparison, and safe rollout.
+
+```{mermaid}
+graph TD
+    subgraph CI["Continuous Integration"]
+        PUSH["Code Push<br/>(Git)"]
+        LINT["Lint & Unit Tests<br/>(pytest, flake8)"]
+        TRAIN["Submit Training<br/>Pipeline (Azure ML)"]
+        EVAL["Evaluate Model<br/>(vs champion)"]
+        REG["Register Model<br/>(if improved)"]
+    end
+
+    subgraph CD["Continuous Deployment"]
+        STAGING["Deploy to Staging<br/>(managed endpoint)"]
+        TEST["Integration Tests<br/>(endpoint health)"]
+        APPROVE["Approval Gate<br/>(manual or auto)"]
+        PROD["Deploy to Production<br/>(traffic shift)"]
+        MONITOR["Enable Monitoring<br/>(drift, performance)"]
+    end
+
+    PUSH --> LINT --> TRAIN --> EVAL --> REG
+    REG --> STAGING --> TEST --> APPROVE --> PROD --> MONITOR
+
+    style CI fill:#6cc3d5,stroke:#333,color:#fff
+    style CD fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Azure DevOps Pipeline Example
+
+```yaml
+# azure-pipelines.yml
+trigger:
+  branches:
+    include: [main]
+  paths:
+    include: [src/**, data/**, pipelines/**]
+
+variables:
+  azureml.workspace: "ws-production-ml"
+  azureml.resourceGroup: "rg-ml-prod"
+  azureml.serviceConnection: "azureml-prod-connection"
+
+stages:
+  # Stage 1: CI - Validate and Train
+  - stage: CI
+    jobs:
+      - job: Validate
+        steps:
+          - task: UsePythonVersion@0
+            inputs: { versionSpec: "3.10" }
+          - script: |
+              pip install -r requirements.txt
+              pytest tests/ --junitxml=results.xml
+              flake8 src/
+            displayName: "Lint & Unit Tests"
+
+      - job: Train
+        dependsOn: Validate
+        steps:
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: $(azureml.serviceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az ml job create \
+                  --file pipelines/training-pipeline.yml \
+                  --resource-group $(azureml.resourceGroup) \
+                  --workspace-name $(azureml.workspace) \
+                  --stream
+            displayName: "Submit Training Pipeline"
+
+  # Stage 2: CD - Deploy
+  - stage: CD
+    dependsOn: CI
+    jobs:
+      - deployment: DeployStaging
+        environment: "ml-staging"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureCLI@2
+                  inputs:
+                    azureSubscription: $(azureml.serviceConnection)
+                    scriptType: bash
+                    inlineScript: |
+                      az ml online-deployment create \
+                        --file deployments/staging.yml \
+                        --resource-group $(azureml.resourceGroup) \
+                        --workspace-name $(azureml.workspace)
+
+      - job: IntegrationTest
+        dependsOn: DeployStaging
+        steps:
+          - script: |
+              python tests/test_endpoint.py \
+                --endpoint-url $(STAGING_ENDPOINT_URL) \
+                --api-key $(STAGING_API_KEY)
+            displayName: "Test Staging Endpoint"
+
+      - deployment: DeployProduction
+        dependsOn: IntegrationTest
+        environment: "ml-production"  # Requires approval
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureCLI@2
+                  inputs:
+                    azureSubscription: $(azureml.serviceConnection)
+                    scriptType: bash
+                    inlineScript: |
+                      # Canary: route 10% traffic to new deployment
+                      az ml online-endpoint update \
+                        --name churn-endpoint \
+                        --traffic "blue=90 green=10" \
+                        --resource-group $(azureml.resourceGroup) \
+                        --workspace-name $(azureml.workspace)
+```
+
+### GitHub Actions Alternative
+
+```yaml
+# .github/workflows/mlops.yml
+name: MLOps Pipeline
+on:
+  push:
+    branches: [main]
+    paths: ["src/**", "pipelines/**"]
+
+jobs:
+  train-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Submit Training Job
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az ml job create --file pipelines/train.yml \
+              -g ${{ vars.RESOURCE_GROUP }} \
+              -w ${{ vars.WORKSPACE }} --stream
+
+      - name: Register Model (if improved)
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az ml model create --file model/registration.yml \
+              -g ${{ vars.RESOURCE_GROUP }} \
+              -w ${{ vars.WORKSPACE }}
+
+      - name: Deploy to Staging
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az ml online-deployment create \
+              --file deployments/staging.yml \
+              -g ${{ vars.RESOURCE_GROUP }} \
+              -w ${{ vars.WORKSPACE }}
+```
+
+### CI/CD Triggers for ML
+
+| Trigger | Action | When |
+|---------|--------|------|
+| **Code push (main)** | Full CI/CD pipeline | Model code or pipeline changes |
+| **Data update** | Retraining pipeline only | New data arrives in datastore |
+| **Model registered** | Deployment pipeline | New model version in registry |
+| **Drift alert** | Retraining pipeline | Monitoring detects significant drift |
+| **Schedule** | Evaluation pipeline | Weekly model performance check |
+| **Manual** | Any stage | Hotfix or ad-hoc deployment |
+
+---
+
+## Q10: How Do You Secure and Govern Azure ML Workspaces?
+
+**Answer:**
+
+Azure ML security spans network isolation, identity management, data protection, and compliance auditing. Enterprise governance ensures that ML workloads meet organizational security policies while enabling data science teams to remain productive.
+
+```{mermaid}
+graph TD
+    subgraph Network["Network Security"]
+        VNET["Virtual Network<br/>(private endpoints)"]
+        NSG["Network Security Groups<br/>(inbound/outbound rules)"]
+        PL["Private Link<br/>(no public internet)"]
+    end
+
+    subgraph Identity["Identity & Access"]
+        AAD["Microsoft Entra ID<br/>(authentication)"]
+        RBAC["Azure RBAC<br/>(role assignments)"]
+        MI["Managed Identity<br/>(system/user assigned)"]
+    end
+
+    subgraph Data["Data Protection"]
+        CMK["Customer-Managed Keys<br/>(encryption at rest)"]
+        DLP["Data Exfiltration<br/>Prevention"]
+        LABEL["Sensitivity Labels<br/>(Microsoft Purview)"]
+    end
+
+    subgraph Governance["Governance & Compliance"]
+        POLICY["Azure Policy<br/>(enforce standards)"]
+        AUDIT["Activity Logs<br/>(Azure Monitor)"]
+        RAI["Responsible AI<br/>(fairness, explainability)"]
+    end
+
+    style Network fill:#6cc3d5,stroke:#333,color:#fff
+    style Identity fill:#56cc9d,stroke:#333,color:#fff
+    style Data fill:#ffce67,stroke:#333
+    style Governance fill:#ff6b6b,stroke:#333,color:#fff
+```
+
+### Azure RBAC Roles for ML
+
+| Role | Scope | Permissions |
+|------|-------|-------------|
+| **Owner** | Workspace | Full access + assign roles |
+| **Contributor** | Workspace | Create/manage all resources, no role assignment |
+| **AzureML Data Scientist** | Workspace | Submit jobs, create endpoints, register models (no infra) |
+| **AzureML Compute Operator** | Workspace | Start/stop compute (no job submission) |
+| **Reader** | Workspace | View-only access to all assets |
+| **Custom roles** | Granular | E.g., "deploy-only" role for CD service principals |
+
+### Network Security Architecture
+
+| Component | Purpose | Configuration |
+|-----------|---------|---------------|
+| **Private Endpoint** | Private IP for workspace access | No public endpoint exposure |
+| **Managed VNet** | Outbound control from compute | Allow-list approved destinations |
+| **NSG** | Network-level firewall rules | Restrict inbound/outbound by port/IP |
+| **Azure Firewall** | Centralized egress filtering | Block unapproved external calls |
+| **Private DNS Zones** | Name resolution within VNet | `privatelink.api.azureml.ms` |
+
+### Data Protection
+
+| Mechanism | What It Protects | How |
+|-----------|-----------------|-----|
+| **Encryption at rest** | Storage, disks, registry | Azure-managed or customer-managed keys (CMK) |
+| **Encryption in transit** | API calls, data movement | TLS 1.2+ enforced |
+| **Azure Key Vault** | Secrets, certificates | Integrated with workspace, accessed via managed identity |
+| **Data exfiltration prevention** | Prevent data leaving tenant | Managed VNet outbound rules, approved destinations only |
+| **Diagnostic settings** | Audit data access | Log to Log Analytics / Storage |
+
+### Responsible AI Integration
+
+| Component | Purpose |
+|-----------|---------|
+| **Fairness assessment** | Detect bias across demographic groups |
+| **Model explainability** | SHAP/LIME explanations for predictions |
+| **Error analysis** | Identify cohorts where model underperforms |
+| **Counterfactual analysis** | What-if scenarios for individual predictions |
+| **Model cards** | Document model purpose, limitations, ethical considerations |
+| **Content safety** | Filter harmful content in generative models |
+
+### Governance Best Practices
+
+| Practice | Implementation |
+|----------|---------------|
+| **Least privilege** | Use AzureML Data Scientist role (not Contributor) for DS teams |
+| **Service principals for CI/CD** | Dedicated identity with minimal permissions for automation |
+| **Managed identity** | Avoid storing credentials; use system-assigned identity |
+| **Azure Policy** | Enforce tags, compute SKU limits, network requirements |
+| **Resource locks** | Prevent accidental deletion of production workspace |
+| **Activity logging** | Monitor who accessed what via Azure Monitor |
+| **Cost management** | Budgets + alerts per resource group, auto-shutdown |
+| **Separate workspaces** | Dev/staging/prod workspaces with different security postures |
+
+### Security Checklist for Production
+
+```
+Network:
+  ☐ Workspace behind private endpoint (no public access)
+  ☐ Compute in managed VNet with outbound rules
+  ☐ Private endpoint for associated resources (Storage, ACR, Key Vault)
+
+Identity:
+  ☐ Entra ID authentication enforced (no local auth)
+  ☐ RBAC roles assigned (least privilege)
+  ☐ Managed identity for compute and endpoints
+  ☐ Conditional Access policies applied
+
+Data:
+  ☐ Customer-managed keys for encryption
+  ☐ Data exfiltration prevention enabled
+  ☐ Diagnostic settings to Log Analytics
+  ☐ Key Vault for all secrets (no hardcoded credentials)
+
+Governance:
+  ☐ Azure Policy for compliance enforcement
+  ☐ Resource tags for cost tracking
+  ☐ Responsible AI dashboard for production models
+  ☐ Regular access reviews and audit log monitoring
+```
+
+---
+
+## Summary Table
+
+| # | Topic | Key Azure Services |
+|---|-------|-------------------|
+| 1 | **Workspace Architecture** | Azure ML Workspace, Storage, Key Vault, ACR, App Insights |
+| 2 | **ML Pipelines** | Azure ML Pipelines (command, sweep, AutoML, parallel steps) |
+| 3 | **Managed Online Endpoints** | Managed endpoints, blue/green traffic, autoscale |
+| 4 | **Batch Endpoints** | Parallel scoring, scale-to-zero, mini-batch processing |
+| 5 | **Model Registry + MLflow** | MLflow tracking, model versioning, lineage, no-code deploy |
+| 6 | **Compute Options** | Compute instances, clusters, serverless, AKS |
+| 7 | **Feature Store** | Managed feature store, offline/online serving, materialization |
+| 8 | **Model Monitoring** | Data drift, prediction drift, data quality, alerting |
+| 9 | **CI/CD for ML** | Azure DevOps Pipelines, GitHub Actions, event-driven triggers |
+| 10 | **Security & Governance** | RBAC, Private Link, CMK, Azure Policy, Responsible AI |
+
+---
+
+## What's Next?
+
+This article covered Azure-specific MLOps services. For related content:
+
+- **General MLOps concepts:** [MLOps Interview QA - 1](/posts/aiops-interview/MLOps-Interview-QA-1.html)
+- **LLMOps (LLM-specific ops):** [LLMOps Interview QA - 1](/posts/aiops-interview/LLMOps-Interview-QA-1.html)
+- **DevOps foundations:** [DevOps Interview QA - 1](/posts/aiops-interview/DevOps-Interview-QA-1.html)
+- **System design:** [System Design Interview QA - 1](/posts/system-design/System-Design-Interview-QA-1.html)
+- **Design patterns:** [Design Pattern Interview QA - 1](/posts/design-pattern/Design-Pattern-Interview-QA-1.html)

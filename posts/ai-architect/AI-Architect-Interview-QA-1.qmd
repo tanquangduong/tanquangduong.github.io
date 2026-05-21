@@ -1,0 +1,909 @@
+---
+title: "AI Architect Interview QA - 1"
+description: "10 AI software architect interview questions covering requirements cartography, system design trade-offs, architecture patterns, tech stack selection, cost-latency-quality triangle, security and compliance, scalability under concurrency, risk management, roadmap strategy, and development lifecycle phases."
+image: /images/ai-architect/thumb_ai_architect_interview_qa_300.png
+date: "2026-05-21"
+keywords:
+  - "AI architect interview"
+  - "AI system design"
+  - "architecture trade-offs"
+  - "tech stack selection"
+  - "cost optimization AI"
+  - "latency optimization"
+  - "scalability AI systems"
+  - "security AI architecture"
+  - "AI roadmap strategy"
+  - "requirements cartography"
+  - "risk management AI"
+  - "concurrency AI systems"
+---
+
+## Introduction
+
+This is **Part 1** of our AI Architect Interview QA series, focused on the **strategic and operational skills** expected of an AI software architect — not just technical depth, but the ability to understand business needs, map system landscapes, make architecture trade-offs, manage risk, control costs, ensure quality, and drive delivery across development phases.
+
+An AI architect bridges business stakeholders, data scientists, ML engineers, platform teams, and security — making decisions that shape systems for years. These questions test that breadth.
+
+> For related technical content, see [System Design Interview QA - 1](/posts/system-design/System-Design-Interview-QA-1.html), [MLOps Interview QA - 1](/posts/aiops-interview/MLOps-Interview-QA-1.html), and [Design Pattern Interview QA - 1](/posts/design-pattern/Design-Pattern-Interview-QA-1.html).
+
+---
+
+## Q1: How Do You Approach Requirements Cartography for an AI System?
+
+**Answer:**
+
+**Requirements cartography** is the process of mapping the full landscape of needs, constraints, and stakeholders before any design begins. Unlike simple requirements gathering, cartography produces a structured view of the problem space — surfacing hidden dependencies, conflicting priorities, and non-functional requirements that dominate architecture decisions.
+
+```{mermaid}
+graph TD
+    subgraph Discovery["Requirements Cartography"]
+        STAKEHOLDERS["Stakeholder Mapping<br/>(who needs what)"]
+        BUSINESS["Business Objectives<br/>(OKRs, KPIs, value)"]
+        FUNCTIONAL["Functional Requirements<br/>(what the system does)"]
+        NFR["Non-Functional Requirements<br/>(how it performs)"]
+        CONSTRAINTS["Constraints<br/>(budget, timeline, compliance)"]
+        DEPENDENCIES["Dependencies<br/>(data, teams, systems)"]
+    end
+
+    subgraph Outputs["Cartography Outputs"]
+        CONTEXT["Context Diagram<br/>(system boundaries)"]
+        QUALITY["Quality Attribute Scenarios<br/>(measurable NFRs)"]
+        RISK_MAP["Risk Register<br/>(identified unknowns)"]
+        TRADEOFF["Trade-off Matrix<br/>(conflicting priorities)"]
+    end
+
+    Discovery --> Outputs
+
+    style Discovery fill:#6cc3d5,stroke:#333,color:#fff
+    style Outputs fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### AI-Specific Requirements Dimensions
+
+| Dimension | Questions to Ask | Why It Matters |
+|-----------|-----------------|----------------|
+| **Data availability** | What data exists? Quality? Volume? Freshness? Access rights? | Models are only as good as training data |
+| **Latency tolerance** | Real-time (<100ms)? Near-real-time (<5s)? Batch (minutes/hours)? | Drives inference architecture completely |
+| **Accuracy requirements** | What's acceptable error rate? False positive vs false negative cost? | Determines model complexity and validation |
+| **Explainability** | Must decisions be interpretable? Regulatory or trust reasons? | May rule out black-box models |
+| **Volume & throughput** | Requests/sec at peak? Data volume for training? | Sizing, scaling strategy |
+| **Compliance** | GDPR, HIPAA, SOC2? Data residency? Audit trail? | Constrains cloud choices, data flows |
+| **Budget** | CapEx vs OpEx? GPU budget? Ongoing inference cost? | Bounds tech stack and model size |
+| **Team capability** | Existing skills? Hiring timeline? | Determines build vs buy vs adapt |
+| **Time-to-market** | MVP in weeks? Full system in months? | Phased delivery strategy |
+| **Evolution** | How will requirements change? Multi-model future? | Extensibility of architecture |
+
+### Requirements Cartography Framework
+
+```
+1. STAKEHOLDER MAP
+   ├── Business sponsors (value, ROI, timeline)
+   ├── End users (UX, latency, accuracy)
+   ├── Data scientists (experimentation freedom, tooling)
+   ├── ML engineers (deployment, monitoring, ops)
+   ├── Platform/infra team (cost, security, compliance)
+   ├── Security & compliance (data handling, audit)
+   └── Support/operations (observability, incident response)
+
+2. QUALITY ATTRIBUTE SCENARIOS (measurable NFRs)
+   Format: [Source] [Stimulus] → [Response] [Measure]
+   Example: "Under 1000 concurrent users, the recommendation
+             API responds within 200ms at p99"
+
+3. CONSTRAINT REGISTER
+   ├── Must use existing Kubernetes cluster
+   ├── Budget: $50K/month cloud spend cap
+   ├── Timeline: MVP in 8 weeks
+   ├── Data: Cannot leave EU (GDPR)
+   └── Team: 2 ML engineers, 3 backend engineers
+
+4. DEPENDENCY MAP
+   ├── Upstream: Customer data lake (daily refresh)
+   ├── Upstream: Real-time event stream (Kafka)
+   ├── Downstream: Mobile app (REST API consumer)
+   ├── Downstream: Analytics dashboard (Looker)
+   └── Shared: Auth service, API gateway
+```
+
+### Common Mistakes in AI Requirements
+
+| Mistake | Consequence | Prevention |
+|---------|-------------|------------|
+| Skipping NFR definition | System works in demo, fails at scale | Explicit quality attribute scenarios |
+| Assuming data quality | Model underperforms in production | Data profiling + validation early |
+| Ignoring feedback loops | Model predictions influence future data | Map causal effects explicitly |
+| No cost ceiling | GPU bills spiral out of control | Budget as a first-class constraint |
+| Single-point accuracy target | "95% accuracy" without context | Define per-class metrics, edge cases |
+
+---
+
+## Q2: How Do You Design the Architecture of an AI/ML System?
+
+**Answer:**
+
+AI system architecture follows a **layered approach** where each layer has distinct concerns — data ingestion, feature engineering, model training, serving, monitoring, and orchestration. The architect must decide boundaries, communication patterns, and the degree of coupling between ML and application logic.
+
+```{mermaid}
+graph TD
+    subgraph DataLayer["Data Layer"]
+        SOURCES["Data Sources<br/>(DBs, APIs, streams, lakes)"]
+        INGEST["Ingestion<br/>(batch + streaming)"]
+        STORE["Feature Store<br/>(online + offline)"]
+    end
+
+    subgraph MLLayer["ML Layer"]
+        TRAIN["Training Pipeline<br/>(experimentation → production)"]
+        REGISTRY["Model Registry<br/>(versioning, metadata)"]
+        EVAL["Evaluation<br/>(offline metrics, A/B tests)"]
+    end
+
+    subgraph ServingLayer["Serving Layer"]
+        INFERENCE["Inference Service<br/>(real-time / batch / streaming)"]
+        GATEWAY["API Gateway<br/>(routing, rate limiting)"]
+        CACHE_S["Prediction Cache<br/>(repeated queries)"]
+    end
+
+    subgraph ObsLayer["Observability Layer"]
+        METRICS["Metrics<br/>(latency, throughput, errors)"]
+        DRIFT["Drift Detection<br/>(data + model quality)"]
+        ALERTS["Alerting + Automation<br/>(retrain triggers)"]
+    end
+
+    subgraph OrcLayer["Orchestration Layer"]
+        PIPELINE["Pipeline Orchestrator<br/>(Airflow, Kubeflow, SageMaker)"]
+        CICD["CI/CD<br/>(model + app deployment)"]
+        IaC["Infrastructure as Code<br/>(Terraform, Pulumi)"]
+    end
+
+    SOURCES --> INGEST --> STORE
+    STORE --> TRAIN --> REGISTRY --> INFERENCE
+    INFERENCE --> GATEWAY
+    INFERENCE --> DRIFT
+    PIPELINE --> TRAIN
+    CICD --> INFERENCE
+
+    style DataLayer fill:#6cc3d5,stroke:#333,color:#fff
+    style MLLayer fill:#56cc9d,stroke:#333,color:#fff
+    style ServingLayer fill:#ffce67,stroke:#333
+    style ObsLayer fill:#ff6b6b,stroke:#333,color:#fff
+    style OrcLayer fill:#c3aed6,stroke:#333
+```
+
+### Architecture Patterns for AI Systems
+
+| Pattern | When to Use | Trade-offs |
+|---------|-------------|-----------|
+| **Monolithic ML** | Single model, simple pipeline, small team | Fast to build; hard to scale independently |
+| **Microservice per model** | Multiple models, independent scaling, separate teams | Operational complexity; network overhead |
+| **Event-driven ML** | Streaming predictions, real-time features | Complex debugging; eventual consistency |
+| **Lambda architecture** | Need both batch accuracy and real-time speed | Dual pipeline maintenance |
+| **Feature platform** | Multiple models share features, team scale | Upfront investment; governance overhead |
+| **Gateway + routing** | A/B testing, canary, multi-model serving | Added latency; routing logic |
+| **Sidecar pattern** | ML at the edge, embedded inference | Model size limits; update complexity |
+| **RAG architecture** | LLM + domain knowledge, dynamic content | Retrieval quality; context window limits |
+
+### Key Architecture Decisions
+
+| Decision | Options | Selection Criteria |
+|----------|---------|-------------------|
+| **Sync vs Async inference** | REST API / gRPC vs Message queue / Batch | Latency requirement, throughput pattern |
+| **Model co-location** | Embedded in app vs Separate service | Deployment independence, resource isolation |
+| **Feature computation** | Pre-computed (store) vs On-the-fly (runtime) | Freshness requirement, computation cost |
+| **Training location** | Cloud managed vs Self-hosted K8s | GPU cost, compliance, team skills |
+| **State management** | Stateless inference vs Stateful sessions | Conversation memory, personalization |
+| **Multi-model orchestration** | Pipeline (serial) vs Ensemble (parallel) vs Cascade | Latency budget, accuracy need |
+| **Data flow** | Push (producer-driven) vs Pull (consumer-driven) | Freshness, coupling, backpressure |
+
+### Architecture Documentation (C4 Model Approach)
+
+| Level | Shows | Audience |
+|-------|-------|----------|
+| **Context** (L1) | System + external actors + neighboring systems | Business stakeholders |
+| **Container** (L2) | Major deployable units (services, DBs, queues) | Tech leads, architects |
+| **Component** (L3) | Internal structure of a container (modules, classes) | Development team |
+| **Code** (L4) | Implementation details (only for critical paths) | Individual developers |
+
+---
+
+## Q3: How Do You Evaluate and Select a Tech Stack for AI/ML Systems?
+
+**Answer:**
+
+Tech stack selection for AI systems is a high-stakes decision with long-lived consequences. The architect must evaluate options against requirements while managing trade-offs between maturity, cost, team skills, vendor lock-in, and ecosystem integration.
+
+```{mermaid}
+graph TD
+    subgraph Criteria["Selection Criteria"]
+        REQ["Requirements Fit<br/>(functional + NFR)"]
+        TEAM["Team Skills<br/>(current + hirable)"]
+        COST_C["Total Cost of Ownership<br/>(build + run + maintain)"]
+        MATURITY["Maturity & Support<br/>(community, docs, enterprise)"]
+        LOCKIN["Vendor Lock-in Risk<br/>(portability, exit cost)"]
+        ECOSYSTEM["Ecosystem Integration<br/>(existing infra, tools)"]
+    end
+
+    subgraph Decision["Decision Framework"]
+        WEIGHT["Weight criteria<br/>per project context"]
+        COMPARE["Compare options<br/>(scored matrix)"]
+        PROTOTYPE["Prototype critical path<br/>(validate assumptions)"]
+        DOC["Document decision<br/>(ADR - Architecture Decision Record)"]
+    end
+
+    Criteria --> Decision
+
+    style Criteria fill:#6cc3d5,stroke:#333,color:#fff
+    style Decision fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### AI Tech Stack Layers
+
+| Layer | Options | Decision Drivers |
+|-------|---------|-----------------|
+| **Cloud platform** | AWS, GCP, Azure, multi-cloud, on-prem | Existing contracts, compliance, GPU availability, team skills |
+| **Orchestration** | Airflow, Kubeflow, SageMaker Pipelines, Vertex AI | K8s expertise, cloud lock-in tolerance, pipeline complexity |
+| **Training** | SageMaker, Vertex AI, Azure ML, self-managed K8s + Ray | GPU cost, distributed training needs, experiment scale |
+| **Serving** | SageMaker Endpoints, KServe, Seldon, BentoML, vLLM | Latency, multi-model, auto-scaling, model size |
+| **Feature store** | Feast, Tecton, SageMaker FS, Vertex AI FS | Online/offline needs, team size, freshness |
+| **Experiment tracking** | MLflow, W&B, Neptune, SageMaker Experiments | Collaboration needs, cost, self-hosted vs SaaS |
+| **Data platform** | Databricks, Snowflake, BigQuery, Redshift | Data volume, SQL/Spark preference, existing investment |
+| **Model format** | ONNX, TorchScript, SavedModel, GGUF | Framework diversity, edge deployment, optimization |
+| **Monitoring** | Evidently, WhyLabs, SageMaker Monitor, custom | Drift types, alerting integration, cost |
+| **LLM infra** | OpenAI API, Anthropic, self-hosted (vLLM, TGI) | Data privacy, latency, cost, fine-tuning needs |
+
+### Evaluation Matrix Template
+
+| Criterion (weight) | Option A: Managed | Option B: Open-source K8s | Option C: Hybrid |
+|--------------------|-------------------|--------------------------|-----------------|
+| **Requirements fit** (25%) | 9/10 | 8/10 | 9/10 |
+| **Team skills** (20%) | 8/10 (lower learning curve) | 5/10 (K8s expertise needed) | 7/10 |
+| **TCO (3-year)** (20%) | 6/10 (higher at scale) | 8/10 (lower unit cost) | 7/10 |
+| **Lock-in risk** (15%) | 4/10 (high lock-in) | 9/10 (portable) | 7/10 |
+| **Maturity** (10%) | 9/10 (enterprise support) | 7/10 (community) | 8/10 |
+| **Ecosystem** (10%) | 8/10 (cloud-native) | 7/10 (integration effort) | 8/10 |
+| **Weighted score** | **7.35** | **7.25** | **7.75** |
+
+### Architecture Decision Record (ADR) Template
+
+```markdown
+# ADR-003: Model Serving Infrastructure
+
+## Status: Accepted (2026-05-21)
+
+## Context
+We need to serve 5 ML models (recommendation, fraud, pricing, 
+search ranking, personalization) with p99 latency < 200ms at 
+10K requests/sec peak. Team has Kubernetes expertise but limited 
+cloud-managed ML experience.
+
+## Decision
+Use KServe on existing EKS cluster with Istio service mesh.
+
+## Rationale
+- Leverages existing K8s expertise and infrastructure
+- Supports multiple frameworks (sklearn, PyTorch, TensorFlow)
+- Provides canary deployments and traffic splitting natively
+- No vendor lock-in (runs on any K8s)
+- Scale-to-zero for low-traffic models reduces cost
+
+## Consequences
+- Team needs to learn KServe CRDs and InferenceService API
+- Must manage GPU node pools ourselves (auto-scaling config)
+- Need to build custom monitoring dashboard (Prometheus + Grafana)
+- Upgrade path: can migrate to managed service later if needed
+
+## Alternatives Considered
+- SageMaker Endpoints: Higher cost at scale, AWS lock-in
+- BentoML Cloud: Less mature, limited auto-scaling options
+- Seldon Core: More complex for our use case (inference graphs not needed)
+```
+
+### Build vs Buy vs Adapt Decision Framework
+
+| Factor | Build Custom | Buy Managed | Adapt Open-Source |
+|--------|-------------|-------------|-------------------|
+| **Time-to-market** | Slowest | Fastest | Medium |
+| **Long-term cost** | Lowest (at scale) | Highest (at scale) | Medium |
+| **Team investment** | High (build + maintain) | Low (vendor manages) | Medium (customize + ops) |
+| **Differentiation** | Maximum (custom to needs) | Limited (shared features) | High (customizable) |
+| **Risk** | Delivery risk (build wrong thing) | Vendor risk (lock-in, shutdown) | Community risk (abandonment) |
+| **Best when** | Core competitive advantage | Commodity capability | Common need + specific customization |
+
+---
+
+## Q4: How Do You Manage the Cost-Latency-Quality Triangle in AI Systems?
+
+**Answer:**
+
+Every AI system faces a fundamental **three-way trade-off** between cost, latency, and quality. Improving any one dimension typically worsens at least one other. The architect's job is to find the optimal balance point for the specific business context and make trade-offs explicit.
+
+```{mermaid}
+graph TD
+    subgraph Triangle["Cost-Latency-Quality Triangle"]
+        COST["COST<br/>(compute, storage, API calls)"]
+        LATENCY["LATENCY<br/>(response time, throughput)"]
+        QUALITY["QUALITY<br/>(accuracy, reliability, UX)"]
+    end
+
+    COST ---|"Cheaper models → lower quality"| QUALITY
+    COST ---|"Fewer resources → higher latency"| LATENCY
+    LATENCY ---|"Faster → simpler model → lower quality"| QUALITY
+
+    style Triangle fill:#f8f9fa,stroke:#333
+    style COST fill:#ff6b6b,stroke:#333,color:#fff
+    style LATENCY fill:#ffce67,stroke:#333
+    style QUALITY fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Trade-off Scenarios
+
+| Scenario | Cost ↓ | Latency ↓ | Quality ↑ | Technique |
+|----------|--------|-----------|-----------|-----------|
+| Use smaller model | ✅ | ✅ | ❌ | Distillation, quantization |
+| Add caching layer | ✅ | ✅ | — | Redis/CDN for repeated queries |
+| Batch predictions | ✅ | ❌ | — | Pre-compute during off-peak |
+| Cascade (cheap → expensive) | ✅ | — | ✅ | Route hard cases to better model |
+| Scale horizontally | ❌ | ✅ | — | More replicas, load balancing |
+| Use larger model | ❌ | ❌ | ✅ | GPT-4 instead of GPT-3.5 |
+| Feature enrichment | ❌ | ❌ | ✅ | More signals → better predictions |
+| A/B test + rollback | — | — | ✅ | Validate quality before full deploy |
+| Spot/preemptible for training | ✅ | ❌ (training time) | — | Checkpointing + retry |
+| Edge inference | ✅ (no cloud) | ✅ (local) | ❌ (model size limit) | ONNX, TFLite on device |
+
+### Cost Optimization Strategies
+
+| Strategy | Savings Potential | Applicability |
+|----------|-------------------|---------------|
+| **Right-size inference instances** | 30-60% | Over-provisioned endpoints |
+| **Auto-scale to zero** | 80-90% for low-traffic | Dev/staging + off-peak models |
+| **Spot instances for training** | 60-90% | Fault-tolerant training jobs |
+| **Model quantization (INT8/FP16)** | 50-75% inference cost | Latency-tolerant applications |
+| **Prediction caching** | 40-80% API call savings | Repeated/similar queries |
+| **Cascade routing** | 40-60% | Mixed complexity requests |
+| **Batch inference** | 70-90% vs real-time | Non-urgent scoring |
+| **Reserved capacity / Savings Plans** | 30-60% | Steady-state workloads |
+| **Smaller models (distillation)** | 50-80% | Where accuracy drop acceptable |
+| **Multi-tenant endpoints** | 40-70% | Many low-traffic models |
+
+### Latency Budget Breakdown
+
+```
+Total latency budget: 200ms (p99 target)
+├── Network (client → gateway): 20ms
+├── API gateway + auth: 10ms
+├── Feature retrieval (online store): 15ms
+├── Model inference: 80ms
+├── Post-processing + business logic: 15ms
+├── Response serialization: 5ms
+├── Network (gateway → client): 20ms
+└── Buffer for variance: 35ms
+```
+
+### Quality Assurance Layers
+
+| Layer | What It Validates | When |
+|-------|-------------------|------|
+| **Offline evaluation** | Accuracy, F1, AUC on held-out data | Before deployment |
+| **Shadow testing** | Compare new model vs production (no user impact) | Pre-production |
+| **Canary deployment** | Small traffic %, monitor metrics | Gradual rollout |
+| **A/B testing** | Statistical comparison of business metrics | Production |
+| **Online monitoring** | Drift, latency, error rate, prediction distribution | Continuous |
+| **User feedback** | Explicit ratings, implicit engagement signals | Ongoing |
+
+---
+
+## Q5: How Do You Ensure Security and Compliance in AI Architecture?
+
+**Answer:**
+
+AI systems introduce unique security challenges — adversarial attacks on models, data poisoning, prompt injection, PII leakage, and model theft. The architect must address security at every layer while meeting regulatory requirements (GDPR, HIPAA, SOC2, EU AI Act).
+
+```{mermaid}
+graph TD
+    subgraph Threats["AI-Specific Threats"]
+        ADV["Adversarial Attacks<br/>(input manipulation)"]
+        POISON["Data Poisoning<br/>(corrupted training data)"]
+        EXTRACT["Model Extraction<br/>(stealing model via API)"]
+        INJECTION["Prompt Injection<br/>(LLM manipulation)"]
+        LEAKAGE["Data Leakage<br/>(PII in outputs/logs)"]
+        SUPPLY["Supply Chain<br/>(malicious packages/models)"]
+    end
+
+    subgraph Defenses["Defense Layers"]
+        NETWORK["Network Security<br/>(VPC, private endpoints)"]
+        DATA_SEC["Data Security<br/>(encryption, access control)"]
+        MODEL_SEC["Model Security<br/>(signing, validation)"]
+        RUNTIME["Runtime Protection<br/>(input validation, guardrails)"]
+        AUDIT["Audit & Governance<br/>(logging, compliance)"]
+        RESPONSIBLE["Responsible AI<br/>(bias, fairness, transparency)"]
+    end
+
+    Threats --> Defenses
+
+    style Threats fill:#ff6b6b,stroke:#333,color:#fff
+    style Defenses fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Security Architecture Checklist
+
+| Layer | Control | Implementation |
+|-------|---------|----------------|
+| **Network** | Isolation | VPC, private subnets, VPC endpoints, no public access |
+| **Network** | Encryption in transit | TLS 1.3 everywhere, mutual TLS for service-to-service |
+| **Data** | Encryption at rest | KMS/CMK for all storage (S3, DB, volumes) |
+| **Data** | Access control | Least privilege IAM, row-level security, column masking |
+| **Data** | PII handling | Tokenization, differential privacy, data minimization |
+| **Model** | Integrity | Model signing, hash verification, immutable registry |
+| **Model** | Access** | API keys + rate limiting + IP allowlisting |
+| **Inference** | Input validation | Schema validation, content filtering, size limits |
+| **Inference** | Output filtering | PII scrubbing, guardrails, response validation |
+| **LLM** | Prompt injection defense | System prompts, input/output guards, sandboxing |
+| **Supply chain** | Dependency scanning | Signed containers, vulnerability scanning, SBOM |
+| **Governance** | Audit trail | All API calls logged, model lineage tracked |
+| **Compliance** | Data residency | Region-locked processing, data classification |
+
+### Regulatory Compliance Matrix
+
+| Regulation | Key Requirements for AI | Architect Response |
+|-----------|------------------------|-------------------|
+| **GDPR** | Right to explanation, data minimization, consent | Interpretable models, data retention policies, audit logs |
+| **EU AI Act** | Risk classification, transparency, human oversight | Risk assessment, model cards, human-in-the-loop for high-risk |
+| **HIPAA** | PHI protection, access logs, BAA | Encryption, access control, audit trail, compliant hosting |
+| **SOC 2** | Security, availability, confidentiality controls | Documented policies, automated controls, annual audit |
+| **CCPA** | Data deletion, opt-out of automated decisions | Data lineage, model unlearning capability |
+| **FDA (SaMD)** | Clinical validation, change control | Locked models, validation studies, version control |
+
+### Zero-Trust Architecture for AI
+
+```
+Principle: Never trust, always verify
+
+1. Identity: Every service has a workload identity (no shared credentials)
+2. Network: Service mesh (Istio/Linkerd) with mTLS between all services
+3. Data: Encrypted at rest AND in transit, even within private network
+4. Access: Just-in-time access to training data, not standing permissions
+5. Inference: Validate every input (schema + content + rate + origin)
+6. Models: Signed artifacts, verified at deployment, immutable in production
+7. Observability: Log all access decisions, model inputs/outputs (redacted)
+8. Supply chain: Signed containers, scanned dependencies, private registry
+```
+
+---
+
+## Q6: How Do You Architect AI Systems for Scalability and Concurrency?
+
+**Answer:**
+
+AI systems face unique scaling challenges: GPU-bound inference, large model loading times, stateful sessions (conversational AI), and variable compute costs per request. The architect must design for elastic scaling across multiple dimensions simultaneously.
+
+```{mermaid}
+graph TD
+    subgraph Scaling["Scaling Dimensions"]
+        HSCALE["Horizontal<br/>(more replicas)"]
+        VSCALE["Vertical<br/>(bigger instances)"]
+        FUNC["Functional<br/>(decompose by model)"]
+        DATA_S["Data<br/>(partition by entity)"]
+    end
+
+    subgraph Patterns["Scaling Patterns"]
+        ASYNC["Async Processing<br/>(queue-based decoupling)"]
+        CACHE_P["Caching<br/>(reduce recomputation)"]
+        BATCH_P["Batching<br/>(GPU efficiency)"]
+        SHARD["Sharding<br/>(partition load)"]
+        CIRCUIT["Circuit Breaker<br/>(graceful degradation)"]
+    end
+
+    subgraph Infra["Infrastructure"]
+        K8S_I["Kubernetes<br/>(pod autoscaling)"]
+        GPU_I["GPU Pools<br/>(heterogeneous nodes)"]
+        LB_I["Load Balancer<br/>(intelligent routing)"]
+        CDN_I["CDN / Edge<br/>(reduce round-trips)"]
+    end
+
+    Scaling --> Patterns --> Infra
+
+    style Scaling fill:#6cc3d5,stroke:#333,color:#fff
+    style Patterns fill:#56cc9d,stroke:#333,color:#fff
+    style Infra fill:#ffce67,stroke:#333
+```
+
+### Scaling Strategy by Load Type
+
+| Load Pattern | Challenge | Architecture Response |
+|-------------|-----------|---------------------|
+| **Steady high throughput** | Cost efficiency at scale | Right-sized reserved instances, model optimization |
+| **Spiky / bursty** | Cold start latency on scale-up | Warm pools, pre-scaled buffer, predictive scaling |
+| **Diurnal (day/night)** | Paying for idle capacity | Scheduled scaling, scale-to-zero off-peak |
+| **Event-driven surges** | Unpredictable 10-100x spikes | Queue-based decoupling, serverless overflow |
+| **Gradual growth** | Architecture ceiling hit | Horizontal partitioning, data sharding |
+| **Multi-tenant** | Noisy neighbor, fair sharing | Resource quotas, priority queues, tenant isolation |
+
+### GPU-Aware Scaling
+
+| Strategy | Description | When to Use |
+|----------|-------------|-------------|
+| **Dynamic batching** | Collect requests and batch GPU inference | High-throughput serving |
+| **Model parallelism** | Split large model across multiple GPUs | LLMs (70B+ params) |
+| **Multi-model serving** | Load multiple small models on one GPU | Many low-traffic models |
+| **GPU sharing (MIG/MPS)** | Partition GPU across workloads | Mixed-size models |
+| **CPU offloading** | Pre/post-processing on CPU, GPU for inference only | Minimize GPU time |
+| **Speculative decoding** | Draft + verify for faster LLM generation | LLM latency reduction |
+
+### Concurrency Patterns for AI
+
+```python
+# Pattern: Queue-based decoupling for variable-cost inference
+# Handles bursts without overwhelming GPU resources
+
+"""
+Producer (API) → Message Queue → Consumer (GPU Workers)
+     ↓                              ↓
+  Immediate ACK              Process at GPU capacity
+  (202 Accepted)             Auto-scale workers on queue depth
+     ↓                              ↓
+  Client polls /             Write result to cache/DB
+  or webhook callback
+"""
+
+# Auto-scaling triggers:
+# 1. Queue depth > 100 → scale up workers
+# 2. Average GPU utilization < 30% → scale down
+# 3. Request latency p99 > SLA → scale up
+# 4. Time-based: pre-scale before known peak hours
+```
+
+### Capacity Planning Formula
+
+| Metric | Formula | Example |
+|--------|---------|---------|
+| **Min replicas** | Peak RPS ÷ Throughput per replica × Safety factor | 1000 RPS ÷ 200/replica × 1.5 = 8 |
+| **GPU memory** | Model size + Batch size × Input size + Overhead | 7GB + 32 × 0.1GB + 2GB = 12.2GB |
+| **Queue depth target** | Acceptable latency × Consumer throughput | 5s × 200/s = 1000 messages |
+| **Storage growth** | Daily data × Retention × Replication | 10GB/day × 90 × 3 = 2.7TB |
+
+---
+
+## Q7: How Do You Manage Risk in AI System Architecture?
+
+**Answer:**
+
+AI projects carry unique risks beyond standard software: model performance degradation, data dependency fragility, regulatory uncertainty, and the gap between offline accuracy and real-world value. The architect manages risk through identification, quantification, mitigation, and continuous monitoring.
+
+```{mermaid}
+graph TD
+    subgraph RiskCategories["Risk Categories"]
+        TECHNICAL["Technical Risk<br/>(model fails, system breaks)"]
+        DATA_R["Data Risk<br/>(quality, availability, drift)"]
+        BUSINESS["Business Risk<br/>(no value delivered)"]
+        OPERATIONAL["Operational Risk<br/>(outage, incidents)"]
+        COMPLIANCE_R["Compliance Risk<br/>(regulatory violations)"]
+        VENDOR_R["Vendor Risk<br/>(lock-in, shutdown, cost hike)"]
+    end
+
+    subgraph Mitigation["Mitigation Strategies"]
+        FALLBACK["Fallback Systems<br/>(graceful degradation)"]
+        MONITORING_R["Active Monitoring<br/>(detect before impact)"]
+        CONTRACTS["Contracts & SLAs<br/>(vendor accountability)"]
+        PHASED["Phased Delivery<br/>(validate before scale)"]
+        INSURANCE["Insurance Patterns<br/>(redundancy, backups)"]
+    end
+
+    RiskCategories --> Mitigation
+
+    style RiskCategories fill:#ff6b6b,stroke:#333,color:#fff
+    style Mitigation fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### AI Risk Register Template
+
+| Risk | Probability | Impact | Score | Mitigation | Owner |
+|------|-------------|--------|-------|-----------|-------|
+| Model accuracy below threshold | Medium | High | **High** | Phased rollout + A/B testing + rollback plan | ML Lead |
+| Training data pipeline fails | Low | Critical | **High** | Redundant sources + data validation + alerting | Data Eng |
+| GPU costs exceed budget 2x | Medium | Medium | **Medium** | Auto-scaling limits + spot instances + cost alerts | Architect |
+| Key vendor discontinues service | Low | High | **Medium** | Abstraction layer + multi-vendor capable | Architect |
+| Data drift degrades model silently | High | High | **Critical** | Model monitoring + automated retraining triggers | MLOps |
+| Regulatory change (EU AI Act) | Medium | High | **High** | Build for interpretability + model cards + audit trail | Legal + Arch |
+| Single point of failure in serving | Low | Critical | **High** | Multi-AZ + circuit breaker + fallback model | Platform |
+| Team member leaves (bus factor) | Medium | Medium | **Medium** | Documentation + pair programming + cross-training | Manager |
+
+### Graceful Degradation Strategy
+
+| Layer | Full Service | Degraded Service | Fallback |
+|-------|-------------|------------------|----------|
+| **ML model** | Latest v3 model (best accuracy) | Previous v2 model (stable) | Rule-based heuristics |
+| **Feature store** | Real-time features | Cached features (1hr old) | Default feature values |
+| **LLM API** | GPT-4 (best quality) | GPT-3.5 (faster, cheaper) | Template responses |
+| **Recommendations** | Personalized (ML model) | Popular items (pre-computed) | Editorial curated list |
+| **Search ranking** | ML-ranked results | TF-IDF / BM25 fallback | Alphabetical / recency |
+| **Fraud detection** | Real-time ML scoring | Rule-based thresholds | Block > $10K transactions |
+
+### Risk Mitigation Patterns
+
+| Pattern | Description | Use Case |
+|---------|-------------|----------|
+| **Circuit breaker** | Stop calling failing service, use fallback | Model service overloaded |
+| **Canary deployment** | Route 5% traffic to new model, monitor | Model release risk |
+| **Shadow mode** | Run new model in parallel, don't serve results | Validate before production |
+| **Feature flags** | Toggle ML features on/off without deploy | Quick disable if issues |
+| **Chaos engineering** | Intentionally break things to find weaknesses | Pre-production resilience testing |
+| **Data contracts** | Formal schema + quality SLA with data producers | Prevent upstream data breaks |
+| **Model rollback** | Automatic revert to previous version | Monitoring-triggered |
+
+---
+
+## Q8: How Do You Build an AI Development Roadmap and Phased Strategy?
+
+**Answer:**
+
+AI projects have high uncertainty — models may not work, data may not exist, and value is hard to predict before deployment. The architect designs a **phased roadmap** that validates assumptions incrementally, demonstrates value early, and avoids big-bang deployments.
+
+```{mermaid}
+graph LR
+    subgraph Phases["Development Phases"]
+        P0["Phase 0: Discovery<br/>(2-4 weeks)"]
+        P1["Phase 1: Proof of Concept<br/>(4-6 weeks)"]
+        P2["Phase 2: MVP<br/>(6-12 weeks)"]
+        P3["Phase 3: Production<br/>(8-16 weeks)"]
+        P4["Phase 4: Scale & Optimize<br/>(ongoing)"]
+    end
+
+    P0 --> P1 --> P2 --> P3 --> P4
+
+    style Phases fill:#f8f9fa,stroke:#333
+    style P0 fill:#c3aed6,stroke:#333
+    style P1 fill:#6cc3d5,stroke:#333,color:#fff
+    style P2 fill:#56cc9d,stroke:#333,color:#fff
+    style P3 fill:#ffce67,stroke:#333
+    style P4 fill:#ff6b6b,stroke:#333,color:#fff
+```
+
+### Phase Breakdown
+
+| Phase | Goal | Deliverables | Go/No-Go Criteria |
+|-------|------|-------------|-------------------|
+| **0: Discovery** | Understand problem, validate feasibility | Requirements cartography, data audit, risk assessment | Data exists + problem is learnable + business case clear |
+| **1: PoC** | Prove model can solve the problem | Notebook + baseline metrics on sample data | Accuracy exceeds heuristic baseline by meaningful margin |
+| **2: MVP** | Deliver working system to limited users | Deployed model + basic API + monitoring | End-to-end works, users get value, latency acceptable |
+| **3: Production** | Reliable, scalable, monitored system | Full pipeline + CI/CD + monitoring + security | Meets SLA, handles peak load, passes security review |
+| **4: Scale** | Optimize cost, add features, expand coverage | A/B testing, multi-model, advanced monitoring | ROI positive, continuous improvement loop running |
+
+### Phase Details
+
+```
+PHASE 0: DISCOVERY (2-4 weeks)
+├── Stakeholder interviews → requirements cartography
+├── Data audit (exists? accessible? quality? volume?)
+├── Literature review (SOTA, similar solutions)
+├── Feasibility assessment (is ML the right tool?)
+├── Success criteria definition (what "good" looks like)
+├── Risk identification + initial mitigation plan
+└── Decision: GO / PIVOT / STOP
+
+PHASE 1: PROOF OF CONCEPT (4-6 weeks)
+├── Data exploration + preprocessing prototype
+├── Baseline model (simple, interpretable)
+├── Evaluation on representative sample
+├── Benchmark against heuristic / rule-based approach
+├── Architecture spike (validate critical tech choices)
+├── Cost estimate (training + serving)
+└── Decision: PROCEED / ADJUST SCOPE / STOP
+
+PHASE 2: MVP (6-12 weeks)
+├── Data pipeline (automated, validated)
+├── Model training pipeline (reproducible)
+├── Basic serving infrastructure (REST API)
+├── Core monitoring (latency, errors, basic drift)
+├── Limited user group deployment (beta)
+├── Collect user feedback + real-world metrics
+└── Decision: SCALE / ITERATE / PIVOT
+
+PHASE 3: PRODUCTION (8-16 weeks)
+├── Hardened infrastructure (HA, auto-scaling, security)
+├── Full CI/CD pipeline (model + application)
+├── Comprehensive monitoring + alerting
+├── A/B testing framework
+├── Documentation + runbooks
+├── Security review + compliance certification
+├── Load testing + chaos engineering
+└── Full production deployment
+
+PHASE 4: SCALE & OPTIMIZE (ongoing)
+├── Cost optimization (right-sizing, caching, batching)
+├── Model improvements (new features, architectures)
+├── Additional use cases (expand coverage)
+├── Advanced monitoring (concept drift, fairness)
+├── User experience refinement
+└── Technical debt reduction
+```
+
+### Roadmap Anti-Patterns
+
+| Anti-Pattern | Problem | Better Approach |
+|-------------|---------|----------------|
+| **Big bang deployment** | Months of work, no validation until end | Phased with go/no-go gates |
+| **Infrastructure first** | Build platform before proving model works | Model-first → infra follows |
+| **Perfectionist PoC** | Over-engineer proof of concept | Time-boxed, minimum viable experiment |
+| **Skip monitoring** | Ship model, discover failure from users | Monitoring from MVP phase |
+| **No baseline** | Can't prove ML adds value | Always compare against simple heuristic |
+| **Scope creep per phase** | Each phase grows unbounded | Fixed time-box + explicit criteria |
+
+---
+
+## Q9: How Do You Make Architecture Trade-Off Decisions and Document Them?
+
+**Answer:**
+
+Architecture is the art of making trade-offs under uncertainty. Every decision involves sacrifice — the architect's skill is in understanding *what* to sacrifice given the specific context, making decisions explicitly, and documenting them so they can be reviewed, challenged, and revised.
+
+```{mermaid}
+graph TD
+    subgraph Framework["Decision Framework"]
+        CONTEXT["1. Understand Context<br/>(constraints, priorities)"]
+        OPTIONS["2. Identify Options<br/>(at least 3 alternatives)"]
+        ANALYZE["3. Analyze Trade-offs<br/>(pros/cons per option)"]
+        DECIDE["4. Decide & Document<br/>(ADR with rationale)"]
+        REVIEW["5. Review & Revisit<br/>(as context changes)"]
+    end
+
+    CONTEXT --> OPTIONS --> ANALYZE --> DECIDE --> REVIEW
+    REVIEW -.->|"Context changed"| CONTEXT
+
+    style Framework fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Common AI Architecture Trade-offs
+
+| Trade-off | Option A | Option B | Decision Driver |
+|-----------|----------|----------|----------------|
+| **Build vs Buy** | Custom model training pipeline | Managed service (SageMaker, Vertex) | Team size, time-to-market, budget |
+| **Single model vs Ensemble** | One model (simple, fast) | Multiple models (accurate, expensive) | Latency budget, accuracy requirement |
+| **Real-time vs Batch** | Instant predictions (costly) | Pre-computed (cheaper, stale) | Freshness requirement |
+| **Monolith vs Microservices** | Single deployment unit | Independent services per model | Team autonomy, scaling independence |
+| **Cloud vs On-prem** | Elastic, managed, pay-per-use | Control, compliance, fixed cost | Data sovereignty, GPU economics |
+| **Generality vs Specialization** | One model for many tasks | Task-specific models | Accuracy need, maintenance burden |
+| **Speed vs Safety** | Fast deployment (no gate) | Multi-stage approval | Risk tolerance, regulatory context |
+| **Freshness vs Cost** | Retrain daily | Retrain monthly | Drift rate, retraining cost |
+
+### ATAM (Architecture Tradeoff Analysis Method)
+
+| Step | Activity | Output |
+|------|----------|--------|
+| 1 | Present architecture to stakeholders | Shared understanding |
+| 2 | Identify quality attribute scenarios | Prioritized list of NFRs |
+| 3 | Analyze architectural approaches | Sensitivity points + trade-off points |
+| 4 | Identify risks and non-risks | Risk themes |
+| 5 | Document findings | Trade-off matrix + ADRs |
+
+### Decision Documentation Principles
+
+| Principle | Why |
+|-----------|-----|
+| **Record the WHY, not just the WHAT** | Future team understands context |
+| **List alternatives considered** | Shows due diligence, aids future revisiting |
+| **State consequences explicitly** | Team knows what they're accepting |
+| **Assign ownership** | Someone monitors if decision remains valid |
+| **Set review trigger** | "Revisit if traffic exceeds 10K RPS" |
+| **Keep decisions lightweight** | 1-page ADR, not a 50-page document |
+| **Version decisions** | Supersede old ADRs when context changes |
+
+### Architecture Fitness Functions
+
+| Quality Attribute | Fitness Function | Threshold |
+|------------------|-----------------|-----------|
+| **Latency** | p99 inference latency measured in CI/CD | < 200ms |
+| **Cost** | Monthly cloud bill tracked per model | < $X/month per model |
+| **Availability** | Uptime measured over 30-day window | > 99.9% |
+| **Deployability** | Time from code merge to production | < 30 minutes |
+| **Model quality** | Automated eval metrics in pipeline | Accuracy > 0.90 |
+| **Security** | Automated vulnerability scan results | Zero critical findings |
+| **Coupling** | Dependency fan-out per service | < 5 direct dependencies |
+
+---
+
+## Q10: What Are the Challenges of AI Architecture and How Do You Address Them?
+
+**Answer:**
+
+AI architecture faces challenges that don't exist in traditional software — from the inherent uncertainty of ML models to the operational complexity of data-dependent systems. Understanding these challenges and having systematic responses is what separates senior architects from technical leads.
+
+```{mermaid}
+graph TD
+    subgraph Challenges["Key AI Architecture Challenges"]
+        UNCERTAINTY["Inherent Uncertainty<br/>(models are probabilistic)"]
+        DATA_DEP["Data Dependencies<br/>(upstream changes break models)"]
+        FEEDBACK["Feedback Loops<br/>(predictions influence data)"]
+        TECHNICAL_DEBT["ML Technical Debt<br/>(glue code, config, entanglement)"]
+        REPRODUCIBILITY["Reproducibility<br/>(non-deterministic training)"]
+        ORG_CHALLENGE["Organizational<br/>(silos between teams)"]
+    end
+
+    subgraph Responses["Architectural Responses"]
+        MODULAR["Modular Boundaries<br/>(isolate ML from application)"]
+        CONTRACTS["Data Contracts<br/>(explicit interfaces)"]
+        OBSERVE["Deep Observability<br/>(detect issues early)"]
+        AUTOMATE["Automation<br/>(CI/CD, testing, retraining)"]
+        ABSTRACT["Abstraction Layers<br/>(swap components)"]
+        CULTURE["Platform Thinking<br/>(self-service for teams)"]
+    end
+
+    Challenges --> Responses
+
+    style Challenges fill:#ff6b6b,stroke:#333,color:#fff
+    style Responses fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Challenge Matrix
+
+| Challenge | Root Cause | Symptom | Architectural Response |
+|-----------|-----------|---------|----------------------|
+| **Model accuracy in prod ≠ offline** | Distribution shift, data leakage | Model metrics look great in eval, fail with real users | Shadow testing, A/B testing, continuous monitoring |
+| **Training-serving skew** | Different code paths for training vs inference | Silent quality degradation | Feature store, shared preprocessing, end-to-end tests |
+| **Data dependency fragility** | Upstream schema/quality changes unannounced | Model breaks without code change | Data contracts, schema validation, alerting |
+| **Feedback loops** | Model predictions influence future training data | Model amplifies biases, creates echochambers | Feedback detection, diversity injection, holdout groups |
+| **Configuration complexity** | Hyperparams, feature flags, model versions, data versions | Changes cause unexpected interactions | Configuration versioning, canary configs, integration tests |
+| **Undeclared consumers** | Other teams start depending on model outputs | Can't change model without breaking unknown downstream | API contracts, deprecation policies, consumer registry |
+| **Entanglement** | Changing one feature affects other features' importance | Can't improve one model without regressing others | Feature importance monitoring, isolated model testing |
+| **Cost explosion** | GPU inference at scale, foundation model API calls | Budget overruns, project threatened | Tiered models, caching, batching, cost monitoring |
+
+### ML Technical Debt Categories (from Google's paper)
+
+| Debt Type | Example | Prevention |
+|-----------|---------|------------|
+| **Glue code** | 95% glue, 5% ML code | Standardized interfaces, SDK |
+| **Pipeline jungles** | Spaghetti data preparation | Managed pipelines, lineage tracking |
+| **Dead experimental code** | Unused model variants in codebase | Regular cleanup, feature flags |
+| **Data testing debt** | No validation on training data | Great Expectations, schema tests |
+| **Configuration debt** | Hardcoded paths, magic numbers | Config management, parameterization |
+| **Reproducibility debt** | Can't recreate past results | DVC, MLflow, seed management |
+| **Monitoring debt** | No drift detection, no alerting | Observability from day one |
+| **Abstraction debt** | No clean interfaces between components | Hexagonal architecture, ports/adapters |
+
+### Organizational Challenges
+
+| Challenge | Symptom | Solution |
+|-----------|---------|----------|
+| **Data scientist ↔ Engineer gap** | "Works in notebook" can't go to production | MLOps platform, shared tooling, embedded engineers |
+| **No ownership model** | Model in production with no team responsible | Clear RACI, model ownership policy |
+| **Competing priorities** | Data team, ML team, platform team misaligned | Shared OKRs, architecture council, regular syncs |
+| **Skill scarcity** | Few people understand full stack | Platform abstractions, documentation, enablement |
+| **Experimentation vs stability** | Data scientists want flexibility, ops wants stability | Separate experiment/production environments with promotion gates |
+
+### Architecture Maturity Model
+
+| Level | Description | Characteristics |
+|-------|-------------|-----------------|
+| **0: Ad-hoc** | Manual everything, notebooks to production | No CI/CD, no monitoring, hero mode |
+| **1: Repeatable** | Automated training pipeline, basic serving | Scripts, cron jobs, manual deployment |
+| **2: Defined** | Standard platform, CI/CD, monitoring | ML platform, model registry, defined process |
+| **3: Managed** | Metrics-driven, SLAs, auto-retraining | Continuous training, A/B testing, cost tracking |
+| **4: Optimized** | Self-improving, multi-model orchestration | AutoML, automated architecture search, ML-driven ops |
+
+---
+
+## Summary Table
+
+| # | Topic | Key Concept |
+|---|-------|-------------|
+| 1 | **Requirements Cartography** | Map stakeholders, NFRs, constraints, and dependencies before design |
+| 2 | **AI System Design** | Layered architecture (data → ML → serving → observability → orchestration) |
+| 3 | **Tech Stack Selection** | Weighted evaluation matrix + ADRs + prototype critical paths |
+| 4 | **Cost-Latency-Quality** | Three-way trade-off; cascade, cache, quantize to optimize |
+| 5 | **Security & Compliance** | AI-specific threats (adversarial, injection, leakage) + zero-trust |
+| 6 | **Scalability & Concurrency** | GPU-aware scaling, dynamic batching, queue-based decoupling |
+| 7 | **Risk Management** | Risk register, graceful degradation, circuit breakers, rollback |
+| 8 | **Roadmap & Phases** | Discovery → PoC → MVP → Production → Scale; go/no-go gates |
+| 9 | **Trade-off Decisions** | ADRs, ATAM, fitness functions; document WHY not just WHAT |
+| 10 | **Challenges** | ML debt, feedback loops, training-serving skew, org silos |
+
+---
+
+## What's Next?
+
+This article covered the strategic and operational dimensions of AI architecture. For related content:
+
+- **System design patterns:** [System Design Interview QA - 1](/posts/system-design/System-Design-Interview-QA-1.html)
+- **Design patterns:** [Design Pattern Interview QA - 1](/posts/design-pattern/Design-Pattern-Interview-QA-1.html)
+- **MLOps fundamentals:** [MLOps Interview QA - 1](/posts/aiops-interview/MLOps-Interview-QA-1.html)
+- **Cloud-agnostic MLOps tools:** [MLOps Interview QA - 5](/posts/aiops-interview/MLOps-Interview-QA-5.html)
+- **LLMOps:** [LLMOps Interview QA - 1](/posts/aiops-interview/LLMOps-Interview-QA-1.html)
+- **Python production APIs:** [Python SWE Interview QA - 4](/posts/swe-interview/Python-SWE-Interview-QA-4.html)

@@ -1,0 +1,1440 @@
+---
+title: "Design Pattern Interview QA - 1"
+description: "10 most-asked design pattern interview questions covering Singleton, Factory, Observer, Strategy, Decorator, Adapter, Builder, Command, Chain of Responsibility, and Proxy patterns with Python implementations."
+image: /images/design-pattern/thumb_design_pattern_interview_qa_300.png
+date: "2026-05-21"
+keywords:
+  - "design patterns interview"
+  - "singleton pattern"
+  - "factory pattern"
+  - "observer pattern"
+  - "strategy pattern"
+  - "decorator pattern"
+  - "adapter pattern"
+  - "builder pattern"
+  - "command pattern"
+  - "chain of responsibility"
+  - "proxy pattern"
+  - "Gang of Four"
+---
+
+## Introduction
+
+This is **Part 1** of our Design Pattern Interview QA series, covering the **10 most frequently asked design patterns** in software engineering interviews. Each question includes a clear explanation, a UML-style diagram, a practical Python implementation, and guidance on when to use each pattern.
+
+> For Python-specific best practices including design patterns applied in idiomatic Python, see [Python SWE Interview QA - 3](/posts/swe-interview/Python-SWE-Interview-QA-3.html). For production API patterns, see [Python SWE Interview QA - 4](/posts/swe-interview/Python-SWE-Interview-QA-4.html).
+
+---
+
+## Q1: What is the Singleton Pattern and when should you use it?
+
+**Answer:**
+
+The **Singleton pattern** ensures a class has only **one instance** and provides a global point of access to it. It solves the problem of controlling access to shared resources like database connections, configuration objects, or logging facilities.
+
+```{mermaid}
+graph TD
+    C1["Client A"] --> S["Singleton Instance<br/>(only one exists)"]
+    C2["Client B"] --> S
+    C3["Client C"] --> S
+    S --> RES["Shared Resource<br/>(DB pool, config, logger)"]
+
+    style S fill:#56cc9d,stroke:#333,color:#fff
+    style RES fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Python Implementations
+
+```python
+# Approach 1: Module-level instance (Pythonic — recommended)
+# config.py
+class _AppConfig:
+    """Private class — consumers use the module-level instance."""
+
+    def __init__(self):
+        self._settings: dict = {}
+        self._loaded = False
+
+    def load(self, path: str) -> None:
+        import json
+        with open(path) as f:
+            self._settings = json.load(f)
+        self._loaded = True
+
+    def get(self, key: str, default=None):
+        return self._settings.get(key, default)
+
+# Module-level singleton — Python imports are cached
+config = _AppConfig()
+
+# Usage:
+# from myapp.config import config
+# config.load("settings.json")
+# db_url = config.get("database_url")
+```
+
+```python
+# Approach 2: __new__ override (when you need class-based control)
+class DatabasePool:
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self, connection_string: str = ""):
+        if self._initialized:
+            return
+        self.connection_string = connection_string
+        self._pool = []
+        self._initialized = True
+
+    def get_connection(self):
+        # Return connection from pool
+        ...
+
+# Both variables point to the same object
+pool1 = DatabasePool("postgres://localhost/db")
+pool2 = DatabasePool("ignored — already initialized")
+assert pool1 is pool2  # True
+```
+
+```python
+# Approach 3: Thread-safe Singleton (for multi-threaded apps)
+import threading
+
+class ThreadSafeSingleton:
+    _instance = None
+    _lock = threading.Lock()
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            with cls._lock:  # Double-checked locking
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+        return cls._instance
+```
+
+### When to Use / Avoid
+
+| Use Singleton | Avoid Singleton |
+|---------------|-----------------|
+| Database connection pools | When objects carry different state |
+| Application configuration | When testability is critical (hard to mock) |
+| Logging services | When you need multiple instances later |
+| Thread pools | When it introduces hidden global state |
+| Hardware interface access | When dependency injection is preferred |
+
+---
+
+## Q2: What is the Factory Method Pattern and how does it differ from Abstract Factory?
+
+**Answer:**
+
+The **Factory Method** pattern defines an interface for creating objects but lets subclasses decide which class to instantiate. It moves object creation logic to a dedicated place, promoting the Open/Closed Principle.
+
+The **Abstract Factory** goes further — it produces *families* of related objects without specifying their concrete classes.
+
+```{mermaid}
+graph TD
+    subgraph FactoryMethod["Factory Method"]
+        FM_CLIENT["Client"]
+        FM_CLIENT --> FM_FACTORY["NotificationFactory"]
+        FM_FACTORY -->|"create('email')"| FM_EMAIL["EmailNotification"]
+        FM_FACTORY -->|"create('sms')"| FM_SMS["SMSNotification"]
+        FM_FACTORY -->|"create('push')"| FM_PUSH["PushNotification"]
+    end
+
+    subgraph AbstractFactory["Abstract Factory"]
+        AF_CLIENT["Client"]
+        AF_CLIENT --> AF_LIGHT["LightThemeFactory"]
+        AF_CLIENT --> AF_DARK["DarkThemeFactory"]
+        AF_LIGHT --> AF_LB["LightButton"]
+        AF_LIGHT --> AF_LI["LightInput"]
+        AF_DARK --> AF_DB["DarkButton"]
+        AF_DARK --> AF_DI["DarkInput"]
+    end
+
+    style FM_FACTORY fill:#56cc9d,stroke:#333,color:#fff
+    style AF_LIGHT fill:#ffce67,stroke:#333
+    style AF_DARK fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Factory Method Implementation
+
+```python
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+
+# Product interface
+class Notification(ABC):
+    @abstractmethod
+    def send(self, recipient: str, message: str) -> bool: ...
+
+# Concrete products
+@dataclass
+class EmailNotification(Notification):
+    smtp_host: str = "smtp.example.com"
+
+    def send(self, recipient: str, message: str) -> bool:
+        print(f"Email to {recipient}: {message}")
+        return True
+
+@dataclass
+class SMSNotification(Notification):
+    api_key: str = ""
+
+    def send(self, recipient: str, message: str) -> bool:
+        print(f"SMS to {recipient}: {message}")
+        return True
+
+@dataclass
+class PushNotification(Notification):
+    def send(self, recipient: str, message: str) -> bool:
+        print(f"Push to {recipient}: {message}")
+        return True
+
+# Factory (Pythonic: use a registry dict, not class hierarchy)
+class NotificationFactory:
+    _registry: dict[str, type[Notification]] = {
+        "email": EmailNotification,
+        "sms": SMSNotification,
+        "push": PushNotification,
+    }
+
+    @classmethod
+    def register(cls, name: str, notification_cls: type[Notification]):
+        """Open for extension — register new types at runtime."""
+        cls._registry[name] = notification_cls
+
+    @classmethod
+    def create(cls, channel: str, **kwargs) -> Notification:
+        if channel not in cls._registry:
+            raise ValueError(f"Unknown channel: {channel}")
+        return cls._registry[channel](**kwargs)
+
+# Usage
+notif = NotificationFactory.create("email", smtp_host="mail.company.com")
+notif.send("alice@example.com", "Hello!")
+
+# Extend without modifying factory:
+NotificationFactory.register("slack", SlackNotification)
+```
+
+### Abstract Factory Implementation
+
+```python
+from abc import ABC, abstractmethod
+
+# Abstract products
+class Button(ABC):
+    @abstractmethod
+    def render(self) -> str: ...
+
+class Input(ABC):
+    @abstractmethod
+    def render(self) -> str: ...
+
+# Concrete products — Light theme
+class LightButton(Button):
+    def render(self) -> str:
+        return "<button class='btn-light'>Click</button>"
+
+class LightInput(Input):
+    def render(self) -> str:
+        return "<input class='input-light'/>"
+
+# Concrete products — Dark theme
+class DarkButton(Button):
+    def render(self) -> str:
+        return "<button class='btn-dark'>Click</button>"
+
+class DarkInput(Input):
+    def render(self) -> str:
+        return "<input class='input-dark'/>"
+
+# Abstract Factory
+class UIFactory(ABC):
+    @abstractmethod
+    def create_button(self) -> Button: ...
+    @abstractmethod
+    def create_input(self) -> Input: ...
+
+class LightThemeFactory(UIFactory):
+    def create_button(self) -> Button:
+        return LightButton()
+    def create_input(self) -> Input:
+        return LightInput()
+
+class DarkThemeFactory(UIFactory):
+    def create_button(self) -> Button:
+        return DarkButton()
+    def create_input(self) -> Input:
+        return DarkInput()
+
+# Client code — works with ANY factory
+def build_form(factory: UIFactory) -> str:
+    button = factory.create_button()
+    input_field = factory.create_input()
+    return f"{input_field.render()}\n{button.render()}"
+
+# Swap themes without changing client code
+print(build_form(DarkThemeFactory()))
+```
+
+### Factory Method vs Abstract Factory
+
+| Aspect | Factory Method | Abstract Factory |
+|--------|---------------|------------------|
+| Creates | One product type | Family of related products |
+| Complexity | Simple | More complex |
+| Extension | New product → new factory method | New family → new factory class |
+| Use case | Parse different file formats | Theme systems, cross-platform UI |
+
+---
+
+## Q3: What is the Observer Pattern and how do you implement it?
+
+**Answer:**
+
+The **Observer pattern** defines a one-to-many dependency so that when one object (the **Subject**) changes state, all its dependents (**Observers**) are notified and updated automatically. It's the backbone of event-driven systems.
+
+```{mermaid}
+graph TD
+    SUBJECT["Subject (Publisher)"]
+    SUBJECT -->|"notify()"| OBS1["Observer A<br/>(Email Service)"]
+    SUBJECT -->|"notify()"| OBS2["Observer B<br/>(Analytics)"]
+    SUBJECT -->|"notify()"| OBS3["Observer C<br/>(Audit Log)"]
+
+    subgraph Operations["Subject Methods"]
+        ATT["subscribe(observer)"]
+        DET["unsubscribe(observer)"]
+        NOT["notify_all()"]
+    end
+
+    style SUBJECT fill:#56cc9d,stroke:#333,color:#fff
+    style OBS1 fill:#6cc3d5,stroke:#333,color:#fff
+    style OBS2 fill:#ffce67,stroke:#333
+    style OBS3 fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Implementation with Type Safety
+
+```python
+from typing import Protocol, Any
+from dataclasses import dataclass, field
+
+# Observer protocol (structural typing — no inheritance required)
+class EventHandler(Protocol):
+    def handle(self, event: str, data: dict[str, Any]) -> None: ...
+
+# Subject (Publisher)
+class EventBus:
+    """Publish-subscribe event system."""
+
+    def __init__(self):
+        self._subscribers: dict[str, list[EventHandler]] = {}
+
+    def subscribe(self, event: str, handler: EventHandler) -> None:
+        if event not in self._subscribers:
+            self._subscribers[event] = []
+        self._subscribers[event].append(handler)
+
+    def unsubscribe(self, event: str, handler: EventHandler) -> None:
+        if event in self._subscribers:
+            self._subscribers[event].remove(handler)
+
+    def publish(self, event: str, **data) -> None:
+        for handler in self._subscribers.get(event, []):
+            handler.handle(event, data)
+
+# Concrete observers
+class EmailNotifier:
+    def handle(self, event: str, data: dict[str, Any]) -> None:
+        email = data.get("email", "")
+        print(f"[Email] Sending notification to {email} for event: {event}")
+
+class AnalyticsTracker:
+    def handle(self, event: str, data: dict[str, Any]) -> None:
+        print(f"[Analytics] Tracking event: {event}, data: {data}")
+
+class AuditLogger:
+    def handle(self, event: str, data: dict[str, Any]) -> None:
+        print(f"[Audit] {event}: {data}")
+
+# Usage
+bus = EventBus()
+bus.subscribe("user_registered", EmailNotifier())
+bus.subscribe("user_registered", AnalyticsTracker())
+bus.subscribe("user_registered", AuditLogger())
+bus.subscribe("order_placed", AnalyticsTracker())
+
+# Publishing an event notifies all relevant observers
+bus.publish("user_registered", email="alice@example.com", user_id=42)
+# Output:
+# [Email] Sending notification to alice@example.com for event: user_registered
+# [Analytics] Tracking event: user_registered, data: {...}
+# [Audit] user_registered: {...}
+```
+
+### Async Observer (for production APIs)
+
+```python
+import asyncio
+from typing import Callable, Awaitable
+
+class AsyncEventBus:
+    """Async event bus for I/O-bound handlers."""
+
+    def __init__(self):
+        self._handlers: dict[str, list[Callable[..., Awaitable]]] = {}
+
+    def on(self, event: str, handler: Callable[..., Awaitable]) -> None:
+        self._handlers.setdefault(event, []).append(handler)
+
+    async def emit(self, event: str, **data) -> None:
+        handlers = self._handlers.get(event, [])
+        # Run all handlers concurrently
+        await asyncio.gather(*(h(**data) for h in handlers))
+
+# Usage
+bus = AsyncEventBus()
+
+async def send_email(email: str, **_):
+    await asyncio.sleep(0.1)  # Simulate I/O
+    print(f"Email sent to {email}")
+
+async def track_event(user_id: int, **_):
+    await asyncio.sleep(0.05)
+    print(f"Tracked signup for user {user_id}")
+
+bus.on("signup", send_email)
+bus.on("signup", track_event)
+await bus.emit("signup", email="bob@test.com", user_id=7)
+```
+
+### Real-World Applications
+
+| Application | Subject | Observers |
+|------------|---------|-----------|
+| GUI frameworks | Button click | Event handlers |
+| Message queues | Topic/Channel | Subscribers |
+| Stock market | Price feed | Trading algorithms |
+| Django signals | Model save | Signal receivers |
+| React state | State store | UI components |
+
+---
+
+## Q4: What is the Strategy Pattern?
+
+**Answer:**
+
+The **Strategy pattern** defines a family of algorithms, encapsulates each one, and makes them interchangeable. It lets the algorithm vary independently from the clients that use it. In Python, strategies are often just **functions** — no class hierarchy needed.
+
+```{mermaid}
+graph TD
+    CONTEXT["Context<br/>(PaymentProcessor)"]
+    CONTEXT --> STRAT["Strategy Interface<br/>(PaymentStrategy)"]
+    STRAT --> S1["CreditCardStrategy"]
+    STRAT --> S2["PayPalStrategy"]
+    STRAT --> S3["CryptoStrategy"]
+
+    NOTE["Client selects strategy<br/>at runtime"]
+
+    style CONTEXT fill:#56cc9d,stroke:#333,color:#fff
+    style STRAT fill:#ffce67,stroke:#333
+```
+
+### Class-Based Strategy
+
+```python
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+
+# Strategy interface
+class CompressionStrategy(ABC):
+    @abstractmethod
+    def compress(self, data: bytes) -> bytes: ...
+
+    @abstractmethod
+    def decompress(self, data: bytes) -> bytes: ...
+
+# Concrete strategies
+class GzipStrategy(CompressionStrategy):
+    def compress(self, data: bytes) -> bytes:
+        import gzip
+        return gzip.compress(data)
+
+    def decompress(self, data: bytes) -> bytes:
+        import gzip
+        return gzip.decompress(data)
+
+class LZ4Strategy(CompressionStrategy):
+    def compress(self, data: bytes) -> bytes:
+        import lz4.frame
+        return lz4.frame.compress(data)
+
+    def decompress(self, data: bytes) -> bytes:
+        import lz4.frame
+        return lz4.frame.decompress(data)
+
+class NoCompression(CompressionStrategy):
+    def compress(self, data: bytes) -> bytes:
+        return data
+
+    def decompress(self, data: bytes) -> bytes:
+        return data
+
+# Context
+class FileStorage:
+    def __init__(self, strategy: CompressionStrategy):
+        self._strategy = strategy
+
+    def set_strategy(self, strategy: CompressionStrategy) -> None:
+        """Switch strategy at runtime."""
+        self._strategy = strategy
+
+    def save(self, filename: str, data: bytes) -> None:
+        compressed = self._strategy.compress(data)
+        with open(filename, "wb") as f:
+            f.write(compressed)
+
+    def load(self, filename: str) -> bytes:
+        with open(filename, "rb") as f:
+            compressed = f.read()
+        return self._strategy.decompress(compressed)
+
+# Usage — switch compression at runtime
+storage = FileStorage(GzipStrategy())
+storage.save("data.gz", b"Hello, world!")
+
+storage.set_strategy(LZ4Strategy())  # Switch strategy
+storage.save("data.lz4", b"Hello, world!")
+```
+
+### Pythonic Strategy (Just Use Functions)
+
+```python
+from typing import Callable
+
+# Strategies are just functions — no classes needed!
+def sort_by_price(products: list[dict]) -> list[dict]:
+    return sorted(products, key=lambda p: p["price"])
+
+def sort_by_rating(products: list[dict]) -> list[dict]:
+    return sorted(products, key=lambda p: p["rating"], reverse=True)
+
+def sort_by_name(products: list[dict]) -> list[dict]:
+    return sorted(products, key=lambda p: p["name"])
+
+# Context accepts any callable matching the signature
+SortStrategy = Callable[[list[dict]], list[dict]]
+
+def display_products(products: list[dict], strategy: SortStrategy) -> None:
+    sorted_products = strategy(products)
+    for p in sorted_products:
+        print(f"  {p['name']}: ${p['price']} ({p['rating']}★)")
+
+# Usage
+products = [
+    {"name": "Widget", "price": 25.99, "rating": 4.5},
+    {"name": "Gadget", "price": 49.99, "rating": 4.8},
+    {"name": "Doohickey", "price": 9.99, "rating": 3.9},
+]
+
+display_products(products, sort_by_price)
+display_products(products, sort_by_rating)
+
+# Lambda as strategy
+display_products(products, lambda ps: sorted(ps, key=lambda p: -p["price"]))
+```
+
+### Strategy vs Other Patterns
+
+| Pattern | Key Difference |
+|---------|---------------|
+| **Strategy** | Choose algorithm at runtime (HAS-A) |
+| **Template Method** | Define algorithm skeleton, override steps (IS-A) |
+| **State** | Similar structure but transitions between strategies automatically |
+| **Command** | Encapsulates a request, not just an algorithm |
+
+---
+
+## Q5: What is the Decorator Pattern?
+
+**Answer:**
+
+The **Decorator pattern** attaches additional responsibilities to an object dynamically. It provides a flexible alternative to subclassing for extending functionality by wrapping objects with new behavior layers.
+
+```{mermaid}
+graph LR
+    BASE["Base Component<br/>(PlainCoffee)"]
+    BASE --> D1["Decorator 1<br/>(MilkDecorator)"]
+    D1 --> D2["Decorator 2<br/>(SugarDecorator)"]
+    D2 --> D3["Decorator 3<br/>(WhipCreamDecorator)"]
+    D3 --> RESULT["Final Object<br/>has all behaviors"]
+
+    style BASE fill:#6cc3d5,stroke:#333,color:#fff
+    style RESULT fill:#56cc9d,stroke:#333,color:#fff
+```
+
+### Class-Based Decorator (GoF Pattern)
+
+```python
+from abc import ABC, abstractmethod
+
+# Component interface
+class DataSource(ABC):
+    @abstractmethod
+    def write(self, data: str) -> None: ...
+
+    @abstractmethod
+    def read(self) -> str: ...
+
+# Concrete component
+class FileDataSource(DataSource):
+    def __init__(self, filename: str):
+        self._filename = filename
+
+    def write(self, data: str) -> None:
+        with open(self._filename, "w") as f:
+            f.write(data)
+
+    def read(self) -> str:
+        with open(self._filename, "r") as f:
+            return f.read()
+
+# Base decorator (wraps a DataSource)
+class DataSourceDecorator(DataSource):
+    def __init__(self, source: DataSource):
+        self._wrapped = source
+
+    def write(self, data: str) -> None:
+        self._wrapped.write(data)
+
+    def read(self) -> str:
+        return self._wrapped.read()
+
+# Concrete decorators — each adds one behavior
+class EncryptionDecorator(DataSourceDecorator):
+    def write(self, data: str) -> None:
+        encrypted = self._encrypt(data)
+        super().write(encrypted)
+
+    def read(self) -> str:
+        data = super().read()
+        return self._decrypt(data)
+
+    def _encrypt(self, data: str) -> str:
+        # Simple Caesar cipher for illustration
+        return "".join(chr(ord(c) + 3) for c in data)
+
+    def _decrypt(self, data: str) -> str:
+        return "".join(chr(ord(c) - 3) for c in data)
+
+class CompressionDecorator(DataSourceDecorator):
+    def write(self, data: str) -> None:
+        compressed = self._compress(data)
+        super().write(compressed)
+
+    def read(self) -> str:
+        data = super().read()
+        return self._decompress(data)
+
+    def _compress(self, data: str) -> str:
+        import zlib, base64
+        return base64.b64encode(zlib.compress(data.encode())).decode()
+
+    def _decompress(self, data: str) -> str:
+        import zlib, base64
+        return zlib.decompress(base64.b64decode(data.encode())).decode()
+
+# Stack decorators: File → Compress → Encrypt
+source = EncryptionDecorator(
+    CompressionDecorator(
+        FileDataSource("secret.dat")
+    )
+)
+source.write("Sensitive data here")
+print(source.read())  # "Sensitive data here" — decrypted & decompressed
+```
+
+### Python's Native Decorator (Function Wrapper)
+
+```python
+import functools
+import time
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Python's @ syntax IS the decorator pattern for functions!
+def retry(max_attempts: int = 3, delay: float = 1.0):
+    """Decorator that retries a function on failure."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if attempt == max_attempts:
+                        raise
+                    logger.warning(f"Attempt {attempt} failed: {e}. Retrying...")
+                    time.sleep(delay)
+        return wrapper
+    return decorator
+
+def cache(ttl_seconds: int = 300):
+    """Decorator that caches results with a TTL."""
+    def decorator(func):
+        _cache: dict = {}
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            key = (args, tuple(sorted(kwargs.items())))
+            if key in _cache:
+                value, timestamp = _cache[key]
+                if time.time() - timestamp < ttl_seconds:
+                    return value
+            result = func(*args, **kwargs)
+            _cache[key] = (result, time.time())
+            return result
+        return wrapper
+    return decorator
+
+# Stack multiple decorators (like wrapping layers)
+@retry(max_attempts=3)
+@cache(ttl_seconds=60)
+def fetch_user(user_id: int) -> dict:
+    """First call fetches, subsequent calls use cache, failures retry."""
+    return api_client.get(f"/users/{user_id}")
+```
+
+### GoF Decorator vs Python `@decorator`
+
+| GoF Decorator (Object Wrapping) | Python `@decorator` (Function Wrapping) |
+|------|------|
+| Wraps objects, adds object behavior | Wraps functions, adds function behavior |
+| Uses inheritance + composition | Uses closures + `functools.wraps` |
+| Multiple layers via nesting | Multiple layers via stacking `@` |
+| Runtime flexibility (swap wrappers) | Applied at definition time |
+
+---
+
+## Q6: What is the Adapter Pattern?
+
+**Answer:**
+
+The **Adapter pattern** allows incompatible interfaces to work together. It acts as a bridge between two objects by wrapping one interface and translating calls to match what the client expects.
+
+```{mermaid}
+graph LR
+    CLIENT["Client Code<br/>(expects PaymentGateway)"]
+    CLIENT --> ADAPTER["StripeAdapter<br/>(implements PaymentGateway)"]
+    ADAPTER --> ADAPTEE["Stripe SDK<br/>(incompatible interface)"]
+
+    CLIENT2["Client Code"] --> ADAPTER2["PayPalAdapter"]
+    ADAPTER2 --> ADAPTEE2["PayPal SDK"]
+
+    style ADAPTER fill:#56cc9d,stroke:#333,color:#fff
+    style ADAPTER2 fill:#56cc9d,stroke:#333,color:#fff
+    style ADAPTEE fill:#ff7851,stroke:#333,color:#fff
+    style ADAPTEE2 fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Implementation
+
+```python
+from typing import Protocol
+from dataclasses import dataclass
+
+# Target interface — what your application expects
+class PaymentGateway(Protocol):
+    def charge(self, amount_cents: int, currency: str, token: str) -> str:
+        """Returns transaction ID."""
+        ...
+
+    def refund(self, transaction_id: str) -> bool: ...
+
+# Adaptee 1: Stripe (uses dollars, different method names)
+class StripeAPI:
+    """Third-party Stripe SDK — incompatible interface."""
+    def create_charge(self, amount: float, cur: str, source: str) -> dict:
+        print(f"Stripe: charging ${amount} {cur}")
+        return {"id": "ch_stripe_123", "status": "succeeded"}
+
+    def create_refund(self, charge_id: str) -> dict:
+        return {"id": "re_456", "status": "succeeded"}
+
+# Adaptee 2: PayPal (completely different API)
+class PayPalSDK:
+    """Third-party PayPal SDK — incompatible interface."""
+    def execute_payment(self, payment_data: dict) -> dict:
+        print(f"PayPal: executing payment")
+        return {"paymentId": "PAY-789", "state": "approved"}
+
+    def void_payment(self, payment_id: str) -> dict:
+        return {"state": "voided"}
+
+# Adapters — translate between your interface and third-party SDKs
+class StripeAdapter:
+    """Adapts Stripe SDK to PaymentGateway interface."""
+
+    def __init__(self, stripe: StripeAPI):
+        self._stripe = stripe
+
+    def charge(self, amount_cents: int, currency: str, token: str) -> str:
+        # Convert cents to dollars (Stripe uses dollars)
+        result = self._stripe.create_charge(
+            amount=amount_cents / 100,
+            cur=currency,
+            source=token,
+        )
+        return result["id"]
+
+    def refund(self, transaction_id: str) -> bool:
+        result = self._stripe.create_refund(transaction_id)
+        return result["status"] == "succeeded"
+
+class PayPalAdapter:
+    """Adapts PayPal SDK to PaymentGateway interface."""
+
+    def __init__(self, paypal: PayPalSDK):
+        self._paypal = paypal
+
+    def charge(self, amount_cents: int, currency: str, token: str) -> str:
+        result = self._paypal.execute_payment({
+            "amount": {"total": amount_cents / 100, "currency": currency},
+            "token": token,
+        })
+        return result["paymentId"]
+
+    def refund(self, transaction_id: str) -> bool:
+        result = self._paypal.void_payment(transaction_id)
+        return result["state"] == "voided"
+
+# Client code — works with any adapter uniformly
+def process_order(gateway: PaymentGateway, amount: int, token: str) -> str:
+    tx_id = gateway.charge(amount, "USD", token)
+    print(f"Order processed. Transaction: {tx_id}")
+    return tx_id
+
+# Swap payment providers without changing business logic
+stripe_gateway = StripeAdapter(StripeAPI())
+paypal_gateway = PayPalAdapter(PayPalSDK())
+
+process_order(stripe_gateway, 4999, "tok_visa")
+process_order(paypal_gateway, 4999, "tok_paypal")
+```
+
+### When to Use Adapter
+
+| Scenario | Example |
+|----------|---------|
+| Integrating third-party libraries | Wrap SDK to match your interface |
+| Legacy system integration | Adapt old API to new interface |
+| Testing with mocks | Adapt test doubles to expected interface |
+| Multiple vendor support | Uniform interface for Stripe/PayPal/Square |
+| Data format conversion | XML ↔ JSON adapters |
+
+---
+
+## Q7: What is the Builder Pattern?
+
+**Answer:**
+
+The **Builder pattern** separates the construction of a complex object from its representation, allowing the same construction process to create different representations. It's essential when objects have many optional parameters.
+
+```{mermaid}
+graph TD
+    DIRECTOR["Director / Client"]
+    DIRECTOR --> BUILDER["Builder"]
+    BUILDER -->|"step 1"| S1["Set required fields"]
+    BUILDER -->|"step 2"| S2["Set optional fields"]
+    BUILDER -->|"step 3"| S3["Configure components"]
+    BUILDER -->|"build()"| PRODUCT["Complex Object"]
+
+    style BUILDER fill:#56cc9d,stroke:#333,color:#fff
+    style PRODUCT fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Pythonic Builder (Method Chaining)
+
+```python
+from dataclasses import dataclass, field
+from typing import Self
+
+@dataclass
+class HttpRequest:
+    """Complex object with many optional components."""
+    method: str
+    url: str
+    headers: dict[str, str] = field(default_factory=dict)
+    query_params: dict[str, str] = field(default_factory=dict)
+    body: str | bytes | None = None
+    timeout: float = 30.0
+    retries: int = 0
+    auth_token: str | None = None
+
+class HttpRequestBuilder:
+    """Fluent builder for constructing HttpRequest objects step by step."""
+
+    def __init__(self, method: str, url: str):
+        self._method = method
+        self._url = url
+        self._headers: dict[str, str] = {}
+        self._query_params: dict[str, str] = {}
+        self._body: str | bytes | None = None
+        self._timeout: float = 30.0
+        self._retries: int = 0
+        self._auth_token: str | None = None
+
+    def header(self, key: str, value: str) -> Self:
+        self._headers[key] = value
+        return self
+
+    def query(self, key: str, value: str) -> Self:
+        self._query_params[key] = value
+        return self
+
+    def body(self, content: str | bytes) -> Self:
+        self._body = content
+        return self
+
+    def timeout(self, seconds: float) -> Self:
+        self._timeout = seconds
+        return self
+
+    def retries(self, count: int) -> Self:
+        self._retries = count
+        return self
+
+    def auth(self, token: str) -> Self:
+        self._auth_token = token
+        self._headers["Authorization"] = f"Bearer {token}"
+        return self
+
+    def build(self) -> HttpRequest:
+        """Construct the final immutable object."""
+        return HttpRequest(
+            method=self._method,
+            url=self._url,
+            headers=self._headers,
+            query_params=self._query_params,
+            body=self._body,
+            timeout=self._timeout,
+            retries=self._retries,
+            auth_token=self._auth_token,
+        )
+
+# Fluent usage — reads like natural language
+request = (
+    HttpRequestBuilder("POST", "https://api.example.com/users")
+    .header("Content-Type", "application/json")
+    .header("X-Request-ID", "abc-123")
+    .auth("my-secret-token")
+    .body('{"name": "Alice", "email": "alice@example.com"}')
+    .timeout(10.0)
+    .retries(3)
+    .build()
+)
+```
+
+### Python Alternative: dataclass with `__post_init__`
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class QueryConfig:
+    """For simpler cases, dataclass + defaults = lightweight builder."""
+    table: str
+    select: list[str] = field(default_factory=lambda: ["*"])
+    where: dict[str, str] = field(default_factory=dict)
+    order_by: str | None = None
+    limit: int = 100
+    offset: int = 0
+
+    def to_sql(self) -> str:
+        cols = ", ".join(self.select)
+        sql = f"SELECT {cols} FROM {self.table}"
+        if self.where:
+            conditions = " AND ".join(f"{k} = '{v}'" for k, v in self.where.items())
+            sql += f" WHERE {conditions}"
+        if self.order_by:
+            sql += f" ORDER BY {self.order_by}"
+        sql += f" LIMIT {self.limit} OFFSET {self.offset}"
+        return sql
+
+# Simple construction with keyword args
+q = QueryConfig(
+    table="users",
+    select=["id", "name", "email"],
+    where={"role": "admin"},
+    order_by="created_at DESC",
+    limit=50,
+)
+print(q.to_sql())
+```
+
+### When Builder vs Other Approaches
+
+| Approach | Use When |
+|----------|----------|
+| **Builder** | Many optional params, validation at build time, immutable result |
+| **dataclass** | Moderate params, mutable, simple defaults |
+| **Factory** | Selection among different types, not step-by-step construction |
+| **`__init__` with kwargs** | Few optional params, no complex validation |
+
+---
+
+## Q8: What is the Command Pattern?
+
+**Answer:**
+
+The **Command pattern** encapsulates a request as an object, letting you parameterize clients with different requests, queue or log requests, and support undoable operations.
+
+```{mermaid}
+graph TD
+    INVOKER["Invoker<br/>(Toolbar / Queue)"]
+    INVOKER --> CMD["Command Interface<br/>execute() / undo()"]
+    CMD --> C1["CopyCommand"]
+    CMD --> C2["PasteCommand"]
+    CMD --> C3["DeleteCommand"]
+
+    C1 --> RECEIVER["Receiver<br/>(Text Editor)"]
+    C2 --> RECEIVER
+    C3 --> RECEIVER
+
+    INVOKER --> HISTORY["Command History<br/>(for undo/redo)"]
+
+    style INVOKER fill:#56cc9d,stroke:#333,color:#fff
+    style CMD fill:#ffce67,stroke:#333
+    style HISTORY fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Implementation with Undo/Redo
+
+```python
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+
+# Command interface
+class Command(ABC):
+    @abstractmethod
+    def execute(self) -> None: ...
+
+    @abstractmethod
+    def undo(self) -> None: ...
+
+# Receiver
+class TextDocument:
+    def __init__(self):
+        self.content: str = ""
+
+    def insert(self, position: int, text: str) -> None:
+        self.content = self.content[:position] + text + self.content[position:]
+
+    def delete(self, position: int, length: int) -> str:
+        deleted = self.content[position:position + length]
+        self.content = self.content[:position] + self.content[position + length:]
+        return deleted
+
+# Concrete commands
+@dataclass
+class InsertCommand(Command):
+    document: TextDocument
+    position: int
+    text: str
+
+    def execute(self) -> None:
+        self.document.insert(self.position, self.text)
+
+    def undo(self) -> None:
+        self.document.delete(self.position, len(self.text))
+
+@dataclass
+class DeleteCommand(Command):
+    document: TextDocument
+    position: int
+    length: int
+    _deleted_text: str = field(default="", init=False)
+
+    def execute(self) -> None:
+        self._deleted_text = self.document.delete(self.position, self.length)
+
+    def undo(self) -> None:
+        self.document.insert(self.position, self._deleted_text)
+
+# Invoker with history
+class CommandInvoker:
+    def __init__(self):
+        self._history: list[Command] = []
+        self._redo_stack: list[Command] = []
+
+    def execute(self, command: Command) -> None:
+        command.execute()
+        self._history.append(command)
+        self._redo_stack.clear()  # New command invalidates redo
+
+    def undo(self) -> None:
+        if not self._history:
+            return
+        command = self._history.pop()
+        command.undo()
+        self._redo_stack.append(command)
+
+    def redo(self) -> None:
+        if not self._redo_stack:
+            return
+        command = self._redo_stack.pop()
+        command.execute()
+        self._history.append(command)
+
+# Usage
+doc = TextDocument()
+invoker = CommandInvoker()
+
+invoker.execute(InsertCommand(doc, 0, "Hello, "))
+invoker.execute(InsertCommand(doc, 7, "World!"))
+print(doc.content)  # "Hello, World!"
+
+invoker.undo()
+print(doc.content)  # "Hello, "
+
+invoker.redo()
+print(doc.content)  # "Hello, World!"
+
+invoker.execute(DeleteCommand(doc, 5, 7))
+print(doc.content)  # "Hello"
+
+invoker.undo()
+print(doc.content)  # "Hello, World!"
+```
+
+### Real-World Applications
+
+| Application | Command Objects |
+|-------------|----------------|
+| Text editors | Insert, Delete, Format commands |
+| Task queues | Job objects with execute() |
+| GUI actions | Menu item / button actions |
+| Database migrations | Up/down migration commands |
+| Game replay | Recorded player actions |
+| Transaction systems | Operations that can be rolled back |
+
+---
+
+## Q9: What is the Chain of Responsibility Pattern?
+
+**Answer:**
+
+The **Chain of Responsibility** pattern lets you pass requests along a chain of handlers. Each handler decides either to process the request or to pass it to the next handler in the chain.
+
+```{mermaid}
+graph LR
+    REQ["Request"]
+    REQ --> H1["Handler 1<br/>(Authentication)"]
+    H1 -->|"pass"| H2["Handler 2<br/>(Rate Limiting)"]
+    H2 -->|"pass"| H3["Handler 3<br/>(Validation)"]
+    H3 -->|"pass"| H4["Handler 4<br/>(Business Logic)"]
+    H4 --> RESP["Response"]
+
+    H1 -.->|"reject"| ERR1["401 Unauthorized"]
+    H2 -.->|"reject"| ERR2["429 Too Many Requests"]
+    H3 -.->|"reject"| ERR3["400 Bad Request"]
+
+    style REQ fill:#6cc3d5,stroke:#333,color:#fff
+    style RESP fill:#56cc9d,stroke:#333,color:#fff
+    style ERR1 fill:#ff7851,stroke:#333,color:#fff
+    style ERR2 fill:#ff7851,stroke:#333,color:#fff
+    style ERR3 fill:#ff7851,stroke:#333,color:#fff
+```
+
+### Implementation: API Middleware Chain
+
+```python
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any
+
+@dataclass
+class Request:
+    path: str
+    method: str
+    headers: dict[str, str]
+    body: dict[str, Any] | None = None
+    user: str | None = None
+
+@dataclass
+class Response:
+    status_code: int
+    body: dict[str, Any]
+
+# Abstract handler
+class Middleware(ABC):
+    def __init__(self):
+        self._next: Middleware | None = None
+
+    def set_next(self, handler: "Middleware") -> "Middleware":
+        self._next = handler
+        return handler  # Enable chaining: a.set_next(b).set_next(c)
+
+    def handle(self, request: Request) -> Response:
+        if self._next:
+            return self._next.handle(request)
+        return Response(200, {"message": "OK"})
+
+# Concrete handlers
+class AuthenticationMiddleware(Middleware):
+    def handle(self, request: Request) -> Response:
+        token = request.headers.get("Authorization", "")
+        if not token.startswith("Bearer "):
+            return Response(401, {"error": "Missing or invalid token"})
+        # Extract user from token
+        request.user = token.split(" ")[1]  # Simplified
+        return super().handle(request)
+
+class RateLimitMiddleware(Middleware):
+    def __init__(self, max_requests: int = 100):
+        super().__init__()
+        self._counts: dict[str, int] = {}
+        self._max = max_requests
+
+    def handle(self, request: Request) -> Response:
+        user = request.user or "anonymous"
+        self._counts[user] = self._counts.get(user, 0) + 1
+        if self._counts[user] > self._max:
+            return Response(429, {"error": "Rate limit exceeded"})
+        return super().handle(request)
+
+class ValidationMiddleware(Middleware):
+    def handle(self, request: Request) -> Response:
+        if request.method == "POST" and not request.body:
+            return Response(400, {"error": "Request body required"})
+        return super().handle(request)
+
+class BusinessLogicHandler(Middleware):
+    def handle(self, request: Request) -> Response:
+        # Final handler — process the request
+        return Response(200, {
+            "message": f"Processed {request.method} {request.path}",
+            "user": request.user,
+        })
+
+# Build the chain
+auth = AuthenticationMiddleware()
+rate_limit = RateLimitMiddleware(max_requests=10)
+validation = ValidationMiddleware()
+logic = BusinessLogicHandler()
+
+auth.set_next(rate_limit).set_next(validation).set_next(logic)
+
+# Process requests through the chain
+request = Request(
+    path="/api/users",
+    method="POST",
+    headers={"Authorization": "Bearer user123"},
+    body={"name": "Alice"},
+)
+
+response = auth.handle(request)
+print(f"{response.status_code}: {response.body}")
+# 200: {'message': 'Processed POST /api/users', 'user': 'user123'}
+
+# Failing request — stopped at authentication
+bad_request = Request(path="/api/users", method="GET", headers={})
+response = auth.handle(bad_request)
+print(f"{response.status_code}: {response.body}")
+# 401: {'error': 'Missing or invalid token'}
+```
+
+### Chain of Responsibility vs Other Patterns
+
+| Pattern | Relationship |
+|---------|-------------|
+| **Chain of Responsibility** | Sequential handlers, each may stop the chain |
+| **Decorator** | All wrappers execute (add behavior), none skip |
+| **Command** | Single handler executes a specific action |
+| **Middleware** (web) | Practical application of Chain of Responsibility |
+
+---
+
+## Q10: What is the Proxy Pattern?
+
+**Answer:**
+
+The **Proxy pattern** provides a surrogate or placeholder for another object to control access to it. Common types include **virtual proxy** (lazy loading), **protection proxy** (access control), and **caching proxy**.
+
+```{mermaid}
+graph TD
+    CLIENT["Client"]
+    CLIENT --> PROXY["Proxy<br/>(same interface as Real Subject)"]
+    PROXY -->|"controlled access"| REAL["Real Subject<br/>(expensive resource)"]
+
+    subgraph Types["Proxy Types"]
+        VP["Virtual Proxy<br/>Lazy initialization"]
+        PP["Protection Proxy<br/>Access control"]
+        CP["Caching Proxy<br/>Store results"]
+        LP["Logging Proxy<br/>Track access"]
+    end
+
+    style PROXY fill:#56cc9d,stroke:#333,color:#fff
+    style REAL fill:#6cc3d5,stroke:#333,color:#fff
+```
+
+### Implementation: Multiple Proxy Types
+
+```python
+from typing import Protocol
+import time
+
+# Subject interface
+class DatabaseService(Protocol):
+    def query(self, sql: str) -> list[dict]: ...
+    def execute(self, sql: str) -> int: ...
+
+# Real subject (expensive to create, sensitive operations)
+class PostgresDatabase:
+    def __init__(self, connection_string: str):
+        print(f"[DB] Connecting to database...")
+        time.sleep(0.5)  # Expensive connection
+        self._conn = connection_string
+
+    def query(self, sql: str) -> list[dict]:
+        print(f"[DB] Executing query: {sql}")
+        return [{"id": 1, "name": "Alice"}]  # Simulated
+
+    def execute(self, sql: str) -> int:
+        print(f"[DB] Executing: {sql}")
+        return 1  # Rows affected
+
+# Virtual Proxy — lazy initialization
+class LazyDatabaseProxy:
+    """Defers expensive database connection until first use."""
+
+    def __init__(self, connection_string: str):
+        self._connection_string = connection_string
+        self._db: PostgresDatabase | None = None
+
+    def _get_db(self) -> PostgresDatabase:
+        if self._db is None:
+            self._db = PostgresDatabase(self._connection_string)
+        return self._db
+
+    def query(self, sql: str) -> list[dict]:
+        return self._get_db().query(sql)
+
+    def execute(self, sql: str) -> int:
+        return self._get_db().execute(sql)
+
+# Caching Proxy — avoids repeated expensive queries
+class CachingDatabaseProxy:
+    """Caches query results to reduce database load."""
+
+    def __init__(self, db: DatabaseService, ttl: float = 60.0):
+        self._db = db
+        self._cache: dict[str, tuple[list[dict], float]] = {}
+        self._ttl = ttl
+
+    def query(self, sql: str) -> list[dict]:
+        now = time.time()
+        if sql in self._cache:
+            result, timestamp = self._cache[sql]
+            if now - timestamp < self._ttl:
+                print(f"[Cache] HIT: {sql}")
+                return result
+
+        print(f"[Cache] MISS: {sql}")
+        result = self._db.query(sql)
+        self._cache[sql] = (result, now)
+        return result
+
+    def execute(self, sql: str) -> int:
+        # Writes invalidate cache
+        self._cache.clear()
+        return self._db.execute(sql)
+
+# Protection Proxy — access control
+class ProtectedDatabaseProxy:
+    """Restricts dangerous operations based on user role."""
+
+    def __init__(self, db: DatabaseService, user_role: str):
+        self._db = db
+        self._role = user_role
+
+    def query(self, sql: str) -> list[dict]:
+        # All roles can read
+        return self._db.query(sql)
+
+    def execute(self, sql: str) -> int:
+        # Only admins can write
+        if self._role != "admin":
+            raise PermissionError(
+                f"Role '{self._role}' cannot execute write operations"
+            )
+        return self._db.execute(sql)
+
+# Compose proxies: Lazy → Caching → Protected
+db = ProtectedDatabaseProxy(
+    CachingDatabaseProxy(
+        LazyDatabaseProxy("postgres://localhost/mydb"),
+        ttl=30,
+    ),
+    user_role="viewer",
+)
+
+# First query: lazy init + cache miss + actual query
+result = db.query("SELECT * FROM users")
+
+# Second query: cache hit (no DB call)
+result = db.query("SELECT * FROM users")
+
+# Write attempt: blocked by protection proxy
+try:
+    db.execute("DELETE FROM users")
+except PermissionError as e:
+    print(f"Blocked: {e}")
+```
+
+### Proxy Types Summary
+
+| Type | Purpose | Example |
+|------|---------|---------|
+| **Virtual** | Lazy initialization of expensive objects | DB connection on first use |
+| **Protection** | Access control / permissions | Role-based operation filtering |
+| **Caching** | Store expensive operation results | Query result cache |
+| **Logging** | Record all access to subject | Audit trail for API calls |
+| **Remote** | Represent remote object locally | RPC stub, API client |
+
+---
+
+## Summary Table
+
+| # | Pattern | Category | Key Idea |
+|---|---------|----------|----------|
+| 1 | **Singleton** | Creational | One instance, global access point |
+| 2 | **Factory / Abstract Factory** | Creational | Delegate object creation; families of objects |
+| 3 | **Observer** | Behavioral | One-to-many notification on state change |
+| 4 | **Strategy** | Behavioral | Interchangeable algorithms at runtime |
+| 5 | **Decorator** | Structural | Add behavior dynamically by wrapping |
+| 6 | **Adapter** | Structural | Bridge between incompatible interfaces |
+| 7 | **Builder** | Creational | Step-by-step complex object construction |
+| 8 | **Command** | Behavioral | Encapsulate requests; support undo/redo |
+| 9 | **Chain of Responsibility** | Behavioral | Pass request through handler chain |
+| 10 | **Proxy** | Structural | Control access to another object |
+
+---
+
+## What's Next?
+
+This article covered the foundational design patterns most asked in interviews. For related content:
+
+- **Python design patterns (Pythonic style):** [Python SWE Interview QA - 3](/posts/swe-interview/Python-SWE-Interview-QA-3.html)
+- **Production API patterns:** [Python SWE Interview QA - 4](/posts/swe-interview/Python-SWE-Interview-QA-4.html)
+- **Python fundamentals:** [Python SWE Interview QA - 1](/posts/swe-interview/Python-SWE-Interview-QA-1.html)
+- **Machine learning concepts:** [ML Interview QA - 1](/posts/ml-interview/ML-Interview-QA-1.html)
+- **LLM architecture:** [LLM Interview QA - 1](/posts/llm-interview/LLM-Interview-QA-1.html)
