@@ -26,11 +26,11 @@ This is **Part 2** of our Design Pattern Interview QA series, focused on **depen
 
 ---
 
-## Q1: What is Dependency Injection and how does the Spring Framework implement it?
+## Q1: What is Dependency Injection and how do modern frameworks implement it?
 
 **Answer:**
 
-**Dependency Injection (DI)** is a design pattern where an object's dependencies are provided from the outside rather than created internally. The **Spring Framework** is the most widely used DI container in Java — it manages object creation, wiring, and lifecycle automatically.
+**Dependency Injection (DI)** is a design pattern where an object's dependencies are provided from the outside rather than created internally. Frameworks such as **Spring** and **FastAPI** manage object creation, wiring, and lifecycle automatically.
 
 ```{mermaid}
 graph TD
@@ -54,178 +54,145 @@ graph TD
     style CONTAINER fill:#9fddea,stroke:#333,color:#222
 ```
 
-### Spring DI: Three Injection Types
+### Python DI: Three Injection Styles
 
-```java
-// 1. CONSTRUCTOR INJECTION (recommended by Spring team)
-@Service
-public class OrderService {
+```python
+from dataclasses import dataclass
+from typing import Protocol
 
-    private final OrderRepository orderRepo;
-    private final EmailService emailService;
+class OrderRepository(Protocol):
+    def save(self, order: "Order") -> "Order": ...
 
-    // Spring auto-injects matching beans
-    @Autowired // Optional in Spring 4.3+ with single constructor
-    public OrderService(OrderRepository orderRepo, EmailService emailService) {
-        this.orderRepo = orderRepo;
-        this.emailService = emailService;
-    }
+class EmailService(Protocol):
+    def send_confirmation(self, order: "Order") -> None: ...
 
-    public Order createOrder(OrderRequest request) {
-        Order order = orderRepo.save(new Order(request));
-        emailService.sendConfirmation(order);
-        return order;
-    }
-}
+@dataclass
+class Order:
+    id: int | None
+    item: str
 
-// 2. SETTER INJECTION (for optional dependencies)
-@Service
-public class ReportService {
+@dataclass
+class OrderRequest:
+    item: str
 
-    private ReportFormatter formatter;
+# 1. CONSTRUCTOR INJECTION (recommended)
+class OrderService:
+    def __init__(self, order_repo: OrderRepository, email_service: EmailService):
+        self.order_repo = order_repo
+        self.email_service = email_service
 
-    @Autowired(required = false) // Optional dependency
-    public void setFormatter(ReportFormatter formatter) {
-        this.formatter = formatter;
-    }
+    def create_order(self, request: OrderRequest) -> Order:
+        order = self.order_repo.save(Order(id=None, item=request.item))
+        self.email_service.send_confirmation(order)
+        return order
 
-    public String generate(List<Data> data) {
-        if (formatter != null) {
-            return formatter.format(data);
-        }
-        return data.toString(); // Fallback
-    }
-}
+# 2. PARAMETER/FUNCTION INJECTION (common in Python)
+def generate_report(data: list[dict], formatter=None) -> str:
+    if formatter is not None:
+        return formatter(data)
+    return str(data)
 
-// 3. FIELD INJECTION (discouraged — hard to test)
-@Service
-public class UserService {
+# 3. FRAMEWORK INJECTION (FastAPI Depends)
+from fastapi import Depends, FastAPI
+from typing import Annotated
 
-    @Autowired // Injected directly — no constructor or setter
-    private UserRepository userRepo;
+app = FastAPI()
 
-    // Hard to test: can't easily provide a mock
-}
+def get_order_service() -> OrderService:
+    return OrderService(order_repo=SqlOrderRepo(), email_service=SmtpEmailService())
+
+@app.post("/orders")
+def create_order(
+    request: OrderRequest,
+    service: Annotated[OrderService, Depends(get_order_service)],
+):
+    return service.create_order(request)
 ```
 
-### Spring Bean Scopes and Lifecycle
+### Python Dependency Scope and Lifecycle
 
-```java
-// Define beans with different scopes
-@Component
-@Scope("singleton") // Default — one instance per container
-public class AppConfig { }
+```python
+from collections.abc import Generator
 
-@Component
-@Scope("prototype") // New instance every time it's injected
-public class RequestHandler { }
+# App-level singleton dependency (created once)
+class Settings:
+    def __init__(self):
+        self.env = "production"
 
-@Component
-@Scope("request") // One instance per HTTP request (web apps)
-public class RequestContext { }
+settings = Settings()
 
-// Bean lifecycle hooks
-@Component
-public class DatabasePool {
+# Request-scoped dependency with cleanup (FastAPI)
+def get_db() -> Generator["Database", None, None]:
+    db = Database("postgresql://localhost/app")
+    try:
+        yield db  # Injected into handlers
+    finally:
+        db.close()  # Lifecycle cleanup
 
-    @PostConstruct // Called after dependency injection
-    public void init() {
-        System.out.println("Initializing connection pool...");
-    }
-
-    @PreDestroy // Called before bean is destroyed
-    public void cleanup() {
-        System.out.println("Closing connections...");
-    }
-}
+# Transient/prototype behavior: create each time
+def build_request_handler() -> "RequestHandler":
+    return RequestHandler()
 ```
 
-### Spring Configuration Approaches
+### Python Configuration Approaches
 
-```java
-// Approach 1: Annotation-based (most common in Spring Boot)
-@Configuration
-public class AppConfig {
+```python
+from pydantic_settings import BaseSettings
 
-    @Bean
-    public DataSource dataSource() {
-        return new HikariDataSource(hikariConfig());
-    }
+# Approach 1: Settings class from env/.env
+class AppSettings(BaseSettings):
+    db_url: str = "sqlite:///app.db"
+    email_backend: str = "smtp"
 
-    @Bean
-    public OrderRepository orderRepository(DataSource ds) {
-        return new JdbcOrderRepository(ds); // Spring injects DataSource
-    }
-}
+settings = AppSettings()
 
-// Approach 2: Component scanning
-@SpringBootApplication // Enables @ComponentScan
-public class Application {
-    public static void main(String[] args) {
-        SpringApplication.run(Application.class, args);
-    }
-}
+# Approach 2: Dependency provider functions
+def get_order_repository() -> "OrderRepository":
+    return SqlOrderRepo(settings.db_url)
 
-// Approach 3: Profiles for environment-specific beans
-@Configuration
-@Profile("production")
-public class ProdConfig {
-    @Bean
-    public EmailService emailService() {
-        return new SmtpEmailService(); // Real email in production
-    }
-}
+def get_email_service() -> "EmailService":
+    if settings.email_backend == "smtp":
+        return SmtpEmailService()
+    return MockEmailService()
 
-@Configuration
-@Profile("test")
-public class TestConfig {
-    @Bean
-    public EmailService emailService() {
-        return new MockEmailService(); // Fake email in tests
-    }
-}
+# Approach 3: Environment-based wiring
+def get_payment_gateway() -> "PaymentGateway":
+    if settings.env == "production":
+        return StripeGateway()
+    return FakePaymentGateway()
 ```
 
-### Testing with Spring DI
+### Testing Python DI
 
-```java
-// Unit test — inject mocks manually (no Spring container)
-class OrderServiceTest {
+```python
+from unittest.mock import Mock
 
-    @Test
-    void shouldCreateOrder() {
-        // Arrange — construct with mocks
-        OrderRepository mockRepo = mock(OrderRepository.class);
-        EmailService mockEmail = mock(EmailService.class);
-        OrderService service = new OrderService(mockRepo, mockEmail);
+# Unit test — inject mocks manually
+def test_create_order_unit():
+    mock_repo = Mock()
+    mock_email = Mock()
+    service = OrderService(mock_repo, mock_email)
 
-        when(mockRepo.save(any())).thenReturn(new Order(1L));
+    mock_repo.save.return_value = Order(id=1, item="Widget")
 
-        // Act
-        Order order = service.createOrder(new OrderRequest("Widget"));
+    order = service.create_order(OrderRequest(item="Widget"))
 
-        // Assert
-        verify(mockRepo).save(any());
-        verify(mockEmail).sendConfirmation(order);
-    }
-}
+    mock_repo.save.assert_called_once()
+    mock_email.send_confirmation.assert_called_once_with(order)
 
-// Integration test — Spring wires everything
-@SpringBootTest
-class OrderServiceIntegrationTest {
+# Integration-style test — override FastAPI dependencies
+from fastapi.testclient import TestClient
 
-    @Autowired
-    private OrderService orderService; // Spring injects real beans
+def test_create_order_api(app):
+    fake_service = Mock()
+    fake_service.create_order.return_value = {"id": 10, "item": "Gadget"}
 
-    @MockBean
-    private EmailService emailService; // Replace with mock
+    app.dependency_overrides[get_order_service] = lambda: fake_service
+    client = TestClient(app)
 
-    @Test
-    void shouldCreateOrderWithRealDB() {
-        Order order = orderService.createOrder(new OrderRequest("Gadget"));
-        assertNotNull(order.getId());
-    }
-}
+    res = client.post("/orders", json={"item": "Gadget"})
+    assert res.status_code == 200
+    app.dependency_overrides.clear()
 ```
 
 ### Why Constructor Injection Is Preferred
@@ -1299,7 +1266,7 @@ class UserService:
 
 ---
 
-## Q9: What is the MVC Pattern and how does Spring implement it?
+## Q9: What is the MVC Pattern and how is it implemented in Python web frameworks?
 
 **Answer:**
 
@@ -1329,88 +1296,58 @@ graph TD
     style Spring fill:#fff
 ```
 
-### Spring MVC Implementation
+### Python MVC Implementation (FastAPI)
 
-```java
-// MODEL — Entity + Service
-@Entity
-public class Product {
-    @Id @GeneratedValue
-    private Long id;
-    private String name;
-    private BigDecimal price;
-    private int stock;
-    // Getters, setters...
-}
+```python
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
-@Service
-public class ProductService {
-    private final ProductRepository repo;
+app = FastAPI()
 
-    public ProductService(ProductRepository repo) {
-        this.repo = repo;
-    }
+# MODEL
+class Product(BaseModel):
+    id: int | None = None
+    name: str
+    price: float
+    stock: int
 
-    public List<Product> listAll() { return repo.findAll(); }
-    public Product getById(Long id) {
-        return repo.findById(id)
-            .orElseThrow(() -> new ProductNotFoundException(id));
-    }
-    public Product create(Product product) { return repo.save(product); }
-}
+class ProductService:
+    def __init__(self):
+        self._products: dict[int, Product] = {}
+        self._next_id = 1
 
-// CONTROLLER — handles HTTP requests
-@RestController  // Returns JSON (no view resolution)
-@RequestMapping("/api/v1/products")
-public class ProductController {
+    def list_all(self) -> list[Product]:
+        return list(self._products.values())
 
-    private final ProductService productService;
+    def get_by_id(self, product_id: int) -> Product:
+        product = self._products.get(product_id)
+        if product is None:
+            raise KeyError(f"Product {product_id} not found")
+        return product
 
-    public ProductController(ProductService productService) {
-        this.productService = productService;
-    }
+    def create(self, product: Product) -> Product:
+        product.id = self._next_id
+        self._products[self._next_id] = product
+        self._next_id += 1
+        return product
 
-    @GetMapping
-    public List<Product> listProducts() {
-        return productService.listAll();
-    }
+service = ProductService()
 
-    @GetMapping("/{id}")
-    public Product getProduct(@PathVariable Long id) {
-        return productService.getById(id);
-    }
+# CONTROLLER (JSON endpoints)
+@app.get("/api/v1/products", response_model=list[Product])
+def list_products():
+    return service.list_all()
 
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public Product createProduct(@Valid @RequestBody Product product) {
-        return productService.create(product);
-    }
+@app.get("/api/v1/products/{product_id}", response_model=Product)
+def get_product(product_id: int):
+    try:
+        return service.get_by_id(product_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    // Exception handling
-    @ExceptionHandler(ProductNotFoundException.class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
-    public Map<String, String> handleNotFound(ProductNotFoundException ex) {
-        return Map.of("error", ex.getMessage());
-    }
-}
-
-// VIEW — for server-side rendering (Thymeleaf)
-@Controller  // Returns view names (not @RestController)
-@RequestMapping("/products")
-public class ProductViewController {
-
-    @GetMapping
-    public String listProducts(Model model) {
-        model.addAttribute("products", productService.listAll());
-        return "products/list";  // → templates/products/list.html
-    }
-
-    @GetMapping("/{id}")
-    public String showProduct(@PathVariable Long id, Model model) {
-        model.addAttribute("product", productService.getById(id));
-        return "products/detail";
-    }
-}
+@app.post("/api/v1/products", response_model=Product, status_code=201)
+def create_product(product: Product):
+    return service.create(product)
 ```
 
 ### MVC Variants
@@ -1556,43 +1493,53 @@ async def get_order(order_id: int):
     return query_handler.handle_get(GetOrderQuery(order_id))
 ```
 
-### Spring CQRS with Separate Models
+### Python CQRS with Separate Models
 
-```java
-// Write model — normalized, validated
-@Entity
-@Table(name = "orders")
-public class Order {
-    @Id @GeneratedValue
-    private Long id;
-    private Long userId;
-    @OneToMany(cascade = CascadeType.ALL)
-    private List<OrderItem> items;
-    private String status;
-    private LocalDateTime createdAt;
-}
+```python
+from sqlalchemy import DateTime, Integer, String, Numeric
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from datetime import datetime
 
-// Read model — denormalized for fast queries
-@Entity
-@Table(name = "order_views")
-public class OrderView {
-    @Id
-    private Long orderId;
-    private String userName;       // Pre-joined
-    private String itemsSummary;   // Pre-computed
-    private BigDecimal total;      // Pre-calculated
-    private String status;
-    private LocalDateTime createdAt;
-}
+class Base(DeclarativeBase):
+    pass
 
-// Separate repositories
-@Repository
-public interface OrderRepository extends JpaRepository<Order, Long> { }
+# Write model — normalized, validated
+class Order(Base):
+    __tablename__ = "orders"
 
-@Repository
-public interface OrderViewRepository extends JpaRepository<OrderView, Long> {
-    Page<OrderView> findByUserNameContaining(String name, Pageable pageable);
-}
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+# Read model — denormalized for fast queries
+class OrderView(Base):
+    __tablename__ = "order_views"
+
+    order_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    items_summary: Mapped[str] = mapped_column(String(1024), nullable=False)
+    total: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+# Repositories are intentionally separate (write repo vs read repo)
+class OrderRepository:
+    def __init__(self, session):
+        self.session = session
+
+class OrderViewRepository:
+    def __init__(self, session):
+        self.session = session
+
+    def find_by_user_name(self, name: str, limit: int = 20, offset: int = 0):
+        stmt = (
+            self.session.query(OrderView)
+            .filter(OrderView.user_name.ilike(f"%{name}%"))
+            .offset(offset)
+            .limit(limit)
+        )
+        return stmt.all()
 ```
 
 ### When to Use CQRS
@@ -1611,7 +1558,7 @@ public interface OrderViewRepository extends JpaRepository<OrderView, Long> {
 
 | # | Pattern | Category | Key Idea |
 |---|---------|----------|----------|
-| 1 | **Spring DI** | IoC / Creational | Container injects dependencies via `@Autowired` / constructor |
+| 1 | **Python DI** | IoC / Creational | Dependencies injected via constructors, provider functions, or `Depends()` |
 | 2 | **Inversion of Control** | Principle | Framework controls object creation and flow |
 | 3 | **Template Method** | Behavioral | Algorithm skeleton in base class, steps in subclasses |
 | 4 | **State** | Behavioral | Object behavior changes with internal state transitions |
