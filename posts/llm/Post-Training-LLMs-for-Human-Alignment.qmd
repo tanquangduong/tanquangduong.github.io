@@ -43,6 +43,7 @@ Before diving into individual methods, here is how post-training fits into the L
 
 ```{mermaid}
 graph LR
+    linkStyle default stroke:#000,color:#000
     A["Pretraining<br/>(next-token prediction<br/>on large corpus)"] --> B["SFT<br/>(instruction<br/>fine-tuning)"]
     B --> C["Preference Alignment<br/>(RLHF / DPO / ORPO<br/>/ KTO / GRPO)"]
     C --> D["Deployment<br/>(quantization,<br/>serving)"]
@@ -61,6 +62,7 @@ SFT is the foundational first step. The model is trained on (instruction, respon
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     A["Pretrained Base Model"] --> B["Instruction Dataset<br/>(prompt → response pairs)"]
     B --> C["Cross-Entropy Loss<br/>on target tokens"]
     C --> D["SFT Model<br/>(follows instructions)"]
@@ -111,6 +113,7 @@ RLHF is the classic alignment method, famously used to build InstructGPT and Cha
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     subgraph Stage1["Stage 1: Reward Model Training"]
         direction TB
         A1["Human Annotators<br/>rank responses"] --> A2["Preference Dataset<br/>(prompt, chosen, rejected)"]
@@ -131,6 +134,8 @@ graph TD
     style B1 fill:#4a90d9,color:#fff,stroke:#333
     style B2 fill:#f5a623,color:#fff,stroke:#333
     style B3 fill:#27ae60,color:#fff,stroke:#333
+    style Stage1 fill:#fff
+    style Stage2 fill:#fff
 ```
 
 ### How It Works
@@ -164,6 +169,7 @@ DPO eliminates the need for a separate reward model by directly optimizing the p
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     A["SFT Model<br/>(policy + reference)"] --> B["Preference Dataset<br/>(prompt, chosen, rejected)"]
     B --> C["DPO Loss<br/>binary cross-entropy<br/>on log-probability ratios"]
     C --> D["Aligned Model<br/>(no reward model needed)"]
@@ -238,6 +244,7 @@ KTO removes the requirement of **paired** preference data. Instead of needing (c
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     A["SFT Model"] --> B["Unpaired Feedback<br/>👍 good examples<br/>👎 bad examples"]
     B --> C["KTO Loss<br/>(Kahneman-Tversky<br/>value function)"]
     C --> D["Aligned Model"]
@@ -272,6 +279,7 @@ ORPO is unique: it **combines SFT and preference alignment into a single trainin
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     A["Pretrained Base Model"] --> B["Preference Dataset<br/>(prompt, chosen, rejected)"]
     B --> C["ORPO Loss<br/>= NLL + λ·OR Loss"]
 
@@ -290,6 +298,7 @@ graph TD
     style D fill:#4a90d9,color:#fff,stroke:#333
     style E fill:#f5a623,color:#fff,stroke:#333
     style F fill:#27ae60,color:#fff,stroke:#333
+    style LossComponents fill:#fff
 ```
 
 ### How It Works
@@ -342,6 +351,7 @@ GRPO was introduced by DeepSeek for enhancing mathematical reasoning. Unlike DPO
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     A["Policy Model"] --> B["Generate G completions<br/>per prompt"]
     B --> C["Score with<br/>Reward Function"]
     C --> D["Compute Group-Relative<br/>Advantages<br/>A = (r - mean) / std"]
@@ -429,6 +439,7 @@ trainer = GRPOTrainer(
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     A{{"Do you have<br/>preference data?"}}
     A -->|"No, only instructions"| B["SFT"]
     A -->|"Yes"| C{{"Paired or<br/>unpaired?"}}
@@ -522,6 +533,7 @@ trainer = DPOTrainer(
 
 ```{mermaid}
 graph LR
+    linkStyle default stroke:#000,color:#000
     A["RLHF + PPO<br/>(2022)<br/>InstructGPT"] --> B["DPO<br/>(2023)<br/>No reward model"]
     B --> C["KTO<br/>(2024)<br/>Unpaired data"]
     B --> D["IPO<br/>(2023)<br/>Regularized DPO"]

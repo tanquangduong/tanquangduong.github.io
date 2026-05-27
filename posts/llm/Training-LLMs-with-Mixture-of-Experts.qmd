@@ -42,6 +42,7 @@ This article covers MoE architecture from the ground up: how routing works, how 
 
 ```{mermaid}
 graph LR
+    linkStyle default stroke:#000,color:#000
     subgraph Dense["Dense Model"]
         direction TB
         D1["All parameters<br/>activated for<br/>every token"]
@@ -62,6 +63,8 @@ graph LR
     style D2 fill:#e74c3c,color:#fff,stroke:#333
     style S2 fill:#27ae60,color:#fff,stroke:#333
     style A fill:#4a90d9,color:#fff,stroke:#333
+    style Dense fill:#fff
+    style Sparse fill:#fff
 ```
 
 | Aspect | Dense Model | MoE Model |
@@ -83,6 +86,7 @@ In a standard Transformer, each layer has a self-attention block followed by a f
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     A["Input Hidden State<br/>(per token)"] --> B["Router<br/>(Gating Network)"]
     B -->|"weight=0.7"| E1["Expert 1<br/>(FFN)"]
     B -->|"weight=0.3"| E2["Expert 2<br/>(FFN)"]
@@ -135,6 +139,7 @@ The router is the most critical design decision in a MoE. It determines which to
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     A{{"Routing<br/>Strategies"}} --> B["Top-K<br/>Routing"]
     A --> C["Expert<br/>Choice"]
     A --> D["Token<br/>Choice"]
@@ -207,6 +212,7 @@ Without intervention, routers converge to send most tokens to a few "popular" ex
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     A["Unbalanced<br/>Routing"] --> B["Popular experts<br/>get more tokens"]
     B --> C["Popular experts<br/>train faster"]
     C --> D["Router reinforces<br/>same experts"]
@@ -278,6 +284,7 @@ Different MoE architectures approach expert design differently. The key innovati
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     A{{"Expert Design<br/>Strategies"}} --> B["Standard MoE<br/>(Mixtral)"]
     A --> C["Fine-Grained MoE<br/>(DeepSeekMoE)"]
     A --> D["Shared + Routed<br/>(DeepSeek-V2/V3)"]
@@ -498,6 +505,7 @@ Training a MoE from scratch is expensive. **Sparse upcycling** offers a practica
 
 ```{mermaid}
 graph LR
+    linkStyle default stroke:#000,color:#000
     A["Dense Model<br/>(pre-trained)"] --> B["Copy FFN weights<br/>to all experts"]
     B --> C["Add random<br/>router weights"]
     C --> D["Continue training<br/>as MoE"]
@@ -661,6 +669,7 @@ MoE training is less stable than dense training. Key practices:
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     A["Pre-trained MoE<br/>(e.g. Qwen3-30B-A3B)"] --> B["Add LoRA adapters<br/>to expert layers"]
     B --> C["Fine-tune with<br/>Unsloth + TRL"]
     C --> D["Merge & Export<br/>(GGUF / safetensors)"]
@@ -786,6 +795,7 @@ MoE models have unique fine-tuning characteristics compared to dense models:
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     A{{"Fine-tuning<br/>Considerations"}} --> B["Overfitting"]
     A --> C["Expert Freezing"]
     A --> D["Instruction Tuning"]

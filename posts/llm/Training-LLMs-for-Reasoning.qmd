@@ -41,6 +41,7 @@ There are fundamentally two paths to build a reasoning model:
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     A["Base / Instruct Model"] --> B{{"Training Approach"}}
     B -->|"Path 1: Distillation"| C["SFT on reasoning traces<br/>from a stronger model"]
     B -->|"Path 2: RL from scratch"| D["GRPO / PPO with<br/>verifiable reward functions"]
@@ -71,6 +72,7 @@ The simplest approach: train your model on (question, reasoning_trace, answer) e
 
 ```{mermaid}
 graph LR
+    linkStyle default stroke:#000,color:#000
     A["Teacher Model<br/>(e.g. DeepSeek-R1,<br/>Qwen3-32B)"] -->|"Generate reasoning<br/>traces"| B["Reasoning Dataset<br/>&lt;think&gt;...&lt;/think&gt;<br/>&lt;answer&gt;...&lt;/answer&gt;"]
     B -->|"SFT"| C["Student Model<br/>(e.g. Qwen2.5-0.5B)"]
     C --> D["Small Reasoning<br/>Model"]
@@ -149,6 +151,7 @@ The more powerful but complex approach: use reinforcement learning to teach the 
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     subgraph Generation["Generation Phase"]
         direction TB
         A1["Policy Model"] --> A2["Generate G completions<br/>per math/code prompt"]
@@ -176,6 +179,9 @@ graph TD
     style B2 fill:#f5a623,color:#fff,stroke:#333
     style C1 fill:#e74c3c,color:#fff,stroke:#333
     style C2 fill:#e74c3c,color:#fff,stroke:#333
+    style Generation fill:#fff
+    style Reward fill:#fff
+    style Update fill:#fff
 ```
 
 ### Why GRPO for Reasoning?
@@ -247,6 +253,7 @@ DeepSeek-R1-Zero demonstrated remarkable emergent capabilities from pure RL:
 
 ```{mermaid}
 graph LR
+    linkStyle default stroke:#000,color:#000
     A["Pure RL Training<br/>(no demonstrations)"] --> B["Self-verification<br/>'Let me check...'"]
     A --> C["Backtracking<br/>'Wait, that's wrong...'"]
     A --> D["Exploration<br/>'Another approach...'"]
@@ -267,6 +274,7 @@ DeepSeek-R1 is the most comprehensive open recipe for training a reasoning model
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     A["DeepSeek-V3 Base<br/>(671B MoE)"] --> B["R1-Zero<br/>Pure GRPO on<br/>math & code"]
     B --> C["Cold Start SFT<br/>Small curated set<br/>for readability"]
     C --> D["RL Phase 2<br/>Expanded rewards<br/>(helpfulness, safety)"]
@@ -323,6 +331,7 @@ An intermediate approach between pure SFT and RL: generate many completions, kee
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     A["Current Model"] --> B["Generate N responses<br/>per prompt<br/>(e.g., N=64)"]
     B --> C["Verify answers<br/>(math: check result,<br/>code: run tests)"]
     C --> D["Keep correct<br/>responses only"]
@@ -397,6 +406,7 @@ The quality of reward functions is critical for RL-based reasoning training. Her
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     A{{"Reward Type"}} --> B["Outcome-Based<br/>(ORM)"]
     A --> C["Process-Based<br/>(PRM)"]
     A --> D["Rule-Based<br/>(Verifiers)"]
@@ -473,6 +483,7 @@ Modern reasoning models support two modes — direct answering when reasoning is
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     A["User Query"] --> B{{"Mode?"}}
     B -->|"/think"| C["Generate:<br/>&lt;think&gt;step-by-step reasoning&lt;/think&gt;<br/>Final answer"]
     B -->|"/no_think"| D["Generate:<br/>&lt;think&gt;&lt;/think&gt;<br/>Direct answer"]
@@ -490,6 +501,7 @@ graph TD
     style E fill:#9b59b6,color:#fff,stroke:#333
     style F fill:#e67e22,color:#fff,stroke:#333
     style G fill:#1abc9c,color:#fff,stroke:#333
+    style Training fill:#fff
 ```
 
 ### Training a Dual-Mode Reasoner
@@ -533,6 +545,7 @@ print(tokenizer.decode(output[0], skip_special_tokens=True))
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     A{{"What resources<br/>do you have?"}}
     A -->|"Limited GPU,<br/>quick results"| B{{"Have a teacher<br/>model?"}}
     B -->|"Yes"| C["Reasoning Distillation<br/>(CoT SFT)"]
@@ -581,6 +594,7 @@ For **multi-GPU cluster**:
 
 ```{mermaid}
 graph LR
+    linkStyle default stroke:#000,color:#000
     A["Chain-of-Thought<br/>Prompting<br/>(Wei et al., 2022)"] --> B["STaR<br/>Self-Taught<br/>Reasoner<br/>(Zelikman, 2022)"]
     B --> C["OpenAI o1<br/>(Sep 2024)"]
     C --> D["DeepSeek-R1<br/>(Jan 2025)"]

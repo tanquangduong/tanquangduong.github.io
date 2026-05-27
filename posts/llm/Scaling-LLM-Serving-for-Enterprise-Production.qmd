@@ -49,6 +49,7 @@ Scaling LLM serving is not a single jump — it is a progressive journey through
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     T1["Tier 1: Single GPU<br/>~10-50 req/s"] --> T2["Tier 2: Multi-GPU Single Node<br/>~100-500 req/s"]
     T2 --> T3["Tier 3: Multi-Node Cluster<br/>~1K-10K req/s"]
     T3 --> T4["Tier 4: Load-Balanced Fleet<br/>~10K-100K req/s"]
@@ -100,6 +101,7 @@ For multi-node deployments, the interconnect between GPUs across nodes becomes t
 
 ```{mermaid}
 graph LR
+    linkStyle default stroke:#000,color:#000
     subgraph Node1["Node 1 — 8x H100"]
         G1["GPU 0"] <-->|"NVLink<br/>900 GB/s"| G2["GPU 1"]
         G2 <-->|"NVLink"| G3["GPU ..."]
@@ -122,6 +124,8 @@ graph LR
     style G6 fill:#27ae60,color:#fff,stroke:#333
     style G7 fill:#27ae60,color:#fff,stroke:#333
     style G8 fill:#27ae60,color:#fff,stroke:#333
+    style Node1 fill:#fff
+    style Node2 fill:#fff
 ```
 
 | Interconnect | Bandwidth | Latency | Use Case |
@@ -213,6 +217,7 @@ When a model exceeds the memory of a single GPU, you must split it across multip
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     A["Model too large for 1 GPU"] --> B{"Fits on single node?"}
     B -->|"Yes"| C["Tensor Parallelism<br/>Split layers across GPUs"]
     B -->|"No"| D["Pipeline Parallelism<br/>Split layers across nodes"]
@@ -354,6 +359,7 @@ For throughput beyond what a single model replica can handle, run **multiple ind
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     Client["Client Requests"] --> LB["Nginx Load Balancer<br/>Round-Robin / Least-Conn"]
     LB --> V1["vLLM Replica 1<br/>GPU 0"]
     LB --> V2["vLLM Replica 2<br/>GPU 1"]
@@ -525,6 +531,7 @@ spec:
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     Users["Users / API Clients"] --> Ingress["K8s Ingress Controller"]
     Ingress --> Router["vLLM Router Service<br/>Prefix + Model-Aware Routing"]
     Router --> Pod1["vLLM Pod 1<br/>GPU 0-3, TP=4"]
@@ -619,6 +626,7 @@ Separate prefill (processing the prompt) from decode (generating tokens) across 
 
 ```{mermaid}
 graph LR
+    linkStyle default stroke:#000,color:#000
     R["Request"] --> PF["Prefill Instance<br/>Compute-Optimized<br/>High TFLOPS GPU"]
     PF -->|"KV Cache Transfer"| DC["Decode Instance<br/>Memory-Optimized<br/>High BW GPU"]
     DC --> Resp["Response Tokens"]
@@ -686,6 +694,7 @@ Here is a reference architecture for serving an LLM at enterprise scale on-premi
 
 ```{mermaid}
 graph TD
+    linkStyle default stroke:#000,color:#000
     LB["L4/L7 Load Balancer<br/>HAProxy / F5 / MetalLB"] --> K8s["Kubernetes Cluster"]
 
     subgraph K8s["Kubernetes Cluster"]
@@ -709,6 +718,7 @@ graph TD
     style HPA2 fill:#c0392b,color:#fff,stroke:#333
     style HPA3 fill:#c0392b,color:#fff,stroke:#333
     style Monitor fill:#f39c12,color:#fff,stroke:#333
+    style K8s fill:#fff
 ```
 
 ### Capacity Planning Example
