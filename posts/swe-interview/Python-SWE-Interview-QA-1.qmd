@@ -148,25 +148,39 @@ graph TD
 ### Solutions for CPU-Bound Parallelism
 
 ```python
-# ✗ Threading — limited by GIL for CPU work
+# Same CPU task for all approaches
+from multiprocessing import Pool
+import asyncio
 import threading
 
-# ✓ Multiprocessing — separate processes, separate GILs
-from multiprocessing import Pool
-
-def cpu_heavy(n):
+def cpu_heavy(n: int) -> int:
     return sum(i * i for i in range(n))
 
-with Pool(4) as p:
-    results = p.map(cpu_heavy, [10**7] * 4)
+# 1) Threading (not ideal for CPU-bound code in CPython because of GIL)
+thread_results = [None] * 4
 
-# ✓ asyncio — for I/O-bound concurrency
-import asyncio
+def thread_worker(index: int, n: int) -> None:
+    thread_results[index] = cpu_heavy(n)
 
-async def fetch_data(url):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
-            return await resp.json()
+threads = [threading.Thread(target=thread_worker, args=(i, 10**7)) for i in range(4)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+
+# 2) Multiprocessing (good for CPU-bound work: true parallelism)
+with Pool(4) as pool:
+    process_results = pool.map(cpu_heavy, [10**7] * 4)
+
+# 3) asyncio (good for I/O-bound work, not CPU-bound loops)
+async def fake_io_call(delay: float) -> str:
+    await asyncio.sleep(delay)  # Simulate network/file/database wait
+    return f"done in {delay}s"
+
+async def run_asyncio_demo() -> list[str]:
+    return await asyncio.gather(fake_io_call(1.0), fake_io_call(1.2), fake_io_call(0.8))
+
+asyncio_results = asyncio.run(run_asyncio_demo())
 ```
 
 ### When to Use What
@@ -382,7 +396,7 @@ list(flatten([1, [2, [3, 4]], 5]))  # [1, 2, 3, 4, 5]
 Python's **data model** (dunder/magic methods) defines how objects behave with built-in operations. By implementing these methods, custom classes integrate seamlessly with Python's syntax and built-in functions.
 
 ```{mermaid}
-graph TD
+graph LR
     linkStyle default stroke:#000,color:#000
     DM["Python Data Model (Dunder Methods)"]
     DM --> LIFE["Object Lifecycle"]
@@ -734,7 +748,7 @@ with timer("data processing"):
 Python uses a combination of **reference counting** (primary) and **cyclic garbage collection** (secondary) to manage memory automatically.
 
 ```{mermaid}
-graph TD
+graph LR
     linkStyle default stroke:#000,color:#000
     MM["Python Memory Management"]
     MM --> RC["Reference Counting<br/>(Primary mechanism)"]
