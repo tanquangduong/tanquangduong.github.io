@@ -10,7 +10,1289 @@
 <atom:link href="https://vectoringai.com/pages/swe-interview.xml" rel="self" type="application/rss+xml"/>
 <description>Software engineering interview questions covering fundamentals, advanced internals, design patterns, best practices, and production code structure.</description>
 <generator>quarto-1.9.36</generator>
-<lastBuildDate>Wed, 20 May 2026 22:00:00 GMT</lastBuildDate>
+<lastBuildDate>Tue, 02 Jun 2026 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>Python SWE Interview QA - 5</title>
+  <dc:creator>Vectoring AI</dc:creator>
+  <link>https://vectoringai.com/posts/swe-interview/Python-SWE-Interview-QA-5.html</link>
+  <description><![CDATA[ 
+
+
+
+
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>This is <strong>Part 5</strong> of our Python SWE Interview QA series, focused on <strong>async programming in real systems</strong>: <code>async</code>/<code>await</code>, I/O-bound vs CPU-bound workloads, threads vs processes, GIL behavior, PIL/Pillow workloads, and production best practices.</p>
+<blockquote class="blockquote">
+<p>For fundamentals, see <a href="../../posts/swe-interview/Python-SWE-Interview-QA-1.html">Part 1</a>. For advanced internals, see <a href="../../posts/swe-interview/Python-SWE-Interview-QA-2.html">Part 2</a>. For architecture and production APIs, see <a href="../../posts/swe-interview/Python-SWE-Interview-QA-3.html">Part 3</a> and <a href="../../posts/swe-interview/Python-SWE-Interview-QA-4.html">Part 4</a>.</p>
+</blockquote>
+<hr>
+</section>
+<section id="q1-what-exactly-do-async-and-await-do-in-python" class="level2">
+<h2 class="anchored" data-anchor-id="q1-what-exactly-do-async-and-await-do-in-python">Q1: What exactly do <code>async</code> and <code>await</code> do in Python?</h2>
+<p><strong>Answer:</strong></p>
+<p><code>async def</code> defines a <strong>coroutine function</strong>. Calling it does not run it immediately; it returns a coroutine object. <code>await</code> tells the event loop: “pause this coroutine here and run other ready work until this awaited operation completes.”</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    linkStyle default stroke:#000,color:#000
+    A["Coroutine A starts"] --&gt; B["await network call"]
+    B --&gt; C["Event loop switches to coroutine B/C/D"]
+    C --&gt; D["I/O completes"]
+    D --&gt; E["Coroutine A resumes"]
+
+    style A fill:#56cc9d,stroke:#333,color:#fff
+    style C fill:#6cc3d5,stroke:#333,color:#fff
+    style E fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<section id="minimal-mental-model" class="level3">
+<h3 class="anchored" data-anchor-id="minimal-mental-model">Minimal Mental Model</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Keyword</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>async def</code></td>
+<td>Defines coroutine function</td>
+</tr>
+<tr class="even">
+<td><code>await x</code></td>
+<td>Suspend current coroutine until <code>x</code> completes</td>
+</tr>
+<tr class="odd">
+<td>Event loop</td>
+<td>Scheduler that runs coroutines cooperatively</td>
+</tr>
+<tr class="even">
+<td><code>Task</code></td>
+<td>Scheduled coroutine managed by the loop</td>
+</tr>
+</tbody>
+</table>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> asyncio</span>
+<span id="cb1-2"></span>
+<span id="cb1-3"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> io_step(name: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, delay: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">float</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb1-4">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> asyncio.sleep(delay)</span>
+<span id="cb1-5">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>name<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> done"</span></span>
+<span id="cb1-6"></span>
+<span id="cb1-7"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> main() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>:</span>
+<span id="cb1-8">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Sequential coroutine awaits (still non-blocking, but one-by-one)</span></span>
+<span id="cb1-9">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> io_step(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"A"</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.0</span>))</span>
+<span id="cb1-10">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> io_step(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"B"</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.0</span>))</span>
+<span id="cb1-11"></span>
+<span id="cb1-12">asyncio.run(main())</span></code></pre></div></div>
+<hr>
+</section>
+</section>
+<section id="q2-why-is-await-in-a-loop-often-slow-and-how-do-you-make-it-concurrent" class="level2">
+<h2 class="anchored" data-anchor-id="q2-why-is-await-in-a-loop-often-slow-and-how-do-you-make-it-concurrent">Q2: Why is <code>await</code> in a loop often slow, and how do you make it concurrent?</h2>
+<p><strong>Answer:</strong></p>
+<p><code>for ...: await ...</code> is typically <strong>sequential</strong>. You only start the next request after the current one finishes. To overlap waits, schedule all work first, then await together with <code>asyncio.gather()</code> (or <code>TaskGroup</code> in Python 3.11+).</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> asyncio</span>
+<span id="cb2-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> aiohttp</span>
+<span id="cb2-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> time</span>
+<span id="cb2-4"></span>
+<span id="cb2-5">URLS <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [</span>
+<span id="cb2-6">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/Python_(programming_language)"</span>,</span>
+<span id="cb2-7">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/Artificial_intelligence"</span>,</span>
+<span id="cb2-8">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/Machine_learning"</span>,</span>
+<span id="cb2-9">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/Data_science"</span>,</span>
+<span id="cb2-10">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/Web_scraping"</span>,</span>
+<span id="cb2-11">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/RESTful_API"</span>,</span>
+<span id="cb2-12">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/Network_socket"</span>,</span>
+<span id="cb2-13">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/Concurrent_computing"</span>,</span>
+<span id="cb2-14">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/Event_loop"</span>,</span>
+<span id="cb2-15">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/Distributed_computing"</span>,</span>
+<span id="cb2-16">]</span>
+<span id="cb2-17"></span>
+<span id="cb2-18"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> fetch_text(session: aiohttp.ClientSession, url: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>:</span>
+<span id="cb2-19">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> session.get(url, timeout<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>aiohttp.ClientTimeout(total<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>)) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> resp:</span>
+<span id="cb2-20">        resp.raise_for_status()</span>
+<span id="cb2-21">        text <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> resp.text()</span>
+<span id="cb2-22">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(text)</span>
+<span id="cb2-23"></span>
+<span id="cb2-24"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> sequential() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">float</span>:</span>
+<span id="cb2-25">    start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb2-26">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> aiohttp.ClientSession() <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> session:</span>
+<span id="cb2-27">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> url <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> URLS:</span>
+<span id="cb2-28">            _ <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> fetch_text(session, url)</span>
+<span id="cb2-29">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> time.perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start</span>
+<span id="cb2-30"></span>
+<span id="cb2-31"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> concurrent() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">float</span>:</span>
+<span id="cb2-32">    start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb2-33">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> aiohttp.ClientSession() <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> session:</span>
+<span id="cb2-34">        tasks <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [fetch_text(session, u) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> u <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> URLS]</span>
+<span id="cb2-35">        _ <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> asyncio.gather(<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>tasks)</span>
+<span id="cb2-36">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> time.perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start</span>
+<span id="cb2-37"></span>
+<span id="cb2-38"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> main() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>:</span>
+<span id="cb2-39">    t1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> sequential()</span>
+<span id="cb2-40">    t2 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> concurrent()</span>
+<span id="cb2-41">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"sequential=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t1<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s concurrent=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t2<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s speedup=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t1 <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> t2<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.1f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">x"</span>)</span>
+<span id="cb2-42"></span>
+<span id="cb2-43">asyncio.run(main())</span></code></pre></div></div>
+<hr>
+</section>
+<section id="q3-what-is-the-difference-between-io-bound-and-cpu-bound-work" class="level2">
+<h2 class="anchored" data-anchor-id="q3-what-is-the-difference-between-io-bound-and-cpu-bound-work">Q3: What is the difference between I/O-bound and CPU-bound work?</h2>
+<p><strong>Answer:</strong></p>
+<ul>
+<li><strong>I/O-bound:</strong> mostly waiting on network, database, filesystem, sockets.</li>
+<li><strong>CPU-bound:</strong> mostly computing (compression, image transforms, parsing huge files, ML inference/preprocessing).</li>
+</ul>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    linkStyle default stroke:#000,color:#000
+    IO["I/O-bound"] --&gt; IO2["Most time waiting"]
+    CPU["CPU-bound"] --&gt; CPU2["Most time calculating"]
+
+    IO2 --&gt; ASYNC["Best first choice: asyncio / threads"]
+    CPU2 --&gt; PROC["Best first choice: processes / native code"]
+
+    style IO fill:#56cc9d,stroke:#333,color:#fff
+    style CPU fill:#ff7851,stroke:#333,color:#fff
+    style ASYNC fill:#6cc3d5,stroke:#333,color:#fff
+    style PROC fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 37%">
+<col style="width: 41%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Workload</th>
+<th>Best Fit</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1,000 HTTP requests</td>
+<td><code>asyncio</code> + async client</td>
+<td>Overlap waiting efficiently</td>
+</tr>
+<tr class="even">
+<td>Blocking SDK/file calls</td>
+<td><code>ThreadPoolExecutor</code></td>
+<td>Keeps event loop responsive</td>
+</tr>
+<tr class="odd">
+<td>Image/video transform</td>
+<td><code>ProcessPoolExecutor</code></td>
+<td>True parallel CPU execution</td>
+</tr>
+<tr class="even">
+<td>Numerical ops in NumPy</td>
+<td>Threads/processes may both help</td>
+<td>Many C libs release GIL</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="q4-thread-vs-process-vs-async-how-do-you-choose-in-interviews-and-production" class="level2">
+<h2 class="anchored" data-anchor-id="q4-thread-vs-process-vs-async-how-do-you-choose-in-interviews-and-production">Q4: Thread vs Process vs Async: how do you choose in interviews and production?</h2>
+<p><strong>Answer:</strong></p>
+<p>Use this selection rule:</p>
+<ol type="1">
+<li>If the operation is naturally async (HTTP, DB async driver), use <strong><code>asyncio</code></strong>.</li>
+<li>If operation is blocking I/O and no async API exists, use <strong>threads</strong>.</li>
+<li>If operation is heavy CPU, use <strong>processes</strong>.</li>
+</ol>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> concurrent.futures <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> ThreadPoolExecutor, ProcessPoolExecutor</span>
+<span id="cb3-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> asyncio</span>
+<span id="cb3-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> requests</span>
+<span id="cb3-4"></span>
+<span id="cb3-5">thread_pool <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> ThreadPoolExecutor(max_workers<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">16</span>)</span>
+<span id="cb3-6">proc_pool <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> ProcessPoolExecutor(max_workers<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>)</span>
+<span id="cb3-7"></span>
+<span id="cb3-8"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> blocking_http(url: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>:</span>
+<span id="cb3-9">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(requests.get(url, timeout<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>).text)</span>
+<span id="cb3-10"></span>
+<span id="cb3-11"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> cpu_heavy(n: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>:</span>
+<span id="cb3-12">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">sum</span>(i <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> i <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(n))</span>
+<span id="cb3-13"></span>
+<span id="cb3-14"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> mixed() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">tuple</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>, <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>]:</span>
+<span id="cb3-15">    loop <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> asyncio.get_running_loop()</span>
+<span id="cb3-16"></span>
+<span id="cb3-17">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Blocking I/O offloaded to thread</span></span>
+<span id="cb3-18">    io_result <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> loop.run_in_executor(thread_pool, blocking_http, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://example.com"</span>)</span>
+<span id="cb3-19"></span>
+<span id="cb3-20">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># CPU work offloaded to process</span></span>
+<span id="cb3-21">    cpu_result <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> loop.run_in_executor(proc_pool, cpu_heavy, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50_000_000</span>)</span>
+<span id="cb3-22"></span>
+<span id="cb3-23">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> io_result, cpu_result</span></code></pre></div></div>
+<hr>
+</section>
+<section id="q5-gil-vs-pil-what-should-you-know-for-interviews" class="level2">
+<h2 class="anchored" data-anchor-id="q5-gil-vs-pil-what-should-you-know-for-interviews">Q5: GIL vs PIL: what should you know for interviews?</h2>
+<p><strong>Answer:</strong></p>
+<p>People often mean <strong>GIL</strong> when saying “PIL” in concurrency discussions. They are different:</p>
+<ul>
+<li><strong>GIL (Global Interpreter Lock):</strong> CPython mechanism that allows one thread to execute Python bytecode at a time.</li>
+<li><strong>PIL/Pillow:</strong> image processing library (<code>PIL</code> namespace from Pillow), unrelated to thread scheduling itself.</li>
+</ul>
+<section id="gil-implications" class="level3">
+<h3 class="anchored" data-anchor-id="gil-implications">GIL implications</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Scenario</th>
+<th>Thread scaling</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Pure Python CPU loops</td>
+<td>Poor scaling due to GIL</td>
+</tr>
+<tr class="even">
+<td>I/O waits</td>
+<td>Good (threads release GIL while waiting)</td>
+</tr>
+<tr class="odd">
+<td>C extensions that release GIL</td>
+<td>Can scale better</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="pillow-implication" class="level3">
+<h3 class="anchored" data-anchor-id="pillow-implication">Pillow implication</h3>
+<p>Pillow tasks (resize/filter/encode) are often CPU-heavy. For high throughput pipelines, process pools are usually safer than thread-only designs.</p>
+<hr>
+</section>
+</section>
+<section id="q6-what-are-the-biggest-async-best-practices-for-production-code" class="level2">
+<h2 class="anchored" data-anchor-id="q6-what-are-the-biggest-async-best-practices-for-production-code">Q6: What are the biggest async best practices for production code?</h2>
+<p><strong>Answer:</strong></p>
+<ol type="1">
+<li>Use <strong>timeouts everywhere</strong> (network, DB, queue).</li>
+<li>Bound concurrency with semaphores to avoid overload.</li>
+<li>Reuse clients/sessions (<code>aiohttp.ClientSession</code>, DB pools).</li>
+<li>Prefer structured concurrency (<code>TaskGroup</code>) for lifecycle safety.</li>
+<li>Never call blocking APIs directly in async paths.</li>
+</ol>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> asyncio</span>
+<span id="cb4-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> aiohttp</span>
+<span id="cb4-3"></span>
+<span id="cb4-4">SEM <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> asyncio.Semaphore(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span>)</span>
+<span id="cb4-5"></span>
+<span id="cb4-6"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> safe_fetch(session: aiohttp.ClientSession, url: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb4-7">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> SEM:</span>
+<span id="cb4-8">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">try</span>:</span>
+<span id="cb4-9">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> session.get(url, timeout<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>aiohttp.ClientTimeout(total<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">8</span>)) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> r:</span>
+<span id="cb4-10">                r.raise_for_status()</span>
+<span id="cb4-11">                <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> r.text()</span>
+<span id="cb4-12">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">except</span> asyncio.<span class="pp" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">TimeoutError</span>:</span>
+<span id="cb4-13">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"timeout"</span></span>
+<span id="cb4-14">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">except</span> aiohttp.ClientError <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> exc:</span>
+<span id="cb4-15">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"client_error: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>exc<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb4-16"></span>
+<span id="cb4-17"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> run(urls: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>]) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>]:</span>
+<span id="cb4-18">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> aiohttp.ClientSession() <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> session:</span>
+<span id="cb4-19">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> asyncio.TaskGroup() <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> tg:</span>
+<span id="cb4-20">            tasks <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [tg.create_task(safe_fetch(session, u)) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> u <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> urls]</span>
+<span id="cb4-21">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> [t.result() <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> t <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> tasks]</span></code></pre></div></div>
+<hr>
+</section>
+<section id="q7-real-use-case-high-throughput-image-pipeline-with-pillow-pil-asyncio" class="level2">
+<h2 class="anchored" data-anchor-id="q7-real-use-case-high-throughput-image-pipeline-with-pillow-pil-asyncio">Q7: Real use case: high-throughput image pipeline with Pillow (PIL) + asyncio</h2>
+<p><strong>Answer:</strong></p>
+<p>A common architecture is:</p>
+<ul>
+<li>Async layer handles upload/download/message passing.</li>
+<li>CPU-heavy image transforms run in a process pool.</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> asyncio</span>
+<span id="cb5-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> concurrent.futures <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> ProcessPoolExecutor</span>
+<span id="cb5-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> PIL <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Image</span>
+<span id="cb5-4"></span>
+<span id="cb5-5">pool <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> ProcessPoolExecutor(max_workers<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>)</span>
+<span id="cb5-6"></span>
+<span id="cb5-7"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> make_thumbnail(input_path: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, output_path: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, size: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">tuple</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>, <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>]) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb5-8">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> Image.<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">open</span>(input_path) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> im:</span>
+<span id="cb5-9">        im <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> im.convert(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"RGB"</span>)</span>
+<span id="cb5-10">        im.thumbnail(size)</span>
+<span id="cb5-11">        im.save(output_path, <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">format</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"JPEG"</span>, quality<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">85</span>, optimize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb5-12">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> output_path</span>
+<span id="cb5-13"></span>
+<span id="cb5-14"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> process_images(jobs: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">tuple</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">tuple</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>, <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>]]]) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>]:</span>
+<span id="cb5-15">    loop <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> asyncio.get_running_loop()</span>
+<span id="cb5-16">    tasks <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [</span>
+<span id="cb5-17">        loop.run_in_executor(pool, make_thumbnail, inp, out, size)</span>
+<span id="cb5-18">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> inp, out, size <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> jobs</span>
+<span id="cb5-19">    ]</span>
+<span id="cb5-20">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> asyncio.gather(<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>tasks)</span></code></pre></div></div>
+<p>Why this works well:</p>
+<ul>
+<li><code>asyncio</code> handles orchestration and I/O concurrency.</li>
+<li><code>ProcessPoolExecutor</code> bypasses GIL bottlenecks for CPU-heavy image transforms.</li>
+</ul>
+<hr>
+</section>
+<section id="q8-how-do-cancellation-retries-and-backpressure-work-in-async-systems" class="level2">
+<h2 class="anchored" data-anchor-id="q8-how-do-cancellation-retries-and-backpressure-work-in-async-systems">Q8: How do cancellation, retries, and backpressure work in async systems?</h2>
+<p><strong>Answer:</strong></p>
+<p>Production async systems fail under overload unless they enforce <strong>backpressure</strong> and clean cancellation.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> asyncio</span>
+<span id="cb6-2"></span>
+<span id="cb6-3">queue: asyncio.Queue[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> asyncio.Queue(maxsize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span>)</span>
+<span id="cb6-4"></span>
+<span id="cb6-5"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> producer(items: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>]) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>:</span>
+<span id="cb6-6">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> item <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> items:</span>
+<span id="cb6-7">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> queue.put(item)  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># blocks when full =&gt; backpressure</span></span>
+<span id="cb6-8"></span>
+<span id="cb6-9"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> worker(name: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>:</span>
+<span id="cb6-10">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">while</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>:</span>
+<span id="cb6-11">        item <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> queue.get()</span>
+<span id="cb6-12">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">try</span>:</span>
+<span id="cb6-13">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> asyncio.sleep(<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.05</span>)  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># simulate I/O</span></span>
+<span id="cb6-14">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">finally</span>:</span>
+<span id="cb6-15">            queue.task_done()</span>
+<span id="cb6-16"></span>
+<span id="cb6-17"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> run_pipeline(items: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>]) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>:</span>
+<span id="cb6-18">    workers <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [asyncio.create_task(worker(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"w</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>i<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">8</span>)]</span>
+<span id="cb6-19">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">try</span>:</span>
+<span id="cb6-20">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> producer(items)</span>
+<span id="cb6-21">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> queue.join()</span>
+<span id="cb6-22">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">finally</span>:</span>
+<span id="cb6-23">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> w <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> workers:</span>
+<span id="cb6-24">            w.cancel()</span>
+<span id="cb6-25">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> asyncio.gather(<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>workers, return_exceptions<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span></code></pre></div></div>
+<p>Best-practice notes:</p>
+<ul>
+<li>Use bounded queues.</li>
+<li>Make operations idempotent for safe retries.</li>
+<li>Handle <code>CancelledError</code> correctly in long-running tasks.</li>
+</ul>
+<hr>
+</section>
+<section id="q9-what-interview-ready-system-designs-use-async-threads-and-processes-together" class="level2">
+<h2 class="anchored" data-anchor-id="q9-what-interview-ready-system-designs-use-async-threads-and-processes-together">Q9: What interview-ready system designs use async, threads, and processes together?</h2>
+<p><strong>Answer:</strong></p>
+<section id="pattern-a-api-aggregator-io-heavy" class="level3">
+<h3 class="anchored" data-anchor-id="pattern-a-api-aggregator-io-heavy">Pattern A: API Aggregator (I/O-heavy)</h3>
+<ul>
+<li>Async fan-out to 10-30 upstream APIs.</li>
+<li>Timeouts + circuit breakers + fallback cache.</li>
+</ul>
+</section>
+<section id="pattern-b-log-ingestion-parsing-mixed" class="level3">
+<h3 class="anchored" data-anchor-id="pattern-b-log-ingestion-parsing-mixed">Pattern B: Log Ingestion + Parsing (mixed)</h3>
+<ul>
+<li>Async network ingestion.</li>
+<li>Thread pool for blocking parser library.</li>
+<li>Process pool for expensive normalization/compression.</li>
+</ul>
+</section>
+<section id="pattern-c-media-platform" class="level3">
+<h3 class="anchored" data-anchor-id="pattern-c-media-platform">Pattern C: Media Platform</h3>
+<ul>
+<li>Async upload and metadata API.</li>
+<li>Process workers for transcode/thumbnails (Pillow/FFmpeg).</li>
+<li>Queue-driven architecture for reliability and retries.</li>
+</ul>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    linkStyle default stroke:#000,color:#000
+    API["Async API Layer"] --&gt; Q["Queue"]
+    Q --&gt; TP["Thread Workers\nblocking I/O adapters"]
+    Q --&gt; PP["Process Workers\nCPU-heavy transforms"]
+    API --&gt; CACHE["Redis Cache"]
+    API --&gt; DB["Database"]
+
+    style API fill:#56cc9d,stroke:#333,color:#fff
+    style Q fill:#ffce67,stroke:#333
+    style PP fill:#ff7851,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<hr>
+</section>
+</section>
+<section id="q10-what-is-the-strongest-concise-interview-answer-for-concurrency-strategy-in-python" class="level2">
+<h2 class="anchored" data-anchor-id="q10-what-is-the-strongest-concise-interview-answer-for-concurrency-strategy-in-python">Q10: What is the strongest concise interview answer for concurrency strategy in Python?</h2>
+<p><strong>Answer:</strong></p>
+<p>A high-quality answer:</p>
+<p>“I classify workload first: I/O-bound vs CPU-bound. For I/O-bound concurrency I prefer <code>asyncio</code> with timeouts, bounded concurrency, and pooled clients. For blocking I/O dependencies I offload to a <code>ThreadPoolExecutor</code>. For CPU-heavy workloads I use <code>ProcessPoolExecutor</code> or native libraries that release the GIL. In production I add observability, retries, cancellation safety, and backpressure so the system degrades gracefully under load.”</p>
+<section id="one-page-decision-matrix" class="level3">
+<h3 class="anchored" data-anchor-id="one-page-decision-matrix">One-page decision matrix</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 37%">
+<col style="width: 33%">
+<col style="width: 29%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Question</th>
+<th>If Yes</th>
+<th>If No</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Is it mostly waiting on I/O?</td>
+<td><code>asyncio</code></td>
+<td>Next question</td>
+</tr>
+<tr class="even">
+<td>Is library blocking and cannot be replaced?</td>
+<td>thread pool</td>
+<td>Next question</td>
+</tr>
+<tr class="odd">
+<td>Is it CPU-heavy Python code?</td>
+<td>process pool</td>
+<td>Simple sync code may be enough</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+</section>
+<section id="summary-table" class="level2">
+<h2 class="anchored" data-anchor-id="summary-table">Summary Table</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 13%">
+<col style="width: 30%">
+<col style="width: 56%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Topic</th>
+<th>Key Concept</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td><code>async</code>/<code>await</code></td>
+<td>Cooperative scheduling at await points</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Sequential vs concurrent</td>
+<td><code>await</code> in loop is sequential; <code>gather</code>/<code>TaskGroup</code> overlaps waits</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>I/O vs CPU bound</td>
+<td>Pick model by bottleneck type</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td>Thread vs process vs async</td>
+<td>Async for I/O, thread for blocking I/O, process for CPU</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td>GIL vs PIL</td>
+<td>GIL affects Python thread CPU parallelism; PIL/Pillow is image library</td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td>Async best practices</td>
+<td>Timeouts, pools, bounded concurrency, structured concurrency</td>
+</tr>
+<tr class="odd">
+<td>7</td>
+<td>PIL/Pillow real use case</td>
+<td>Async orchestration + process pool for image transforms</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td>Reliability patterns</td>
+<td>Backpressure, cancellation, retries</td>
+</tr>
+<tr class="odd">
+<td>9</td>
+<td>Real architectures</td>
+<td>Aggregators, ingestion pipelines, media systems</td>
+</tr>
+<tr class="even">
+<td>10</td>
+<td>Interview framing</td>
+<td>Explain workload-first strategy clearly</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+<section id="whats-next" class="level2">
+<h2 class="anchored" data-anchor-id="whats-next">What’s Next?</h2>
+<p>For related content:</p>
+<ul>
+<li><a href="../../posts/swe-interview/Python-SWE-Interview-QA-1.html">Python SWE Interview QA - 1</a></li>
+<li><a href="../../posts/swe-interview/Python-SWE-Interview-QA-2.html">Python SWE Interview QA - 2</a></li>
+<li><a href="../../posts/swe-interview/Python-SWE-Interview-QA-3.html">Python SWE Interview QA - 3</a></li>
+<li><a href="../../posts/swe-interview/Python-SWE-Interview-QA-4.html">Python SWE Interview QA - 4</a></li>
+<li><a href="../../posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a></li>
+<li><a href="../../posts/llm-interview/LLM-Interview-QA-1.html">LLM Interview QA - 1</a></li>
+</ul>
+<div class="callout callout-style-simple callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Enjoyed this article?
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If this article helped you:</p>
+<ul>
+<li><a href="https://www.youtube.com/@VectoringAI">Subscribe to Vectoring AI on YouTube</a></li>
+<li>Share this article with your team</li>
+<li>Support with <a href="https://www.buymeacoffee.com/vectoringai">a coffee</a></li>
+</ul>
+</div>
+</div>
+
+
+</section>
+
+ ]]></description>
+  <guid>https://vectoringai.com/posts/swe-interview/Python-SWE-Interview-QA-5.html</guid>
+  <pubDate>Tue, 02 Jun 2026 00:00:00 GMT</pubDate>
+  <media:content url="https://vectoringai.com/images/python-swe-interview/thumb_python_swe_interview_qa_300.png" medium="image" type="image/png" height="96" width="144"/>
+</item>
 <item>
   <title>Python SWE Interview QA - 4</title>
   <dc:creator>Vectoring AI</dc:creator>
@@ -24,7 +1306,7 @@
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
 <p>This is <strong>Part 4</strong> of our Python SWE Interview QA series, focused on <strong>building production REST APIs</strong> — covering API design, concurrency under load, latency optimization, and security hardening. These are the questions that separate backend engineers who ship to production from those who only build prototypes.</p>
 <blockquote class="blockquote">
-<p>For foundational Python topics, see <a href="../..\posts/swe-interview/Python-SWE-Interview-QA-1.html">Python SWE Interview QA - 1</a>. For advanced internals, see <a href="../..\posts/swe-interview/Python-SWE-Interview-QA-2.html">Part 2</a>. For design patterns and code structure, see <a href="../..\posts/swe-interview/Python-SWE-Interview-QA-3.html">Part 3</a>.</p>
+<p>For foundational Python topics, see <a href="../../posts/swe-interview/Python-SWE-Interview-QA-1.html">Python SWE Interview QA - 1</a>. For advanced internals, see <a href="../../posts/swe-interview/Python-SWE-Interview-QA-2.html">Part 2</a>. For design patterns and code structure, see <a href="../../posts/swe-interview/Python-SWE-Interview-QA-3.html">Part 3</a>.</p>
 </blockquote>
 <hr>
 </section>
@@ -4249,11 +5531,11 @@ font-style: inherit;">  # Allow LB to deregister</span></span></code></pre></div
 <h2 class="anchored" data-anchor-id="whats-next">What’s Next?</h2>
 <p>This article covered production API concerns. For related content:</p>
 <ul>
-<li><strong>Python fundamentals:</strong> <a href="../..\posts/swe-interview/Python-SWE-Interview-QA-1.html">Python SWE Interview QA - 1</a></li>
-<li><strong>Advanced internals:</strong> <a href="../..\posts/swe-interview/Python-SWE-Interview-QA-2.html">Python SWE Interview QA - 2</a></li>
-<li><strong>Design patterns and structure:</strong> <a href="../..\posts/swe-interview/Python-SWE-Interview-QA-3.html">Python SWE Interview QA - 3</a></li>
-<li><strong>Machine learning concepts:</strong> <a href="../..\posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a></li>
-<li><strong>LLM architecture:</strong> <a href="../..\posts/llm-interview/LLM-Interview-QA-1.html">LLM Interview QA - 1</a></li>
+<li><strong>Python fundamentals:</strong> <a href="../../posts/swe-interview/Python-SWE-Interview-QA-1.html">Python SWE Interview QA - 1</a></li>
+<li><strong>Advanced internals:</strong> <a href="../../posts/swe-interview/Python-SWE-Interview-QA-2.html">Python SWE Interview QA - 2</a></li>
+<li><strong>Design patterns and structure:</strong> <a href="../../posts/swe-interview/Python-SWE-Interview-QA-3.html">Python SWE Interview QA - 3</a></li>
+<li><strong>Machine learning concepts:</strong> <a href="../../posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a></li>
+<li><strong>LLM architecture:</strong> <a href="../../posts/llm-interview/LLM-Interview-QA-1.html">LLM Interview QA - 1</a></li>
 </ul>
 <div class="callout callout-style-simple callout-tip no-icon callout-titled">
 <div class="callout-header d-flex align-content-center">
@@ -4281,7 +5563,7 @@ font-style: inherit;">  # Allow LB to deregister</span></span></code></pre></div
 
  ]]></description>
   <guid>https://vectoringai.com/posts/swe-interview/Python-SWE-Interview-QA-4.html</guid>
-  <pubDate>Wed, 20 May 2026 22:00:00 GMT</pubDate>
+  <pubDate>Thu, 21 May 2026 00:00:00 GMT</pubDate>
   <media:content url="https://vectoringai.com/images/python-swe-interview/thumb_python_swe_interview_qa_300.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
@@ -4297,7 +5579,7 @@ font-style: inherit;">  # Allow LB to deregister</span></span></code></pre></div
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
 <p>This is <strong>Part 1</strong> of our Python SWE Interview QA series. It covers 10 foundational questions that appear in nearly every Python Software Engineer interview — from startups to FAANG. Each answer includes code examples, diagrams, and real-world context.</p>
 <blockquote class="blockquote">
-<p>This series complements our AI/ML interview preparation. For machine learning concepts, see <a href="../..\posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a> and <a href="../..\posts/ml-interview/ML-Interview-QA-2.html">ML Interview QA - 2</a>. For LLM topics, see <a href="../..\posts/llm-interview/LLM-Interview-QA-1.html">LLM Interview QA - 1</a>.</p>
+<p>This series complements our AI/ML interview preparation. For machine learning concepts, see <a href="../../posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a> and <a href="../../posts/ml-interview/ML-Interview-QA-2.html">ML Interview QA - 2</a>. For LLM topics, see <a href="../../posts/llm-interview/LLM-Interview-QA-1.html">LLM Interview QA - 1</a>.</p>
 </blockquote>
 <hr>
 </section>
@@ -7297,11 +8579,11 @@ font-style: inherit;">&gt;</span> threshold:</span>
 <h2 class="anchored" data-anchor-id="whats-next">What’s Next?</h2>
 <p>This article covered foundational Python concepts for SWE interviews. For related content:</p>
 <ul>
-<li><strong>Machine learning fundamentals:</strong> <a href="../..\posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a></li>
-<li><strong>Evaluation metrics and data handling:</strong> <a href="../..\posts/ml-interview/ML-Interview-QA-2.html">ML Interview QA - 2</a></li>
-<li><strong>LLM concepts for AI engineers:</strong> <a href="../..\posts/llm-interview/LLM-Interview-QA-1.html">LLM Interview QA - 1</a></li>
-<li><strong>Advanced LLM topics:</strong> <a href="../..\posts/llm-interview/LLM-Interview-QA-2.html">LLM Interview QA - 2</a></li>
-<li><strong>LLM configuration and decoding:</strong> <a href="../..\posts/llm-interview/LLM-Interview-QA-3.html">LLM Interview QA - 3</a></li>
+<li><strong>Machine learning fundamentals:</strong> <a href="../../posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a></li>
+<li><strong>Evaluation metrics and data handling:</strong> <a href="../../posts/ml-interview/ML-Interview-QA-2.html">ML Interview QA - 2</a></li>
+<li><strong>LLM concepts for AI engineers:</strong> <a href="../../posts/llm-interview/LLM-Interview-QA-1.html">LLM Interview QA - 1</a></li>
+<li><strong>Advanced LLM topics:</strong> <a href="../../posts/llm-interview/LLM-Interview-QA-2.html">LLM Interview QA - 2</a></li>
+<li><strong>LLM configuration and decoding:</strong> <a href="../../posts/llm-interview/LLM-Interview-QA-3.html">LLM Interview QA - 3</a></li>
 </ul>
 <div class="callout callout-style-simple callout-tip no-icon callout-titled">
 <div class="callout-header d-flex align-content-center">
@@ -7329,7 +8611,7 @@ font-style: inherit;">&gt;</span> threshold:</span>
 
  ]]></description>
   <guid>https://vectoringai.com/posts/swe-interview/Python-SWE-Interview-QA-1.html</guid>
-  <pubDate>Tue, 19 May 2026 22:00:00 GMT</pubDate>
+  <pubDate>Wed, 20 May 2026 00:00:00 GMT</pubDate>
   <media:content url="https://vectoringai.com/images/python-swe-interview/thumb_python_swe_interview_qa_300.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
@@ -7345,7 +8627,7 @@ font-style: inherit;">&gt;</span> threshold:</span>
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
 <p>This is <strong>Part 2</strong> of our Python SWE Interview QA series, covering <strong>advanced topics</strong> that distinguish senior engineers from junior candidates. These questions test deeper understanding of Python internals, modern Python features, and production-quality code practices.</p>
 <blockquote class="blockquote">
-<p>For foundational Python topics (GIL, decorators, generators, etc.), see <a href="../..\posts/python-swe-interview/Python-SWE-Interview-QA-1.html">Python SWE Interview QA - 1</a>. For ML/AI interview content, see <a href="../..\posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a> and <a href="../..\posts/llm-interview/LLM-Interview-QA-1.html">LLM Interview QA - 1</a>.</p>
+<p>For foundational Python topics (GIL, decorators, generators, etc.), see <a href="../../posts/python-swe-interview/Python-SWE-Interview-QA-1.html">Python SWE Interview QA - 1</a>. For ML/AI interview content, see <a href="../../posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a> and <a href="../../posts/llm-interview/LLM-Interview-QA-1.html">LLM Interview QA - 1</a>.</p>
 </blockquote>
 <hr>
 </section>
@@ -7433,54 +8715,262 @@ font-style: inherit;">import</span> asyncio</span>
 <span id="cb1-2"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> aiohttp</span>
-<span id="cb1-3"></span>
-<span id="cb1-4"><span class="cf" style="color: #003B4F;
+<span id="cb1-3"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> time</span>
+<span id="cb1-4"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> typing <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Any</span>
+<span id="cb1-5"></span>
+<span id="cb1-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># ============================================================================</span></span>
+<span id="cb1-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># EXAMPLE: Sequential vs Concurrent Wikipedia Fetching with asyncio</span></span>
+<span id="cb1-8"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># ============================================================================</span></span>
+<span id="cb1-9"></span>
+<span id="cb1-10"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 10 Real Wikipedia URLs (popular topics)</span></span>
+<span id="cb1-11">WIKI_URLS <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [</span>
+<span id="cb1-12">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/Python_(programming_language)"</span>,</span>
+<span id="cb1-13">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/Artificial_intelligence"</span>,</span>
+<span id="cb1-14">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/Machine_learning"</span>,</span>
+<span id="cb1-15">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/Data_science"</span>,</span>
+<span id="cb1-16">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/Web_scraping"</span>,</span>
+<span id="cb1-17">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/RESTful_API"</span>,</span>
+<span id="cb1-18">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/Network_socket"</span>,</span>
+<span id="cb1-19">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/Concurrent_computing"</span>,</span>
+<span id="cb1-20">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/Event_loop"</span>,</span>
+<span id="cb1-21">]</span>
+<span id="cb1-22"></span>
+<span id="cb1-23">HEADERS <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> {</span>
+<span id="cb1-24">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"User-Agent"</span>: (</span>
+<span id="cb1-25">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Mozilla/5.0 (X11; Linux x86_64) "</span></span>
+<span id="cb1-26">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"AppleWebKit/537.36 (KHTML, like Gecko) "</span></span>
+<span id="cb1-27">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Chrome/124.0.0.0 Safari/537.36"</span></span>
+<span id="cb1-28">    ),</span>
+<span id="cb1-29">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Accept-Language"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"en-US,en;q=0.9"</span>,</span>
+<span id="cb1-30">}</span>
+<span id="cb1-31"></span>
+<span id="cb1-32"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- SEQUENTIAL APPROACH: Fetch URLs one at a time ---</span></span>
+<span id="cb1-33"><span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">def</span> fetch_url(session, url):</span>
-<span id="cb1-5">    <span class="co" style="color: #5E5E5E;
+font-style: inherit;">def</span> fetch_url(session, url: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, Any]:</span>
+<span id="cb1-34">    <span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">"""Fetch a single URL — suspends at await, frees event loop."""</span></span>
-<span id="cb1-6">    <span class="cf" style="color: #003B4F;
+<span id="cb1-35">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">try</span>:</span>
+<span id="cb1-36">        <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">async</span> <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">with</span> session.get(url) <span class="im" style="color: #00769E;
+font-style: inherit;">with</span> session.get(url, timeout<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>aiohttp.ClientTimeout(total<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>)) <span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">as</span> response:</span>
-<span id="cb1-7">        <span class="cf" style="color: #003B4F;
+<span id="cb1-37">            content <span class="op" style="color: #5E5E5E;
 background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span> <span class="cf" style="color: #003B4F;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">await</span> response.text()</span>
-<span id="cb1-8"></span>
-<span id="cb1-9"><span class="cf" style="color: #003B4F;
+<span id="cb1-38">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> {</span>
+<span id="cb1-39">                <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"url"</span>: url,</span>
+<span id="cb1-40">                <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"status"</span>: response.status,</span>
+<span id="cb1-41">                <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"size"</span>: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(content),</span>
+<span id="cb1-42">                <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"title"</span>: response.url.name,</span>
+<span id="cb1-43">            }</span>
+<span id="cb1-44">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">except</span> <span class="pp" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">Exception</span> <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> e:</span>
+<span id="cb1-45">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"url"</span>: url, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"error"</span>: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>(e)}</span>
+<span id="cb1-46"></span>
+<span id="cb1-47"><span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">def</span> fetch_all(urls):</span>
-<span id="cb1-10">    <span class="co" style="color: #5E5E5E;
+font-style: inherit;">def</span> fetch_all_sequential(urls: <span class="bu" style="color: null;
 background-color: null;
-font-style: inherit;">"""Fetch all URLs concurrently — not sequentially!"""</span></span>
-<span id="cb1-11">    <span class="cf" style="color: #003B4F;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>]) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, Any]]:</span>
+<span id="cb1-48">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Fetch URLs ONE AT A TIME (sequential/blocking)."""</span></span>
+<span id="cb1-49">    results <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> []</span>
+<span id="cb1-50">    <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">async</span> <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">with</span> aiohttp.ClientSession() <span class="im" style="color: #00769E;
+font-style: inherit;">with</span> aiohttp.ClientSession(headers<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>HEADERS) <span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">as</span> session:</span>
-<span id="cb1-12">        tasks <span class="op" style="color: #5E5E5E;
+<span id="cb1-51">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> url <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> urls:</span>
+<span id="cb1-52">            result <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> fetch_url(session, url)</span>
+<span id="cb1-53">            results.append(result)</span>
+<span id="cb1-54">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> results</span>
+<span id="cb1-55"></span>
+<span id="cb1-56"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- CONCURRENT APPROACH: Fetch URLs all at once ---</span></span>
+<span id="cb1-57"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> fetch_all_concurrent(urls: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>]) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, Any]]:</span>
+<span id="cb1-58">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Fetch URLs CONCURRENTLY (overlapped, non-blocking)."""</span></span>
+<span id="cb1-59">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> aiohttp.ClientSession(headers<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>HEADERS) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> session:</span>
+<span id="cb1-60">        <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Create tasks for ALL URLs simultaneously</span></span>
+<span id="cb1-61">        tasks <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> [asyncio.create_task(fetch_url(session, url)) <span class="cf" style="color: #003B4F;
 background-color: null;
@@ -7489,46 +8979,347 @@ font-style: inherit;">for</span> url <span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">in</span> urls]</span>
-<span id="cb1-13">        <span class="cf" style="color: #003B4F;
+<span id="cb1-62">        <span class="co" style="color: #5E5E5E;
 background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span> <span class="cf" style="color: #003B4F;
+font-style: inherit;"># Wait for ALL tasks to complete</span></span>
+<span id="cb1-63">        results <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">await</span> asyncio.gather(<span class="op" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">*</span>tasks)</span>
-<span id="cb1-14"></span>
-<span id="cb1-15"><span class="co" style="color: #5E5E5E;
+font-style: inherit;">*</span>tasks, return_exceptions<span class="op" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;"># Sequential: 10 URLs × 200ms = ~2000ms</span></span>
-<span id="cb1-16"><span class="co" style="color: #5E5E5E;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
 background-color: null;
-font-style: inherit;"># Concurrent: 10 URLs overlapped = ~200ms</span></span>
-<span id="cb1-17">urls <span class="op" style="color: #5E5E5E;
+font-style: inherit;">True</span>)</span>
+<span id="cb1-64">    <span class="cf" style="color: #003B4F;
 background-color: null;
-font-style: inherit;">=</span> [<span class="ss" style="color: #20794D;
+font-weight: bold;
+font-style: inherit;">return</span> results</span>
+<span id="cb1-65"></span>
+<span id="cb1-66"><span class="co" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">f"https://api.example.com/data/</span><span class="sc" style="color: #5E5E5E;
+font-style: inherit;"># --- MAIN: Compare performance ---</span></span>
+<span id="cb1-67"><span class="cf" style="color: #003B4F;
 background-color: null;
-font-style: inherit;">{</span>i<span class="sc" style="color: #5E5E5E;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> main():</span>
+<span id="cb1-68">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"="</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">70</span>)</span>
+<span id="cb1-69">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"SEQUENTIAL vs CONCURRENT Fetching: Wikipedia URLs"</span>)</span>
+<span id="cb1-70">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"="</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">70</span>)</span>
+<span id="cb1-71"></span>
+<span id="cb1-72">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Sequential fetching</span></span>
+<span id="cb1-73">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">[SEQUENTIAL] Fetching </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(WIKI_URLS)<span class="sc" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">}</span><span class="ss" style="color: #20794D;
 background-color: null;
-font-style: inherit;">"</span> <span class="cf" style="color: #003B4F;
+font-style: inherit;"> Wikipedia URLs one-by-one..."</span>)</span>
+<span id="cb1-74">    start_time <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.time()</span>
+<span id="cb1-75">    seq_results <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+font-style: inherit;">await</span> fetch_all_sequential(WIKI_URLS)</span>
+<span id="cb1-76">    seq_duration <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.time() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start_time</span>
+<span id="cb1-77">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"✓ Completed in </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>seq_duration<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s"</span>)</span>
+<span id="cb1-78">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"  Results:"</span>)</span>
+<span id="cb1-79">    <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">in</span> <span class="bu" style="color: null;
+font-style: inherit;">for</span> result <span class="kw" style="color: #003B4F;
 background-color: null;
-font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+font-weight: bold;
+font-style: inherit;">in</span> seq_results:</span>
+<span id="cb1-80">        <span class="bu" style="color: null;
 background-color: null;
-font-style: inherit;">10</span>)]</span>
-<span id="cb1-18">results <span class="op" style="color: #5E5E5E;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
 background-color: null;
-font-style: inherit;">=</span> asyncio.run(fetch_all(urls))</span></code></pre></div></div>
+font-style: inherit;">f"    </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>result<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb1-81"></span>
+<span id="cb1-82">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Concurrent fetching</span></span>
+<span id="cb1-83">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">[CONCURRENT] Fetching </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(WIKI_URLS)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;"> Wikipedia URLs overlapped..."</span>)</span>
+<span id="cb1-84">    start_time <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.time()</span>
+<span id="cb1-85">    conc_results <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> fetch_all_concurrent(WIKI_URLS)</span>
+<span id="cb1-86">    conc_duration <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.time() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start_time</span>
+<span id="cb1-87">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"✓ Completed in </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>conc_duration<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s"</span>)</span>
+<span id="cb1-88">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"  Results:"</span>)</span>
+<span id="cb1-89">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> result <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> conc_results:</span>
+<span id="cb1-90">        <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"    </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>result<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb1-91"></span>
+<span id="cb1-92">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Performance comparison</span></span>
+<span id="cb1-93">    speedup <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> seq_duration <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> conc_duration</span>
+<span id="cb1-94">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">[PERFORMANCE]"</span>)</span>
+<span id="cb1-95">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"  Sequential:  </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>seq_duration<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s"</span>)</span>
+<span id="cb1-96">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"  Concurrent:  </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>conc_duration<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s"</span>)</span>
+<span id="cb1-97">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"  Speedup:     </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>speedup<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.1f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">x faster with async"</span>)</span>
+<span id="cb1-98">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"  Time saved:  </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>seq_duration <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> conc_duration<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s (</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> conc_duration<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span>seq_duration)<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.0f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">%)"</span>)</span>
+<span id="cb1-99"></span>
+<span id="cb1-100"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Run the example</span></span>
+<span id="cb1-101"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">__name__</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"__main__"</span>:</span>
+<span id="cb1-102">    asyncio.run(main())</span>
+<span id="cb1-103"></span>
+<span id="cb1-104"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Expected output (approximate):</span></span>
+<span id="cb1-105"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># ======================================================================</span></span>
+<span id="cb1-106"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># SEQUENTIAL vs CONCURRENT Fetching: Wikipedia URLs</span></span>
+<span id="cb1-107"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># ======================================================================</span></span>
+<span id="cb1-108"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#</span></span>
+<span id="cb1-109"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># [SEQUENTIAL] Fetching 10 Wikipedia URLs one-by-one...</span></span>
+<span id="cb1-110"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># ✓ Completed in 12.45s</span></span>
+<span id="cb1-111"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#   Sample: {'url': 'https://...', 'status': 200, 'size': 125430, ...}</span></span>
+<span id="cb1-112"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#</span></span>
+<span id="cb1-113"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># [CONCURRENT] Fetching 10 Wikipedia URLs overlapped...</span></span>
+<span id="cb1-114"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># ✓ Completed in 1.65s</span></span>
+<span id="cb1-115"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#   Sample: {'url': 'https://...', 'status': 200, 'size': 125430, ...}</span></span>
+<span id="cb1-116"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#</span></span>
+<span id="cb1-117"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># [PERFORMANCE]</span></span>
+<span id="cb1-118"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#   Sequential:  12.45s</span></span>
+<span id="cb1-119"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#   Concurrent:  1.65s</span></span>
+<span id="cb1-120"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#   Speedup:     7.5x faster with async</span></span>
+<span id="cb1-121"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">#   Time saved:  10.80s (87%)</span></span></code></pre></div></div>
 </section>
 <section id="when-to-use-and-not-use-async" class="level3">
 <h3 class="anchored" data-anchor-id="when-to-use-and-not-use-async">When to Use (and NOT Use) async</h3>
@@ -11157,11 +12948,11 @@ font-style: inherit;"># Creates data descriptors for each slot</span></span></co
 <h2 class="anchored" data-anchor-id="whats-next">What’s Next?</h2>
 <p>This article covered advanced Python internals and production patterns. For related content:</p>
 <ul>
-<li><strong>Python fundamentals:</strong> <a href="../..\posts/python-swe-interview/Python-SWE-Interview-QA-1.html">Python SWE Interview QA - 1</a></li>
-<li><strong>Machine learning concepts:</strong> <a href="../..\posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a> and <a href="../..\posts/ml-interview/ML-Interview-QA-2.html">ML Interview QA - 2</a></li>
-<li><strong>LLM architecture and concepts:</strong> <a href="../..\posts/llm-interview/LLM-Interview-QA-1.html">LLM Interview QA - 1</a></li>
-<li><strong>Advanced LLM topics:</strong> <a href="../..\posts/llm-interview/LLM-Interview-QA-2.html">LLM Interview QA - 2</a></li>
-<li><strong>LLM configuration and decoding:</strong> <a href="../..\posts/llm-interview/LLM-Interview-QA-3.html">LLM Interview QA - 3</a></li>
+<li><strong>Python fundamentals:</strong> <a href="../../posts/python-swe-interview/Python-SWE-Interview-QA-1.html">Python SWE Interview QA - 1</a></li>
+<li><strong>Machine learning concepts:</strong> <a href="../../posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a> and <a href="../../posts/ml-interview/ML-Interview-QA-2.html">ML Interview QA - 2</a></li>
+<li><strong>LLM architecture and concepts:</strong> <a href="../../posts/llm-interview/LLM-Interview-QA-1.html">LLM Interview QA - 1</a></li>
+<li><strong>Advanced LLM topics:</strong> <a href="../../posts/llm-interview/LLM-Interview-QA-2.html">LLM Interview QA - 2</a></li>
+<li><strong>LLM configuration and decoding:</strong> <a href="../../posts/llm-interview/LLM-Interview-QA-3.html">LLM Interview QA - 3</a></li>
 </ul>
 <div class="callout callout-style-simple callout-tip no-icon callout-titled">
 <div class="callout-header d-flex align-content-center">
@@ -11189,7 +12980,7 @@ font-style: inherit;"># Creates data descriptors for each slot</span></span></co
 
  ]]></description>
   <guid>https://vectoringai.com/posts/swe-interview/Python-SWE-Interview-QA-2.html</guid>
-  <pubDate>Tue, 19 May 2026 22:00:00 GMT</pubDate>
+  <pubDate>Wed, 20 May 2026 00:00:00 GMT</pubDate>
   <media:content url="https://vectoringai.com/images/python-swe-interview/thumb_python_swe_interview_qa_300.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 <item>
@@ -11205,7 +12996,7 @@ font-style: inherit;"># Creates data descriptors for each slot</span></span></co
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
 <p>This is <strong>Part 3</strong> of our Python SWE Interview QA series, focused on <strong>best practices, design patterns, and source code structure</strong> — the topics that distinguish engineers who write production-quality code from those who just make things work.</p>
 <blockquote class="blockquote">
-<p>For foundational Python topics, see <a href="../..\posts/python-swe-interview/Python-SWE-Interview-QA-1.html">Python SWE Interview QA - 1</a>. For advanced internals (async, metaclasses, descriptors), see <a href="../..\posts/python-swe-interview/Python-SWE-Interview-QA-2.html">Python SWE Interview QA - 2</a>.</p>
+<p>For foundational Python topics, see <a href="../../posts/python-swe-interview/Python-SWE-Interview-QA-1.html">Python SWE Interview QA - 1</a>. For advanced internals (async, metaclasses, descriptors), see <a href="../../posts/python-swe-interview/Python-SWE-Interview-QA-2.html">Python SWE Interview QA - 2</a>.</p>
 </blockquote>
 <hr>
 </section>
@@ -14828,11 +16619,11 @@ font-style: inherit;"># Generate lockfile for reproducibility</span></span></cod
 <h2 class="anchored" data-anchor-id="whats-next">What’s Next?</h2>
 <p>This article covered production code practices and architecture. For related content:</p>
 <ul>
-<li><strong>Python fundamentals:</strong> <a href="../..\posts/python-swe-interview/Python-SWE-Interview-QA-1.html">Python SWE Interview QA - 1</a></li>
-<li><strong>Advanced internals:</strong> <a href="../..\posts/python-swe-interview/Python-SWE-Interview-QA-2.html">Python SWE Interview QA - 2</a></li>
-<li><strong>Machine learning concepts:</strong> <a href="../..\posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a> and <a href="../..\posts/ml-interview/ML-Interview-QA-2.html">ML Interview QA - 2</a></li>
-<li><strong>LLM architecture:</strong> <a href="../..\posts/llm-interview/LLM-Interview-QA-1.html">LLM Interview QA - 1</a></li>
-<li><strong>LLM configuration and decoding:</strong> <a href="../..\posts/llm-interview/LLM-Interview-QA-3.html">LLM Interview QA - 3</a></li>
+<li><strong>Python fundamentals:</strong> <a href="../../posts/python-swe-interview/Python-SWE-Interview-QA-1.html">Python SWE Interview QA - 1</a></li>
+<li><strong>Advanced internals:</strong> <a href="../../posts/python-swe-interview/Python-SWE-Interview-QA-2.html">Python SWE Interview QA - 2</a></li>
+<li><strong>Machine learning concepts:</strong> <a href="../../posts/ml-interview/ML-Interview-QA-1.html">ML Interview QA - 1</a> and <a href="../../posts/ml-interview/ML-Interview-QA-2.html">ML Interview QA - 2</a></li>
+<li><strong>LLM architecture:</strong> <a href="../../posts/llm-interview/LLM-Interview-QA-1.html">LLM Interview QA - 1</a></li>
+<li><strong>LLM configuration and decoding:</strong> <a href="../../posts/llm-interview/LLM-Interview-QA-3.html">LLM Interview QA - 3</a></li>
 </ul>
 <div class="callout callout-style-simple callout-tip no-icon callout-titled">
 <div class="callout-header d-flex align-content-center">
@@ -14860,7 +16651,7 @@ font-style: inherit;"># Generate lockfile for reproducibility</span></span></cod
 
  ]]></description>
   <guid>https://vectoringai.com/posts/swe-interview/Python-SWE-Interview-QA-3.html</guid>
-  <pubDate>Tue, 19 May 2026 22:00:00 GMT</pubDate>
+  <pubDate>Wed, 20 May 2026 00:00:00 GMT</pubDate>
   <media:content url="https://vectoringai.com/images/python-swe-interview/thumb_python_swe_interview_qa_300.png" medium="image" type="image/png" height="96" width="144"/>
 </item>
 </channel>
