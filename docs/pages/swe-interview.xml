@@ -22,7 +22,7 @@
 
 <section id="introduction" class="level2">
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
-<p>This is <strong>Part 5</strong> of our Python SWE Interview QA series, focused on <strong>async programming in real systems</strong>: <code>async</code>/<code>await</code>, I/O-bound vs CPU-bound workloads, threads vs processes, GIL behavior, PIL/Pillow workloads, and production best practices.</p>
+<p>This is <strong>Part 5</strong> of our Python SWE Interview QA series, focused on <strong>async programming in real systems</strong>: <code>async</code>/<code>await</code>, I/O-bound vs CPU-bound workloads, threads vs processes, GIL behavior, and production best practices.</p>
 <blockquote class="blockquote">
 <p>For fundamentals, see <a href="../../posts/swe-interview/Python-SWE-Interview-QA-1.html">Part 1</a>. For advanced internals, see <a href="../../posts/swe-interview/Python-SWE-Interview-QA-2.html">Part 2</a>. For architecture and production APIs, see <a href="../../posts/swe-interview/Python-SWE-Interview-QA-3.html">Part 3</a> and <a href="../../posts/swe-interview/Python-SWE-Interview-QA-4.html">Part 4</a>.</p>
 </blockquote>
@@ -40,7 +40,7 @@
 <pre class="mermaid mermaid-js">graph TD
     linkStyle default stroke:#000,color:#000
     A["Coroutine A starts"] --&gt; B["await network call"]
-    B --&gt; C["Event loop switches to coroutine B/C/D"]
+    B --&gt; C["Event loop switches to&lt;br/&gt;coroutine B/C/D"]
     C --&gt; D["I/O completes"]
     D --&gt; E["Coroutine A resumes"]
 
@@ -406,8 +406,8 @@ font-style: inherit;">x"</span>)</span>
     IO["I/O-bound"] --&gt; IO2["Most time waiting"]
     CPU["CPU-bound"] --&gt; CPU2["Most time calculating"]
 
-    IO2 --&gt; ASYNC["Best first choice: asyncio / threads"]
-    CPU2 --&gt; PROC["Best first choice: processes / native code"]
+    IO2 --&gt; ASYNC["Best first choice:&lt;br/&gt;asyncio / threads"]
+    CPU2 --&gt; PROC["Best first choice:&lt;br/&gt;processes / native code"]
 
     style IO fill:#56cc9d,stroke:#333,color:#fff
     style CPU fill:#ff7851,stroke:#333,color:#fff
@@ -590,14 +590,10 @@ font-weight: bold;
 font-style: inherit;">return</span> io_result, cpu_result</span></code></pre></div></div>
 <hr>
 </section>
-<section id="q5-gil-vs-pil-what-should-you-know-for-interviews" class="level2">
-<h2 class="anchored" data-anchor-id="q5-gil-vs-pil-what-should-you-know-for-interviews">Q5: GIL vs PIL: what should you know for interviews?</h2>
+<section id="q5-how-does-the-gil-affect-concurrency-choices-in-python" class="level2">
+<h2 class="anchored" data-anchor-id="q5-how-does-the-gil-affect-concurrency-choices-in-python">Q5: How does the GIL affect concurrency choices in Python?</h2>
 <p><strong>Answer:</strong></p>
-<p>People often mean <strong>GIL</strong> when saying “PIL” in concurrency discussions. They are different:</p>
-<ul>
-<li><strong>GIL (Global Interpreter Lock):</strong> CPython mechanism that allows one thread to execute Python bytecode at a time.</li>
-<li><strong>PIL/Pillow:</strong> image processing library (<code>PIL</code> namespace from Pillow), unrelated to thread scheduling itself.</li>
-</ul>
+<p><strong>GIL (Global Interpreter Lock)</strong> is a CPython mechanism that allows only one thread to execute Python bytecode at a time in a single process.</p>
 <section id="gil-implications" class="level3">
 <h3 class="anchored" data-anchor-id="gil-implications">GIL implications</h3>
 <table class="caption-top table">
@@ -622,10 +618,6 @@ font-style: inherit;">return</span> io_result, cpu_result</span></code></pre></d
 </tr>
 </tbody>
 </table>
-</section>
-<section id="pillow-implication" class="level3">
-<h3 class="anchored" data-anchor-id="pillow-implication">Pillow implication</h3>
-<p>Pillow tasks (resize/filter/encode) are often CPU-heavy. For high throughput pipelines, process pools are usually safer than thread-only designs.</p>
 <hr>
 </section>
 </section>
@@ -786,13 +778,13 @@ font-weight: bold;
 font-style: inherit;">in</span> tasks]</span></code></pre></div></div>
 <hr>
 </section>
-<section id="q7-real-use-case-high-throughput-image-pipeline-with-pillow-pil-asyncio" class="level2">
-<h2 class="anchored" data-anchor-id="q7-real-use-case-high-throughput-image-pipeline-with-pillow-pil-asyncio">Q7: Real use case: high-throughput image pipeline with Pillow (PIL) + asyncio</h2>
+<section id="q7-real-use-case-high-throughput-event-enrichment-pipeline-with-asyncio-processes" class="level2">
+<h2 class="anchored" data-anchor-id="q7-real-use-case-high-throughput-event-enrichment-pipeline-with-asyncio-processes">Q7: Real use case: high-throughput event enrichment pipeline with asyncio + processes</h2>
 <p><strong>Answer:</strong></p>
 <p>A common architecture is:</p>
 <ul>
-<li>Async layer handles upload/download/message passing.</li>
-<li>CPU-heavy image transforms run in a process pool.</li>
+<li>Async layer handles message ingestion and external I/O.</li>
+<li>CPU-heavy enrichment/scoring runs in a process pool.</li>
 </ul>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="im" style="color: #00769E;
 background-color: null;
@@ -804,9 +796,9 @@ background-color: null;
 font-style: inherit;">import</span> ProcessPoolExecutor</span>
 <span id="cb5-3"><span class="im" style="color: #00769E;
 background-color: null;
-font-style: inherit;">from</span> PIL <span class="im" style="color: #00769E;
+font-style: inherit;">from</span> hashlib <span class="im" style="color: #00769E;
 background-color: null;
-font-style: inherit;">import</span> Image</span>
+font-style: inherit;">import</span> sha256</span>
 <span id="cb5-4"></span>
 <span id="cb5-5">pool <span class="op" style="color: #5E5E5E;
 background-color: null;
@@ -819,54 +811,59 @@ font-style: inherit;">4</span>)</span>
 <span id="cb5-7"><span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">def</span> make_thumbnail(input_path: <span class="bu" style="color: null;
+font-style: inherit;">def</span> enrich_event(payload: <span class="bu" style="color: null;
 background-color: null;
-font-style: inherit;">str</span>, output_path: <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">str</span>, size: <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">tuple</span>[<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">int</span>, <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">int</span>]) <span class="op" style="color: #5E5E5E;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
 background-color: null;
-font-style: inherit;">str</span>:</span>
-<span id="cb5-8">    <span class="cf" style="color: #003B4F;
+font-style: inherit;">dict</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>]:</span>
+<span id="cb5-8">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Simulate CPU-heavy parsing/scoring work.</span></span>
+<span id="cb5-9">    digest <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> payload</span>
+<span id="cb5-10">    <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">with</span> Image.<span class="bu" style="color: null;
+font-style: inherit;">for</span> _ <span class="kw" style="color: #003B4F;
 background-color: null;
-font-style: inherit;">open</span>(input_path) <span class="im" style="color: #00769E;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
 background-color: null;
-font-style: inherit;">as</span> im:</span>
-<span id="cb5-9">        im <span class="op" style="color: #5E5E5E;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
 background-color: null;
-font-style: inherit;">=</span> im.convert(<span class="st" style="color: #20794D;
+font-style: inherit;">50_000</span>):</span>
+<span id="cb5-11">        digest <span class="op" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">"RGB"</span>)</span>
-<span id="cb5-10">        im.thumbnail(size)</span>
-<span id="cb5-11">        im.save(output_path, <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">format</span><span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"JPEG"</span>, quality<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">85</span>, optimize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>)</span>
+font-style: inherit;">=</span> sha256(digest.encode()).hexdigest()</span>
 <span id="cb5-12">    <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">return</span> output_path</span>
+font-style: inherit;">return</span> {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"payload"</span>: payload, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"score"</span>: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>(digest[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">8</span>], <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">16</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">%</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1000</span>}</span>
 <span id="cb5-13"></span>
 <span id="cb5-14"><span class="cf" style="color: #003B4F;
 background-color: null;
@@ -874,41 +871,39 @@ font-weight: bold;
 font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">def</span> process_images(jobs: <span class="bu" style="color: null;
+font-style: inherit;">def</span> process_events(events: <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">list</span>[<span class="bu" style="color: null;
 background-color: null;
-font-style: inherit;">tuple</span>[<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">str</span>, <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">str</span>, <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">tuple</span>[<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">int</span>, <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">int</span>]]]) <span class="op" style="color: #5E5E5E;
+font-style: inherit;">str</span>]) <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">list</span>[<span class="bu" style="color: null;
 background-color: null;
-font-style: inherit;">str</span>]:</span>
+font-style: inherit;">dict</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>]]:</span>
 <span id="cb5-15">    loop <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> asyncio.get_running_loop()</span>
 <span id="cb5-16">    tasks <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> [</span>
-<span id="cb5-17">        loop.run_in_executor(pool, make_thumbnail, inp, out, size)</span>
+<span id="cb5-17">        loop.run_in_executor(pool, enrich_event, event)</span>
 <span id="cb5-18">        <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">for</span> inp, out, size <span class="kw" style="color: #003B4F;
+font-style: inherit;">for</span> event <span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">in</span> jobs</span>
+font-style: inherit;">in</span> events</span>
 <span id="cb5-19">    ]</span>
 <span id="cb5-20">    <span class="cf" style="color: #003B4F;
 background-color: null;
@@ -922,7 +917,7 @@ font-style: inherit;">*</span>tasks)</span></code></pre></div></div>
 <p>Why this works well:</p>
 <ul>
 <li><code>asyncio</code> handles orchestration and I/O concurrency.</li>
-<li><code>ProcessPoolExecutor</code> bypasses GIL bottlenecks for CPU-heavy image transforms.</li>
+<li><code>ProcessPoolExecutor</code> bypasses GIL bottlenecks for CPU-heavy enrichment.</li>
 </ul>
 <hr>
 </section>
@@ -1116,7 +1111,7 @@ font-style: inherit;">True</span>)</span></code></pre></div></div>
 <h3 class="anchored" data-anchor-id="pattern-c-media-platform">Pattern C: Media Platform</h3>
 <ul>
 <li>Async upload and metadata API.</li>
-<li>Process workers for transcode/thumbnails (Pillow/FFmpeg).</li>
+<li>Process workers for CPU-heavy feature extraction/scoring.</li>
 <li>Queue-driven architecture for reliability and retries.</li>
 </ul>
 <div class="cell" data-layout-align="default">
@@ -1127,8 +1122,8 @@ font-style: inherit;">True</span>)</span></code></pre></div></div>
 <pre class="mermaid mermaid-js">graph TD
     linkStyle default stroke:#000,color:#000
     API["Async API Layer"] --&gt; Q["Queue"]
-    Q --&gt; TP["Thread Workers\nblocking I/O adapters"]
-    Q --&gt; PP["Process Workers\nCPU-heavy transforms"]
+    Q --&gt; TP["Thread Workers&lt;br/&gt;blocking I/O adapters"]
+    Q --&gt; PP["Process Workers&lt;br/&gt;CPU-heavy transforms"]
     API --&gt; CACHE["Redis Cache"]
     API --&gt; DB["Database"]
 
@@ -1223,8 +1218,8 @@ font-style: inherit;">True</span>)</span></code></pre></div></div>
 </tr>
 <tr class="odd">
 <td>5</td>
-<td>GIL vs PIL</td>
-<td>GIL affects Python thread CPU parallelism; PIL/Pillow is image library</td>
+<td>GIL behavior</td>
+<td>GIL limits CPU scaling in threads for pure Python code</td>
 </tr>
 <tr class="even">
 <td>6</td>
@@ -1233,8 +1228,8 @@ font-style: inherit;">True</span>)</span></code></pre></div></div>
 </tr>
 <tr class="odd">
 <td>7</td>
-<td>PIL/Pillow real use case</td>
-<td>Async orchestration + process pool for image transforms</td>
+<td>Event pipeline use case</td>
+<td>Async orchestration + process pool for CPU-heavy enrichment</td>
 </tr>
 <tr class="even">
 <td>8</td>
@@ -1253,6 +1248,78 @@ font-style: inherit;">True</span>)</span></code></pre></div></div>
 </tr>
 </tbody>
 </table>
+<hr>
+</section>
+<section id="real-world-use-case-food-delivery-platform" class="level2">
+<h2 class="anchored" data-anchor-id="real-world-use-case-food-delivery-platform">Real-World Use Case: Food Delivery Platform</h2>
+<p>Assume one backend powers order placement, restaurant sync, driver dispatch, payment updates, and analytics.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Task in Application</th>
+<th>Workload Type</th>
+<th>Best Practice Choice</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Fan-out to restaurant, pricing, and ETA services per order</td>
+<td>I/O-bound</td>
+<td><code>asyncio</code> + <code>TaskGroup</code> + per-call timeout</td>
+<td>Concurrent network waits with safer lifecycle management</td>
+</tr>
+<tr class="even">
+<td>Call legacy blocking payment SDK</td>
+<td>Blocking I/O</td>
+<td><code>ThreadPoolExecutor</code> via <code>run_in_executor</code></td>
+<td>Prevents blocking the event loop</td>
+</tr>
+<tr class="odd">
+<td>Compute route batches and optimization hints</td>
+<td>CPU-bound</td>
+<td><code>ProcessPoolExecutor</code></td>
+<td>True parallelism for heavy Python compute</td>
+</tr>
+<tr class="even">
+<td>Write order state transitions to DB</td>
+<td>I/O-bound</td>
+<td>Async DB client + connection pool</td>
+<td>High throughput with controlled resource reuse</td>
+</tr>
+<tr class="odd">
+<td>Push notifications to customer/driver apps</td>
+<td>I/O-bound burst traffic</td>
+<td><code>asyncio</code> + bounded semaphore</td>
+<td>Caps concurrency and protects upstreams</td>
+</tr>
+<tr class="even">
+<td>Consume delivery events from queue</td>
+<td>Mixed</td>
+<td>Bounded <code>asyncio.Queue</code> + worker tasks</td>
+<td>Built-in backpressure and predictable memory use</td>
+</tr>
+<tr class="odd">
+<td>Retry transient downstream failures</td>
+<td>Reliability concern</td>
+<td>Idempotent handlers + exponential backoff</td>
+<td>Safe retry behavior without duplicate side effects</td>
+</tr>
+<tr class="even">
+<td>Graceful deploy/shutdown during peak traffic</td>
+<td>Lifecycle concern</td>
+<td>Structured cancellation (<code>TaskGroup</code>, <code>CancelledError</code> handling)</td>
+<td>Prevents orphan work and partial state updates</td>
+</tr>
+</tbody>
+</table>
+<p>This is the interview-ready framing: classify each task by bottleneck, then apply the smallest concurrency model that solves that bottleneck safely.</p>
 <hr>
 </section>
 <section id="whats-next" class="level2">
@@ -1276,10 +1343,10 @@ font-style: inherit;">True</span>)</span></code></pre></div></div>
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>If this article helped you:</p>
+<p>If this article helped you, your support helps us deliver more useful content. Here are a few ways to support our work:</p>
 <ul>
 <li><a href="https://www.youtube.com/@VectoringAI">Subscribe to Vectoring AI on YouTube</a></li>
-<li>Share this article with your team</li>
+<li>Share this article with your networks</li>
 <li>Support with <a href="https://www.buymeacoffee.com/vectoringai">a coffee</a></li>
 </ul>
 </div>
@@ -5543,18 +5610,16 @@ font-style: inherit;">  # Allow LB to deregister</span></span></code></pre></div
 <i class="callout-icon no-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Tip</span>💚 Enjoyed this article?
+<span class="screen-reader-only">Tip</span>Enjoyed this article?
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>At Vectoring AI, we publish practical tutorials, benchmark analyses, and deep dives on LLMs, RAG systems, AI agents, and modern AI engineering. We also share AI interview Q&amp;A, mock interviews, career insights, and real-world system design discussions to help engineers, researchers, and practitioners grow their AI careers.</p>
-<p>If this article helped you, here are a few ways to support our work:</p>
+<p>If this article helped you, your support helps us deliver more useful content. Here are a few ways to support our work:</p>
 <ul>
-<li><a href="https://www.youtube.com/@VectoringAI">Subscribe to our YouTube channel</a> for AI engineering tutorials and insights.</li>
-<li>Share this article with colleagues and friends.</li>
-<li>Support Vectoring AI with <a href="https://www.buymeacoffee.com/vectoringai">a coffee</a> to help us create more open-source projects, tutorials, and in-depth technical content.</li>
+<li><a href="https://www.youtube.com/@VectoringAI">Subscribe to Vectoring AI on YouTube</a></li>
+<li>Share this article with your networks</li>
+<li>Support with <a href="https://www.buymeacoffee.com/vectoringai">a coffee</a></li>
 </ul>
-<p>Thank you for being part of the community!</p>
 </div>
 </div>
 
@@ -8591,18 +8656,16 @@ font-style: inherit;">&gt;</span> threshold:</span>
 <i class="callout-icon no-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Tip</span>💚 Enjoyed this article?
+<span class="screen-reader-only">Tip</span>Enjoyed this article?
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>At Vectoring AI, we publish practical tutorials, benchmark analyses, and deep dives on LLMs, RAG systems, AI agents, and modern AI engineering. We also share AI interview Q&amp;A, mock interviews, career insights, and real-world system design discussions to help engineers, researchers, and practitioners grow their AI careers.</p>
-<p>If this article helped you, here are a few ways to support our work:</p>
+<p>If this article helped you, your support helps us deliver more useful content. Here are a few ways to support our work:</p>
 <ul>
-<li><a href="https://www.youtube.com/@VectoringAI">Subscribe to our YouTube channel</a> for AI engineering tutorials and insights.</li>
-<li>Share this article with colleagues and friends.</li>
-<li>Support Vectoring AI with <a href="https://www.buymeacoffee.com/vectoringai">a coffee</a> to help us create more open-source projects, tutorials, and in-depth technical content.</li>
+<li><a href="https://www.youtube.com/@VectoringAI">Subscribe to Vectoring AI on YouTube</a></li>
+<li>Share this article with your networks</li>
+<li>Support with <a href="https://www.buymeacoffee.com/vectoringai">a coffee</a></li>
 </ul>
-<p>Thank you for being part of the community!</p>
 </div>
 </div>
 
@@ -12960,18 +13023,16 @@ font-style: inherit;"># Creates data descriptors for each slot</span></span></co
 <i class="callout-icon no-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Tip</span>💚 Enjoyed this article?
+<span class="screen-reader-only">Tip</span>Enjoyed this article?
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>At Vectoring AI, we publish practical tutorials, benchmark analyses, and deep dives on LLMs, RAG systems, AI agents, and modern AI engineering. We also share AI interview Q&amp;A, mock interviews, career insights, and real-world system design discussions to help engineers, researchers, and practitioners grow their AI careers.</p>
-<p>If this article helped you, here are a few ways to support our work:</p>
+<p>If this article helped you, your support helps us deliver more useful content. Here are a few ways to support our work:</p>
 <ul>
-<li><a href="https://www.youtube.com/@VectoringAI">Subscribe to our YouTube channel</a> for AI engineering tutorials and insights.</li>
-<li>Share this article with colleagues and friends.</li>
-<li>Support Vectoring AI with <a href="https://www.buymeacoffee.com/vectoringai">a coffee</a> to help us create more open-source projects, tutorials, and in-depth technical content.</li>
+<li><a href="https://www.youtube.com/@VectoringAI">Subscribe to Vectoring AI on YouTube</a></li>
+<li>Share this article with your networks</li>
+<li>Support with <a href="https://www.buymeacoffee.com/vectoringai">a coffee</a></li>
 </ul>
-<p>Thank you for being part of the community!</p>
 </div>
 </div>
 
@@ -16631,18 +16692,16 @@ font-style: inherit;"># Generate lockfile for reproducibility</span></span></cod
 <i class="callout-icon no-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Tip</span>💚 Enjoyed this article?
+<span class="screen-reader-only">Tip</span>Enjoyed this article?
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>At Vectoring AI, we publish practical tutorials, benchmark analyses, and deep dives on LLMs, RAG systems, AI agents, and modern AI engineering. We also share AI interview Q&amp;A, mock interviews, career insights, and real-world system design discussions to help engineers, researchers, and practitioners grow their AI careers.</p>
-<p>If this article helped you, here are a few ways to support our work:</p>
+<p>If this article helped you, your support helps us deliver more useful content. Here are a few ways to support our work:</p>
 <ul>
-<li><a href="https://www.youtube.com/@VectoringAI">Subscribe to our YouTube channel</a> for AI engineering tutorials and insights.</li>
-<li>Share this article with colleagues and friends.</li>
-<li>Support Vectoring AI with <a href="https://www.buymeacoffee.com/vectoringai">a coffee</a> to help us create more open-source projects, tutorials, and in-depth technical content.</li>
+<li><a href="https://www.youtube.com/@VectoringAI">Subscribe to Vectoring AI on YouTube</a></li>
+<li>Share this article with your networks</li>
+<li>Support with <a href="https://www.buymeacoffee.com/vectoringai">a coffee</a></li>
 </ul>
-<p>Thank you for being part of the community!</p>
 </div>
 </div>
 
