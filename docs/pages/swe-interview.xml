@@ -214,6 +214,42 @@ font-style: inherit;">s (about 2.0s =&gt; not parallel)"</span>)</span>
 <h2 class="anchored" data-anchor-id="q2-why-is-await-in-a-loop-often-slow-and-how-do-you-make-it-concurrent">Q2: Why is <code>await</code> in a loop often slow, and how do you make it concurrent?</h2>
 <p><strong>Answer:</strong></p>
 <p><code>for ...: await ...</code> is typically <strong>sequential</strong>. You only start the next request after the current one finishes. To overlap waits, schedule all work first, then await together with <code>asyncio.gather()</code> (or <code>TaskGroup</code> in Python 3.11+).</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    linkStyle default stroke:#000,color:#000
+    subgraph Sequential
+        direction TB
+        S1["Request 1&lt;br/&gt;wait 200ms"] --&gt; S2["Request 2&lt;br/&gt;wait 200ms"]
+        S2 --&gt; S3["Request 3&lt;br/&gt;wait 200ms"]
+        S3 --&gt; S10["... Request 10&lt;br/&gt;Total ≈ 2000ms"]
+    end
+
+    subgraph Concurrent
+        direction TB
+        C1["Request 1"] 
+        C2["Request 2"]
+        C3["Request 3"]
+        C10["... Request 10"]
+        C1 --&gt; G["gather() waits for all&lt;br/&gt;Total ≈ 200ms"]
+        C2 --&gt; G
+        C3 --&gt; G
+        C10 --&gt; G
+    end
+
+    style S10 fill:#ff7851,stroke:#333,color:#fff
+    style G fill:#56cc9d,stroke:#333,color:#fff
+    style Sequential fill:#f8f9fa,stroke:#333,color:#000
+    style Concurrent fill:#f8f9fa,stroke:#333,color:#000
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> asyncio</span>
@@ -541,6 +577,31 @@ font-style: inherit;">x"</span>)</span>
 <li>If operation is blocking I/O and no async API exists, use <strong>threads</strong>.</li>
 <li>If operation is heavy CPU, use <strong>processes</strong>.</li>
 </ol>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    linkStyle default stroke:#000,color:#000
+    TASK["New task arrives"] --&gt; Q1{"Is it naturally&lt;br/&gt;async I/O?"}
+    Q1 --&gt;|Yes| ASYNC["Use asyncio"]
+    Q1 --&gt;|No| Q2{"Is it blocking I/O&lt;br/&gt;with no async API?"}
+    Q2 --&gt;|Yes| THREAD["Use ThreadPoolExecutor"]
+    Q2 --&gt;|No| Q3{"Is it CPU-heavy?"}
+    Q3 --&gt;|Yes| PROC["Use ProcessPoolExecutor"]
+    Q3 --&gt;|No| SYNC["Simple sync code&lt;br/&gt;is enough"]
+
+    style ASYNC fill:#56cc9d,stroke:#333,color:#fff
+    style THREAD fill:#6cc3d5,stroke:#333,color:#fff
+    style PROC fill:#ff7851,stroke:#333,color:#fff
+    style SYNC fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">from</span> concurrent.futures <span class="im" style="color: #00769E;
@@ -551,24 +612,27 @@ background-color: null;
 font-style: inherit;">import</span> asyncio</span>
 <span id="cb3-3"><span class="im" style="color: #00769E;
 background-color: null;
+font-style: inherit;">import</span> time</span>
+<span id="cb3-4"><span class="im" style="color: #00769E;
+background-color: null;
 font-style: inherit;">import</span> requests</span>
-<span id="cb3-4"></span>
-<span id="cb3-5">thread_pool <span class="op" style="color: #5E5E5E;
+<span id="cb3-5"></span>
+<span id="cb3-6">thread_pool <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> ThreadPoolExecutor(max_workers<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">16</span>)</span>
-<span id="cb3-6">proc_pool <span class="op" style="color: #5E5E5E;
+<span id="cb3-7">proc_pool <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> ProcessPoolExecutor(max_workers<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">4</span>)</span>
-<span id="cb3-7"></span>
-<span id="cb3-8"><span class="kw" style="color: #003B4F;
+<span id="cb3-8"></span>
+<span id="cb3-9"><span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">def</span> blocking_http(url: <span class="bu" style="color: null;
@@ -578,7 +642,7 @@ background-color: null;
 font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">int</span>:</span>
-<span id="cb3-9">    <span class="cf" style="color: #003B4F;
+<span id="cb3-10">    <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">return</span> <span class="bu" style="color: null;
@@ -588,8 +652,8 @@ background-color: null;
 font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">10</span>).text)</span>
-<span id="cb3-10"></span>
-<span id="cb3-11"><span class="kw" style="color: #003B4F;
+<span id="cb3-11"></span>
+<span id="cb3-12"><span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">def</span> cpu_heavy(n: <span class="bu" style="color: null;
@@ -599,7 +663,7 @@ background-color: null;
 font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">int</span>:</span>
-<span id="cb3-12">    <span class="cf" style="color: #003B4F;
+<span id="cb3-13">    <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">return</span> <span class="bu" style="color: null;
@@ -615,60 +679,180 @@ font-weight: bold;
 font-style: inherit;">in</span> <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">range</span>(n))</span>
-<span id="cb3-13"></span>
-<span id="cb3-14"><span class="cf" style="color: #003B4F;
+<span id="cb3-14"></span>
+<span id="cb3-15"><span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">def</span> mixed() <span class="op" style="color: #5E5E5E;
+font-style: inherit;">def</span> baseline_sequential() <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
 background-color: null;
-font-style: inherit;">tuple</span>[<span class="bu" style="color: null;
+font-style: inherit;">float</span>:</span>
+<span id="cb3-16">    <span class="co" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">int</span>, <span class="bu" style="color: null;
+font-style: inherit;">"""Run blocking I/O + CPU in the main thread sequentially."""</span></span>
+<span id="cb3-17">    start <span class="op" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">int</span>]:</span>
-<span id="cb3-15">    loop <span class="op" style="color: #5E5E5E;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb3-18">    _ <span class="op" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">=</span> asyncio.get_running_loop()</span>
-<span id="cb3-16"></span>
-<span id="cb3-17">    <span class="co" style="color: #5E5E5E;
+font-style: inherit;">=</span> blocking_http(<span class="st" style="color: #20794D;
 background-color: null;
-font-style: inherit;"># Blocking I/O offloaded to thread</span></span>
-<span id="cb3-18">    io_result <span class="op" style="color: #5E5E5E;
+font-style: inherit;">"https://en.wikipedia.org/wiki/Artificial_intelligence"</span>)</span>
+<span id="cb3-19">    _ <span class="op" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">await</span> loop.run_in_executor(thread_pool, blocking_http, <span class="st" style="color: #20794D;
-background-color: null;
-font-style: inherit;">"https://example.com"</span>)</span>
-<span id="cb3-19"></span>
-<span id="cb3-20">    <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># CPU work offloaded to process</span></span>
-<span id="cb3-21">    cpu_result <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">await</span> loop.run_in_executor(proc_pool, cpu_heavy, <span class="dv" style="color: #AD0000;
+font-style: inherit;">=</span> cpu_heavy(<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">50_000_000</span>)</span>
-<span id="cb3-22"></span>
-<span id="cb3-23">    <span class="cf" style="color: #003B4F;
+<span id="cb3-20">    <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">return</span> io_result, cpu_result</span></code></pre></div></div>
+font-style: inherit;">return</span> time.perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start</span>
+<span id="cb3-21"></span>
+<span id="cb3-22"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> offloaded_mixed() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">float</span>:</span>
+<span id="cb3-23">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Offload blocking I/O to thread, CPU to process — overlap both."""</span></span>
+<span id="cb3-24">    loop <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> asyncio.get_running_loop()</span>
+<span id="cb3-25">    start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb3-26"></span>
+<span id="cb3-27">    io_task <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> loop.run_in_executor(thread_pool, blocking_http, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"https://en.wikipedia.org/wiki/Artificial_intelligence"</span>)</span>
+<span id="cb3-28">    cpu_task <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> loop.run_in_executor(proc_pool, cpu_heavy, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50_000_000</span>)</span>
+<span id="cb3-29">    _ <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> asyncio.gather(io_task, cpu_task)</span>
+<span id="cb3-30"></span>
+<span id="cb3-31">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> time.perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start</span>
+<span id="cb3-32"></span>
+<span id="cb3-33"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> main() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>:</span>
+<span id="cb3-34">    t_seq <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> baseline_sequential()</span>
+<span id="cb3-35">    t_off <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> offloaded_mixed()</span>
+<span id="cb3-36">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"sequential=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_seq<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s  offloaded=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_off<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s  speedup=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_seq <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> t_off<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.1f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">x"</span>)</span>
+<span id="cb3-37"></span>
+<span id="cb3-38">asyncio.run(main())</span></code></pre></div></div>
+<p><strong>Why <code>asyncio.get_running_loop()</code> matters:</strong> <code>run_in_executor</code> is a method on the event loop object, not a standalone function. You call <code>get_running_loop()</code> inside an <code>async</code> function to get a reference to the loop that is currently driving the coroutine. This gives you access to <code>loop.run_in_executor(...)</code>, which submits blocking work to a thread or process pool and returns an awaitable — so the event loop stays free to handle other tasks while the executor does the heavy lifting. Without the loop reference you cannot bridge sync executors into the async world.</p>
+<p><strong>What if you use <code>ThreadPoolExecutor</code>/<code>ProcessPoolExecutor</code> directly?</strong> You can call <code>executor.submit(func, *args)</code> or <code>pool.map(func, items)</code> without the loop — this is exactly what Q5 does and it works fine there because Q5 has <strong>no event loop</strong>; it is pure sync code. But inside an <code>async</code> function (like Q4’s <code>offloaded_mixed</code>), calling <code>pool.map(...)</code> or <code>future.result()</code> <strong>blocks the entire event loop</strong> until the work finishes. That means:</p>
+<ol type="1">
+<li>The I/O task and CPU task would run <strong>one after the other</strong> (no overlap).</li>
+<li>While they run, every other coroutine in your program is frozen — no HTTP handling, no DB queries, nothing.</li>
+</ol>
+<p>With <code>loop.run_in_executor()</code>, both tasks are dispatched simultaneously and the event loop stays free. <code>gather(io_task, cpu_task)</code> then awaits both at once, so I/O wait and CPU work <strong>overlap</strong> — cutting total time from <code>t_io + t_cpu</code> to roughly <code>max(t_io, t_cpu)</code>.</p>
+<p><strong>Rule of thumb:</strong> use <code>pool.map()</code> / <code>pool.submit()</code> in pure sync code (scripts, CLI tools, Q5-style benchmarks). Use <code>loop.run_in_executor()</code> whenever you are inside an async context and need to keep the event loop responsive.</p>
+<p><strong>How do you know you have an event loop?</strong> If your function is declared with <code>async def</code>, you are inside an event loop. The loop was started by <code>asyncio.run(main())</code> at the top level, and every <code>async def</code> function called from there runs on that loop. It does not matter whether you have one task or ten — any <code>async def</code> function has a running loop. The reason you <em>reach for</em> <code>run_in_executor</code> is when that async function needs to call blocking code (I/O SDK, CPU work) without freezing the loop. So the decision is:</p>
+<ul>
+<li><strong>One blocking call, no other concurrent work?</strong> You could still use <code>run_in_executor</code> to keep the loop alive for other coroutines elsewhere in your program.</li>
+<li><strong>Multiple blocking calls that can overlap?</strong> Definitely use <code>run_in_executor</code> + <code>gather</code> — this is Q4’s pattern.</li>
+<li><strong>Pure sync script with no event loop at all?</strong> Use <code>pool.map()</code> / <code>pool.submit()</code> directly — this is Q5’s pattern.</li>
+</ul>
 <hr>
 </section>
 <section id="q5-how-does-the-gil-affect-concurrency-choices-in-python" class="level2">
 <h2 class="anchored" data-anchor-id="q5-how-does-the-gil-affect-concurrency-choices-in-python">Q5: How does the GIL affect concurrency choices in Python?</h2>
 <p><strong>Answer:</strong></p>
 <p><strong>GIL (Global Interpreter Lock)</strong> is a CPython mechanism that allows only one thread to execute Python bytecode at a time in a single process.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    linkStyle default stroke:#000,color:#000
+    GIL["GIL: one thread&lt;br/&gt;executes bytecode at a time"]
+    GIL --&gt; IO["I/O wait →&lt;br/&gt;thread releases GIL"]
+    GIL --&gt; CPU["CPU loop →&lt;br/&gt;thread holds GIL"]
+    IO --&gt; SCALE_OK["Other threads run&lt;br/&gt;while waiting ✓"]
+    CPU --&gt; SCALE_BAD["Other threads blocked&lt;br/&gt;no real parallelism ✗"]
+    SCALE_BAD --&gt; FIX["Solution:&lt;br/&gt;ProcessPoolExecutor"]
+
+    style GIL fill:#ffce67,stroke:#333
+    style SCALE_OK fill:#56cc9d,stroke:#333,color:#fff
+    style SCALE_BAD fill:#ff7851,stroke:#333,color:#fff
+    style FIX fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
 <section id="gil-implications" class="level3">
 <h3 class="anchored" data-anchor-id="gil-implications">GIL implications</h3>
 <table class="caption-top table">
@@ -693,11 +877,219 @@ font-style: inherit;">return</span> io_result, cpu_result</span></code></pre></d
 </tr>
 </tbody>
 </table>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> time</span>
+<span id="cb4-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> concurrent.futures <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> ThreadPoolExecutor, ProcessPoolExecutor</span>
+<span id="cb4-3"></span>
+<span id="cb4-4"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> cpu_work(n: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>:</span>
+<span id="cb4-5">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Pure Python CPU loop — GIL-bound."""</span></span>
+<span id="cb4-6">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">sum</span>(i <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> i <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(n))</span>
+<span id="cb4-7"></span>
+<span id="cb4-8">N <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10_000_000</span></span>
+<span id="cb4-9">TASKS <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span></span>
+<span id="cb4-10"></span>
+<span id="cb4-11"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> baseline_sequential() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">float</span>:</span>
+<span id="cb4-12">    start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb4-13">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> _ <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(TASKS):</span>
+<span id="cb4-14">        cpu_work(N)</span>
+<span id="cb4-15">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> time.perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start</span>
+<span id="cb4-16"></span>
+<span id="cb4-17"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> with_threads() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">float</span>:</span>
+<span id="cb4-18">    start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb4-19">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> ThreadPoolExecutor(max_workers<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>TASKS) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> pool:</span>
+<span id="cb4-20">        <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>(pool.<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">map</span>(cpu_work, [N] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> TASKS))</span>
+<span id="cb4-21">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> time.perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start</span>
+<span id="cb4-22"></span>
+<span id="cb4-23"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> with_processes() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">float</span>:</span>
+<span id="cb4-24">    start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb4-25">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> ProcessPoolExecutor(max_workers<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>TASKS) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> pool:</span>
+<span id="cb4-26">        <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>(pool.<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">map</span>(cpu_work, [N] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> TASKS))</span>
+<span id="cb4-27">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> time.perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start</span>
+<span id="cb4-28"></span>
+<span id="cb4-29"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">__name__</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"__main__"</span>:</span>
+<span id="cb4-30">    t_seq <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> baseline_sequential()</span>
+<span id="cb4-31">    t_thr <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> with_threads()</span>
+<span id="cb4-32">    t_proc <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> with_processes()</span>
+<span id="cb4-33">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"sequential=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_seq<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s  threads=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_thr<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s  processes=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_proc<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s"</span>)</span>
+<span id="cb4-34">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"thread_speedup=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_seq <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> t_thr<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.1f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">x  process_speedup=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_seq <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> t_proc<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.1f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">x"</span>)</span></code></pre></div></div>
+<p><strong>Expected output:</strong> threads give ~1x speedup (no gain due to GIL), processes give ~3–4x speedup (true parallelism across cores).</p>
 <hr>
 </section>
 </section>
-<section id="q6-what-are-the-biggest-async-best-practices-for-production-code" class="level2">
-<h2 class="anchored" data-anchor-id="q6-what-are-the-biggest-async-best-practices-for-production-code">Q6: What are the biggest async best practices for production code?</h2>
+<section id="q6-what-are-the-async-best-practices-for-production-code" class="level2">
+<h2 class="anchored" data-anchor-id="q6-what-are-the-async-best-practices-for-production-code">Q6: What are the async best practices for production code?</h2>
 <p><strong>Answer:</strong></p>
 <ol type="1">
 <li>Use <strong>timeouts everywhere</strong> (network, DB, queue).</li>
@@ -706,20 +1098,67 @@ font-style: inherit;">return</span> io_result, cpu_result</span></code></pre></d
 <li>Prefer structured concurrency (<code>TaskGroup</code>) for lifecycle safety.</li>
 <li>Never call blocking APIs directly in async paths.</li>
 </ol>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><span class="im" style="color: #00769E;
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    linkStyle default stroke:#000,color:#000
+    REQ["Incoming requests"] --&gt; SEM["Semaphore gate&lt;br/&gt;(max 20 concurrent)"]
+    SEM --&gt; SESSION["Shared ClientSession&lt;br/&gt;(connection reuse)"]
+    SESSION --&gt; TIMEOUT["Per-request timeout&lt;br/&gt;(8s hard limit)"]
+    TIMEOUT --&gt; OK["Success → return data"]
+    TIMEOUT --&gt; FAIL["Timeout / error →&lt;br/&gt;graceful fallback"]
+    SEM --&gt; TG["TaskGroup manages&lt;br/&gt;all task lifecycles"]
+    TG --&gt; CANCEL["On failure →&lt;br/&gt;cancel siblings cleanly"]
+
+    style SEM fill:#56cc9d,stroke:#333,color:#fff
+    style SESSION fill:#6cc3d5,stroke:#333,color:#fff
+    style TIMEOUT fill:#ffce67,stroke:#333
+    style FAIL fill:#ff7851,stroke:#333,color:#fff
+    style TG fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p><strong>How they work together:</strong> requests enter through a semaphore (rule 2) that caps active work. Each request uses a shared session (rule 3) with a timeout (rule 1). All tasks are grouped under a <code>TaskGroup</code> (rule 4) so if something goes wrong, cleanup is automatic. Blocking calls never enter this path directly (rule 5); they go through <code>run_in_executor</code> instead.</p>
+<p><strong>Why the semaphore matters:</strong> without it, if you have 10,000 URLs, <code>asyncio.gather</code> will fire 10,000 connections at once. This exhausts file descriptors, overwhelms upstream servers, and triggers rate-limits or connection resets. A semaphore like <code>Semaphore(20)</code> means only 20 requests are in-flight at any moment; the rest wait their turn without consuming resources. It is the simplest form of <strong>client-side backpressure</strong>.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> asyncio</span>
-<span id="cb4-2"><span class="im" style="color: #00769E;
+<span id="cb5-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> time</span>
+<span id="cb5-3"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> aiohttp</span>
-<span id="cb4-3"></span>
-<span id="cb4-4">SEM <span class="op" style="color: #5E5E5E;
+<span id="cb5-4"></span>
+<span id="cb5-5">URLS <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"https://httpbin.org/delay/1"</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> _ <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span>)]</span>
+<span id="cb5-6"></span>
+<span id="cb5-7">SEM <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> asyncio.Semaphore(<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">20</span>)</span>
-<span id="cb4-5"></span>
-<span id="cb4-6"><span class="cf" style="color: #003B4F;
+<span id="cb5-8"></span>
+<span id="cb5-9"><span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
@@ -732,18 +1171,18 @@ background-color: null;
 font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">str</span>:</span>
-<span id="cb4-7">    <span class="cf" style="color: #003B4F;
+<span id="cb5-10">    <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">async</span> <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">with</span> SEM:</span>
-<span id="cb4-8">        <span class="cf" style="color: #003B4F;
+<span id="cb5-11">        <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">try</span>:</span>
-<span id="cb4-9">            <span class="cf" style="color: #003B4F;
+<span id="cb5-12">            <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">async</span> <span class="cf" style="color: #003B4F;
@@ -758,33 +1197,33 @@ background-color: null;
 font-style: inherit;">8</span>)) <span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">as</span> r:</span>
-<span id="cb4-10">                r.raise_for_status()</span>
-<span id="cb4-11">                <span class="cf" style="color: #003B4F;
+<span id="cb5-13">                r.raise_for_status()</span>
+<span id="cb5-14">                <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">return</span> <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">await</span> r.text()</span>
-<span id="cb4-12">        <span class="cf" style="color: #003B4F;
+<span id="cb5-15">        <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">except</span> asyncio.<span class="pp" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">TimeoutError</span>:</span>
-<span id="cb4-13">            <span class="cf" style="color: #003B4F;
+<span id="cb5-16">            <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">return</span> <span class="st" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"timeout"</span></span>
-<span id="cb4-14">        <span class="cf" style="color: #003B4F;
+<span id="cb5-17">        <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">except</span> aiohttp.ClientError <span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">as</span> exc:</span>
-<span id="cb4-15">            <span class="cf" style="color: #003B4F;
+<span id="cb5-18">            <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">return</span> <span class="ss" style="color: #20794D;
@@ -796,14 +1235,14 @@ background-color: null;
 font-style: inherit;">}</span><span class="ss" style="color: #20794D;
 background-color: null;
 font-style: inherit;">"</span></span>
-<span id="cb4-16"></span>
-<span id="cb4-17"><span class="cf" style="color: #003B4F;
+<span id="cb5-19"></span>
+<span id="cb5-20"><span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">def</span> run(urls: <span class="bu" style="color: null;
+font-style: inherit;">def</span> baseline_sequential(urls: <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">list</span>[<span class="bu" style="color: null;
 background-color: null;
@@ -811,10 +1250,14 @@ font-style: inherit;">str</span>]) <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
 background-color: null;
-font-style: inherit;">list</span>[<span class="bu" style="color: null;
+font-style: inherit;">float</span>:</span>
+<span id="cb5-21">    <span class="co" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">str</span>]:</span>
-<span id="cb4-18">    <span class="cf" style="color: #003B4F;
+font-style: inherit;">"""Fetch URLs one-by-one without semaphore or TaskGroup."""</span></span>
+<span id="cb5-22">    start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb5-23">    <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">async</span> <span class="cf" style="color: #003B4F;
@@ -823,7 +1266,84 @@ font-weight: bold;
 font-style: inherit;">with</span> aiohttp.ClientSession() <span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">as</span> session:</span>
-<span id="cb4-19">        <span class="cf" style="color: #003B4F;
+<span id="cb5-24">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> url <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> urls:</span>
+<span id="cb5-25">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">try</span>:</span>
+<span id="cb5-26">                <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> session.get(url, timeout<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>aiohttp.ClientTimeout(total<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">8</span>)) <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> r:</span>
+<span id="cb5-27">                    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> r.text()</span>
+<span id="cb5-28">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">except</span> <span class="pp" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">Exception</span>:</span>
+<span id="cb5-29">                <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">pass</span></span>
+<span id="cb5-30">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> time.perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start</span>
+<span id="cb5-31"></span>
+<span id="cb5-32"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> run_with_best_practices(urls: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>]) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">float</span>:</span>
+<span id="cb5-33">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Fetch with semaphore + TaskGroup + shared session + timeout."""</span></span>
+<span id="cb5-34">    start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb5-35">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> aiohttp.ClientSession() <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> session:</span>
+<span id="cb5-36">        <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">async</span> <span class="cf" style="color: #003B4F;
@@ -832,7 +1352,7 @@ font-weight: bold;
 font-style: inherit;">with</span> asyncio.TaskGroup() <span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">as</span> tg:</span>
-<span id="cb4-20">            tasks <span class="op" style="color: #5E5E5E;
+<span id="cb5-37">            tasks <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> [tg.create_task(safe_fetch(session, u)) <span class="cf" style="color: #003B4F;
 background-color: null;
@@ -841,16 +1361,72 @@ font-style: inherit;">for</span> u <span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">in</span> urls]</span>
-<span id="cb4-21">        <span class="cf" style="color: #003B4F;
+<span id="cb5-38">        _ <span class="op" style="color: #5E5E5E;
 background-color: null;
-font-weight: bold;
-font-style: inherit;">return</span> [t.result() <span class="cf" style="color: #003B4F;
+font-style: inherit;">=</span> [t.result() <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">for</span> t <span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">in</span> tasks]</span></code></pre></div></div>
+font-style: inherit;">in</span> tasks]</span>
+<span id="cb5-39">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> time.perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start</span>
+<span id="cb5-40"></span>
+<span id="cb5-41"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> main() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>:</span>
+<span id="cb5-42">    t_seq <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> baseline_sequential(URLS)</span>
+<span id="cb5-43">    t_best <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> run_with_best_practices(URLS)</span>
+<span id="cb5-44">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"sequential=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_seq<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s  best_practices=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_best<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s  speedup=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_seq <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> t_best<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.1f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">x"</span>)</span>
+<span id="cb5-45"></span>
+<span id="cb5-46">asyncio.run(main())</span></code></pre></div></div>
 <hr>
 </section>
 <section id="q7-real-use-case-high-throughput-event-enrichment-pipeline-with-asyncio-processes" class="level2">
@@ -861,29 +1437,63 @@ font-style: inherit;">in</span> tasks]</span></code></pre></div></div>
 <li>Async layer handles message ingestion and external I/O.</li>
 <li>CPU-heavy enrichment/scoring runs in a process pool.</li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><span class="im" style="color: #00769E;
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    linkStyle default stroke:#000,color:#000
+    INGEST["Async ingestion&lt;br/&gt;(event loop)"] --&gt; DISPATCH["Dispatch events&lt;br/&gt;to process pool"]
+    DISPATCH --&gt; W1["Worker process 1&lt;br/&gt;enrich_event()"]
+    DISPATCH --&gt; W2["Worker process 2&lt;br/&gt;enrich_event()"]
+    DISPATCH --&gt; W3["Worker process 3&lt;br/&gt;enrich_event()"]
+    DISPATCH --&gt; W4["Worker process 4&lt;br/&gt;enrich_event()"]
+    W1 --&gt; GATHER["await gather()&lt;br/&gt;collect all results"]
+    W2 --&gt; GATHER
+    W3 --&gt; GATHER
+    W4 --&gt; GATHER
+    GATHER --&gt; OUT["Return enriched&lt;br/&gt;event list"]
+
+    style INGEST fill:#56cc9d,stroke:#333,color:#fff
+    style DISPATCH fill:#6cc3d5,stroke:#333,color:#fff
+    style W1 fill:#ff7851,stroke:#333,color:#fff
+    style W2 fill:#ff7851,stroke:#333,color:#fff
+    style W3 fill:#ff7851,stroke:#333,color:#fff
+    style W4 fill:#ff7851,stroke:#333,color:#fff
+    style GATHER fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> asyncio</span>
-<span id="cb5-2"><span class="im" style="color: #00769E;
+<span id="cb6-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> time</span>
+<span id="cb6-3"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">from</span> concurrent.futures <span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> ProcessPoolExecutor</span>
-<span id="cb5-3"><span class="im" style="color: #00769E;
+<span id="cb6-4"><span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">from</span> hashlib <span class="im" style="color: #00769E;
 background-color: null;
 font-style: inherit;">import</span> sha256</span>
-<span id="cb5-4"></span>
-<span id="cb5-5">pool <span class="op" style="color: #5E5E5E;
+<span id="cb6-5"></span>
+<span id="cb6-6">pool <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> ProcessPoolExecutor(max_workers<span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">4</span>)</span>
-<span id="cb5-6"></span>
-<span id="cb5-7"><span class="kw" style="color: #003B4F;
+<span id="cb6-7"></span>
+<span id="cb6-8"><span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">def</span> enrich_event(payload: <span class="bu" style="color: null;
@@ -901,13 +1511,13 @@ background-color: null;
 font-style: inherit;">|</span> <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">int</span>]:</span>
-<span id="cb5-8">    <span class="co" style="color: #5E5E5E;
+<span id="cb6-9">    <span class="co" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;"># Simulate CPU-heavy parsing/scoring work.</span></span>
-<span id="cb5-9">    digest <span class="op" style="color: #5E5E5E;
+<span id="cb6-10">    digest <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> payload</span>
-<span id="cb5-10">    <span class="cf" style="color: #003B4F;
+<span id="cb6-11">    <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">for</span> _ <span class="kw" style="color: #003B4F;
@@ -918,10 +1528,10 @@ background-color: null;
 font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">50_000</span>):</span>
-<span id="cb5-11">        digest <span class="op" style="color: #5E5E5E;
+<span id="cb6-12">        digest <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> sha256(digest.encode()).hexdigest()</span>
-<span id="cb5-12">    <span class="cf" style="color: #003B4F;
+<span id="cb6-13">    <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">return</span> {<span class="st" style="color: #20794D;
@@ -939,14 +1549,11 @@ background-color: null;
 font-style: inherit;">%</span> <span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">1000</span>}</span>
-<span id="cb5-13"></span>
-<span id="cb5-14"><span class="cf" style="color: #003B4F;
+<span id="cb6-14"></span>
+<span id="cb6-15"><span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> process_events(events: <span class="bu" style="color: null;
+font-style: inherit;">def</span> baseline_sequential(events: <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">list</span>[<span class="bu" style="color: null;
 background-color: null;
@@ -965,22 +1572,64 @@ background-color: null;
 font-style: inherit;">|</span> <span class="bu" style="color: null;
 background-color: null;
 font-style: inherit;">int</span>]]:</span>
-<span id="cb5-15">    loop <span class="op" style="color: #5E5E5E;
+<span id="cb6-16">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Process events one-by-one in the main process (no parallelism)."""</span></span>
+<span id="cb6-17">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> [enrich_event(e) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> e <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> events]</span>
+<span id="cb6-18"></span>
+<span id="cb6-19"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> process_events_parallel(events: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>]) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>]]:</span>
+<span id="cb6-20">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Dispatch events to process pool and collect results concurrently."""</span></span>
+<span id="cb6-21">    loop <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> asyncio.get_running_loop()</span>
-<span id="cb5-16">    tasks <span class="op" style="color: #5E5E5E;
+<span id="cb6-22">    tasks <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">=</span> [</span>
-<span id="cb5-17">        loop.run_in_executor(pool, enrich_event, event)</span>
-<span id="cb5-18">        <span class="cf" style="color: #003B4F;
+<span id="cb6-23">        loop.run_in_executor(pool, enrich_event, event)</span>
+<span id="cb6-24">        <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">for</span> event <span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">in</span> events</span>
-<span id="cb5-19">    ]</span>
-<span id="cb5-20">    <span class="cf" style="color: #003B4F;
+<span id="cb6-25">    ]</span>
+<span id="cb6-26">    <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">return</span> <span class="cf" style="color: #003B4F;
@@ -988,130 +1637,30 @@ background-color: null;
 font-weight: bold;
 font-style: inherit;">await</span> asyncio.gather(<span class="op" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">*</span>tasks)</span></code></pre></div></div>
-<p>Why this works well:</p>
-<ul>
-<li><code>asyncio</code> handles orchestration and I/O concurrency.</li>
-<li><code>ProcessPoolExecutor</code> bypasses GIL bottlenecks for CPU-heavy enrichment.</li>
-</ul>
-<hr>
-</section>
-<section id="q8-how-do-cancellation-retries-and-backpressure-work-in-async-systems" class="level2">
-<h2 class="anchored" data-anchor-id="q8-how-do-cancellation-retries-and-backpressure-work-in-async-systems">Q8: How do cancellation, retries, and backpressure work in async systems?</h2>
-<p><strong>Answer:</strong></p>
-<p>Production async systems fail under overload unless they enforce <strong>backpressure</strong> and clean cancellation.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><span class="im" style="color: #00769E;
-background-color: null;
-font-style: inherit;">import</span> asyncio</span>
-<span id="cb6-2"></span>
-<span id="cb6-3">queue: asyncio.Queue[<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">str</span>] <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> asyncio.Queue(maxsize<span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">1000</span>)</span>
-<span id="cb6-4"></span>
-<span id="cb6-5"><span class="cf" style="color: #003B4F;
+font-style: inherit;">*</span>tasks)</span>
+<span id="cb6-27"></span>
+<span id="cb6-28"><span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">def</span> producer(items: <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">list</span>[<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">str</span>]) <span class="op" style="color: #5E5E5E;
+font-style: inherit;">def</span> main() <span class="op" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">-&gt;</span> <span class="va" style="color: #111111;
 background-color: null;
 font-style: inherit;">None</span>:</span>
-<span id="cb6-6">    <span class="cf" style="color: #003B4F;
+<span id="cb6-29">    events <span class="op" style="color: #5E5E5E;
 background-color: null;
-font-weight: bold;
-font-style: inherit;">for</span> item <span class="kw" style="color: #003B4F;
+font-style: inherit;">=</span> [<span class="ss" style="color: #20794D;
 background-color: null;
-font-weight: bold;
-font-style: inherit;">in</span> items:</span>
-<span id="cb6-7">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">await</span> queue.put(item)  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># blocks when full =&gt; backpressure</span></span>
-<span id="cb6-8"></span>
-<span id="cb6-9"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> worker(name: <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-&gt;</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">None</span>:</span>
-<span id="cb6-10">    <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">while</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">True</span>:</span>
-<span id="cb6-11">        item <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">await</span> queue.get()</span>
-<span id="cb6-12">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">try</span>:</span>
-<span id="cb6-13">            <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">await</span> asyncio.sleep(<span class="fl" style="color: #AD0000;
-background-color: null;
-font-style: inherit;">0.05</span>)  <span class="co" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;"># simulate I/O</span></span>
-<span id="cb6-14">        <span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">finally</span>:</span>
-<span id="cb6-15">            queue.task_done()</span>
-<span id="cb6-16"></span>
-<span id="cb6-17"><span class="cf" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
-background-color: null;
-font-weight: bold;
-font-style: inherit;">def</span> run_pipeline(items: <span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">list</span>[<span class="bu" style="color: null;
-background-color: null;
-font-style: inherit;">str</span>]) <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">-&gt;</span> <span class="va" style="color: #111111;
-background-color: null;
-font-style: inherit;">None</span>:</span>
-<span id="cb6-18">    workers <span class="op" style="color: #5E5E5E;
-background-color: null;
-font-style: inherit;">=</span> [asyncio.create_task(worker(<span class="ss" style="color: #20794D;
-background-color: null;
-font-style: inherit;">f"w</span><span class="sc" style="color: #5E5E5E;
+font-style: inherit;">f"order_</span><span class="sc" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">{</span>i<span class="sc" style="color: #5E5E5E;
 background-color: null;
 font-style: inherit;">}</span><span class="ss" style="color: #20794D;
 background-color: null;
-font-style: inherit;">"</span>)) <span class="cf" style="color: #003B4F;
+font-style: inherit;">"</span> <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
@@ -1122,43 +1671,487 @@ background-color: null;
 font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
 background-color: null;
 font-style: inherit;">8</span>)]</span>
-<span id="cb6-19">    <span class="cf" style="color: #003B4F;
+<span id="cb6-30"></span>
+<span id="cb6-31">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Baseline: sequential in main process</span></span>
+<span id="cb6-32">    start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb6-33">    _ <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> baseline_sequential(events)</span>
+<span id="cb6-34">    t_seq <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start</span>
+<span id="cb6-35"></span>
+<span id="cb6-36">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Parallel: dispatched to 4 worker processes</span></span>
+<span id="cb6-37">    start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb6-38">    _ <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">try</span>:</span>
-<span id="cb6-20">        <span class="cf" style="color: #003B4F;
+font-style: inherit;">await</span> process_events_parallel(events)</span>
+<span id="cb6-39">    t_par <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start</span>
+<span id="cb6-40"></span>
+<span id="cb6-41">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"sequential=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_seq<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s  parallel=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_par<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s  speedup=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_seq <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> t_par<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.1f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">x"</span>)</span>
+<span id="cb6-42"></span>
+<span id="cb6-43">asyncio.run(main())</span></code></pre></div></div>
+<p><strong>Step-by-step explanation:</strong></p>
+<ol type="1">
+<li><code>ProcessPoolExecutor(max_workers=4)</code> — creates 4 separate OS processes. Each has its own GIL, so they truly run CPU work in parallel.</li>
+<li><code>enrich_event()</code> — a pure function that does heavy hashing (simulates scoring/parsing). It runs entirely inside a worker process, not in the main event loop.</li>
+<li><code>baseline_sequential()</code> — processes all events one-by-one in the main process. This is the slowest path because only one CPU core is used at a time.</li>
+<li><code>loop.run_in_executor(pool, enrich_event, event)</code> — submits one event to the process pool and returns an awaitable. The event loop stays free to handle other I/O while this runs.</li>
+<li>The list comprehension creates one awaitable per event, so all events are dispatched to the pool at once.</li>
+<li><code>await asyncio.gather(*tasks)</code> — waits for all worker processes to finish and collects results in order.</li>
+<li><code>main()</code> compares both approaches: with 8 events and 4 workers, parallel should be roughly 2–4x faster than sequential.</li>
+</ol>
+<p><strong>What is the event loop?</strong></p>
+<p>The event loop is the central scheduler in <code>asyncio</code>. Think of it as a single-threaded coordinator that:</p>
+<ul>
+<li>Maintains a queue of ready-to-run coroutines.</li>
+<li>Runs one coroutine until it hits an <code>await</code>, then switches to the next ready coroutine.</li>
+<li>Monitors I/O file descriptors (sockets, pipes) and wakes up coroutines when their I/O completes.</li>
+<li>Never does CPU-heavy work itself — it only orchestrates.</li>
+</ul>
+<p>In this Q7 example, the event loop dispatches CPU work to separate processes via <code>run_in_executor</code>, then suspends at <code>await gather(...)</code>. While waiting, it could handle other tasks (e.g., incoming HTTP requests, DB queries). When all process workers finish, <code>gather</code> resumes and returns the results.</p>
+<p><strong>Why this works well:</strong></p>
+<ul>
+<li>The event loop never blocks on CPU work; it just dispatches and waits.</li>
+<li>Up to 4 events are enriched in true parallel (one per process).</li>
+<li>If you also have network I/O (e.g., fetching metadata), the event loop can handle those concurrently while processes crunch numbers.</li>
+<li><code>ProcessPoolExecutor</code> completely bypasses the GIL because each worker is a separate process with its own Python interpreter.</li>
+</ul>
+<hr>
+</section>
+<section id="q8-how-do-cancellation-retries-and-backpressure-work-in-async-systems" class="level2">
+<h2 class="anchored" data-anchor-id="q8-how-do-cancellation-retries-and-backpressure-work-in-async-systems">Q8: How do cancellation, retries, and backpressure work in async systems?</h2>
+<p><strong>Answer:</strong></p>
+<p>Production async systems fail under overload unless they enforce <strong>backpressure</strong> and clean cancellation.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    linkStyle default stroke:#000,color:#000
+    PROD["Producer&lt;br/&gt;(fast)"] --&gt; Q["Bounded Queue&lt;br/&gt;maxsize=1000"]
+    Q --&gt;|"queue full →&lt;br/&gt;producer waits"| PROD
+    Q --&gt; W1["Worker 1"]
+    Q --&gt; W2["Worker 2"]
+    Q --&gt; W3["Worker ..."]
+    Q --&gt; W8["Worker 8"]
+    W1 --&gt; DONE["task_done()"]
+    W8 --&gt; DONE
+    DONE --&gt;|"all done"| CANCEL["Cancel workers&lt;br/&gt;+ gather(return_exceptions)"]
+
+    style Q fill:#ffce67,stroke:#333
+    style PROD fill:#6cc3d5,stroke:#333,color:#fff
+    style CANCEL fill:#ff7851,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p><strong>How backpressure works:</strong> when the queue is full (<code>maxsize=1000</code>), <code>await queue.put()</code> suspends the producer until a worker frees a slot. This prevents unbounded memory growth and keeps the system stable under load.</p>
+<p><strong>How does backpressure differ from a semaphore?</strong> Both limit concurrency, but they solve different problems at different layers:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Semaphore (Q6)</th>
+<th>Bounded Queue (Q8)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>What it limits</strong></td>
+<td>Number of tasks executing concurrently</td>
+<td>Number of items buffered between producer and consumer</td>
+</tr>
+<tr class="even">
+<td><strong>Where it sits</strong></td>
+<td>Around the work itself (wrap the call)</td>
+<td>Between the producer and workers</td>
+</tr>
+<tr class="odd">
+<td><strong>Producer behavior</strong></td>
+<td>Producer creates all tasks immediately; semaphore gates execution</td>
+<td>Producer is suspended when queue is full — cannot even enqueue more</td>
+</tr>
+<tr class="even">
+<td><strong>Memory model</strong></td>
+<td>All tasks exist in memory; only N run at once</td>
+<td>Only <code>maxsize</code> items + N workers exist at any time</td>
+</tr>
+<tr class="odd">
+<td><strong>Best for</strong></td>
+<td>Capping concurrent outbound connections (HTTP, DB)</td>
+<td>Decoupling a fast producer from slow consumers</td>
+</tr>
+</tbody>
+</table>
+<p><strong>In short:</strong> a semaphore says “only N tasks may be <em>active</em> at once” but all tasks are already scheduled. A bounded queue says “only N items may be <em>waiting</em> at once” — the producer itself is slowed down, which is true end-to-end backpressure. Use a semaphore when you already have a fixed batch of work (e.g., 100 URLs). Use a bounded queue when work arrives continuously and you need to throttle the source (e.g., streaming events from Kafka).</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> asyncio</span>
+<span id="cb7-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> time</span>
+<span id="cb7-3"></span>
+<span id="cb7-4"><span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">await</span> producer(items)</span>
-<span id="cb6-21">        <span class="cf" style="color: #003B4F;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">await</span> queue.join()</span>
-<span id="cb6-22">    <span class="cf" style="color: #003B4F;
+font-style: inherit;">def</span> simulate_io_work(item: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>:</span>
+<span id="cb7-5">    <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">finally</span>:</span>
-<span id="cb6-23">        <span class="cf" style="color: #003B4F;
+font-style: inherit;">await</span> asyncio.sleep(<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.01</span>)  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># simulate fast I/O per item</span></span>
+<span id="cb7-6"></span>
+<span id="cb7-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- Baseline: no backpressure, fire all at once ---</span></span>
+<span id="cb7-8"><span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">for</span> w <span class="kw" style="color: #003B4F;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
-font-style: inherit;">in</span> workers:</span>
-<span id="cb6-24">            w.cancel()</span>
-<span id="cb6-25">        <span class="cf" style="color: #003B4F;
+font-style: inherit;">def</span> baseline_unbounded(items: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>]) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">float</span>:</span>
+<span id="cb7-9">    start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb7-10">    tasks <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [asyncio.create_task(simulate_io_work(i)) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> items]</span>
+<span id="cb7-11">    <span class="cf" style="color: #003B4F;
 background-color: null;
 font-weight: bold;
 font-style: inherit;">await</span> asyncio.gather(<span class="op" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">*</span>workers, return_exceptions<span class="op" style="color: #5E5E5E;
+font-style: inherit;">*</span>tasks)</span>
+<span id="cb7-12">    <span class="cf" style="color: #003B4F;
 background-color: null;
-font-style: inherit;">=</span><span class="va" style="color: #111111;
+font-weight: bold;
+font-style: inherit;">return</span> time.perf_counter() <span class="op" style="color: #5E5E5E;
 background-color: null;
-font-style: inherit;">True</span>)</span></code></pre></div></div>
+font-style: inherit;">-</span> start</span>
+<span id="cb7-13"></span>
+<span id="cb7-14"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- Best practice: bounded queue + worker pool ---</span></span>
+<span id="cb7-15"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> with_backpressure(items: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>], num_workers: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">8</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">float</span>:</span>
+<span id="cb7-16">    queue: asyncio.Queue[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> asyncio.Queue(maxsize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">100</span>)</span>
+<span id="cb7-17"></span>
+<span id="cb7-18">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> producer() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>:</span>
+<span id="cb7-19">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> item <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> items:</span>
+<span id="cb7-20">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> queue.put(item)</span>
+<span id="cb7-21">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> _ <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(num_workers):</span>
+<span id="cb7-22">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> queue.put(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>)  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># poison pill</span></span>
+<span id="cb7-23"></span>
+<span id="cb7-24">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> worker() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>:</span>
+<span id="cb7-25">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">while</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>:</span>
+<span id="cb7-26">            item <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> queue.get()</span>
+<span id="cb7-27">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> item <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">is</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>:</span>
+<span id="cb7-28">                queue.task_done()</span>
+<span id="cb7-29">                <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">break</span></span>
+<span id="cb7-30">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">try</span>:</span>
+<span id="cb7-31">                <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> simulate_io_work(item)</span>
+<span id="cb7-32">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">finally</span>:</span>
+<span id="cb7-33">                queue.task_done()</span>
+<span id="cb7-34"></span>
+<span id="cb7-35">    start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb7-36">    workers <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [asyncio.create_task(worker()) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> _ <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(num_workers)]</span>
+<span id="cb7-37">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> producer()</span>
+<span id="cb7-38">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> queue.join()</span>
+<span id="cb7-39">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> asyncio.gather(<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>workers)</span>
+<span id="cb7-40">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> time.perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start</span>
+<span id="cb7-41"></span>
+<span id="cb7-42"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> main() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>:</span>
+<span id="cb7-43">    items <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"event_</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>i<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2000</span>)]</span>
+<span id="cb7-44"></span>
+<span id="cb7-45">    t_unbounded <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> baseline_unbounded(items)</span>
+<span id="cb7-46">    t_bounded <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> with_backpressure(items)</span>
+<span id="cb7-47"></span>
+<span id="cb7-48">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"unbounded=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_unbounded<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s  bounded=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_bounded<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s"</span>)</span>
+<span id="cb7-49">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Peak tasks: unbounded=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(items)<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">  bounded=8 workers + 100 queue slots"</span>)</span>
+<span id="cb7-50"></span>
+<span id="cb7-51">asyncio.run(main())</span></code></pre></div></div>
+<p><strong>Key takeaway:</strong> both finish in similar wall-clock time, but the bounded version uses far less memory (max 108 concurrent items vs 2000 tasks at once). Under real load with heavier payloads, unbounded approaches cause OOM or file descriptor exhaustion.</p>
 <p>Best-practice notes:</p>
 <ul>
-<li>Use bounded queues.</li>
+<li>Use bounded queues for predictable memory.</li>
 <li>Make operations idempotent for safe retries.</li>
 <li>Handle <code>CancelledError</code> correctly in long-running tasks.</li>
 </ul>
@@ -1214,10 +2207,10 @@ font-style: inherit;">True</span>)</span></code></pre></div></div>
 <hr>
 </section>
 </section>
-<section id="q10-what-is-the-strongest-concise-production-answer-for-concurrency-strategy-in-python" class="level2">
-<h2 class="anchored" data-anchor-id="q10-what-is-the-strongest-concise-production-answer-for-concurrency-strategy-in-python">Q10: What is the strongest concise production answer for concurrency strategy in Python?</h2>
+<section id="q10-what-is-the-strongest-concise-answer-for-concurrency-strategy-in-python" class="level2">
+<h2 class="anchored" data-anchor-id="q10-what-is-the-strongest-concise-answer-for-concurrency-strategy-in-python">Q10: What is the strongest concise answer for concurrency strategy in Python?</h2>
 <p><strong>Answer:</strong></p>
-<p>A strong production-ready answer:</p>
+<p>A strong concise answer:</p>
 <p>“I classify workload first: I/O-bound vs CPU-bound. For I/O-bound concurrency I prefer <code>asyncio</code> with timeouts, bounded concurrency, and pooled clients. For blocking I/O dependencies I offload to a <code>ThreadPoolExecutor</code>. For CPU-heavy workloads I use <code>ProcessPoolExecutor</code> or native libraries that release the GIL. In production I add observability, retries, cancellation safety, and backpressure so the system degrades gracefully under load.”</p>
 <section id="one-page-decision-matrix" class="level3">
 <h3 class="anchored" data-anchor-id="one-page-decision-matrix">One-page decision matrix</h3>
@@ -1395,6 +2388,1256 @@ font-style: inherit;">True</span>)</span></code></pre></div></div>
 </tbody>
 </table>
 <p>This is the production-ready framing: classify each task by bottleneck, then apply the smallest concurrency model that solves that bottleneck safely.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""</span></span>
+<span id="cb8-2"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">Food Delivery Platform — concurrency patterns in one service.</span></span>
+<span id="cb8-3"></span>
+<span id="cb8-4"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">Demonstrates: asyncio fan-out, ThreadPoolExecutor for blocking SDK,</span></span>
+<span id="cb8-5"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">ProcessPoolExecutor for CPU work, bounded semaphore, backpressure queue,</span></span>
+<span id="cb8-6"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">structured cancellation, and retry with exponential backoff.</span></span>
+<span id="cb8-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""</span></span>
+<span id="cb8-8"></span>
+<span id="cb8-9"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> asyncio</span>
+<span id="cb8-10"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> time</span>
+<span id="cb8-11"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> random</span>
+<span id="cb8-12"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> concurrent.futures <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> ThreadPoolExecutor, ProcessPoolExecutor</span>
+<span id="cb8-13"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> hashlib <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> sha256</span>
+<span id="cb8-14"></span>
+<span id="cb8-15"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- Executor pools (shared across the service lifetime) ---</span></span>
+<span id="cb8-16">thread_pool <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> ThreadPoolExecutor(max_workers<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">8</span>)</span>
+<span id="cb8-17">proc_pool <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> ProcessPoolExecutor(max_workers<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>)</span>
+<span id="cb8-18"></span>
+<span id="cb8-19"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- Simulated external services ---</span></span>
+<span id="cb8-20"></span>
+<span id="cb8-21"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> call_restaurant_service(order_id: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>:</span>
+<span id="cb8-22">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Async I/O: fan-out to restaurant availability API."""</span></span>
+<span id="cb8-23">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> asyncio.sleep(random.uniform(<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.05</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.15</span>))</span>
+<span id="cb8-24">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"order"</span>: order_id, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"restaurant"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"confirmed"</span>}</span>
+<span id="cb8-25"></span>
+<span id="cb8-26"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> call_pricing_service(order_id: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>:</span>
+<span id="cb8-27">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Async I/O: get dynamic pricing."""</span></span>
+<span id="cb8-28">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> asyncio.sleep(random.uniform(<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.05</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.1</span>))</span>
+<span id="cb8-29">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"order"</span>: order_id, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"price"</span>: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">round</span>(random.uniform(<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">8.0</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">25.0</span>), <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>)}</span>
+<span id="cb8-30"></span>
+<span id="cb8-31"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> call_eta_service(order_id: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>:</span>
+<span id="cb8-32">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Async I/O: estimated delivery time."""</span></span>
+<span id="cb8-33">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> asyncio.sleep(random.uniform(<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.05</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.12</span>))</span>
+<span id="cb8-34">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"order"</span>: order_id, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"eta_minutes"</span>: random.randint(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">15</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">45</span>)}</span>
+<span id="cb8-35"></span>
+<span id="cb8-36"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> blocking_payment_sdk(order_id: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, amount: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">float</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>:</span>
+<span id="cb8-37">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Blocking I/O: legacy payment SDK with no async API."""</span></span>
+<span id="cb8-38">    time.sleep(random.uniform(<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.1</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.2</span>))  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># simulates blocking network call</span></span>
+<span id="cb8-39">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"order"</span>: order_id, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"payment"</span>: <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"success"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"charged"</span>: amount}</span>
+<span id="cb8-40"></span>
+<span id="cb8-41"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> compute_route_optimization(waypoints: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>]) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>:</span>
+<span id="cb8-42">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""CPU-bound: heavy route computation."""</span></span>
+<span id="cb8-43">    digest <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">","</span>.join(waypoints)</span>
+<span id="cb8-44">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> _ <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20_000</span>):</span>
+<span id="cb8-45">        digest <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> sha256(digest.encode()).hexdigest()</span>
+<span id="cb8-46">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> {<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"route_hash"</span>: digest[:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12</span>], <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"waypoints"</span>: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">len</span>(waypoints)}</span>
+<span id="cb8-47"></span>
+<span id="cb8-48"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> write_order_state(order_id: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, state: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>:</span>
+<span id="cb8-49">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Async I/O: DB write (simulated)."""</span></span>
+<span id="cb8-50">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> asyncio.sleep(<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.02</span>)</span>
+<span id="cb8-51"></span>
+<span id="cb8-52"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- Pattern 1: Fan-out with TaskGroup + timeout ---</span></span>
+<span id="cb8-53"></span>
+<span id="cb8-54"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> place_order(order_id: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>:</span>
+<span id="cb8-55">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Fan-out to restaurant, pricing, and ETA concurrently."""</span></span>
+<span id="cb8-56">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> asyncio.TaskGroup() <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> tg:</span>
+<span id="cb8-57">        t_rest <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> tg.create_task(</span>
+<span id="cb8-58">            asyncio.wait_for(call_restaurant_service(order_id), timeout<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2.0</span>)</span>
+<span id="cb8-59">        )</span>
+<span id="cb8-60">        t_price <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> tg.create_task(</span>
+<span id="cb8-61">            asyncio.wait_for(call_pricing_service(order_id), timeout<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2.0</span>)</span>
+<span id="cb8-62">        )</span>
+<span id="cb8-63">        t_eta <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> tg.create_task(</span>
+<span id="cb8-64">            asyncio.wait_for(call_eta_service(order_id), timeout<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2.0</span>)</span>
+<span id="cb8-65">        )</span>
+<span id="cb8-66">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> {</span>
+<span id="cb8-67">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"restaurant"</span>: t_rest.result(),</span>
+<span id="cb8-68">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"pricing"</span>: t_price.result(),</span>
+<span id="cb8-69">        <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"eta"</span>: t_eta.result(),</span>
+<span id="cb8-70">    }</span>
+<span id="cb8-71"></span>
+<span id="cb8-72"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- Pattern 2: Blocking SDK via thread pool ---</span></span>
+<span id="cb8-73"></span>
+<span id="cb8-74"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> process_payment(order_id: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, amount: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">float</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>:</span>
+<span id="cb8-75">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Offload blocking payment SDK to thread pool."""</span></span>
+<span id="cb8-76">    loop <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> asyncio.get_running_loop()</span>
+<span id="cb8-77">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> loop.run_in_executor(</span>
+<span id="cb8-78">        thread_pool, blocking_payment_sdk, order_id, amount</span>
+<span id="cb8-79">    )</span>
+<span id="cb8-80"></span>
+<span id="cb8-81"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- Pattern 3: CPU-heavy work via process pool ---</span></span>
+<span id="cb8-82"></span>
+<span id="cb8-83"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> optimize_routes(orders: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>]) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">dict</span>]:</span>
+<span id="cb8-84">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Dispatch route optimization to process pool."""</span></span>
+<span id="cb8-85">    loop <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> asyncio.get_running_loop()</span>
+<span id="cb8-86">    tasks <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [</span>
+<span id="cb8-87">        loop.run_in_executor(proc_pool, compute_route_optimization, [o, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"warehouse"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"customer"</span>])</span>
+<span id="cb8-88">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> o <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> orders</span>
+<span id="cb8-89">    ]</span>
+<span id="cb8-90">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> asyncio.gather(<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>tasks)</span>
+<span id="cb8-91"></span>
+<span id="cb8-92"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- Pattern 4: Bounded semaphore for notification burst ---</span></span>
+<span id="cb8-93"></span>
+<span id="cb8-94">NOTIFY_SEM <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> asyncio.Semaphore(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">10</span>)</span>
+<span id="cb8-95"></span>
+<span id="cb8-96"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> send_notification(user_id: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>, message: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>:</span>
+<span id="cb8-97">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Push notification with bounded concurrency."""</span></span>
+<span id="cb8-98">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> NOTIFY_SEM:</span>
+<span id="cb8-99">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> asyncio.sleep(random.uniform(<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.02</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.05</span>))</span>
+<span id="cb8-100">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"notified:</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>user_id<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span></span>
+<span id="cb8-101"></span>
+<span id="cb8-102"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> notify_all_drivers(driver_ids: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>], message: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">list</span>[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span>]:</span>
+<span id="cb8-103">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Send to many drivers without overwhelming push service."""</span></span>
+<span id="cb8-104">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">with</span> asyncio.TaskGroup() <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> tg:</span>
+<span id="cb8-105">        tasks <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [tg.create_task(send_notification(d, message)) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> d <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> driver_ids]</span>
+<span id="cb8-106">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> [t.result() <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> t <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> tasks]</span>
+<span id="cb8-107"></span>
+<span id="cb8-108"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- Pattern 5: Bounded queue for event consumption ---</span></span>
+<span id="cb8-109"></span>
+<span id="cb8-110"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> consume_delivery_events(num_events: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>, num_workers: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span>:</span>
+<span id="cb8-111">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Process delivery events with backpressure."""</span></span>
+<span id="cb8-112">    queue: asyncio.Queue[<span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">str</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>] <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> asyncio.Queue(maxsize<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span>)</span>
+<span id="cb8-113">    processed <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span></span>
+<span id="cb8-114"></span>
+<span id="cb8-115">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> producer():</span>
+<span id="cb8-116">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(num_events):</span>
+<span id="cb8-117">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> queue.put(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"delivery_event_</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>i<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb8-118">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> _ <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(num_workers):</span>
+<span id="cb8-119">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> queue.put(<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>)</span>
+<span id="cb8-120"></span>
+<span id="cb8-121">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> worker():</span>
+<span id="cb8-122">        <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">nonlocal</span> processed</span>
+<span id="cb8-123">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">while</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>:</span>
+<span id="cb8-124">            item <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> queue.get()</span>
+<span id="cb8-125">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> item <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">is</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>:</span>
+<span id="cb8-126">                queue.task_done()</span>
+<span id="cb8-127">                <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">break</span></span>
+<span id="cb8-128">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> asyncio.sleep(<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.005</span>)  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># simulate processing</span></span>
+<span id="cb8-129">            processed <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span></span>
+<span id="cb8-130">            queue.task_done()</span>
+<span id="cb8-131"></span>
+<span id="cb8-132">    workers <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [asyncio.create_task(worker()) <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> _ <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(num_workers)]</span>
+<span id="cb8-133">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> producer()</span>
+<span id="cb8-134">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> queue.join()</span>
+<span id="cb8-135">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> asyncio.gather(<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span>workers)</span>
+<span id="cb8-136">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> processed</span>
+<span id="cb8-137"></span>
+<span id="cb8-138"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- Pattern 6: Retry with exponential backoff ---</span></span>
+<span id="cb8-139"></span>
+<span id="cb8-140"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> retry_with_backoff(coro_factory, max_retries: <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">int</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>) <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">any</span>:</span>
+<span id="cb8-141">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Retry a coroutine with exponential backoff."""</span></span>
+<span id="cb8-142">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> attempt <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(max_retries <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>):</span>
+<span id="cb8-143">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">try</span>:</span>
+<span id="cb8-144">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> coro_factory()</span>
+<span id="cb8-145">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">except</span> <span class="pp" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">Exception</span> <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> exc:</span>
+<span id="cb8-146">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> attempt <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">==</span> max_retries:</span>
+<span id="cb8-147">                <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">raise</span></span>
+<span id="cb8-148">            wait <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.1</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> (<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span> attempt)</span>
+<span id="cb8-149">            <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> asyncio.sleep(wait)</span>
+<span id="cb8-150"></span>
+<span id="cb8-151"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- Baseline: everything sequential, no concurrency ---</span></span>
+<span id="cb8-152"></span>
+<span id="cb8-153"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> baseline_sequential() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">float</span>:</span>
+<span id="cb8-154">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Run all operations sequentially — no fan-out, no pools, no overlap."""</span></span>
+<span id="cb8-155">    start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb8-156"></span>
+<span id="cb8-157">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 1. Call services one-by-one (no TaskGroup)</span></span>
+<span id="cb8-158">    _ <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> call_restaurant_service(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ORD-001"</span>)</span>
+<span id="cb8-159">    pricing <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> call_pricing_service(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ORD-001"</span>)</span>
+<span id="cb8-160">    _ <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> call_eta_service(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ORD-001"</span>)</span>
+<span id="cb8-161"></span>
+<span id="cb8-162">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 2. Blocking payment in main thread (blocks event loop)</span></span>
+<span id="cb8-163">    _ <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> blocking_payment_sdk(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ORD-001"</span>, pricing[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"price"</span>])</span>
+<span id="cb8-164"></span>
+<span id="cb8-165">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 3. DB write</span></span>
+<span id="cb8-166">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> write_order_state(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ORD-001"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"confirmed"</span>)</span>
+<span id="cb8-167"></span>
+<span id="cb8-168">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 4. Route optimization sequentially in main process</span></span>
+<span id="cb8-169">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> o <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> [<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ORD-001"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ORD-002"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ORD-003"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ORD-004"</span>]:</span>
+<span id="cb8-170">        _ <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> compute_route_optimization([o, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"warehouse"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"customer"</span>])</span>
+<span id="cb8-171"></span>
+<span id="cb8-172">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 5. Notifications one-by-one</span></span>
+<span id="cb8-173">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> d <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> [<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"driver_</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>i<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span>)]:</span>
+<span id="cb8-174">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> asyncio.sleep(random.uniform(<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.02</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.05</span>))</span>
+<span id="cb8-175"></span>
+<span id="cb8-176">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 6. Events one-by-one</span></span>
+<span id="cb8-177">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span>):</span>
+<span id="cb8-178">        <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> asyncio.sleep(<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.005</span>)</span>
+<span id="cb8-179"></span>
+<span id="cb8-180">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> time.perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start</span>
+<span id="cb8-181"></span>
+<span id="cb8-182"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- Optimized: all concurrency patterns applied ---</span></span>
+<span id="cb8-183"></span>
+<span id="cb8-184"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> optimized_concurrent() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">float</span>:</span>
+<span id="cb8-185">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Run with fan-out, executors, semaphore, and backpressure."""</span></span>
+<span id="cb8-186">    start <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> time.perf_counter()</span>
+<span id="cb8-187"></span>
+<span id="cb8-188">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 1. Fan-out (TaskGroup + timeout)</span></span>
+<span id="cb8-189">    order <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> place_order(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ORD-001"</span>)</span>
+<span id="cb8-190"></span>
+<span id="cb8-191">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 2. Payment (thread pool)</span></span>
+<span id="cb8-192">    _ <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> process_payment(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ORD-001"</span>, order[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"pricing"</span>][<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"price"</span>])</span>
+<span id="cb8-193"></span>
+<span id="cb8-194">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 3. DB write (async)</span></span>
+<span id="cb8-195">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> write_order_state(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ORD-001"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"confirmed"</span>)</span>
+<span id="cb8-196"></span>
+<span id="cb8-197">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 4. Routes (process pool)</span></span>
+<span id="cb8-198">    _ <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> optimize_routes([<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ORD-001"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ORD-002"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ORD-003"</span>, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"ORD-004"</span>])</span>
+<span id="cb8-199"></span>
+<span id="cb8-200">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 5. Notifications (bounded semaphore)</span></span>
+<span id="cb8-201">    drivers <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> [<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"driver_</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>i<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">for</span> i <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">in</span> <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">range</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">20</span>)]</span>
+<span id="cb8-202">    _ <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> notify_all_drivers(drivers, <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"New order nearby!"</span>)</span>
+<span id="cb8-203"></span>
+<span id="cb8-204">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># 6. Events (backpressure queue)</span></span>
+<span id="cb8-205">    _ <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> consume_delivery_events(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">200</span>)</span>
+<span id="cb8-206"></span>
+<span id="cb8-207">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> time.perf_counter() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> start</span>
+<span id="cb8-208"></span>
+<span id="cb8-209"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># --- Main: compare baseline vs optimized ---</span></span>
+<span id="cb8-210"></span>
+<span id="cb8-211"><span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">async</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> main() <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-&gt;</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>:</span>
+<span id="cb8-212">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"="</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span>)</span>
+<span id="cb8-213">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"BASELINE (sequential, no concurrency)"</span>)</span>
+<span id="cb8-214">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"="</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span>)</span>
+<span id="cb8-215">    t_baseline <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> baseline_sequential()</span>
+<span id="cb8-216">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Baseline elapsed: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_baseline<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb8-217"></span>
+<span id="cb8-218">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"="</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span>)</span>
+<span id="cb8-219">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"OPTIMIZED (fan-out, executors, semaphore, queue)"</span>)</span>
+<span id="cb8-220">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"="</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span>)</span>
+<span id="cb8-221">    t_optimized <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">await</span> optimized_concurrent()</span>
+<span id="cb8-222">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"Optimized elapsed: </span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_optimized<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s</span><span class="ch" style="color: #20794D;
+background-color: null;
+font-style: inherit;">\n</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"</span>)</span>
+<span id="cb8-223"></span>
+<span id="cb8-224">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"="</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span>)</span>
+<span id="cb8-225">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"RESULT: baseline=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_baseline<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s  optimized=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_optimized<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.2f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">s  "</span></span>
+<span id="cb8-226">          <span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">f"speedup=</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">{</span>t_baseline <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">/</span> t_optimized<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:.1f}</span><span class="ss" style="color: #20794D;
+background-color: null;
+font-style: inherit;">x"</span>)</span>
+<span id="cb8-227">    <span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">print</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"="</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">50</span>)</span>
+<span id="cb8-228"></span>
+<span id="cb8-229">asyncio.run(main())</span></code></pre></div></div>
 <hr>
 </section>
 <section id="whats-next" class="level2">

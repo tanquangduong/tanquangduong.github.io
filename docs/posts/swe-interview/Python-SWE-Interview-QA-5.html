@@ -635,11 +635,11 @@ document.addEventListener("DOMContentLoaded", function () {
   <li><a href="#q3-what-is-the-difference-between-io-bound-and-cpu-bound-work" id="toc-q3-what-is-the-difference-between-io-bound-and-cpu-bound-work" class="nav-link" data-scroll-target="#q3-what-is-the-difference-between-io-bound-and-cpu-bound-work">Q3: What is the difference between I/O-bound and CPU-bound work?</a></li>
   <li><a href="#q4-thread-vs-process-vs-async-how-do-you-choose-in-production" id="toc-q4-thread-vs-process-vs-async-how-do-you-choose-in-production" class="nav-link" data-scroll-target="#q4-thread-vs-process-vs-async-how-do-you-choose-in-production">Q4: Thread vs Process vs Async: how do you choose in production?</a></li>
   <li><a href="#q5-how-does-the-gil-affect-concurrency-choices-in-python" id="toc-q5-how-does-the-gil-affect-concurrency-choices-in-python" class="nav-link" data-scroll-target="#q5-how-does-the-gil-affect-concurrency-choices-in-python">Q5: How does the GIL affect concurrency choices in Python?</a></li>
-  <li><a href="#q6-what-are-the-biggest-async-best-practices-for-production-code" id="toc-q6-what-are-the-biggest-async-best-practices-for-production-code" class="nav-link" data-scroll-target="#q6-what-are-the-biggest-async-best-practices-for-production-code">Q6: What are the biggest async best practices for production code?</a></li>
+  <li><a href="#q6-what-are-the-async-best-practices-for-production-code" id="toc-q6-what-are-the-async-best-practices-for-production-code" class="nav-link" data-scroll-target="#q6-what-are-the-async-best-practices-for-production-code">Q6: What are the async best practices for production code?</a></li>
   <li><a href="#q7-real-use-case-high-throughput-event-enrichment-pipeline-with-asyncio-processes" id="toc-q7-real-use-case-high-throughput-event-enrichment-pipeline-with-asyncio-processes" class="nav-link" data-scroll-target="#q7-real-use-case-high-throughput-event-enrichment-pipeline-with-asyncio-processes">Q7: Real use case: high-throughput event enrichment pipeline with asyncio + processes</a></li>
   <li><a href="#q8-how-do-cancellation-retries-and-backpressure-work-in-async-systems" id="toc-q8-how-do-cancellation-retries-and-backpressure-work-in-async-systems" class="nav-link" data-scroll-target="#q8-how-do-cancellation-retries-and-backpressure-work-in-async-systems">Q8: How do cancellation, retries, and backpressure work in async systems?</a></li>
   <li><a href="#q9-what-production-system-designs-use-async-threads-and-processes-together" id="toc-q9-what-production-system-designs-use-async-threads-and-processes-together" class="nav-link" data-scroll-target="#q9-what-production-system-designs-use-async-threads-and-processes-together">Q9: What production system designs use async, threads, and processes together?</a></li>
-  <li><a href="#q10-what-is-the-strongest-concise-production-answer-for-concurrency-strategy-in-python" id="toc-q10-what-is-the-strongest-concise-production-answer-for-concurrency-strategy-in-python" class="nav-link" data-scroll-target="#q10-what-is-the-strongest-concise-production-answer-for-concurrency-strategy-in-python">Q10: What is the strongest concise production answer for concurrency strategy in Python?</a></li>
+  <li><a href="#q10-what-is-the-strongest-concise-answer-for-concurrency-strategy-in-python" id="toc-q10-what-is-the-strongest-concise-answer-for-concurrency-strategy-in-python" class="nav-link" data-scroll-target="#q10-what-is-the-strongest-concise-answer-for-concurrency-strategy-in-python">Q10: What is the strongest concise answer for concurrency strategy in Python?</a></li>
   <li><a href="#summary-table" id="toc-summary-table" class="nav-link" data-scroll-target="#summary-table">Summary Table</a></li>
   <li><a href="#real-world-use-case-food-delivery-platform" id="toc-real-world-use-case-food-delivery-platform" class="nav-link" data-scroll-target="#real-world-use-case-food-delivery-platform">Real-World Use Case: Food Delivery Platform</a></li>
   <li><a href="#whats-next" id="toc-whats-next" class="nav-link" data-scroll-target="#whats-next">What’s Next?</a></li>
@@ -787,6 +787,42 @@ document.addEventListener("DOMContentLoaded", function () {
 <h2 class="anchored" data-anchor-id="q2-why-is-await-in-a-loop-often-slow-and-how-do-you-make-it-concurrent">Q2: Why is <code>await</code> in a loop often slow, and how do you make it concurrent?</h2>
 <p><strong>Answer:</strong></p>
 <p><code>for ...: await ...</code> is typically <strong>sequential</strong>. You only start the next request after the current one finishes. To overlap waits, schedule all work first, then await together with <code>asyncio.gather()</code> (or <code>TaskGroup</code> in Python 3.11+).</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    linkStyle default stroke:#000,color:#000
+    subgraph Sequential
+        direction TB
+        S1["Request 1&lt;br/&gt;wait 200ms"] --&gt; S2["Request 2&lt;br/&gt;wait 200ms"]
+        S2 --&gt; S3["Request 3&lt;br/&gt;wait 200ms"]
+        S3 --&gt; S10["... Request 10&lt;br/&gt;Total ≈ 2000ms"]
+    end
+
+    subgraph Concurrent
+        direction TB
+        C1["Request 1"] 
+        C2["Request 2"]
+        C3["Request 3"]
+        C10["... Request 10"]
+        C1 --&gt; G["gather() waits for all&lt;br/&gt;Total ≈ 200ms"]
+        C2 --&gt; G
+        C3 --&gt; G
+        C10 --&gt; G
+    end
+
+    style S10 fill:#ff7851,stroke:#333,color:#fff
+    style G fill:#56cc9d,stroke:#333,color:#fff
+    style Sequential fill:#f8f9fa,stroke:#333,color:#000
+    style Concurrent fill:#f8f9fa,stroke:#333,color:#000
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> asyncio</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> aiohttp</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
@@ -918,35 +954,113 @@ document.addEventListener("DOMContentLoaded", function () {
 <li>If operation is blocking I/O and no async API exists, use <strong>threads</strong>.</li>
 <li>If operation is heavy CPU, use <strong>processes</strong>.</li>
 </ol>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    linkStyle default stroke:#000,color:#000
+    TASK["New task arrives"] --&gt; Q1{"Is it naturally&lt;br/&gt;async I/O?"}
+    Q1 --&gt;|Yes| ASYNC["Use asyncio"]
+    Q1 --&gt;|No| Q2{"Is it blocking I/O&lt;br/&gt;with no async API?"}
+    Q2 --&gt;|Yes| THREAD["Use ThreadPoolExecutor"]
+    Q2 --&gt;|No| Q3{"Is it CPU-heavy?"}
+    Q3 --&gt;|Yes| PROC["Use ProcessPoolExecutor"]
+    Q3 --&gt;|No| SYNC["Simple sync code&lt;br/&gt;is enough"]
+
+    style ASYNC fill:#56cc9d,stroke:#333,color:#fff
+    style THREAD fill:#6cc3d5,stroke:#333,color:#fff
+    style PROC fill:#ff7851,stroke:#333,color:#fff
+    style SYNC fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> concurrent.futures <span class="im">import</span> ThreadPoolExecutor, ProcessPoolExecutor</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> asyncio</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> requests</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>thread_pool <span class="op">=</span> ThreadPoolExecutor(max_workers<span class="op">=</span><span class="dv">16</span>)</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>proc_pool <span class="op">=</span> ProcessPoolExecutor(max_workers<span class="op">=</span><span class="dv">4</span>)</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> blocking_http(url: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">int</span>:</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">len</span>(requests.get(url, timeout<span class="op">=</span><span class="dv">10</span>).text)</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> cpu_heavy(n: <span class="bu">int</span>) <span class="op">-&gt;</span> <span class="bu">int</span>:</span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">sum</span>(i <span class="op">*</span> i <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(n))</span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> mixed() <span class="op">-&gt;</span> <span class="bu">tuple</span>[<span class="bu">int</span>, <span class="bu">int</span>]:</span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    loop <span class="op">=</span> asyncio.get_running_loop()</span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Blocking I/O offloaded to thread</span></span>
-<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>    io_result <span class="op">=</span> <span class="cf">await</span> loop.run_in_executor(thread_pool, blocking_http, <span class="st">"https://example.com"</span>)</span>
-<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>    <span class="co"># CPU work offloaded to process</span></span>
-<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>    cpu_result <span class="op">=</span> <span class="cf">await</span> loop.run_in_executor(proc_pool, cpu_heavy, <span class="dv">50_000_000</span>)</span>
-<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> io_result, cpu_result</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> requests</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>thread_pool <span class="op">=</span> ThreadPoolExecutor(max_workers<span class="op">=</span><span class="dv">16</span>)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>proc_pool <span class="op">=</span> ProcessPoolExecutor(max_workers<span class="op">=</span><span class="dv">4</span>)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> blocking_http(url: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">int</span>:</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">len</span>(requests.get(url, timeout<span class="op">=</span><span class="dv">10</span>).text)</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> cpu_heavy(n: <span class="bu">int</span>) <span class="op">-&gt;</span> <span class="bu">int</span>:</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">sum</span>(i <span class="op">*</span> i <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(n))</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> baseline_sequential() <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Run blocking I/O + CPU in the main thread sequentially."""</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>    _ <span class="op">=</span> blocking_http(<span class="st">"https://en.wikipedia.org/wiki/Artificial_intelligence"</span>)</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>    _ <span class="op">=</span> cpu_heavy(<span class="dv">50_000_000</span>)</span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> offloaded_mixed() <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Offload blocking I/O to thread, CPU to process — overlap both."""</span></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>    loop <span class="op">=</span> asyncio.get_running_loop()</span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>    io_task <span class="op">=</span> loop.run_in_executor(thread_pool, blocking_http, <span class="st">"https://en.wikipedia.org/wiki/Artificial_intelligence"</span>)</span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>    cpu_task <span class="op">=</span> loop.run_in_executor(proc_pool, cpu_heavy, <span class="dv">50_000_000</span>)</span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>    _ <span class="op">=</span> <span class="cf">await</span> asyncio.gather(io_task, cpu_task)</span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> main() <span class="op">-&gt;</span> <span class="va">None</span>:</span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a>    t_seq <span class="op">=</span> <span class="cf">await</span> baseline_sequential()</span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>    t_off <span class="op">=</span> <span class="cf">await</span> offloaded_mixed()</span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"sequential=</span><span class="sc">{</span>t_seq<span class="sc">:.2f}</span><span class="ss">s  offloaded=</span><span class="sc">{</span>t_off<span class="sc">:.2f}</span><span class="ss">s  speedup=</span><span class="sc">{</span>t_seq <span class="op">/</span> t_off<span class="sc">:.1f}</span><span class="ss">x"</span>)</span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>asyncio.run(main())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Why <code>asyncio.get_running_loop()</code> matters:</strong> <code>run_in_executor</code> is a method on the event loop object, not a standalone function. You call <code>get_running_loop()</code> inside an <code>async</code> function to get a reference to the loop that is currently driving the coroutine. This gives you access to <code>loop.run_in_executor(...)</code>, which submits blocking work to a thread or process pool and returns an awaitable — so the event loop stays free to handle other tasks while the executor does the heavy lifting. Without the loop reference you cannot bridge sync executors into the async world.</p>
+<p><strong>What if you use <code>ThreadPoolExecutor</code>/<code>ProcessPoolExecutor</code> directly?</strong> You can call <code>executor.submit(func, *args)</code> or <code>pool.map(func, items)</code> without the loop — this is exactly what Q5 does and it works fine there because Q5 has <strong>no event loop</strong>; it is pure sync code. But inside an <code>async</code> function (like Q4’s <code>offloaded_mixed</code>), calling <code>pool.map(...)</code> or <code>future.result()</code> <strong>blocks the entire event loop</strong> until the work finishes. That means:</p>
+<ol type="1">
+<li>The I/O task and CPU task would run <strong>one after the other</strong> (no overlap).</li>
+<li>While they run, every other coroutine in your program is frozen — no HTTP handling, no DB queries, nothing.</li>
+</ol>
+<p>With <code>loop.run_in_executor()</code>, both tasks are dispatched simultaneously and the event loop stays free. <code>gather(io_task, cpu_task)</code> then awaits both at once, so I/O wait and CPU work <strong>overlap</strong> — cutting total time from <code>t_io + t_cpu</code> to roughly <code>max(t_io, t_cpu)</code>.</p>
+<p><strong>Rule of thumb:</strong> use <code>pool.map()</code> / <code>pool.submit()</code> in pure sync code (scripts, CLI tools, Q5-style benchmarks). Use <code>loop.run_in_executor()</code> whenever you are inside an async context and need to keep the event loop responsive.</p>
+<p><strong>How do you know you have an event loop?</strong> If your function is declared with <code>async def</code>, you are inside an event loop. The loop was started by <code>asyncio.run(main())</code> at the top level, and every <code>async def</code> function called from there runs on that loop. It does not matter whether you have one task or ten — any <code>async def</code> function has a running loop. The reason you <em>reach for</em> <code>run_in_executor</code> is when that async function needs to call blocking code (I/O SDK, CPU work) without freezing the loop. So the decision is:</p>
+<ul>
+<li><strong>One blocking call, no other concurrent work?</strong> You could still use <code>run_in_executor</code> to keep the loop alive for other coroutines elsewhere in your program.</li>
+<li><strong>Multiple blocking calls that can overlap?</strong> Definitely use <code>run_in_executor</code> + <code>gather</code> — this is Q4’s pattern.</li>
+<li><strong>Pure sync script with no event loop at all?</strong> Use <code>pool.map()</code> / <code>pool.submit()</code> directly — this is Q5’s pattern.</li>
+</ul>
 <hr>
 </section>
 <section id="q5-how-does-the-gil-affect-concurrency-choices-in-python" class="level2">
 <h2 class="anchored" data-anchor-id="q5-how-does-the-gil-affect-concurrency-choices-in-python">Q5: How does the GIL affect concurrency choices in Python?</h2>
 <p><strong>Answer:</strong></p>
 <p><strong>GIL (Global Interpreter Lock)</strong> is a CPython mechanism that allows only one thread to execute Python bytecode at a time in a single process.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    linkStyle default stroke:#000,color:#000
+    GIL["GIL: one thread&lt;br/&gt;executes bytecode at a time"]
+    GIL --&gt; IO["I/O wait →&lt;br/&gt;thread releases GIL"]
+    GIL --&gt; CPU["CPU loop →&lt;br/&gt;thread holds GIL"]
+    IO --&gt; SCALE_OK["Other threads run&lt;br/&gt;while waiting ✓"]
+    CPU --&gt; SCALE_BAD["Other threads blocked&lt;br/&gt;no real parallelism ✗"]
+    SCALE_BAD --&gt; FIX["Solution:&lt;br/&gt;ProcessPoolExecutor"]
+
+    style GIL fill:#ffce67,stroke:#333
+    style SCALE_OK fill:#56cc9d,stroke:#333,color:#fff
+    style SCALE_BAD fill:#ff7851,stroke:#333,color:#fff
+    style FIX fill:#6cc3d5,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
 <section id="gil-implications" class="level3">
 <h3 class="anchored" data-anchor-id="gil-implications">GIL implications</h3>
 <table class="caption-top table">
@@ -971,11 +1085,46 @@ document.addEventListener("DOMContentLoaded", function () {
 </tr>
 </tbody>
 </table>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> concurrent.futures <span class="im">import</span> ThreadPoolExecutor, ProcessPoolExecutor</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> cpu_work(n: <span class="bu">int</span>) <span class="op">-&gt;</span> <span class="bu">int</span>:</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Pure Python CPU loop — GIL-bound."""</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">sum</span>(i <span class="op">*</span> i <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(n))</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>N <span class="op">=</span> <span class="dv">10_000_000</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>TASKS <span class="op">=</span> <span class="dv">4</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> baseline_sequential() <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(TASKS):</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>        cpu_work(N)</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> with_threads() <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>    <span class="cf">with</span> ThreadPoolExecutor(max_workers<span class="op">=</span>TASKS) <span class="im">as</span> pool:</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>        <span class="bu">list</span>(pool.<span class="bu">map</span>(cpu_work, [N] <span class="op">*</span> TASKS))</span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> with_processes() <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">with</span> ProcessPoolExecutor(max_workers<span class="op">=</span>TASKS) <span class="im">as</span> pool:</span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>        <span class="bu">list</span>(pool.<span class="bu">map</span>(cpu_work, [N] <span class="op">*</span> TASKS))</span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="va">__name__</span> <span class="op">==</span> <span class="st">"__main__"</span>:</span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>    t_seq <span class="op">=</span> baseline_sequential()</span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a>    t_thr <span class="op">=</span> with_threads()</span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a>    t_proc <span class="op">=</span> with_processes()</span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"sequential=</span><span class="sc">{</span>t_seq<span class="sc">:.2f}</span><span class="ss">s  threads=</span><span class="sc">{</span>t_thr<span class="sc">:.2f}</span><span class="ss">s  processes=</span><span class="sc">{</span>t_proc<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"thread_speedup=</span><span class="sc">{</span>t_seq <span class="op">/</span> t_thr<span class="sc">:.1f}</span><span class="ss">x  process_speedup=</span><span class="sc">{</span>t_seq <span class="op">/</span> t_proc<span class="sc">:.1f}</span><span class="ss">x"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Expected output:</strong> threads give ~1x speedup (no gain due to GIL), processes give ~3–4x speedup (true parallelism across cores).</p>
 <hr>
 </section>
 </section>
-<section id="q6-what-are-the-biggest-async-best-practices-for-production-code" class="level2">
-<h2 class="anchored" data-anchor-id="q6-what-are-the-biggest-async-best-practices-for-production-code">Q6: What are the biggest async best practices for production code?</h2>
+<section id="q6-what-are-the-async-best-practices-for-production-code" class="level2">
+<h2 class="anchored" data-anchor-id="q6-what-are-the-async-best-practices-for-production-code">Q6: What are the async best practices for production code?</h2>
 <p><strong>Answer:</strong></p>
 <ol type="1">
 <li>Use <strong>timeouts everywhere</strong> (network, DB, queue).</li>
@@ -984,27 +1133,80 @@ document.addEventListener("DOMContentLoaded", function () {
 <li>Prefer structured concurrency (<code>TaskGroup</code>) for lifecycle safety.</li>
 <li>Never call blocking APIs directly in async paths.</li>
 </ol>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> asyncio</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> aiohttp</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>SEM <span class="op">=</span> asyncio.Semaphore(<span class="dv">20</span>)</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> safe_fetch(session: aiohttp.ClientSession, url: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="cf">with</span> SEM:</span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>        <span class="cf">try</span>:</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>            <span class="cf">async</span> <span class="cf">with</span> session.get(url, timeout<span class="op">=</span>aiohttp.ClientTimeout(total<span class="op">=</span><span class="dv">8</span>)) <span class="im">as</span> r:</span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>                r.raise_for_status()</span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>                <span class="cf">return</span> <span class="cf">await</span> r.text()</span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">except</span> asyncio.<span class="pp">TimeoutError</span>:</span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="st">"timeout"</span></span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>        <span class="cf">except</span> aiohttp.ClientError <span class="im">as</span> exc:</span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="ss">f"client_error: </span><span class="sc">{</span>exc<span class="sc">}</span><span class="ss">"</span></span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> run(urls: <span class="bu">list</span>[<span class="bu">str</span>]) <span class="op">-&gt;</span> <span class="bu">list</span>[<span class="bu">str</span>]:</span>
-<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="cf">with</span> aiohttp.ClientSession() <span class="im">as</span> session:</span>
-<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>        <span class="cf">async</span> <span class="cf">with</span> asyncio.TaskGroup() <span class="im">as</span> tg:</span>
-<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>            tasks <span class="op">=</span> [tg.create_task(safe_fetch(session, u)) <span class="cf">for</span> u <span class="kw">in</span> urls]</span>
-<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> [t.result() <span class="cf">for</span> t <span class="kw">in</span> tasks]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph TD
+    linkStyle default stroke:#000,color:#000
+    REQ["Incoming requests"] --&gt; SEM["Semaphore gate&lt;br/&gt;(max 20 concurrent)"]
+    SEM --&gt; SESSION["Shared ClientSession&lt;br/&gt;(connection reuse)"]
+    SESSION --&gt; TIMEOUT["Per-request timeout&lt;br/&gt;(8s hard limit)"]
+    TIMEOUT --&gt; OK["Success → return data"]
+    TIMEOUT --&gt; FAIL["Timeout / error →&lt;br/&gt;graceful fallback"]
+    SEM --&gt; TG["TaskGroup manages&lt;br/&gt;all task lifecycles"]
+    TG --&gt; CANCEL["On failure →&lt;br/&gt;cancel siblings cleanly"]
+
+    style SEM fill:#56cc9d,stroke:#333,color:#fff
+    style SESSION fill:#6cc3d5,stroke:#333,color:#fff
+    style TIMEOUT fill:#ffce67,stroke:#333
+    style FAIL fill:#ff7851,stroke:#333,color:#fff
+    style TG fill:#56cc9d,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p><strong>How they work together:</strong> requests enter through a semaphore (rule 2) that caps active work. Each request uses a shared session (rule 3) with a timeout (rule 1). All tasks are grouped under a <code>TaskGroup</code> (rule 4) so if something goes wrong, cleanup is automatic. Blocking calls never enter this path directly (rule 5); they go through <code>run_in_executor</code> instead.</p>
+<p><strong>Why the semaphore matters:</strong> without it, if you have 10,000 URLs, <code>asyncio.gather</code> will fire 10,000 connections at once. This exhausts file descriptors, overwhelms upstream servers, and triggers rate-limits or connection resets. A semaphore like <code>Semaphore(20)</code> means only 20 requests are in-flight at any moment; the rest wait their turn without consuming resources. It is the simplest form of <strong>client-side backpressure</strong>.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> asyncio</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> aiohttp</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>URLS <span class="op">=</span> [<span class="ss">f"https://httpbin.org/delay/1"</span> <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">20</span>)]</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>SEM <span class="op">=</span> asyncio.Semaphore(<span class="dv">20</span>)</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> safe_fetch(session: aiohttp.ClientSession, url: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="cf">with</span> SEM:</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>        <span class="cf">try</span>:</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>            <span class="cf">async</span> <span class="cf">with</span> session.get(url, timeout<span class="op">=</span>aiohttp.ClientTimeout(total<span class="op">=</span><span class="dv">8</span>)) <span class="im">as</span> r:</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>                r.raise_for_status()</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>                <span class="cf">return</span> <span class="cf">await</span> r.text()</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>        <span class="cf">except</span> asyncio.<span class="pp">TimeoutError</span>:</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="st">"timeout"</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>        <span class="cf">except</span> aiohttp.ClientError <span class="im">as</span> exc:</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="ss">f"client_error: </span><span class="sc">{</span>exc<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> baseline_sequential(urls: <span class="bu">list</span>[<span class="bu">str</span>]) <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Fetch URLs one-by-one without semaphore or TaskGroup."""</span></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="cf">with</span> aiohttp.ClientSession() <span class="im">as</span> session:</span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> url <span class="kw">in</span> urls:</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>            <span class="cf">try</span>:</span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>                <span class="cf">async</span> <span class="cf">with</span> session.get(url, timeout<span class="op">=</span>aiohttp.ClientTimeout(total<span class="op">=</span><span class="dv">8</span>)) <span class="im">as</span> r:</span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>                    <span class="cf">await</span> r.text()</span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>            <span class="cf">except</span> <span class="pp">Exception</span>:</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>                <span class="cf">pass</span></span>
+<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> run_with_best_practices(urls: <span class="bu">list</span>[<span class="bu">str</span>]) <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
+<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Fetch with semaphore + TaskGroup + shared session + timeout."""</span></span>
+<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="cf">with</span> aiohttp.ClientSession() <span class="im">as</span> session:</span>
+<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a>        <span class="cf">async</span> <span class="cf">with</span> asyncio.TaskGroup() <span class="im">as</span> tg:</span>
+<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a>            tasks <span class="op">=</span> [tg.create_task(safe_fetch(session, u)) <span class="cf">for</span> u <span class="kw">in</span> urls]</span>
+<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a>        _ <span class="op">=</span> [t.result() <span class="cf">for</span> t <span class="kw">in</span> tasks]</span>
+<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb5-40"><a href="#cb5-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-41"><a href="#cb5-41" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> main() <span class="op">-&gt;</span> <span class="va">None</span>:</span>
+<span id="cb5-42"><a href="#cb5-42" aria-hidden="true" tabindex="-1"></a>    t_seq <span class="op">=</span> <span class="cf">await</span> baseline_sequential(URLS)</span>
+<span id="cb5-43"><a href="#cb5-43" aria-hidden="true" tabindex="-1"></a>    t_best <span class="op">=</span> <span class="cf">await</span> run_with_best_practices(URLS)</span>
+<span id="cb5-44"><a href="#cb5-44" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"sequential=</span><span class="sc">{</span>t_seq<span class="sc">:.2f}</span><span class="ss">s  best_practices=</span><span class="sc">{</span>t_best<span class="sc">:.2f}</span><span class="ss">s  speedup=</span><span class="sc">{</span>t_seq <span class="op">/</span> t_best<span class="sc">:.1f}</span><span class="ss">x"</span>)</span>
+<span id="cb5-45"><a href="#cb5-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-46"><a href="#cb5-46" aria-hidden="true" tabindex="-1"></a>asyncio.run(main())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <hr>
 </section>
 <section id="q7-real-use-case-high-throughput-event-enrichment-pipeline-with-asyncio-processes" class="level2">
@@ -1015,30 +1217,105 @@ document.addEventListener("DOMContentLoaded", function () {
 <li>Async layer handles message ingestion and external I/O.</li>
 <li>CPU-heavy enrichment/scoring runs in a process pool.</li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> asyncio</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> concurrent.futures <span class="im">import</span> ProcessPoolExecutor</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> hashlib <span class="im">import</span> sha256</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>pool <span class="op">=</span> ProcessPoolExecutor(max_workers<span class="op">=</span><span class="dv">4</span>)</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> enrich_event(payload: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">dict</span>[<span class="bu">str</span>, <span class="bu">str</span> <span class="op">|</span> <span class="bu">int</span>]:</span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Simulate CPU-heavy parsing/scoring work.</span></span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    digest <span class="op">=</span> payload</span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">50_000</span>):</span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>        digest <span class="op">=</span> sha256(digest.encode()).hexdigest()</span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"payload"</span>: payload, <span class="st">"score"</span>: <span class="bu">int</span>(digest[:<span class="dv">8</span>], <span class="dv">16</span>) <span class="op">%</span> <span class="dv">1000</span>}</span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> process_events(events: <span class="bu">list</span>[<span class="bu">str</span>]) <span class="op">-&gt;</span> <span class="bu">list</span>[<span class="bu">dict</span>[<span class="bu">str</span>, <span class="bu">str</span> <span class="op">|</span> <span class="bu">int</span>]]:</span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>    loop <span class="op">=</span> asyncio.get_running_loop()</span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    tasks <span class="op">=</span> [</span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>        loop.run_in_executor(pool, enrich_event, event)</span>
-<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> event <span class="kw">in</span> events</span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>    ]</span>
-<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="cf">await</span> asyncio.gather(<span class="op">*</span>tasks)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Why this works well:</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    linkStyle default stroke:#000,color:#000
+    INGEST["Async ingestion&lt;br/&gt;(event loop)"] --&gt; DISPATCH["Dispatch events&lt;br/&gt;to process pool"]
+    DISPATCH --&gt; W1["Worker process 1&lt;br/&gt;enrich_event()"]
+    DISPATCH --&gt; W2["Worker process 2&lt;br/&gt;enrich_event()"]
+    DISPATCH --&gt; W3["Worker process 3&lt;br/&gt;enrich_event()"]
+    DISPATCH --&gt; W4["Worker process 4&lt;br/&gt;enrich_event()"]
+    W1 --&gt; GATHER["await gather()&lt;br/&gt;collect all results"]
+    W2 --&gt; GATHER
+    W3 --&gt; GATHER
+    W4 --&gt; GATHER
+    GATHER --&gt; OUT["Return enriched&lt;br/&gt;event list"]
+
+    style INGEST fill:#56cc9d,stroke:#333,color:#fff
+    style DISPATCH fill:#6cc3d5,stroke:#333,color:#fff
+    style W1 fill:#ff7851,stroke:#333,color:#fff
+    style W2 fill:#ff7851,stroke:#333,color:#fff
+    style W3 fill:#ff7851,stroke:#333,color:#fff
+    style W4 fill:#ff7851,stroke:#333,color:#fff
+    style GATHER fill:#ffce67,stroke:#333
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> asyncio</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> concurrent.futures <span class="im">import</span> ProcessPoolExecutor</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> hashlib <span class="im">import</span> sha256</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>pool <span class="op">=</span> ProcessPoolExecutor(max_workers<span class="op">=</span><span class="dv">4</span>)</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> enrich_event(payload: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">dict</span>[<span class="bu">str</span>, <span class="bu">str</span> <span class="op">|</span> <span class="bu">int</span>]:</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Simulate CPU-heavy parsing/scoring work.</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    digest <span class="op">=</span> payload</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">50_000</span>):</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>        digest <span class="op">=</span> sha256(digest.encode()).hexdigest()</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"payload"</span>: payload, <span class="st">"score"</span>: <span class="bu">int</span>(digest[:<span class="dv">8</span>], <span class="dv">16</span>) <span class="op">%</span> <span class="dv">1000</span>}</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> baseline_sequential(events: <span class="bu">list</span>[<span class="bu">str</span>]) <span class="op">-&gt;</span> <span class="bu">list</span>[<span class="bu">dict</span>[<span class="bu">str</span>, <span class="bu">str</span> <span class="op">|</span> <span class="bu">int</span>]]:</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Process events one-by-one in the main process (no parallelism)."""</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> [enrich_event(e) <span class="cf">for</span> e <span class="kw">in</span> events]</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> process_events_parallel(events: <span class="bu">list</span>[<span class="bu">str</span>]) <span class="op">-&gt;</span> <span class="bu">list</span>[<span class="bu">dict</span>[<span class="bu">str</span>, <span class="bu">str</span> <span class="op">|</span> <span class="bu">int</span>]]:</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Dispatch events to process pool and collect results concurrently."""</span></span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>    loop <span class="op">=</span> asyncio.get_running_loop()</span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>    tasks <span class="op">=</span> [</span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>        loop.run_in_executor(pool, enrich_event, event)</span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> event <span class="kw">in</span> events</span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>    ]</span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="cf">await</span> asyncio.gather(<span class="op">*</span>tasks)</span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> main() <span class="op">-&gt;</span> <span class="va">None</span>:</span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a>    events <span class="op">=</span> [<span class="ss">f"order_</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">8</span>)]</span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Baseline: sequential in main process</span></span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a>    _ <span class="op">=</span> baseline_sequential(events)</span>
+<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a>    t_seq <span class="op">=</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Parallel: dispatched to 4 worker processes</span></span>
+<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a>    _ <span class="op">=</span> <span class="cf">await</span> process_events_parallel(events)</span>
+<span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a>    t_par <span class="op">=</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-41"><a href="#cb6-41" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"sequential=</span><span class="sc">{</span>t_seq<span class="sc">:.2f}</span><span class="ss">s  parallel=</span><span class="sc">{</span>t_par<span class="sc">:.2f}</span><span class="ss">s  speedup=</span><span class="sc">{</span>t_seq <span class="op">/</span> t_par<span class="sc">:.1f}</span><span class="ss">x"</span>)</span>
+<span id="cb6-42"><a href="#cb6-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-43"><a href="#cb6-43" aria-hidden="true" tabindex="-1"></a>asyncio.run(main())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Step-by-step explanation:</strong></p>
+<ol type="1">
+<li><code>ProcessPoolExecutor(max_workers=4)</code> — creates 4 separate OS processes. Each has its own GIL, so they truly run CPU work in parallel.</li>
+<li><code>enrich_event()</code> — a pure function that does heavy hashing (simulates scoring/parsing). It runs entirely inside a worker process, not in the main event loop.</li>
+<li><code>baseline_sequential()</code> — processes all events one-by-one in the main process. This is the slowest path because only one CPU core is used at a time.</li>
+<li><code>loop.run_in_executor(pool, enrich_event, event)</code> — submits one event to the process pool and returns an awaitable. The event loop stays free to handle other I/O while this runs.</li>
+<li>The list comprehension creates one awaitable per event, so all events are dispatched to the pool at once.</li>
+<li><code>await asyncio.gather(*tasks)</code> — waits for all worker processes to finish and collects results in order.</li>
+<li><code>main()</code> compares both approaches: with 8 events and 4 workers, parallel should be roughly 2–4x faster than sequential.</li>
+</ol>
+<p><strong>What is the event loop?</strong></p>
+<p>The event loop is the central scheduler in <code>asyncio</code>. Think of it as a single-threaded coordinator that:</p>
 <ul>
-<li><code>asyncio</code> handles orchestration and I/O concurrency.</li>
-<li><code>ProcessPoolExecutor</code> bypasses GIL bottlenecks for CPU-heavy enrichment.</li>
+<li>Maintains a queue of ready-to-run coroutines.</li>
+<li>Runs one coroutine until it hits an <code>await</code>, then switches to the next ready coroutine.</li>
+<li>Monitors I/O file descriptors (sockets, pipes) and wakes up coroutines when their I/O completes.</li>
+<li>Never does CPU-heavy work itself — it only orchestrates.</li>
+</ul>
+<p>In this Q7 example, the event loop dispatches CPU work to separate processes via <code>run_in_executor</code>, then suspends at <code>await gather(...)</code>. While waiting, it could handle other tasks (e.g., incoming HTTP requests, DB queries). When all process workers finish, <code>gather</code> resumes and returns the results.</p>
+<p><strong>Why this works well:</strong></p>
+<ul>
+<li>The event loop never blocks on CPU work; it just dispatches and waits.</li>
+<li>Up to 4 events are enriched in true parallel (one per process).</li>
+<li>If you also have network I/O (e.g., fetching metadata), the event loop can handle those concurrently while processes crunch numbers.</li>
+<li><code>ProcessPoolExecutor</code> completely bypasses the GIL because each worker is a separate process with its own Python interpreter.</li>
 </ul>
 <hr>
 </section>
@@ -1046,34 +1323,131 @@ document.addEventListener("DOMContentLoaded", function () {
 <h2 class="anchored" data-anchor-id="q8-how-do-cancellation-retries-and-backpressure-work-in-async-systems">Q8: How do cancellation, retries, and backpressure work in async systems?</h2>
 <p><strong>Answer:</strong></p>
 <p>Production async systems fail under overload unless they enforce <strong>backpressure</strong> and clean cancellation.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> asyncio</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>queue: asyncio.Queue[<span class="bu">str</span>] <span class="op">=</span> asyncio.Queue(maxsize<span class="op">=</span><span class="dv">1000</span>)</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> producer(items: <span class="bu">list</span>[<span class="bu">str</span>]) <span class="op">-&gt;</span> <span class="va">None</span>:</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> item <span class="kw">in</span> items:</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">await</span> queue.put(item)  <span class="co"># blocks when full =&gt; backpressure</span></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> worker(name: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="va">None</span>:</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">while</span> <span class="va">True</span>:</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>        item <span class="op">=</span> <span class="cf">await</span> queue.get()</span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>        <span class="cf">try</span>:</span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>            <span class="cf">await</span> asyncio.sleep(<span class="fl">0.05</span>)  <span class="co"># simulate I/O</span></span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>        <span class="cf">finally</span>:</span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>            queue.task_done()</span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> run_pipeline(items: <span class="bu">list</span>[<span class="bu">str</span>]) <span class="op">-&gt;</span> <span class="va">None</span>:</span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>    workers <span class="op">=</span> [asyncio.create_task(worker(<span class="ss">f"w</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span>)) <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">8</span>)]</span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
-<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>        <span class="cf">await</span> producer(items)</span>
-<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>        <span class="cf">await</span> queue.join()</span>
-<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>    <span class="cf">finally</span>:</span>
-<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> w <span class="kw">in</span> workers:</span>
-<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>            w.cancel()</span>
-<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>        <span class="cf">await</span> asyncio.gather(<span class="op">*</span>workers, return_exceptions<span class="op">=</span><span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class="figure"><p></p>
+<div>
+<pre class="mermaid mermaid-js">graph LR
+    linkStyle default stroke:#000,color:#000
+    PROD["Producer&lt;br/&gt;(fast)"] --&gt; Q["Bounded Queue&lt;br/&gt;maxsize=1000"]
+    Q --&gt;|"queue full →&lt;br/&gt;producer waits"| PROD
+    Q --&gt; W1["Worker 1"]
+    Q --&gt; W2["Worker 2"]
+    Q --&gt; W3["Worker ..."]
+    Q --&gt; W8["Worker 8"]
+    W1 --&gt; DONE["task_done()"]
+    W8 --&gt; DONE
+    DONE --&gt;|"all done"| CANCEL["Cancel workers&lt;br/&gt;+ gather(return_exceptions)"]
+
+    style Q fill:#ffce67,stroke:#333
+    style PROD fill:#6cc3d5,stroke:#333,color:#fff
+    style CANCEL fill:#ff7851,stroke:#333,color:#fff
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<p><strong>How backpressure works:</strong> when the queue is full (<code>maxsize=1000</code>), <code>await queue.put()</code> suspends the producer until a worker frees a slot. This prevents unbounded memory growth and keeps the system stable under load.</p>
+<p><strong>How does backpressure differ from a semaphore?</strong> Both limit concurrency, but they solve different problems at different layers:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Semaphore (Q6)</th>
+<th>Bounded Queue (Q8)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>What it limits</strong></td>
+<td>Number of tasks executing concurrently</td>
+<td>Number of items buffered between producer and consumer</td>
+</tr>
+<tr class="even">
+<td><strong>Where it sits</strong></td>
+<td>Around the work itself (wrap the call)</td>
+<td>Between the producer and workers</td>
+</tr>
+<tr class="odd">
+<td><strong>Producer behavior</strong></td>
+<td>Producer creates all tasks immediately; semaphore gates execution</td>
+<td>Producer is suspended when queue is full — cannot even enqueue more</td>
+</tr>
+<tr class="even">
+<td><strong>Memory model</strong></td>
+<td>All tasks exist in memory; only N run at once</td>
+<td>Only <code>maxsize</code> items + N workers exist at any time</td>
+</tr>
+<tr class="odd">
+<td><strong>Best for</strong></td>
+<td>Capping concurrent outbound connections (HTTP, DB)</td>
+<td>Decoupling a fast producer from slow consumers</td>
+</tr>
+</tbody>
+</table>
+<p><strong>In short:</strong> a semaphore says “only N tasks may be <em>active</em> at once” but all tasks are already scheduled. A bounded queue says “only N items may be <em>waiting</em> at once” — the producer itself is slowed down, which is true end-to-end backpressure. Use a semaphore when you already have a fixed batch of work (e.g., 100 URLs). Use a bounded queue when work arrives continuously and you need to throttle the source (e.g., streaming events from Kafka).</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> asyncio</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> simulate_io_work(item: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="va">None</span>:</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">await</span> asyncio.sleep(<span class="fl">0.01</span>)  <span class="co"># simulate fast I/O per item</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Baseline: no backpressure, fire all at once ---</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> baseline_unbounded(items: <span class="bu">list</span>[<span class="bu">str</span>]) <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    tasks <span class="op">=</span> [asyncio.create_task(simulate_io_work(i)) <span class="cf">for</span> i <span class="kw">in</span> items]</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">await</span> asyncio.gather(<span class="op">*</span>tasks)</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Best practice: bounded queue + worker pool ---</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> with_backpressure(items: <span class="bu">list</span>[<span class="bu">str</span>], num_workers: <span class="bu">int</span> <span class="op">=</span> <span class="dv">8</span>) <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>    queue: asyncio.Queue[<span class="bu">str</span> <span class="op">|</span> <span class="va">None</span>] <span class="op">=</span> asyncio.Queue(maxsize<span class="op">=</span><span class="dv">100</span>)</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="kw">def</span> producer() <span class="op">-&gt;</span> <span class="va">None</span>:</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> item <span class="kw">in</span> items:</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>            <span class="cf">await</span> queue.put(item)</span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(num_workers):</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>            <span class="cf">await</span> queue.put(<span class="va">None</span>)  <span class="co"># poison pill</span></span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="kw">def</span> worker() <span class="op">-&gt;</span> <span class="va">None</span>:</span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>        <span class="cf">while</span> <span class="va">True</span>:</span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>            item <span class="op">=</span> <span class="cf">await</span> queue.get()</span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> item <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>                queue.task_done()</span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>                <span class="cf">break</span></span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a>            <span class="cf">try</span>:</span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a>                <span class="cf">await</span> simulate_io_work(item)</span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a>            <span class="cf">finally</span>:</span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a>                queue.task_done()</span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a>    workers <span class="op">=</span> [asyncio.create_task(worker()) <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(num_workers)]</span>
+<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a>    <span class="cf">await</span> producer()</span>
+<span id="cb7-38"><a href="#cb7-38" aria-hidden="true" tabindex="-1"></a>    <span class="cf">await</span> queue.join()</span>
+<span id="cb7-39"><a href="#cb7-39" aria-hidden="true" tabindex="-1"></a>    <span class="cf">await</span> asyncio.gather(<span class="op">*</span>workers)</span>
+<span id="cb7-40"><a href="#cb7-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb7-41"><a href="#cb7-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-42"><a href="#cb7-42" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> main() <span class="op">-&gt;</span> <span class="va">None</span>:</span>
+<span id="cb7-43"><a href="#cb7-43" aria-hidden="true" tabindex="-1"></a>    items <span class="op">=</span> [<span class="ss">f"event_</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">2000</span>)]</span>
+<span id="cb7-44"><a href="#cb7-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-45"><a href="#cb7-45" aria-hidden="true" tabindex="-1"></a>    t_unbounded <span class="op">=</span> <span class="cf">await</span> baseline_unbounded(items)</span>
+<span id="cb7-46"><a href="#cb7-46" aria-hidden="true" tabindex="-1"></a>    t_bounded <span class="op">=</span> <span class="cf">await</span> with_backpressure(items)</span>
+<span id="cb7-47"><a href="#cb7-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-48"><a href="#cb7-48" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"unbounded=</span><span class="sc">{</span>t_unbounded<span class="sc">:.2f}</span><span class="ss">s  bounded=</span><span class="sc">{</span>t_bounded<span class="sc">:.2f}</span><span class="ss">s"</span>)</span>
+<span id="cb7-49"><a href="#cb7-49" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Peak tasks: unbounded=</span><span class="sc">{</span><span class="bu">len</span>(items)<span class="sc">}</span><span class="ss">  bounded=8 workers + 100 queue slots"</span>)</span>
+<span id="cb7-50"><a href="#cb7-50" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-51"><a href="#cb7-51" aria-hidden="true" tabindex="-1"></a>asyncio.run(main())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Key takeaway:</strong> both finish in similar wall-clock time, but the bounded version uses far less memory (max 108 concurrent items vs 2000 tasks at once). Under real load with heavier payloads, unbounded approaches cause OOM or file descriptor exhaustion.</p>
 <p>Best-practice notes:</p>
 <ul>
-<li>Use bounded queues.</li>
+<li>Use bounded queues for predictable memory.</li>
 <li>Make operations idempotent for safe retries.</li>
 <li>Handle <code>CancelledError</code> correctly in long-running tasks.</li>
 </ul>
@@ -1129,10 +1503,10 @@ document.addEventListener("DOMContentLoaded", function () {
 <hr>
 </section>
 </section>
-<section id="q10-what-is-the-strongest-concise-production-answer-for-concurrency-strategy-in-python" class="level2">
-<h2 class="anchored" data-anchor-id="q10-what-is-the-strongest-concise-production-answer-for-concurrency-strategy-in-python">Q10: What is the strongest concise production answer for concurrency strategy in Python?</h2>
+<section id="q10-what-is-the-strongest-concise-answer-for-concurrency-strategy-in-python" class="level2">
+<h2 class="anchored" data-anchor-id="q10-what-is-the-strongest-concise-answer-for-concurrency-strategy-in-python">Q10: What is the strongest concise answer for concurrency strategy in Python?</h2>
 <p><strong>Answer:</strong></p>
-<p>A strong production-ready answer:</p>
+<p>A strong concise answer:</p>
 <p>“I classify workload first: I/O-bound vs CPU-bound. For I/O-bound concurrency I prefer <code>asyncio</code> with timeouts, bounded concurrency, and pooled clients. For blocking I/O dependencies I offload to a <code>ThreadPoolExecutor</code>. For CPU-heavy workloads I use <code>ProcessPoolExecutor</code> or native libraries that release the GIL. In production I add observability, retries, cancellation safety, and backpressure so the system degrades gracefully under load.”</p>
 <section id="one-page-decision-matrix" class="level3">
 <h3 class="anchored" data-anchor-id="one-page-decision-matrix">One-page decision matrix</h3>
@@ -1310,6 +1684,235 @@ document.addEventListener("DOMContentLoaded", function () {
 </tbody>
 </table>
 <p>This is the production-ready framing: classify each task by bottleneck, then apply the smallest concurrency model that solves that bottleneck safely.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="co">Food Delivery Platform — concurrency patterns in one service.</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="co">Demonstrates: asyncio fan-out, ThreadPoolExecutor for blocking SDK,</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="co">ProcessPoolExecutor for CPU work, bounded semaphore, backpressure queue,</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="co">structured cancellation, and retry with exponential backoff.</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="co">"""</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> asyncio</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> random</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> concurrent.futures <span class="im">import</span> ThreadPoolExecutor, ProcessPoolExecutor</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> hashlib <span class="im">import</span> sha256</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Executor pools (shared across the service lifetime) ---</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>thread_pool <span class="op">=</span> ThreadPoolExecutor(max_workers<span class="op">=</span><span class="dv">8</span>)</span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>proc_pool <span class="op">=</span> ProcessPoolExecutor(max_workers<span class="op">=</span><span class="dv">4</span>)</span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Simulated external services ---</span></span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> call_restaurant_service(order_id: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Async I/O: fan-out to restaurant availability API."""</span></span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">await</span> asyncio.sleep(random.uniform(<span class="fl">0.05</span>, <span class="fl">0.15</span>))</span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"order"</span>: order_id, <span class="st">"restaurant"</span>: <span class="st">"confirmed"</span>}</span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> call_pricing_service(order_id: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Async I/O: get dynamic pricing."""</span></span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>    <span class="cf">await</span> asyncio.sleep(random.uniform(<span class="fl">0.05</span>, <span class="fl">0.1</span>))</span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"order"</span>: order_id, <span class="st">"price"</span>: <span class="bu">round</span>(random.uniform(<span class="fl">8.0</span>, <span class="fl">25.0</span>), <span class="dv">2</span>)}</span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> call_eta_service(order_id: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Async I/O: estimated delivery time."""</span></span>
+<span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a>    <span class="cf">await</span> asyncio.sleep(random.uniform(<span class="fl">0.05</span>, <span class="fl">0.12</span>))</span>
+<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"order"</span>: order_id, <span class="st">"eta_minutes"</span>: random.randint(<span class="dv">15</span>, <span class="dv">45</span>)}</span>
+<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-36"><a href="#cb8-36" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> blocking_payment_sdk(order_id: <span class="bu">str</span>, amount: <span class="bu">float</span>) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb8-37"><a href="#cb8-37" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Blocking I/O: legacy payment SDK with no async API."""</span></span>
+<span id="cb8-38"><a href="#cb8-38" aria-hidden="true" tabindex="-1"></a>    time.sleep(random.uniform(<span class="fl">0.1</span>, <span class="fl">0.2</span>))  <span class="co"># simulates blocking network call</span></span>
+<span id="cb8-39"><a href="#cb8-39" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"order"</span>: order_id, <span class="st">"payment"</span>: <span class="st">"success"</span>, <span class="st">"charged"</span>: amount}</span>
+<span id="cb8-40"><a href="#cb8-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-41"><a href="#cb8-41" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compute_route_optimization(waypoints: <span class="bu">list</span>[<span class="bu">str</span>]) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb8-42"><a href="#cb8-42" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""CPU-bound: heavy route computation."""</span></span>
+<span id="cb8-43"><a href="#cb8-43" aria-hidden="true" tabindex="-1"></a>    digest <span class="op">=</span> <span class="st">","</span>.join(waypoints)</span>
+<span id="cb8-44"><a href="#cb8-44" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">20_000</span>):</span>
+<span id="cb8-45"><a href="#cb8-45" aria-hidden="true" tabindex="-1"></a>        digest <span class="op">=</span> sha256(digest.encode()).hexdigest()</span>
+<span id="cb8-46"><a href="#cb8-46" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {<span class="st">"route_hash"</span>: digest[:<span class="dv">12</span>], <span class="st">"waypoints"</span>: <span class="bu">len</span>(waypoints)}</span>
+<span id="cb8-47"><a href="#cb8-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-48"><a href="#cb8-48" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> write_order_state(order_id: <span class="bu">str</span>, state: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="va">None</span>:</span>
+<span id="cb8-49"><a href="#cb8-49" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Async I/O: DB write (simulated)."""</span></span>
+<span id="cb8-50"><a href="#cb8-50" aria-hidden="true" tabindex="-1"></a>    <span class="cf">await</span> asyncio.sleep(<span class="fl">0.02</span>)</span>
+<span id="cb8-51"><a href="#cb8-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-52"><a href="#cb8-52" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Pattern 1: Fan-out with TaskGroup + timeout ---</span></span>
+<span id="cb8-53"><a href="#cb8-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-54"><a href="#cb8-54" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> place_order(order_id: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb8-55"><a href="#cb8-55" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Fan-out to restaurant, pricing, and ETA concurrently."""</span></span>
+<span id="cb8-56"><a href="#cb8-56" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="cf">with</span> asyncio.TaskGroup() <span class="im">as</span> tg:</span>
+<span id="cb8-57"><a href="#cb8-57" aria-hidden="true" tabindex="-1"></a>        t_rest <span class="op">=</span> tg.create_task(</span>
+<span id="cb8-58"><a href="#cb8-58" aria-hidden="true" tabindex="-1"></a>            asyncio.wait_for(call_restaurant_service(order_id), timeout<span class="op">=</span><span class="fl">2.0</span>)</span>
+<span id="cb8-59"><a href="#cb8-59" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb8-60"><a href="#cb8-60" aria-hidden="true" tabindex="-1"></a>        t_price <span class="op">=</span> tg.create_task(</span>
+<span id="cb8-61"><a href="#cb8-61" aria-hidden="true" tabindex="-1"></a>            asyncio.wait_for(call_pricing_service(order_id), timeout<span class="op">=</span><span class="fl">2.0</span>)</span>
+<span id="cb8-62"><a href="#cb8-62" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb8-63"><a href="#cb8-63" aria-hidden="true" tabindex="-1"></a>        t_eta <span class="op">=</span> tg.create_task(</span>
+<span id="cb8-64"><a href="#cb8-64" aria-hidden="true" tabindex="-1"></a>            asyncio.wait_for(call_eta_service(order_id), timeout<span class="op">=</span><span class="fl">2.0</span>)</span>
+<span id="cb8-65"><a href="#cb8-65" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb8-66"><a href="#cb8-66" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> {</span>
+<span id="cb8-67"><a href="#cb8-67" aria-hidden="true" tabindex="-1"></a>        <span class="st">"restaurant"</span>: t_rest.result(),</span>
+<span id="cb8-68"><a href="#cb8-68" aria-hidden="true" tabindex="-1"></a>        <span class="st">"pricing"</span>: t_price.result(),</span>
+<span id="cb8-69"><a href="#cb8-69" aria-hidden="true" tabindex="-1"></a>        <span class="st">"eta"</span>: t_eta.result(),</span>
+<span id="cb8-70"><a href="#cb8-70" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb8-71"><a href="#cb8-71" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-72"><a href="#cb8-72" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Pattern 2: Blocking SDK via thread pool ---</span></span>
+<span id="cb8-73"><a href="#cb8-73" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-74"><a href="#cb8-74" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> process_payment(order_id: <span class="bu">str</span>, amount: <span class="bu">float</span>) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
+<span id="cb8-75"><a href="#cb8-75" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Offload blocking payment SDK to thread pool."""</span></span>
+<span id="cb8-76"><a href="#cb8-76" aria-hidden="true" tabindex="-1"></a>    loop <span class="op">=</span> asyncio.get_running_loop()</span>
+<span id="cb8-77"><a href="#cb8-77" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="cf">await</span> loop.run_in_executor(</span>
+<span id="cb8-78"><a href="#cb8-78" aria-hidden="true" tabindex="-1"></a>        thread_pool, blocking_payment_sdk, order_id, amount</span>
+<span id="cb8-79"><a href="#cb8-79" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb8-80"><a href="#cb8-80" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-81"><a href="#cb8-81" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Pattern 3: CPU-heavy work via process pool ---</span></span>
+<span id="cb8-82"><a href="#cb8-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-83"><a href="#cb8-83" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> optimize_routes(orders: <span class="bu">list</span>[<span class="bu">str</span>]) <span class="op">-&gt;</span> <span class="bu">list</span>[<span class="bu">dict</span>]:</span>
+<span id="cb8-84"><a href="#cb8-84" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Dispatch route optimization to process pool."""</span></span>
+<span id="cb8-85"><a href="#cb8-85" aria-hidden="true" tabindex="-1"></a>    loop <span class="op">=</span> asyncio.get_running_loop()</span>
+<span id="cb8-86"><a href="#cb8-86" aria-hidden="true" tabindex="-1"></a>    tasks <span class="op">=</span> [</span>
+<span id="cb8-87"><a href="#cb8-87" aria-hidden="true" tabindex="-1"></a>        loop.run_in_executor(proc_pool, compute_route_optimization, [o, <span class="st">"warehouse"</span>, <span class="st">"customer"</span>])</span>
+<span id="cb8-88"><a href="#cb8-88" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> o <span class="kw">in</span> orders</span>
+<span id="cb8-89"><a href="#cb8-89" aria-hidden="true" tabindex="-1"></a>    ]</span>
+<span id="cb8-90"><a href="#cb8-90" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="cf">await</span> asyncio.gather(<span class="op">*</span>tasks)</span>
+<span id="cb8-91"><a href="#cb8-91" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-92"><a href="#cb8-92" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Pattern 4: Bounded semaphore for notification burst ---</span></span>
+<span id="cb8-93"><a href="#cb8-93" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-94"><a href="#cb8-94" aria-hidden="true" tabindex="-1"></a>NOTIFY_SEM <span class="op">=</span> asyncio.Semaphore(<span class="dv">10</span>)</span>
+<span id="cb8-95"><a href="#cb8-95" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-96"><a href="#cb8-96" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> send_notification(user_id: <span class="bu">str</span>, message: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb8-97"><a href="#cb8-97" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Push notification with bounded concurrency."""</span></span>
+<span id="cb8-98"><a href="#cb8-98" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="cf">with</span> NOTIFY_SEM:</span>
+<span id="cb8-99"><a href="#cb8-99" aria-hidden="true" tabindex="-1"></a>        <span class="cf">await</span> asyncio.sleep(random.uniform(<span class="fl">0.02</span>, <span class="fl">0.05</span>))</span>
+<span id="cb8-100"><a href="#cb8-100" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="ss">f"notified:</span><span class="sc">{</span>user_id<span class="sc">}</span><span class="ss">"</span></span>
+<span id="cb8-101"><a href="#cb8-101" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-102"><a href="#cb8-102" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> notify_all_drivers(driver_ids: <span class="bu">list</span>[<span class="bu">str</span>], message: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">list</span>[<span class="bu">str</span>]:</span>
+<span id="cb8-103"><a href="#cb8-103" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Send to many drivers without overwhelming push service."""</span></span>
+<span id="cb8-104"><a href="#cb8-104" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="cf">with</span> asyncio.TaskGroup() <span class="im">as</span> tg:</span>
+<span id="cb8-105"><a href="#cb8-105" aria-hidden="true" tabindex="-1"></a>        tasks <span class="op">=</span> [tg.create_task(send_notification(d, message)) <span class="cf">for</span> d <span class="kw">in</span> driver_ids]</span>
+<span id="cb8-106"><a href="#cb8-106" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> [t.result() <span class="cf">for</span> t <span class="kw">in</span> tasks]</span>
+<span id="cb8-107"><a href="#cb8-107" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-108"><a href="#cb8-108" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Pattern 5: Bounded queue for event consumption ---</span></span>
+<span id="cb8-109"><a href="#cb8-109" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-110"><a href="#cb8-110" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> consume_delivery_events(num_events: <span class="bu">int</span>, num_workers: <span class="bu">int</span> <span class="op">=</span> <span class="dv">4</span>) <span class="op">-&gt;</span> <span class="bu">int</span>:</span>
+<span id="cb8-111"><a href="#cb8-111" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Process delivery events with backpressure."""</span></span>
+<span id="cb8-112"><a href="#cb8-112" aria-hidden="true" tabindex="-1"></a>    queue: asyncio.Queue[<span class="bu">str</span> <span class="op">|</span> <span class="va">None</span>] <span class="op">=</span> asyncio.Queue(maxsize<span class="op">=</span><span class="dv">50</span>)</span>
+<span id="cb8-113"><a href="#cb8-113" aria-hidden="true" tabindex="-1"></a>    processed <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb8-114"><a href="#cb8-114" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-115"><a href="#cb8-115" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="kw">def</span> producer():</span>
+<span id="cb8-116"><a href="#cb8-116" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(num_events):</span>
+<span id="cb8-117"><a href="#cb8-117" aria-hidden="true" tabindex="-1"></a>            <span class="cf">await</span> queue.put(<span class="ss">f"delivery_event_</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb8-118"><a href="#cb8-118" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(num_workers):</span>
+<span id="cb8-119"><a href="#cb8-119" aria-hidden="true" tabindex="-1"></a>            <span class="cf">await</span> queue.put(<span class="va">None</span>)</span>
+<span id="cb8-120"><a href="#cb8-120" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-121"><a href="#cb8-121" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="kw">def</span> worker():</span>
+<span id="cb8-122"><a href="#cb8-122" aria-hidden="true" tabindex="-1"></a>        <span class="kw">nonlocal</span> processed</span>
+<span id="cb8-123"><a href="#cb8-123" aria-hidden="true" tabindex="-1"></a>        <span class="cf">while</span> <span class="va">True</span>:</span>
+<span id="cb8-124"><a href="#cb8-124" aria-hidden="true" tabindex="-1"></a>            item <span class="op">=</span> <span class="cf">await</span> queue.get()</span>
+<span id="cb8-125"><a href="#cb8-125" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> item <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb8-126"><a href="#cb8-126" aria-hidden="true" tabindex="-1"></a>                queue.task_done()</span>
+<span id="cb8-127"><a href="#cb8-127" aria-hidden="true" tabindex="-1"></a>                <span class="cf">break</span></span>
+<span id="cb8-128"><a href="#cb8-128" aria-hidden="true" tabindex="-1"></a>            <span class="cf">await</span> asyncio.sleep(<span class="fl">0.005</span>)  <span class="co"># simulate processing</span></span>
+<span id="cb8-129"><a href="#cb8-129" aria-hidden="true" tabindex="-1"></a>            processed <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb8-130"><a href="#cb8-130" aria-hidden="true" tabindex="-1"></a>            queue.task_done()</span>
+<span id="cb8-131"><a href="#cb8-131" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-132"><a href="#cb8-132" aria-hidden="true" tabindex="-1"></a>    workers <span class="op">=</span> [asyncio.create_task(worker()) <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(num_workers)]</span>
+<span id="cb8-133"><a href="#cb8-133" aria-hidden="true" tabindex="-1"></a>    <span class="cf">await</span> producer()</span>
+<span id="cb8-134"><a href="#cb8-134" aria-hidden="true" tabindex="-1"></a>    <span class="cf">await</span> queue.join()</span>
+<span id="cb8-135"><a href="#cb8-135" aria-hidden="true" tabindex="-1"></a>    <span class="cf">await</span> asyncio.gather(<span class="op">*</span>workers)</span>
+<span id="cb8-136"><a href="#cb8-136" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> processed</span>
+<span id="cb8-137"><a href="#cb8-137" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-138"><a href="#cb8-138" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Pattern 6: Retry with exponential backoff ---</span></span>
+<span id="cb8-139"><a href="#cb8-139" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-140"><a href="#cb8-140" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> retry_with_backoff(coro_factory, max_retries: <span class="bu">int</span> <span class="op">=</span> <span class="dv">3</span>) <span class="op">-&gt;</span> <span class="bu">any</span>:</span>
+<span id="cb8-141"><a href="#cb8-141" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Retry a coroutine with exponential backoff."""</span></span>
+<span id="cb8-142"><a href="#cb8-142" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> attempt <span class="kw">in</span> <span class="bu">range</span>(max_retries <span class="op">+</span> <span class="dv">1</span>):</span>
+<span id="cb8-143"><a href="#cb8-143" aria-hidden="true" tabindex="-1"></a>        <span class="cf">try</span>:</span>
+<span id="cb8-144"><a href="#cb8-144" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="cf">await</span> coro_factory()</span>
+<span id="cb8-145"><a href="#cb8-145" aria-hidden="true" tabindex="-1"></a>        <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> exc:</span>
+<span id="cb8-146"><a href="#cb8-146" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> attempt <span class="op">==</span> max_retries:</span>
+<span id="cb8-147"><a href="#cb8-147" aria-hidden="true" tabindex="-1"></a>                <span class="cf">raise</span></span>
+<span id="cb8-148"><a href="#cb8-148" aria-hidden="true" tabindex="-1"></a>            wait <span class="op">=</span> <span class="fl">0.1</span> <span class="op">*</span> (<span class="dv">2</span> <span class="op">**</span> attempt)</span>
+<span id="cb8-149"><a href="#cb8-149" aria-hidden="true" tabindex="-1"></a>            <span class="cf">await</span> asyncio.sleep(wait)</span>
+<span id="cb8-150"><a href="#cb8-150" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-151"><a href="#cb8-151" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Baseline: everything sequential, no concurrency ---</span></span>
+<span id="cb8-152"><a href="#cb8-152" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-153"><a href="#cb8-153" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> baseline_sequential() <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
+<span id="cb8-154"><a href="#cb8-154" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Run all operations sequentially — no fan-out, no pools, no overlap."""</span></span>
+<span id="cb8-155"><a href="#cb8-155" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb8-156"><a href="#cb8-156" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-157"><a href="#cb8-157" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 1. Call services one-by-one (no TaskGroup)</span></span>
+<span id="cb8-158"><a href="#cb8-158" aria-hidden="true" tabindex="-1"></a>    _ <span class="op">=</span> <span class="cf">await</span> call_restaurant_service(<span class="st">"ORD-001"</span>)</span>
+<span id="cb8-159"><a href="#cb8-159" aria-hidden="true" tabindex="-1"></a>    pricing <span class="op">=</span> <span class="cf">await</span> call_pricing_service(<span class="st">"ORD-001"</span>)</span>
+<span id="cb8-160"><a href="#cb8-160" aria-hidden="true" tabindex="-1"></a>    _ <span class="op">=</span> <span class="cf">await</span> call_eta_service(<span class="st">"ORD-001"</span>)</span>
+<span id="cb8-161"><a href="#cb8-161" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-162"><a href="#cb8-162" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 2. Blocking payment in main thread (blocks event loop)</span></span>
+<span id="cb8-163"><a href="#cb8-163" aria-hidden="true" tabindex="-1"></a>    _ <span class="op">=</span> blocking_payment_sdk(<span class="st">"ORD-001"</span>, pricing[<span class="st">"price"</span>])</span>
+<span id="cb8-164"><a href="#cb8-164" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-165"><a href="#cb8-165" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 3. DB write</span></span>
+<span id="cb8-166"><a href="#cb8-166" aria-hidden="true" tabindex="-1"></a>    <span class="cf">await</span> write_order_state(<span class="st">"ORD-001"</span>, <span class="st">"confirmed"</span>)</span>
+<span id="cb8-167"><a href="#cb8-167" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-168"><a href="#cb8-168" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 4. Route optimization sequentially in main process</span></span>
+<span id="cb8-169"><a href="#cb8-169" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> o <span class="kw">in</span> [<span class="st">"ORD-001"</span>, <span class="st">"ORD-002"</span>, <span class="st">"ORD-003"</span>, <span class="st">"ORD-004"</span>]:</span>
+<span id="cb8-170"><a href="#cb8-170" aria-hidden="true" tabindex="-1"></a>        _ <span class="op">=</span> compute_route_optimization([o, <span class="st">"warehouse"</span>, <span class="st">"customer"</span>])</span>
+<span id="cb8-171"><a href="#cb8-171" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-172"><a href="#cb8-172" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 5. Notifications one-by-one</span></span>
+<span id="cb8-173"><a href="#cb8-173" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> d <span class="kw">in</span> [<span class="ss">f"driver_</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">20</span>)]:</span>
+<span id="cb8-174"><a href="#cb8-174" aria-hidden="true" tabindex="-1"></a>        <span class="cf">await</span> asyncio.sleep(random.uniform(<span class="fl">0.02</span>, <span class="fl">0.05</span>))</span>
+<span id="cb8-175"><a href="#cb8-175" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-176"><a href="#cb8-176" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 6. Events one-by-one</span></span>
+<span id="cb8-177"><a href="#cb8-177" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">200</span>):</span>
+<span id="cb8-178"><a href="#cb8-178" aria-hidden="true" tabindex="-1"></a>        <span class="cf">await</span> asyncio.sleep(<span class="fl">0.005</span>)</span>
+<span id="cb8-179"><a href="#cb8-179" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-180"><a href="#cb8-180" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb8-181"><a href="#cb8-181" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-182"><a href="#cb8-182" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Optimized: all concurrency patterns applied ---</span></span>
+<span id="cb8-183"><a href="#cb8-183" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-184"><a href="#cb8-184" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> optimized_concurrent() <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
+<span id="cb8-185"><a href="#cb8-185" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Run with fan-out, executors, semaphore, and backpressure."""</span></span>
+<span id="cb8-186"><a href="#cb8-186" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb8-187"><a href="#cb8-187" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-188"><a href="#cb8-188" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 1. Fan-out (TaskGroup + timeout)</span></span>
+<span id="cb8-189"><a href="#cb8-189" aria-hidden="true" tabindex="-1"></a>    order <span class="op">=</span> <span class="cf">await</span> place_order(<span class="st">"ORD-001"</span>)</span>
+<span id="cb8-190"><a href="#cb8-190" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-191"><a href="#cb8-191" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 2. Payment (thread pool)</span></span>
+<span id="cb8-192"><a href="#cb8-192" aria-hidden="true" tabindex="-1"></a>    _ <span class="op">=</span> <span class="cf">await</span> process_payment(<span class="st">"ORD-001"</span>, order[<span class="st">"pricing"</span>][<span class="st">"price"</span>])</span>
+<span id="cb8-193"><a href="#cb8-193" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-194"><a href="#cb8-194" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 3. DB write (async)</span></span>
+<span id="cb8-195"><a href="#cb8-195" aria-hidden="true" tabindex="-1"></a>    <span class="cf">await</span> write_order_state(<span class="st">"ORD-001"</span>, <span class="st">"confirmed"</span>)</span>
+<span id="cb8-196"><a href="#cb8-196" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-197"><a href="#cb8-197" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 4. Routes (process pool)</span></span>
+<span id="cb8-198"><a href="#cb8-198" aria-hidden="true" tabindex="-1"></a>    _ <span class="op">=</span> <span class="cf">await</span> optimize_routes([<span class="st">"ORD-001"</span>, <span class="st">"ORD-002"</span>, <span class="st">"ORD-003"</span>, <span class="st">"ORD-004"</span>])</span>
+<span id="cb8-199"><a href="#cb8-199" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-200"><a href="#cb8-200" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 5. Notifications (bounded semaphore)</span></span>
+<span id="cb8-201"><a href="#cb8-201" aria-hidden="true" tabindex="-1"></a>    drivers <span class="op">=</span> [<span class="ss">f"driver_</span><span class="sc">{</span>i<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">20</span>)]</span>
+<span id="cb8-202"><a href="#cb8-202" aria-hidden="true" tabindex="-1"></a>    _ <span class="op">=</span> <span class="cf">await</span> notify_all_drivers(drivers, <span class="st">"New order nearby!"</span>)</span>
+<span id="cb8-203"><a href="#cb8-203" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-204"><a href="#cb8-204" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 6. Events (backpressure queue)</span></span>
+<span id="cb8-205"><a href="#cb8-205" aria-hidden="true" tabindex="-1"></a>    _ <span class="op">=</span> <span class="cf">await</span> consume_delivery_events(<span class="dv">200</span>)</span>
+<span id="cb8-206"><a href="#cb8-206" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-207"><a href="#cb8-207" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb8-208"><a href="#cb8-208" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-209"><a href="#cb8-209" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Main: compare baseline vs optimized ---</span></span>
+<span id="cb8-210"><a href="#cb8-210" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-211"><a href="#cb8-211" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> main() <span class="op">-&gt;</span> <span class="va">None</span>:</span>
+<span id="cb8-212"><a href="#cb8-212" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"="</span> <span class="op">*</span> <span class="dv">50</span>)</span>
+<span id="cb8-213"><a href="#cb8-213" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"BASELINE (sequential, no concurrency)"</span>)</span>
+<span id="cb8-214"><a href="#cb8-214" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"="</span> <span class="op">*</span> <span class="dv">50</span>)</span>
+<span id="cb8-215"><a href="#cb8-215" aria-hidden="true" tabindex="-1"></a>    t_baseline <span class="op">=</span> <span class="cf">await</span> baseline_sequential()</span>
+<span id="cb8-216"><a href="#cb8-216" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Baseline elapsed: </span><span class="sc">{</span>t_baseline<span class="sc">:.2f}</span><span class="ss">s</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb8-217"><a href="#cb8-217" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-218"><a href="#cb8-218" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"="</span> <span class="op">*</span> <span class="dv">50</span>)</span>
+<span id="cb8-219"><a href="#cb8-219" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"OPTIMIZED (fan-out, executors, semaphore, queue)"</span>)</span>
+<span id="cb8-220"><a href="#cb8-220" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"="</span> <span class="op">*</span> <span class="dv">50</span>)</span>
+<span id="cb8-221"><a href="#cb8-221" aria-hidden="true" tabindex="-1"></a>    t_optimized <span class="op">=</span> <span class="cf">await</span> optimized_concurrent()</span>
+<span id="cb8-222"><a href="#cb8-222" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"Optimized elapsed: </span><span class="sc">{</span>t_optimized<span class="sc">:.2f}</span><span class="ss">s</span><span class="ch">\n</span><span class="ss">"</span>)</span>
+<span id="cb8-223"><a href="#cb8-223" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-224"><a href="#cb8-224" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"="</span> <span class="op">*</span> <span class="dv">50</span>)</span>
+<span id="cb8-225"><a href="#cb8-225" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"RESULT: baseline=</span><span class="sc">{</span>t_baseline<span class="sc">:.2f}</span><span class="ss">s  optimized=</span><span class="sc">{</span>t_optimized<span class="sc">:.2f}</span><span class="ss">s  "</span></span>
+<span id="cb8-226"><a href="#cb8-226" aria-hidden="true" tabindex="-1"></a>          <span class="ss">f"speedup=</span><span class="sc">{</span>t_baseline <span class="op">/</span> t_optimized<span class="sc">:.1f}</span><span class="ss">x"</span>)</span>
+<span id="cb8-227"><a href="#cb8-227" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"="</span> <span class="op">*</span> <span class="dv">50</span>)</span>
+<span id="cb8-228"><a href="#cb8-228" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-229"><a href="#cb8-229" aria-hidden="true" tabindex="-1"></a>asyncio.run(main())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <hr>
 </section>
 <section id="whats-next" class="level2">
