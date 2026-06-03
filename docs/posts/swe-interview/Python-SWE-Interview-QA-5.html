@@ -633,13 +633,13 @@ document.addEventListener("DOMContentLoaded", function () {
   <li><a href="#q1-what-exactly-do-async-and-await-do-in-python" id="toc-q1-what-exactly-do-async-and-await-do-in-python" class="nav-link" data-scroll-target="#q1-what-exactly-do-async-and-await-do-in-python">Q1: What exactly do <code>async</code> and <code>await</code> do in Python?</a></li>
   <li><a href="#q2-why-is-await-in-a-loop-often-slow-and-how-do-you-make-it-concurrent" id="toc-q2-why-is-await-in-a-loop-often-slow-and-how-do-you-make-it-concurrent" class="nav-link" data-scroll-target="#q2-why-is-await-in-a-loop-often-slow-and-how-do-you-make-it-concurrent">Q2: Why is <code>await</code> in a loop often slow, and how do you make it concurrent?</a></li>
   <li><a href="#q3-what-is-the-difference-between-io-bound-and-cpu-bound-work" id="toc-q3-what-is-the-difference-between-io-bound-and-cpu-bound-work" class="nav-link" data-scroll-target="#q3-what-is-the-difference-between-io-bound-and-cpu-bound-work">Q3: What is the difference between I/O-bound and CPU-bound work?</a></li>
-  <li><a href="#q4-thread-vs-process-vs-async-how-do-you-choose-in-interviews-and-production" id="toc-q4-thread-vs-process-vs-async-how-do-you-choose-in-interviews-and-production" class="nav-link" data-scroll-target="#q4-thread-vs-process-vs-async-how-do-you-choose-in-interviews-and-production">Q4: Thread vs Process vs Async: how do you choose in interviews and production?</a></li>
+  <li><a href="#q4-thread-vs-process-vs-async-how-do-you-choose-in-production" id="toc-q4-thread-vs-process-vs-async-how-do-you-choose-in-production" class="nav-link" data-scroll-target="#q4-thread-vs-process-vs-async-how-do-you-choose-in-production">Q4: Thread vs Process vs Async: how do you choose in production?</a></li>
   <li><a href="#q5-how-does-the-gil-affect-concurrency-choices-in-python" id="toc-q5-how-does-the-gil-affect-concurrency-choices-in-python" class="nav-link" data-scroll-target="#q5-how-does-the-gil-affect-concurrency-choices-in-python">Q5: How does the GIL affect concurrency choices in Python?</a></li>
   <li><a href="#q6-what-are-the-biggest-async-best-practices-for-production-code" id="toc-q6-what-are-the-biggest-async-best-practices-for-production-code" class="nav-link" data-scroll-target="#q6-what-are-the-biggest-async-best-practices-for-production-code">Q6: What are the biggest async best practices for production code?</a></li>
   <li><a href="#q7-real-use-case-high-throughput-event-enrichment-pipeline-with-asyncio-processes" id="toc-q7-real-use-case-high-throughput-event-enrichment-pipeline-with-asyncio-processes" class="nav-link" data-scroll-target="#q7-real-use-case-high-throughput-event-enrichment-pipeline-with-asyncio-processes">Q7: Real use case: high-throughput event enrichment pipeline with asyncio + processes</a></li>
   <li><a href="#q8-how-do-cancellation-retries-and-backpressure-work-in-async-systems" id="toc-q8-how-do-cancellation-retries-and-backpressure-work-in-async-systems" class="nav-link" data-scroll-target="#q8-how-do-cancellation-retries-and-backpressure-work-in-async-systems">Q8: How do cancellation, retries, and backpressure work in async systems?</a></li>
-  <li><a href="#q9-what-interview-ready-system-designs-use-async-threads-and-processes-together" id="toc-q9-what-interview-ready-system-designs-use-async-threads-and-processes-together" class="nav-link" data-scroll-target="#q9-what-interview-ready-system-designs-use-async-threads-and-processes-together">Q9: What interview-ready system designs use async, threads, and processes together?</a></li>
-  <li><a href="#q10-what-is-the-strongest-concise-interview-answer-for-concurrency-strategy-in-python" id="toc-q10-what-is-the-strongest-concise-interview-answer-for-concurrency-strategy-in-python" class="nav-link" data-scroll-target="#q10-what-is-the-strongest-concise-interview-answer-for-concurrency-strategy-in-python">Q10: What is the strongest concise interview answer for concurrency strategy in Python?</a></li>
+  <li><a href="#q9-what-production-system-designs-use-async-threads-and-processes-together" id="toc-q9-what-production-system-designs-use-async-threads-and-processes-together" class="nav-link" data-scroll-target="#q9-what-production-system-designs-use-async-threads-and-processes-together">Q9: What production system designs use async, threads, and processes together?</a></li>
+  <li><a href="#q10-what-is-the-strongest-concise-production-answer-for-concurrency-strategy-in-python" id="toc-q10-what-is-the-strongest-concise-production-answer-for-concurrency-strategy-in-python" class="nav-link" data-scroll-target="#q10-what-is-the-strongest-concise-production-answer-for-concurrency-strategy-in-python">Q10: What is the strongest concise production answer for concurrency strategy in Python?</a></li>
   <li><a href="#summary-table" id="toc-summary-table" class="nav-link" data-scroll-target="#summary-table">Summary Table</a></li>
   <li><a href="#real-world-use-case-food-delivery-platform" id="toc-real-world-use-case-food-delivery-platform" class="nav-link" data-scroll-target="#real-world-use-case-food-delivery-platform">Real-World Use Case: Food Delivery Platform</a></li>
   <li><a href="#whats-next" id="toc-whats-next" class="nav-link" data-scroll-target="#whats-next">What’s Next?</a></li>
@@ -753,17 +753,33 @@ document.addEventListener("DOMContentLoaded", function () {
 </tbody>
 </table>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> asyncio</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> io_step(name: <span class="bu">str</span>, delay: <span class="bu">float</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">await</span> asyncio.sleep(delay)</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="ss">f"</span><span class="sc">{</span>name<span class="sc">}</span><span class="ss"> done"</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> main() <span class="op">-&gt;</span> <span class="va">None</span>:</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Sequential coroutine awaits (still non-blocking, but one-by-one)</span></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="cf">await</span> io_step(<span class="st">"A"</span>, <span class="fl">1.0</span>))</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="cf">await</span> io_step(<span class="st">"B"</span>, <span class="fl">1.0</span>))</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>asyncio.run(main())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> io_step(name: <span class="bu">str</span>, delay: <span class="bu">float</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>name<span class="sc">}</span><span class="ss">: start"</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">await</span> asyncio.sleep(delay)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>name<span class="sc">}</span><span class="ss">: end"</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="ss">f"</span><span class="sc">{</span>name<span class="sc">}</span><span class="ss"> done"</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> main() <span class="op">-&gt;</span> <span class="va">None</span>:</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Sequential awaits: B starts only after A completes.</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="cf">await</span> io_step(<span class="st">"A"</span>, <span class="fl">1.0</span>))</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="cf">await</span> io_step(<span class="st">"B"</span>, <span class="fl">1.0</span>))</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>    elapsed <span class="op">=</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"elapsed=</span><span class="sc">{</span>elapsed<span class="sc">:.2f}</span><span class="ss">s (about 2.0s =&gt; not parallel)"</span>)</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>asyncio.run(main())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Objective of this snippet:</strong> show that <code>async</code>/<code>await</code> does <strong>not</strong> automatically mean parallel execution. With sequential <code>await</code>, work still runs one-by-one.</p>
+<p>Expected behavior:</p>
+<ul>
+<li><code>A</code> starts and finishes first.</li>
+<li><code>B</code> starts only after <code>A</code> is fully done.</li>
+<li>Total time is about 2 seconds for two 1-second waits, which proves this is sequential.</li>
+</ul>
+<p>Parallelism is introduced later (Q2) by scheduling multiple coroutines first (for example with <code>asyncio.gather()</code>), then awaiting them together.</p>
 <hr>
 </section>
 </section>
@@ -788,32 +804,41 @@ document.addEventListener("DOMContentLoaded", function () {
 <span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    <span class="st">"https://en.wikipedia.org/wiki/Distributed_computing"</span>,</span>
 <span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>]</span>
 <span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> fetch_text(session: aiohttp.ClientSession, url: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">int</span>:</span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="cf">with</span> session.get(url, timeout<span class="op">=</span>aiohttp.ClientTimeout(total<span class="op">=</span><span class="dv">10</span>)) <span class="im">as</span> resp:</span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>        resp.raise_for_status()</span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>        text <span class="op">=</span> <span class="cf">await</span> resp.text()</span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="bu">len</span>(text)</span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> sequential() <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> time.perf_counter()</span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="cf">with</span> aiohttp.ClientSession() <span class="im">as</span> session:</span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> url <span class="kw">in</span> URLS:</span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>            _ <span class="op">=</span> <span class="cf">await</span> fetch_text(session, url)</span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> time.perf_counter() <span class="op">-</span> start</span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> concurrent() <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> time.perf_counter()</span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="cf">with</span> aiohttp.ClientSession() <span class="im">as</span> session:</span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>        tasks <span class="op">=</span> [fetch_text(session, u) <span class="cf">for</span> u <span class="kw">in</span> URLS]</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>        _ <span class="op">=</span> <span class="cf">await</span> asyncio.gather(<span class="op">*</span>tasks)</span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> time.perf_counter() <span class="op">-</span> start</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> main() <span class="op">-&gt;</span> <span class="va">None</span>:</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>    t1 <span class="op">=</span> <span class="cf">await</span> sequential()</span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>    t2 <span class="op">=</span> <span class="cf">await</span> concurrent()</span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"sequential=</span><span class="sc">{</span>t1<span class="sc">:.2f}</span><span class="ss">s concurrent=</span><span class="sc">{</span>t2<span class="sc">:.2f}</span><span class="ss">s speedup=</span><span class="sc">{</span>t1 <span class="op">/</span> t2<span class="sc">:.1f}</span><span class="ss">x"</span>)</span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>asyncio.run(main())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>HEADERS <span class="op">=</span> {</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    <span class="st">"User-Agent"</span>: <span class="st">"Mozilla/5.0 (X11; Linux x86_64) AsyncInterviewDemo/1.0"</span>,</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Accept-Language"</span>: <span class="st">"en-US,en;q=0.9"</span>,</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> fetch_text(session: aiohttp.ClientSession, url: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">int</span>:</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="cf">with</span> session.get(</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>        url,</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>        headers<span class="op">=</span>HEADERS,</span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>        timeout<span class="op">=</span>aiohttp.ClientTimeout(total<span class="op">=</span><span class="dv">10</span>),</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>    ) <span class="im">as</span> resp:</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>        resp.raise_for_status()</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>        text <span class="op">=</span> <span class="cf">await</span> resp.text()</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="bu">len</span>(text)</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> sequential() <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="cf">with</span> aiohttp.ClientSession() <span class="im">as</span> session:</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> url <span class="kw">in</span> URLS:</span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>            _ <span class="op">=</span> <span class="cf">await</span> fetch_text(session, url)</span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> concurrent() <span class="op">-&gt;</span> <span class="bu">float</span>:</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>    start <span class="op">=</span> time.perf_counter()</span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>    <span class="cf">async</span> <span class="cf">with</span> aiohttp.ClientSession() <span class="im">as</span> session:</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>        tasks <span class="op">=</span> [fetch_text(session, u) <span class="cf">for</span> u <span class="kw">in</span> URLS]</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>        _ <span class="op">=</span> <span class="cf">await</span> asyncio.gather(<span class="op">*</span>tasks)</span>
+<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> time.perf_counter() <span class="op">-</span> start</span>
+<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a><span class="cf">async</span> <span class="kw">def</span> main() <span class="op">-&gt;</span> <span class="va">None</span>:</span>
+<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>    t1 <span class="op">=</span> <span class="cf">await</span> sequential()</span>
+<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>    t2 <span class="op">=</span> <span class="cf">await</span> concurrent()</span>
+<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="ss">f"sequential=</span><span class="sc">{</span>t1<span class="sc">:.2f}</span><span class="ss">s concurrent=</span><span class="sc">{</span>t2<span class="sc">:.2f}</span><span class="ss">s speedup=</span><span class="sc">{</span>t1 <span class="op">/</span> t2<span class="sc">:.1f}</span><span class="ss">x"</span>)</span>
+<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a>asyncio.run(main())</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <hr>
 </section>
 <section id="q3-what-is-the-difference-between-io-bound-and-cpu-bound-work" class="level2">
@@ -884,10 +909,10 @@ document.addEventListener("DOMContentLoaded", function () {
 </table>
 <hr>
 </section>
-<section id="q4-thread-vs-process-vs-async-how-do-you-choose-in-interviews-and-production" class="level2">
-<h2 class="anchored" data-anchor-id="q4-thread-vs-process-vs-async-how-do-you-choose-in-interviews-and-production">Q4: Thread vs Process vs Async: how do you choose in interviews and production?</h2>
+<section id="q4-thread-vs-process-vs-async-how-do-you-choose-in-production" class="level2">
+<h2 class="anchored" data-anchor-id="q4-thread-vs-process-vs-async-how-do-you-choose-in-production">Q4: Thread vs Process vs Async: how do you choose in production?</h2>
 <p><strong>Answer:</strong></p>
-<p>Use this selection rule:</p>
+<p>Use this production selection rule:</p>
 <ol type="1">
 <li>If the operation is naturally async (HTTP, DB async driver), use <strong><code>asyncio</code></strong>.</li>
 <li>If operation is blocking I/O and no async API exists, use <strong>threads</strong>.</li>
@@ -1054,8 +1079,8 @@ document.addEventListener("DOMContentLoaded", function () {
 </ul>
 <hr>
 </section>
-<section id="q9-what-interview-ready-system-designs-use-async-threads-and-processes-together" class="level2">
-<h2 class="anchored" data-anchor-id="q9-what-interview-ready-system-designs-use-async-threads-and-processes-together">Q9: What interview-ready system designs use async, threads, and processes together?</h2>
+<section id="q9-what-production-system-designs-use-async-threads-and-processes-together" class="level2">
+<h2 class="anchored" data-anchor-id="q9-what-production-system-designs-use-async-threads-and-processes-together">Q9: What production system designs use async, threads, and processes together?</h2>
 <p><strong>Answer:</strong></p>
 <section id="pattern-a-api-aggregator-io-heavy" class="level3">
 <h3 class="anchored" data-anchor-id="pattern-a-api-aggregator-io-heavy">Pattern A: API Aggregator (I/O-heavy)</h3>
@@ -1104,10 +1129,10 @@ document.addEventListener("DOMContentLoaded", function () {
 <hr>
 </section>
 </section>
-<section id="q10-what-is-the-strongest-concise-interview-answer-for-concurrency-strategy-in-python" class="level2">
-<h2 class="anchored" data-anchor-id="q10-what-is-the-strongest-concise-interview-answer-for-concurrency-strategy-in-python">Q10: What is the strongest concise interview answer for concurrency strategy in Python?</h2>
+<section id="q10-what-is-the-strongest-concise-production-answer-for-concurrency-strategy-in-python" class="level2">
+<h2 class="anchored" data-anchor-id="q10-what-is-the-strongest-concise-production-answer-for-concurrency-strategy-in-python">Q10: What is the strongest concise production answer for concurrency strategy in Python?</h2>
 <p><strong>Answer:</strong></p>
-<p>A high-quality answer:</p>
+<p>A strong production-ready answer:</p>
 <p>“I classify workload first: I/O-bound vs CPU-bound. For I/O-bound concurrency I prefer <code>asyncio</code> with timeouts, bounded concurrency, and pooled clients. For blocking I/O dependencies I offload to a <code>ThreadPoolExecutor</code>. For CPU-heavy workloads I use <code>ProcessPoolExecutor</code> or native libraries that release the GIL. In production I add observability, retries, cancellation safety, and backpressure so the system degrades gracefully under load.”</p>
 <section id="one-page-decision-matrix" class="level3">
 <h3 class="anchored" data-anchor-id="one-page-decision-matrix">One-page decision matrix</h3>
@@ -1208,7 +1233,7 @@ document.addEventListener("DOMContentLoaded", function () {
 </tr>
 <tr class="even">
 <td>10</td>
-<td>Interview framing</td>
+<td>Concurrency strategy framing</td>
 <td>Explain workload-first strategy clearly</td>
 </tr>
 </tbody>
@@ -1284,7 +1309,7 @@ document.addEventListener("DOMContentLoaded", function () {
 </tr>
 </tbody>
 </table>
-<p>This is the interview-ready framing: classify each task by bottleneck, then apply the smallest concurrency model that solves that bottleneck safely.</p>
+<p>This is the production-ready framing: classify each task by bottleneck, then apply the smallest concurrency model that solves that bottleneck safely.</p>
 <hr>
 </section>
 <section id="whats-next" class="level2">

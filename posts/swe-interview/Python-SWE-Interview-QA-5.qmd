@@ -55,18 +55,36 @@ graph TD
 
 ```python
 import asyncio
+import time
 
 async def io_step(name: str, delay: float) -> str:
+    print(f"{name}: start")
     await asyncio.sleep(delay)
+    print(f"{name}: end")
     return f"{name} done"
 
 async def main() -> None:
-    # Sequential coroutine awaits (still non-blocking, but one-by-one)
+    start = time.perf_counter()
+
+    # Sequential awaits: B starts only after A completes.
     print(await io_step("A", 1.0))
     print(await io_step("B", 1.0))
 
+    elapsed = time.perf_counter() - start
+    print(f"elapsed={elapsed:.2f}s (about 2.0s => not parallel)")
+
 asyncio.run(main())
 ```
+
+**Objective of this snippet:** show that `async`/`await` does **not** automatically mean parallel execution. With sequential `await`, work still runs one-by-one.
+
+Expected behavior:
+
+- `A` starts and finishes first.
+- `B` starts only after `A` is fully done.
+- Total time is about 2 seconds for two 1-second waits, which proves this is sequential.
+
+Parallelism is introduced later (Q2) by scheduling multiple coroutines first (for example with `asyncio.gather()`), then awaiting them together.
 
 ---
 
@@ -94,8 +112,17 @@ URLS = [
     "https://en.wikipedia.org/wiki/Distributed_computing",
 ]
 
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AsyncInterviewDemo/1.0",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
 async def fetch_text(session: aiohttp.ClientSession, url: str) -> int:
-    async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+    async with session.get(
+        url,
+        headers=HEADERS,
+        timeout=aiohttp.ClientTimeout(total=10),
+    ) as resp:
         resp.raise_for_status()
         text = await resp.text()
         return len(text)
@@ -155,11 +182,11 @@ graph LR
 
 ---
 
-## Q4: Thread vs Process vs Async: how do you choose in interviews and production?
+## Q4: Thread vs Process vs Async: how do you choose in production?
 
 **Answer:**
 
-Use this selection rule:
+Use this production selection rule:
 
 1. If the operation is naturally async (HTTP, DB async driver), use **`asyncio`**.
 2. If operation is blocking I/O and no async API exists, use **threads**.
@@ -326,7 +353,7 @@ Best-practice notes:
 
 ---
 
-## Q9: What interview-ready system designs use async, threads, and processes together?
+## Q9: What production system designs use async, threads, and processes together?
 
 **Answer:**
 
@@ -363,11 +390,11 @@ graph TD
 
 ---
 
-## Q10: What is the strongest concise interview answer for concurrency strategy in Python?
+## Q10: What is the strongest concise production answer for concurrency strategy in Python?
 
 **Answer:**
 
-A high-quality answer:
+A strong production-ready answer:
 
 "I classify workload first: I/O-bound vs CPU-bound. For I/O-bound concurrency I prefer `asyncio` with timeouts, bounded concurrency, and pooled clients. For blocking I/O dependencies I offload to a `ThreadPoolExecutor`. For CPU-heavy workloads I use `ProcessPoolExecutor` or native libraries that release the GIL. In production I add observability, retries, cancellation safety, and backpressure so the system degrades gracefully under load."
 
@@ -394,7 +421,7 @@ A high-quality answer:
 | 7 | Event pipeline use case | Async orchestration + process pool for CPU-heavy enrichment |
 | 8 | Reliability patterns | Backpressure, cancellation, retries |
 | 9 | Real architectures | Aggregators, ingestion pipelines, media systems |
-| 10 | Interview framing | Explain workload-first strategy clearly |
+| 10 | Concurrency strategy framing | Explain workload-first strategy clearly |
 
 ---
 
@@ -413,7 +440,7 @@ Assume one backend powers order placement, restaurant sync, driver dispatch, pay
 | Retry transient downstream failures | Reliability concern | Idempotent handlers + exponential backoff | Safe retry behavior without duplicate side effects |
 | Graceful deploy/shutdown during peak traffic | Lifecycle concern | Structured cancellation (`TaskGroup`, `CancelledError` handling) | Prevents orphan work and partial state updates |
 
-This is the interview-ready framing: classify each task by bottleneck, then apply the smallest concurrency model that solves that bottleneck safely.
+This is the production-ready framing: classify each task by bottleneck, then apply the smallest concurrency model that solves that bottleneck safely.
 
 ---
 
