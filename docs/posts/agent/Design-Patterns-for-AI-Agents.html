@@ -447,6 +447,35 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 });
 </script>
+<script>
+// Apply sidebar collapsed state immediately before first paint
+if (localStorage.getItem("sidebar-collapsed") === "true") {
+  document.documentElement.classList.add("sidebar-collapsed-early");
+}
+</script>
+<style>
+/* Instant hide before body renders — no flash */
+html.sidebar-collapsed-early body #quarto-sidebar {
+  transform: translateX(-100%);
+  position: fixed;
+}
+html.sidebar-collapsed-early body #quarto-content {
+  margin-left: 0 !important;
+}
+
+/* Prevent layout jump from secondary nav being hidden after paint */
+nav.quarto-secondary-nav {
+  display: none !important;
+}
+
+/* Prevent content jumping by locking top alignment immediately */
+body.nav-sidebar #quarto-content,
+body.nav-sidebar #quarto-content main.content {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+  top: 0 !important;
+}
+</style>
 <script src="../../site_libs/quarto-diagram/mermaid.min.js"></script>
 <script src="../../site_libs/quarto-diagram/mermaid-init.js"></script>
 <link href="../../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
@@ -2459,10 +2488,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
   document.body.appendChild(btn);
 
-  // Restore state from localStorage
+  // Restore state from localStorage (sync with early header script)
   if (localStorage.getItem("sidebar-collapsed") === "true") {
     document.body.classList.add("sidebar-collapsed");
   }
+  // Remove the early class now that body class is set
+  document.documentElement.classList.remove("sidebar-collapsed-early");
 
   btn.addEventListener("click", function () {
     // Enable transitions only on user interaction
@@ -2471,90 +2502,6 @@ document.addEventListener("DOMContentLoaded", function () {
     var collapsed = document.body.classList.contains("sidebar-collapsed");
     localStorage.setItem("sidebar-collapsed", collapsed);
     if (!collapsed) updateSidebarWidth();
-  });
-
-  // --- SPA-style navigation for sidebar links ---
-  function swapContent(url) {
-    return fetch(url).then(function(res) {
-      if (!res.ok) { window.location.href = url; return; }
-      return res.text();
-    }).then(function(html) {
-      if (!html) return;
-      var parser = new DOMParser();
-      var doc = parser.parseFromString(html, "text/html");
-
-      // Swap main content
-      var newMain = doc.querySelector("main#quarto-document-content");
-      var oldMain = document.querySelector("main#quarto-document-content");
-      if (newMain && oldMain) {
-        oldMain.replaceWith(newMain);
-      }
-
-      // Swap margin sidebar (TOC)
-      var newMargin = doc.getElementById("quarto-margin-sidebar");
-      var oldMargin = document.getElementById("quarto-margin-sidebar");
-      if (newMargin && oldMargin) {
-        oldMargin.replaceWith(newMargin);
-      } else if (!newMargin && oldMargin) {
-        oldMargin.innerHTML = "";
-      }
-
-      // Update body classes (keep sidebar-collapsed and sidebar-animate)
-      var keepClasses = ["sidebar-collapsed", "sidebar-animate"];
-      var kept = keepClasses.filter(function(c) { return document.body.classList.contains(c); });
-      document.body.className = doc.body.className;
-      kept.forEach(function(c) { document.body.classList.add(c); });
-
-      // Update page title
-      document.title = doc.title;
-
-      // Update active sidebar link
-      document.querySelectorAll("#quarto-sidebar .sidebar-link.active").forEach(function(el) {
-        el.classList.remove("active");
-      });
-      var currentPath = new URL(url, window.location.origin).pathname;
-      document.querySelectorAll("#quarto-sidebar .sidebar-link").forEach(function(el) {
-        var href = el.getAttribute("href");
-        if (href) {
-          var linkPath = new URL(href, window.location.href).pathname;
-          if (linkPath === currentPath) {
-            el.classList.add("active");
-          }
-        }
-      });
-
-      // Scroll to top
-      window.scrollTo(0, 0);
-
-      // Re-run scripts in new content (inline only)
-      document.querySelectorAll("main#quarto-document-content script").forEach(function(oldScript) {
-        var newScript = document.createElement("script");
-        if (oldScript.src) {
-          newScript.src = oldScript.src;
-        } else {
-          newScript.textContent = oldScript.textContent;
-        }
-        oldScript.replaceWith(newScript);
-      });
-    });
-  }
-
-  function handleSidebarClick(e) {
-    var link = e.target.closest("#quarto-sidebar a.sidebar-link");
-    if (!link) return;
-    var href = link.getAttribute("href");
-    if (!href || href.startsWith("http") || href.startsWith("#")) return;
-
-    e.preventDefault();
-    var fullUrl = new URL(href, window.location.href).href;
-    history.pushState(null, "", fullUrl);
-    swapContent(fullUrl);
-  }
-
-  document.getElementById("quarto-sidebar").addEventListener("click", handleSidebarClick);
-
-  window.addEventListener("popstate", function() {
-    swapContent(window.location.href);
   });
 });
 </script>
