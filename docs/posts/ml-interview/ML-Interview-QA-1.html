@@ -2497,6 +2497,10 @@ document.getElementById('mobile-menu-fab').addEventListener('click', function() 
 <script>
 (function() {
   function initTitleAnimation() {
+    // Remove existing canvas if re-initializing
+    var existingCanvas = document.getElementById('title-block-canvas');
+    if (existingCanvas) existingCanvas.remove();
+
     var target = document.querySelector('.quarto-title-banner') || document.getElementById('title-block-header');
     if (!target) return;
 
@@ -2602,6 +2606,9 @@ document.getElementById('mobile-menu-fab').addEventListener('click', function() 
   } else {
     initTitleAnimation();
   }
+
+  // Expose globally for SPA re-init
+  window.initTitleAnimation = initTitleAnimation;
 })();
 </script>
 <style>
@@ -2800,6 +2807,33 @@ document.addEventListener("DOMContentLoaded", function () {
             if (s.src) ns.src = s.src; else ns.textContent = s.textContent;
             s.replaceWith(ns);
           });
+        }
+
+        // Re-init title animation
+        if (typeof initTitleAnimation === "function") {
+          initTitleAnimation();
+        } else if (typeof window.initTitleAnimation === "function") {
+          window.initTitleAnimation();
+        }
+
+        // Re-render mermaid diagrams if any exist in new content
+        var mermaidEls = document.querySelectorAll("pre.mermaid-js");
+        if (mermaidEls.length > 0 && typeof mermaid !== "undefined") {
+          (async function () {
+            var i = Date.now();
+            for (var el of Array.from(mermaidEls)) {
+              var text = el.textContent.replaceAll("\u00a0", " ");
+              var result = await mermaid.mermaidAPI.render("mermaid-spa-" + (++i), text, el);
+              el.innerHTML = result.svg || result;
+              var svg = el.querySelector("svg");
+              if (svg) {
+                var parent = el.parentElement;
+                parent.removeChild(el);
+                parent.appendChild(svg);
+                svg.classList.add("mermaid-js");
+              }
+            }
+          })();
         }
       })
       .catch(function () {
