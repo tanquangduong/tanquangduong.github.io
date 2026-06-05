@@ -1606,16 +1606,24 @@ document.addEventListener("DOMContentLoaded", function () {
   // Only add on desktop
   if (window.innerWidth < 992) return;
 
-  // Set sidebar width CSS variable and update on resize
+  // Set sidebar width CSS variable and keep it in sync
   var sidebar = document.getElementById("quarto-sidebar");
   function updateSidebarWidth() {
     if (sidebar && !document.body.classList.contains("sidebar-collapsed")) {
-      var sidebarWidth = sidebar.offsetWidth;
+      var sidebarWidth = sidebar.getBoundingClientRect().width;
       document.documentElement.style.setProperty("--sidebar-width", sidebarWidth + "px");
     }
   }
   updateSidebarWidth();
   window.addEventListener("resize", updateSidebarWidth);
+
+  // Watch for sidebar size changes (e.g. different pages, font load, content reflow)
+  if (sidebar && typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(updateSidebarWidth).observe(sidebar);
+  }
+
+  // Recheck after fonts and layout settle
+  window.addEventListener("load", updateSidebarWidth);
 
   var btn = document.createElement("button");
   btn.className = "sidebar-toggle-btn";
