@@ -2512,6 +2512,85 @@ document.addEventListener("DOMContentLoaded", function () {
     localStorage.setItem("sidebar-collapsed", collapsed);
     if (!collapsed) updateSidebarWidth();
   });
+
+  // --- SPA navigation for sidebar links (keeps logo/sidebar intact) ---
+  function navigateWithoutReload(url) {
+    fetch(url, { credentials: "same-origin" })
+      .then(function (res) {
+        if (!res.ok) throw new Error(res.status);
+        return res.text();
+      })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, "text/html");
+
+        // Swap main content
+        var newMain = doc.getElementById("quarto-document-content");
+        var oldMain = document.getElementById("quarto-document-content");
+        if (newMain && oldMain) oldMain.replaceWith(newMain);
+
+        // Swap margin sidebar (TOC)
+        var newMargin = doc.getElementById("quarto-margin-sidebar");
+        var oldMargin = document.getElementById("quarto-margin-sidebar");
+        if (newMargin && oldMargin) oldMargin.replaceWith(newMargin);
+        else if (!newMargin && oldMargin) oldMargin.innerHTML = "";
+
+        // Update body classes, preserve collapse state
+        var wasCollapsed = document.body.classList.contains("sidebar-collapsed");
+        var wasAnimate = document.body.classList.contains("sidebar-animate");
+        document.body.className = doc.body.className;
+        if (wasCollapsed) document.body.classList.add("sidebar-collapsed");
+        if (wasAnimate) document.body.classList.add("sidebar-animate");
+
+        // Update title
+        document.title = doc.title;
+
+        // Update active link in sidebar
+        document.querySelectorAll("#quarto-sidebar .sidebar-link.active").forEach(function (el) {
+          el.classList.remove("active");
+        });
+        var path = new URL(url, location.origin).pathname;
+        document.querySelectorAll("#quarto-sidebar .sidebar-link").forEach(function (el) {
+          var href = el.getAttribute("href");
+          if (href && new URL(href, location.href).pathname === path) {
+            el.classList.add("active");
+          }
+        });
+
+        window.scrollTo(0, 0);
+
+        // Execute inline scripts in new content
+        var main = document.getElementById("quarto-document-content");
+        if (main) {
+          main.querySelectorAll("script").forEach(function (s) {
+            var ns = document.createElement("script");
+            if (s.src) ns.src = s.src; else ns.textContent = s.textContent;
+            s.replaceWith(ns);
+          });
+        }
+      })
+      .catch(function () {
+        // Fallback to normal navigation on error
+        window.location.href = url;
+      });
+  }
+
+  document.getElementById("quarto-sidebar").addEventListener("click", function (e) {
+    var link = e.target.closest("a.sidebar-link");
+    if (!link) return;
+    var href = link.getAttribute("href");
+    if (!href || href.startsWith("http") || href.startsWith("#") || href.startsWith("mailto")) return;
+    // Only handle same-origin internal links
+    var target = new URL(href, location.href);
+    if (target.origin !== location.origin) return;
+
+    e.preventDefault();
+    history.pushState(null, "", target.href);
+    navigateWithoutReload(target.href);
+  });
+
+  window.addEventListener("popstate", function () {
+    navigateWithoutReload(location.href);
+  });
 });
 </script>
 <script id="quarto-html-after-body" type="application/javascript">
