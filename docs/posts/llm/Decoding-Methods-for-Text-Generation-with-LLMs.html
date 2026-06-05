@@ -1687,6 +1687,26 @@ document.getElementById('mobile-menu-fab').addEventListener('click', function() 
 })();
 </script>
 <style>
+/* Cross-page view transitions - keeps sidebar/logo visually stable */
+@view-transition {
+  navigation: auto;
+}
+
+#quarto-sidebar {
+  view-transition-name: sidebar;
+}
+
+.sidebar-toggle-btn {
+  view-transition-name: sidebar-toggle;
+}
+
+::view-transition-old(sidebar),
+::view-transition-new(sidebar),
+::view-transition-old(sidebar-toggle),
+::view-transition-new(sidebar-toggle) {
+  animation: none;
+}
+
 /* Sidebar toggle button - desktop only */
 @media (min-width: 992px) {
   .sidebar-toggle-btn {
@@ -1703,7 +1723,7 @@ document.getElementById('mobile-menu-fab').addEventListener('click', function() 
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: left 0.3s ease, background 0.2s;
+    transition: none;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   }
 
@@ -1735,13 +1755,17 @@ document.getElementById('mobile-menu-fab').addEventListener('click', function() 
     margin-left: 0 !important;
   }
 
-  /* Smooth transitions */
-  #quarto-sidebar {
+  /* Smooth transitions - only after first user interaction */
+  body.sidebar-animate #quarto-sidebar {
     transition: transform 0.3s ease;
   }
 
-  #quarto-content {
+  body.sidebar-animate #quarto-content {
     transition: margin-left 0.3s ease;
+  }
+
+  body.sidebar-animate .sidebar-toggle-btn {
+    transition: left 0.3s ease, background 0.2s;
   }
 }
 
@@ -1791,9 +1815,12 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   btn.addEventListener("click", function () {
+    // Enable transitions only on user interaction
+    document.body.classList.add("sidebar-animate");
     document.body.classList.toggle("sidebar-collapsed");
     var collapsed = document.body.classList.contains("sidebar-collapsed");
     localStorage.setItem("sidebar-collapsed", collapsed);
+    if (!collapsed) updateSidebarWidth();
   });
 });
 </script>
