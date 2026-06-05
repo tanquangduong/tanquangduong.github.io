@@ -81,7 +81,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dbc92dda8186f57fa2e333fbb71d6a9d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-b981e3f33a8ad6ba97cc0b6118e04959.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-23f3439e4bd86aeeff5ff0174c43dd13.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/all.css" rel="stylesheet">
 <link href="../../site_libs/quarto-contrib/fontawesome6-0.1.0/latex-fontsize.css" rel="stylesheet">
 <script id="quarto-search-options" type="application/json">{
@@ -385,53 +385,101 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 </script>
 <script>
+
   var link = document.createElement('link');
+
   link.rel = 'canonical';
+
   var path = window.location.pathname.replace(/index\.html$/, '');
+
   link.href = 'https://vectoringai.com' + path;
+
   document.head.appendChild(link);
+
 </script>
+
 <script>
+
 document.addEventListener('DOMContentLoaded', function() {
+
   var ogTitle = document.querySelector('meta[property="og:title"]');
+
   var ogDesc = document.querySelector('meta[property="og:description"]');
+
   var ogImage = document.querySelector('meta[property="og:image"]');
+
   var dcDate = document.querySelector('meta[name="dcterms.date"]');
+
+
 
   if (!ogTitle) return;
 
+
+
   var isArticle = !!dcDate;
+
   var jsonld = {
+
     "@context": "https://schema.org",
+
     "@type": isArticle ? "Article" : "WebPage",
+
     "headline": ogTitle.content.replace(/ – Vectoring AI$/, ''),
+
     "description": ogDesc ? ogDesc.content : "",
+
     "url": window.location.href,
+
     "author": {
+
       "@type": "Organization",
+
       "name": "Vectoring AI",
+
       "url": "https://vectoringai.com/pages/about.html"
+
     },
+
     "publisher": {
+
       "@type": "Organization",
+
       "name": "Vectoring AI",
+
       "url": "https://vectoringai.com",
+
       "logo": {
+
         "@type": "ImageObject",
+
         "url": "https://vectoringai.com/images/favicon_io/android-chrome-512x512.png"
+
       }
+
     }
+
   };
 
+
+
   if (ogImage) jsonld.image = ogImage.content;
+
   if (dcDate) jsonld.datePublished = dcDate.content;
 
+
+
   var el = document.createElement('script');
+
   el.type = 'application/ld+json';
+
   el.textContent = JSON.stringify(jsonld);
+
   document.head.appendChild(el);
+
 });
+
 </script>
+
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   var title = document.querySelector(".sidebar-title");
@@ -725,13 +773,13 @@ pre.mermaid-js {
 </div>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="../../images/agent/guardrails-safety-autonomous-retrieval-agents-300px.png" class="img-fluid figure-img" width="300"></p>
+<p><img src="../..\images/agent/guardrails-safety-autonomous-retrieval-agents-300px.png" class="img-fluid figure-img" width="300"></p>
 <figcaption>Five-layer guardrail architecture for autonomous retrieval agents</figcaption>
 </figure>
 </div>
 <section id="introduction" class="level2">
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
-<p>Autonomous retrieval agents are powerful — they can <a href="../../posts/agent/Planning-and-Query-Decomposition-for-Complex-Retrieval.html">plan multi-step queries</a>, <a href="../../posts/agent/Tool-Use-and-Function-Calling-for-Retrieval-Agents.html">call tools</a>, <a href="../../posts/agent/Multi-Agent-RAG-Orchestration-Patterns.html">orchestrate sub-agents</a>, and <a href="../../posts/agent/Deep-Research-Agents-from-RAG-to-Autonomous-Investigation.html">conduct deep research</a>. But every capability you grant an agent is a capability an attacker can exploit.</p>
+<p>Autonomous retrieval agents are powerful — they can <a href="../..\posts/agent/Planning-and-Query-Decomposition-for-Complex-Retrieval.html">plan multi-step queries</a>, <a href="../..\posts/agent/Tool-Use-and-Function-Calling-for-Retrieval-Agents.html">call tools</a>, <a href="../..\posts/agent/Multi-Agent-RAG-Orchestration-Patterns.html">orchestrate sub-agents</a>, and <a href="../..\posts/agent/Deep-Research-Agents-from-RAG-to-Autonomous-Investigation.html">conduct deep research</a>. But every capability you grant an agent is a capability an attacker can exploit.</p>
 <p>The <strong>OWASP Top 10 for LLM Applications 2025</strong> identifies <em>Prompt Injection</em> (LLM01), <em>Excessive Agency</em> (LLM06), and <em>Unbounded Consumption</em> (LLM10) as critical risks. An unguarded retrieval agent can be tricked into querying unauthorized data sources, exfiltrating private information through crafted tool calls, or consuming unlimited tokens in runaway loops.</p>
 <p>This article builds a <strong>defense-in-depth architecture</strong> for retrieval agents. We cover five layers of protection — input validation, tool-call authorization gates, sandboxed execution, budget limits, and prompt injection defense — with working code in <strong>LangGraph</strong> and <strong>NeMo Guardrails</strong>. The goal is not to eliminate every possible attack (no single defense can), but to make exploitation expensive, detectable, and recoverable.</p>
 <blockquote class="blockquote">
@@ -1060,7 +1108,7 @@ pre.mermaid-js {
 </section>
 <section id="layer-3-tool-call-authorization-gates" class="level2">
 <h2 class="anchored" data-anchor-id="layer-3-tool-call-authorization-gates">Layer 3: Tool-Call Authorization Gates</h2>
-<p>The <a href="../../posts/agent/Building-a-ReAct-Agent-from-Scratch.html">ReAct loop</a> gives agents the power to call tools — and that is exactly where <strong>excessive agency</strong> (OWASP LLM06) manifests. Authorization gates ensure the agent can only call approved tools with approved arguments.</p>
+<p>The <a href="../..\posts/agent/Building-a-ReAct-Agent-from-Scratch.html">ReAct loop</a> gives agents the power to call tools — and that is exactly where <strong>excessive agency</strong> (OWASP LLM06) manifests. Authorization gates ensure the agent can only call approved tools with approved arguments.</p>
 <section id="permission-model" class="level3">
 <h3 class="anchored" data-anchor-id="permission-model">Permission Model</h3>
 <p>Define a permission layer that maps users, tools, and argument constraints:</p>
@@ -1127,7 +1175,7 @@ pre.mermaid-js {
 </section>
 <section id="authorization-gate-in-langgraph" class="level3">
 <h3 class="anchored" data-anchor-id="authorization-gate-in-langgraph">Authorization Gate in LangGraph</h3>
-<p>Integrate the authorization gate into a <a href="../../posts/agent/Building-Agents-with-LangGraph.html">LangGraph</a> state graph using the <code>interrupt</code> pattern for human-in-the-loop confirmation on sensitive actions:</p>
+<p>Integrate the authorization gate into a <a href="../..\posts/agent/Building-Agents-with-LangGraph.html">LangGraph</a> state graph using the <code>interrupt</code> pattern for human-in-the-loop confirmation on sensitive actions:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> TypedDict, Annotated</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.graph <span class="im">import</span> StateGraph, START, END</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> langgraph.checkpoint.memory <span class="im">import</span> MemorySaver</span>
@@ -1346,7 +1394,7 @@ pre.mermaid-js {
 </section>
 <section id="layer-5-budget-limits" class="level2">
 <h2 class="anchored" data-anchor-id="layer-5-budget-limits">Layer 5: Budget Limits</h2>
-<p><strong>Unbounded consumption</strong> (OWASP LLM10) is a real production risk. A <a href="../../posts/agent/Deep-Research-Agents-from-RAG-to-Autonomous-Investigation.html">deep research agent</a> might legitimately need dozens of tool calls — but an exploited agent could make thousands.</p>
+<p><strong>Unbounded consumption</strong> (OWASP LLM10) is a real production risk. A <a href="../..\posts/agent/Deep-Research-Agents-from-RAG-to-Autonomous-Investigation.html">deep research agent</a> might legitimately need dozens of tool calls — but an exploited agent could make thousands.</p>
 <section id="token-and-cost-budget" class="level3">
 <h3 class="anchored" data-anchor-id="token-and-cost-budget">Token and Cost Budget</h3>
 <p>Track cumulative costs and halt execution when limits are reached:</p>
@@ -1844,7 +1892,7 @@ pre.mermaid-js {
 <section id="conclusion" class="level2">
 <h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
 <p>Building autonomous retrieval agents without guardrails is like deploying a web application without authentication — it works until someone notices. The five-layer defense architecture presented here — <strong>input validation</strong>, <strong>prompt injection detection</strong>, <strong>tool-call authorization</strong>, <strong>sandboxed execution</strong>, and <strong>budget limits</strong> — transforms an open attack surface into a controlled, auditable system.</p>
-<p>No single guardrail stops every attack. Prompt injection in particular remains an open research problem. The key insight is <strong>defense-in-depth</strong>: each layer independently limits damage, and together they make exploitation dramatically harder. Combined with <a href="../../posts/agent/Building-Agents-with-LangGraph.html">human-in-the-loop checkpoints</a>, <a href="../../posts/llm/Observability-for-Multi-Turn-LLM-Conversations.html">observability</a>, and structured monitoring, you get a production agent system that is both capable and trustworthy.</p>
+<p>No single guardrail stops every attack. Prompt injection in particular remains an open research problem. The key insight is <strong>defense-in-depth</strong>: each layer independently limits damage, and together they make exploitation dramatically harder. Combined with <a href="../..\posts/agent/Building-Agents-with-LangGraph.html">human-in-the-loop checkpoints</a>, <a href="../..\posts/llm/Observability-for-Multi-Turn-LLM-Conversations.html">observability</a>, and structured monitoring, you get a production agent system that is both capable and trustworthy.</p>
 <div class="callout callout-style-simple callout-tip no-icon callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -1880,15 +1928,15 @@ pre.mermaid-js {
 <section id="read-more" class="level2">
 <h2 class="anchored" data-anchor-id="read-more">Read More</h2>
 <ul>
-<li>Lock down the <a href="../../posts/agent/Building-a-ReAct-Agent-from-Scratch.html">ReAct agent loop</a> that these guardrails protect — understand the Thought-Action-Observation cycle before adding safety layers.</li>
-<li>Apply authorization gates to <a href="../../posts/agent/Tool-Use-and-Function-Calling-for-Retrieval-Agents.html">tool calls and function calling</a> — see how agents select and invoke tools in practice.</li>
-<li>Integrate guardrails into <a href="../../posts/agent/Building-Agents-with-LangGraph.html">LangGraph state machines</a> — use <code>interrupt</code>, checkpointers, and conditional routing for human-in-the-loop approval.</li>
-<li>Add policy enforcement across <a href="../../posts/agent/Multi-Agent-RAG-Orchestration-Patterns.html">multi-agent orchestration patterns</a> — supervisor agents can enforce global budgets and tool permissions.</li>
-<li>Protect <a href="../../posts/agent/Memory-Systems-for-Long-Running-Retrieval-Agents.html">long-running agent memory</a> from poisoning — memory injection is an emerging attack vector for persistent agents.</li>
-<li>Apply budget limits to <a href="../../posts/agent/Planning-and-Query-Decomposition-for-Complex-Retrieval.html">planning and query decomposition</a> — multi-step plans can amplify token consumption.</li>
-<li>Secure <a href="../../posts/agent/Deep-Research-Agents-from-RAG-to-Autonomous-Investigation.html">deep research agents</a> that make dozens of web searches — budget and sandbox controls are critical for open-ended investigation.</li>
-<li>Explore <a href="../../posts/llm/Guardrails-for-LLM-Applications-with-Giskard.html">Guardrails for LLM Applications with Giskard</a> — a complementary approach using Giskard for vulnerability scanning and model testing.</li>
-<li>Track agent behavior across sessions with <a href="../../posts/llm/Observability-for-Multi-Turn-LLM-Conversations.html">Observability for Multi-Turn LLM Conversations</a>.</li>
+<li>Lock down the <a href="../..\posts/agent/Building-a-ReAct-Agent-from-Scratch.html">ReAct agent loop</a> that these guardrails protect — understand the Thought-Action-Observation cycle before adding safety layers.</li>
+<li>Apply authorization gates to <a href="../..\posts/agent/Tool-Use-and-Function-Calling-for-Retrieval-Agents.html">tool calls and function calling</a> — see how agents select and invoke tools in practice.</li>
+<li>Integrate guardrails into <a href="../..\posts/agent/Building-Agents-with-LangGraph.html">LangGraph state machines</a> — use <code>interrupt</code>, checkpointers, and conditional routing for human-in-the-loop approval.</li>
+<li>Add policy enforcement across <a href="../..\posts/agent/Multi-Agent-RAG-Orchestration-Patterns.html">multi-agent orchestration patterns</a> — supervisor agents can enforce global budgets and tool permissions.</li>
+<li>Protect <a href="../..\posts/agent/Memory-Systems-for-Long-Running-Retrieval-Agents.html">long-running agent memory</a> from poisoning — memory injection is an emerging attack vector for persistent agents.</li>
+<li>Apply budget limits to <a href="../..\posts/agent/Planning-and-Query-Decomposition-for-Complex-Retrieval.html">planning and query decomposition</a> — multi-step plans can amplify token consumption.</li>
+<li>Secure <a href="../..\posts/agent/Deep-Research-Agents-from-RAG-to-Autonomous-Investigation.html">deep research agents</a> that make dozens of web searches — budget and sandbox controls are critical for open-ended investigation.</li>
+<li>Explore <a href="../..\posts/llm/Guardrails-for-LLM-Applications-with-Giskard.html">Guardrails for LLM Applications with Giskard</a> — a complementary approach using Giskard for vulnerability scanning and model testing.</li>
+<li>Track agent behavior across sessions with <a href="../..\posts/llm/Observability-for-Multi-Turn-LLM-Conversations.html">Observability for Multi-Turn LLM Conversations</a>.</li>
 </ul>
 <!-- nav-buttons -->
 <p><a href="../../pages/agent.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-robot" aria-label="robot"></i> Explore Agents</a> <a href="../../index.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-house" aria-label="house"></i> Home</a></p>
@@ -2123,145 +2171,285 @@ document.getElementById('mobile-menu-fab').addEventListener('click', function() 
 })();
 </script>
 <style>
+
 /* Sidebar toggle button - desktop only */
+
 @media (min-width: 992px) {
+
   .sidebar-toggle-btn {
+
     position: fixed;
+
     top: 15px;
+
     left: calc(var(--sidebar-width, 250px) - 48px);
+
     z-index: 1100;
+
     width: 28px;
+
     height: 28px;
+
     border: 1px solid #dee2e6;
+
     border-radius: 4px;
+
     background: #ffffff;
+
     cursor: pointer;
+
     display: flex;
+
     align-items: center;
+
     justify-content: center;
+
     transition: none;
+
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+
   }
+
+
 
   .sidebar-toggle-btn:hover {
+
     background: #f0f0f0;
+
   }
+
+
 
   .sidebar-toggle-btn svg {
+
     width: 16px;
+
     height: 16px;
+
     transition: transform 0.3s ease;
+
   }
+
+
 
   /* When sidebar is hidden */
+
   body.sidebar-collapsed #quarto-sidebar {
+
     transform: translateX(-100%);
+
     position: fixed;
+
   }
+
+
 
   body.sidebar-collapsed .sidebar-toggle-btn {
+
     left: 10px;
+
   }
+
+
 
   body.sidebar-collapsed .sidebar-toggle-btn svg {
+
     transform: rotate(180deg);
+
   }
+
+
 
   body.sidebar-collapsed #quarto-content {
+
     margin-left: 0 !important;
+
   }
+
+
 
   /* Smooth transitions - only after first user interaction */
+
   body.sidebar-animate #quarto-sidebar {
+
     transition: transform 0.3s ease;
+
   }
+
+
 
   body.sidebar-animate #quarto-content {
+
     transition: margin-left 0.3s ease;
+
   }
+
+
 
   body.sidebar-animate .sidebar-toggle-btn {
+
     transition: left 0.3s ease, background 0.2s;
+
   }
+
 }
+
+
 
 /* Hide on mobile */
+
 @media (max-width: 991px) {
+
   .sidebar-toggle-btn {
+
     display: none !important;
+
   }
+
 }
+
 </style>
 
+
+
 <script>
+
 document.addEventListener("DOMContentLoaded", function () {
+
   // Only add on desktop
+
   if (window.innerWidth < 992) return;
 
+
+
   // Set sidebar width CSS variable and keep it in sync
+
   var sidebar = document.getElementById("quarto-sidebar");
+
   function updateSidebarWidth() {
+
     if (sidebar && !document.body.classList.contains("sidebar-collapsed")) {
+
       var sidebarWidth = sidebar.getBoundingClientRect().width;
+
       document.documentElement.style.setProperty("--sidebar-width", sidebarWidth + "px");
+
     }
+
   }
+
   updateSidebarWidth();
+
   window.addEventListener("resize", updateSidebarWidth);
 
+
+
   // Watch for sidebar size changes (e.g. different pages, font load, content reflow)
+
   if (sidebar && typeof ResizeObserver !== "undefined") {
+
     new ResizeObserver(updateSidebarWidth).observe(sidebar);
+
   }
 
+
+
   // Recheck after fonts and layout settle
+
   window.addEventListener("load", updateSidebarWidth);
 
+
+
   var btn = document.createElement("button");
+
   btn.className = "sidebar-toggle-btn";
+
   btn.setAttribute("aria-label", "Toggle sidebar");
+
   btn.setAttribute("title", "Toggle sidebar");
+
   btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>';
+
+
 
   document.body.appendChild(btn);
 
+
+
   // Restore state from localStorage (sync with early header script)
+
   if (localStorage.getItem("sidebar-collapsed") === "true") {
+
     document.body.classList.add("sidebar-collapsed");
+
   }
+
   // Remove the early class now that body class is set
+
   document.documentElement.classList.remove("sidebar-collapsed-early");
 
+
+
   btn.addEventListener("click", function () {
+
     // Enable transitions only on user interaction
+
     document.body.classList.add("sidebar-animate");
+
     document.body.classList.toggle("sidebar-collapsed");
+
     var collapsed = document.body.classList.contains("sidebar-collapsed");
+
     localStorage.setItem("sidebar-collapsed", collapsed);
+
     if (!collapsed) updateSidebarWidth();
+
   });
 
+
+
   // --- Prefetch links on hover for instant page loads ---
+
   var prefetched = new Set();
+
   document.addEventListener("pointerenter", function (e) {
+
     var link = e.target.closest("a");
+
     if (!link) return;
+
     var href = link.getAttribute("href");
+
     if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("javascript:")) return;
+
     if (link.hasAttribute("download") || link.getAttribute("target") === "_blank") return;
+
     try {
+
       var target = new URL(href, location.href);
+
       if (target.origin !== location.origin) return;
+
       if (prefetched.has(target.pathname)) return;
+
       prefetched.add(target.pathname);
+
       var prefetchLink = document.createElement("link");
+
       prefetchLink.rel = "prefetch";
+
       prefetchLink.href = target.href;
+
       document.head.appendChild(prefetchLink);
+
     } catch (e) {}
+
   }, true);
+
 });
+
 </script>
+
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     const icon = "";
@@ -2674,7 +2862,7 @@ document.addEventListener("DOMContentLoaded", function () {
       &nbsp;
     </div>   
     <div class="nav-footer-center">
-<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> 2025-2026 Vectoring AI. All rights reserved. | <a href="../../pages/privacy.html">Privacy Policy</a></p>
+<p><i class="fa-regular fa-copyright" aria-label="copyright"></i> 2025-2026 Vectoring AI. All rights reserved. | <a href="../..\pages/privacy.html">Privacy Policy</a></p>
 </div>
     <div class="nav-footer-right">
       &nbsp;
