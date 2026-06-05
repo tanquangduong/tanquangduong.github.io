@@ -3499,6 +3499,16 @@ document.getElementById('mobile-menu-fab').addEventListener('click', function() 
     display: none !important;
   }
 }
+
+/* Smooth content transition during SPA navigation */
+#quarto-document-content {
+  opacity: 1;
+  transition: opacity 0.15s ease;
+}
+
+#quarto-document-content.spa-loading {
+  opacity: 0;
+}
 </style>
 
 <script>
@@ -3549,8 +3559,15 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!collapsed) updateSidebarWidth();
   });
 
-  // --- SPA navigation for sidebar links (keeps logo/sidebar intact) ---
-  function navigateWithoutReload(url) {
+  // --- SPA navigation for all internal links (keeps sidebar intact) ---
+  function navigateWithoutReload(url, skipFade) {
+    var oldMain = document.getElementById("quarto-document-content");
+
+    // Fade out current content
+    if (!skipFade && oldMain) {
+      oldMain.classList.add("spa-loading");
+    }
+
     fetch(url, { credentials: "same-origin" })
       .then(function (res) {
         if (!res.ok) throw new Error(res.status);
@@ -3561,8 +3578,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
         // Swap main content
         var newMain = doc.getElementById("quarto-document-content");
-        var oldMain = document.getElementById("quarto-document-content");
-        if (newMain && oldMain) oldMain.replaceWith(newMain);
+        oldMain = document.getElementById("quarto-document-content");
+        if (newMain && oldMain) {
+          newMain.classList.add("spa-loading");
+          oldMain.replaceWith(newMain);
+          // Fade in after a frame
+          requestAnimationFrame(function () {
+            newMain.classList.remove("spa-loading");
+          });
+        }
 
         // Swap margin sidebar (TOC)
         var newMargin = doc.getElementById("quarto-margin-sidebar");
@@ -3605,19 +3629,34 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       })
       .catch(function () {
-        // Fallback to normal navigation on error
         window.location.href = url;
       });
   }
 
-  document.getElementById("quarto-sidebar").addEventListener("click", function (e) {
-    var link = e.target.closest("a.sidebar-link");
-    if (!link) return;
+  // Check if a link is an internal navigable link
+  function isInternalLink(link) {
     var href = link.getAttribute("href");
-    if (!href || href.startsWith("http") || href.startsWith("#") || href.startsWith("mailto")) return;
-    // Only handle same-origin internal links
-    var target = new URL(href, location.href);
-    if (target.origin !== location.origin) return;
+    if (!href) return false;
+    if (href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("javascript:")) return false;
+    if (link.hasAttribute("download") || link.getAttribute("target") === "_blank") return false;
+    try {
+      var target = new URL(href, location.href);
+      return target.origin === location.origin;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Handle all clicks on internal links
+  document.addEventListener("click", function (e) {
+    // Skip if modifier keys (open in new tab)
+    if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    var link = e.target.closest("a");
+    if (!link || !isInternalLink(link)) return;
+
+    var target = new URL(link.getAttribute("href"), location.href);
+    // Skip same-page anchors
+    if (target.pathname === location.pathname && target.hash) return;
 
     e.preventDefault();
     history.pushState(null, "", target.href);
@@ -3625,7 +3664,7 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   window.addEventListener("popstate", function () {
-    navigateWithoutReload(location.href);
+    navigateWithoutReload(location.href, true);
   });
 });
 </script>
